@@ -1,12 +1,12 @@
-# MDflow Help
+# Bugter Help
 
-MDflow is a lightweight document workspace for Markdown, HTML, code/config files,
+Bugter is a lightweight document workspace for Markdown, HTML, code/config files,
 PDFs, Excalidraw boards, and visual mindmaps.
 
 ## Windows and panes
 
 Choose **View → New Window** or press `⌘⇧N` to create an independent native window.
-On macOS, you can also right-click the MDflow Dock icon and choose **New Window**.
+On macOS, you can also right-click the Bugter Dock icon and choose **New Window**.
 Each native window has its own tabs and Explorer workspace.
 
 Inside any native window, the Main/Sub control creates an optional second document
@@ -47,11 +47,11 @@ JSON, and YAML use language-aware syntax highlighting.
 
 Use `⌘S` to save or `⌘⇧S` for Save As. Tabs show a dirty marker for unsaved changes.
 
-MDflow keeps crash-recovery drafts outside the document itself while you edit. After
+Bugter keeps crash-recovery drafts outside the document itself while you edit. After
 an interrupted session, use the launch banner to restore or discard the recovered
 buffers. The real file still changes only when you explicitly save.
 
-When a file changes in another app, MDflow reloads a clean buffer or asks before
+When a file changes in another app, Bugter reloads a clean buffer or asks before
 discarding unsaved work. Saving over newer disk contents also requires confirmation.
 
 Use `⌘K` and choose **Snapshot Now** or **Show Version History** for saved files.
@@ -111,7 +111,7 @@ Toggle the right-side panel with the activity-bar agent button. It has two tabs:
   **Gear → Agent → Agent Console**. Embedded font/size and live theme settings apply
   only to the embedded renderer.
   Drag the divider to resize the panel. With Explorer hidden, Agent Console can use
-  up to 80% of the MDflow window while retaining a narrow document workspace.
+  up to 80% of the Bugter window while retaining a narrow document workspace.
 
 Agents, models, and terminals are configured in `agent.json` (open it from
 **Gear → Open agent.json**). API keys are stored in the macOS Keychain. HTTP model
@@ -128,8 +128,8 @@ them: Apply returns to that tab, and refuses if it was closed or changed meanwhi
 **Permission profiles** select which command template a CLI agent runs. The built-in
 profiles are **Ask before doing** and full-access; an agent can define more in
 `agent.json`. A full-access (bypass) profile requires confirmation on every send, is
-not persisted as the default, and MDflow starts in **Ask before doing** after launch.
-MDflow chooses the command template — the CLI agent still enforces its own permissions.
+not persisted as the default, and Bugter starts in **Ask before doing** after launch.
+Bugter chooses the command template — the CLI agent still enforces its own permissions.
 
 ## Keyboard shortcuts
 
@@ -163,7 +163,7 @@ also shows the file type, cursor line/column, and word count where applicable.
 
 Choose **Help → Check for Updates…** for a manual check. Enable automatic checks
 from Gear → General → Updates or **Help → Automatically Check for Updates**.
-MDflow checks at most once per 24 hours and always asks before installation.
+Bugter checks at most once per 24 hours and always asks before installation.
 
 ## Export
 
@@ -173,7 +173,7 @@ Export options depend on the active document. Rendered PDF/DOCX export requires:
 brew install pandoc typst
 ```
 
-MDflow checks these tools before asking where to save and shows the missing install
+Bugter checks these tools before asking where to save and shows the missing install
 command when setup is incomplete.
 
-This help document is itself Markdown and opens as a normal MDflow tab.
+This help document is itself Markdown and opens as a normal Bugter tab.

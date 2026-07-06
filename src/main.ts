@@ -300,7 +300,7 @@ function commandItems(): PaletteItem[] {
     command("settings", "Open Settings", openSettings),
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
-    command("help", "MDflow Help", openHelp),
+    command("help", "Bugter Help", openHelp),
     ...QUICK_ACTIONS.map((action) =>
       command(action.id, `AI: ${action.label}`, () =>
         runQuickActionById(action.id),
@@ -1370,7 +1370,7 @@ async function exportImage(kind: "png" | "svg"): Promise<void> {
 }
 
 function openHelp(): void {
-  openInWindow(getState().activeWindowId, { path: null, name: "MDflow Help", text: helpDoc });
+  openInWindow(getState().activeWindowId, { path: null, name: "Bugter Help", text: helpDoc });
 }
 
 function handleExplorerPathChange(from: string, to: string | null): void {
@@ -1754,7 +1754,7 @@ function buildAIPanel(): void {
     beforeApply: panelReview.beforeApply,
     confirmPermission: (providerLabel, profileLabel) =>
       confirm(
-        `Run ${providerLabel} with "${profileLabel}" permissions? MDflow will start the selected CLI command; the agent enforces its own permission flags.`,
+        `Run ${providerLabel} with "${profileLabel}" permissions? Bugter will start the selected CLI command; the agent enforces its own permission flags.`,
         {
           title: "Confirm AI run",
           kind: "warning",
@@ -1794,7 +1794,8 @@ function buildAIPanel(): void {
         workspaceContext: enabled,
       });
     },
-    historyKey: `mdflow.ai.history.${nativeWindowLabel}`,
+    historyKey: `bugter.ai.history.${nativeWindowLabel}`,
+    legacyHistoryKey: `mdflow.ai.history.${nativeWindowLabel}`,
   });
 }
 
@@ -1879,7 +1880,7 @@ async function openInSub(path: string): Promise<void> {
   const contents = await invoke<string>("read_file", { path });
   openInWindow("sub", { path, name: basename(path), text: contents });
 }
-(window as any).mdflowOpenInSub = (p: string) => void openInSub(p);
+(window as any).bugterOpenInSub = (p: string) => void openInSub(p);
 
 async function compareFiles(
   selectedPath: string,
@@ -1951,14 +1952,14 @@ async function setAsDefault(role: "markdown" | "pdf"): Promise<void> {
   const label = role === "pdf" ? "PDF" : "Markdown";
   try {
     await invoke("set_default_handler", { role });
-    await message(`MDflow is now your default ${label} app.`, {
+    await message(`Bugter is now your default ${label} app.`, {
       title: "Set as Default",
       kind: "info",
     });
   } catch (error) {
     await invoke("open_default_apps_settings").catch(() => {});
     await message(
-      `macOS did not allow changing the default automatically. Choose MDflow in System Settings ▸ Apps ▸ Default Apps, or use Finder ▸ Get Info ▸ Open with ▸ Change All.\n\n${exportError(error)}`,
+      `macOS did not allow changing the default automatically. Choose Bugter in System Settings ▸ Apps ▸ Default Apps, or use Finder ▸ Get Info ▸ Open with ▸ Change All.\n\n${exportError(error)}`,
       { title: "Set as Default", kind: "info" },
     );
   }

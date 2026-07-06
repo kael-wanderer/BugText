@@ -1,27 +1,38 @@
 use keyring::{Entry, Error};
 
-const SERVICE: &str = "com.kael.mdflow";
+const SERVICE: &str = "com.kael.bugter";
+const LEGACY_SERVICE: &str = "com.kael.mdflow";
 
-fn entry(id: &str) -> Result<Entry, String> {
-    Entry::new(SERVICE, id).map_err(|error| error.to_string())
+fn entry(service: &str, id: &str) -> Result<Entry, String> {
+    Entry::new(service, id).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub fn set_secret(id: String, secret: String) -> Result<(), String> {
-    entry(&id)?
+    entry(SERVICE, &id)?
         .set_password(&secret)
         .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub fn get_secret(id: String) -> Option<String> {
-    entry(&id).ok()?.get_password().ok()
+    entry(SERVICE, &id)
+        .ok()
+        .and_then(|entry| entry.get_password().ok())
+        .or_else(|| {
+            entry(LEGACY_SERVICE, &id)
+                .ok()
+                .and_then(|entry| entry.get_password().ok())
+        })
 }
 
 #[tauri::command]
 pub fn delete_secret(id: String) -> Result<(), String> {
-    match entry(&id)?.delete_credential() {
-        Ok(()) | Err(Error::NoEntry) => Ok(()),
-        Err(error) => Err(error.to_string()),
+    for service in [SERVICE, LEGACY_SERVICE] {
+        match entry(service, &id)?.delete_credential() {
+            Ok(()) | Err(Error::NoEntry) => {}
+            Err(error) => return Err(error.to_string()),
+        }
     }
+    Ok(())
 }

@@ -1,6 +1,6 @@
-# MDflow — Roadmap
+# Bugter — Roadmap
 
-The full picture: where MDflow has been and where it's going. Shipped work is
+The full picture: where Bugter has been and where it's going. Shipped work is
 marked **done**; planned/deferred work is at the bottom. For the live task tracker
 see `docs/tasks.md`; for release notes see `CHANGELOG.md`.
 
@@ -90,12 +90,12 @@ Legend: ✅ done · 🔜 planned/deferred
   installers + updater `.sig`, generate `latest.json`, and `gh release create` with
   notes from `CHANGELOG.md`. First run shipped **v0.2.0** (all platforms) green.
 - ✅ **Signed updater feed wired** — `npx tauri signer generate` keypair (private key
-  kept locally at `~/.tauri/mdflow.key`, never committed); `TAURI_SIGNING_PRIVATE_KEY`
+  kept locally at `~/.tauri/bugter.key`, never committed); `TAURI_SIGNING_PRIVATE_KEY`
   + `..._PASSWORD` repo secrets; `bundle.createUpdaterArtifacts`, `plugins.updater.pubkey`,
   and the `latest.json` endpoint set in `tauri.conf.json`. In-app Check for Updates
   reaches the feed ("up to date"). First signed feed lands with the next tag (v0.2.1).
 - ✅ Removed the upstream Excalidraw public Firebase key from the vendored bundle
-  (GitHub secret-scan alert; dismissed as false positive — not an MDflow credential).
+  (GitHub secret-scan alert; dismissed as false positive — not a Bugter credential).
 
 ## Stage 7 — Search, AI, terminal, and workflow polish ✅ (2026-06-21)
 
@@ -121,9 +121,9 @@ choices clearly:
   commands/aliases such as `codex-skip`
 - **Terminal app** — Embedded, Apple Terminal, Ghostty, or cmux
 
-External terminal apps launch outside MDflow in the active project directory;
+External terminal apps launch outside Bugter in the active project directory;
 Embedded remains the in-app xterm.js renderer. Agent Console can resize up to 80%
-of the MDflow window while preserving a minimum document area.
+of the Bugter window while preserving a minimum document area.
 
 ### Workflow polish ✅
 

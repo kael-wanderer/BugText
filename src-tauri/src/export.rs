@@ -110,7 +110,7 @@ pub fn export_docx(markdown: String, out: String) -> Result<(), String> {
 pub fn export_pdf_html(html: String, out: String) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let typst = find_typst().ok_or(TYPST_MISSING)?;
-    let media = std::env::temp_dir().join("mdflow-export-media");
+    let media = std::env::temp_dir().join("bugter-export-media");
     let args = vec![
         "--from".into(),
         "html".into(),
@@ -127,7 +127,7 @@ pub fn export_pdf_html(html: String, out: String) -> Result<(), String> {
 #[tauri::command]
 pub fn export_docx_html(html: String, out: String) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
-    let media = std::env::temp_dir().join("mdflow-export-media");
+    let media = std::env::temp_dir().join("bugter-export-media");
     let args = vec![
         "--from".into(),
         "html".into(),

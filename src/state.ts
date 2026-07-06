@@ -13,7 +13,8 @@ export type UIState = {
   lineNumbers: boolean;
 };
 
-const KEY = "mdflow.ui";
+const KEY = "bugter.ui";
+const LEGACY_KEY = "mdflow.ui";
 const DEFAULTS: UIState = {
   viewMode: "editor",
   zoom: 1,
@@ -40,7 +41,7 @@ export function freshState(): UIState {
 
 export function loadState(): UIState {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (!raw) return freshState();
     return { ...DEFAULTS, ...JSON.parse(raw) };
   } catch {
@@ -55,11 +56,12 @@ export function saveState(s: UIState): void {
 // Tracks which HTTP providers have an API key saved, so the settings UI can show
 // a "Key saved" badge without reading the OS keychain (which prompts for the
 // login password on macOS). The keychain is only read when a key is actually used.
-const SAVED_KEYS = "mdflow.savedKeys";
+const SAVED_KEYS = "bugter.savedKeys";
+const LEGACY_SAVED_KEYS = "mdflow.savedKeys";
 
 export function loadSavedKeyIds(): Set<string> {
   try {
-    const raw = localStorage.getItem(SAVED_KEYS);
+    const raw = localStorage.getItem(SAVED_KEYS) ?? localStorage.getItem(LEGACY_SAVED_KEYS);
     const parsed = raw ? JSON.parse(raw) : [];
     return new Set(
       Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [],

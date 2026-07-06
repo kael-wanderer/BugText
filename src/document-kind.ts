@@ -103,7 +103,7 @@ export function normalizeDocumentViewMode(
 // allow-same-origin), so the parent reads contentDocument to apply zoom and
 // auto-fit in place — no reload, no white flash.
 export function htmlWithPreviewZoom(html: string, zoom: number): string {
-  const injection = `<style data-mdflow-preview-zoom>html{zoom:${zoom}!important}</style>`;
+  const injection = `<style data-bugter-preview-zoom>html{zoom:${zoom}!important}</style>`;
   const headEnd = html.search(/<\/head\s*>/i);
   if (headEnd >= 0) {
     return `${html.slice(0, headEnd)}${injection}${html.slice(headEnd)}`;

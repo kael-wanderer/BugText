@@ -52,7 +52,7 @@ describe("serializeExcalidrawDocument", () => {
     expect(output).toMatchObject({
       type: "excalidraw",
       version: 2,
-      source: "mdflow",
+      source: "bugter",
       elements: [{ id: "a" }],
       appState: { viewBackgroundColor: "#fff" },
       files: { image: { id: "image" } },

@@ -46,7 +46,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         next_window_label(app),
         WebviewUrl::App("index.html".into()),
     )
-    .title("MDflow")
+    .title("Bugter")
     .inner_size(1100.0, 740.0)
     .min_inner_size(640.0, 420.0)
     .center()

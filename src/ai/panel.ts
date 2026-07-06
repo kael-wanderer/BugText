@@ -61,6 +61,7 @@ export type AIPanelDeps = {
   getWorkspaceContext: () => { enabled: boolean; k: number };
   onWorkspaceContextChange: (enabled: boolean) => void;
   historyKey: string;
+  legacyHistoryKey?: string;
 };
 
 export type AIPanel = {
@@ -146,9 +147,10 @@ function renderRunSummary(
   host.scrollTop = host.scrollHeight;
 }
 
-function loadHistory(key: string): ChatMessage[] {
+function loadHistory(key: string, legacyKey?: string): ChatMessage[] {
   try {
-    const value = JSON.parse(localStorage.getItem(key) ?? "[]");
+    const raw = localStorage.getItem(key) ?? (legacyKey ? localStorage.getItem(legacyKey) : null);
+    const value = JSON.parse(raw ?? "[]");
     return Array.isArray(value) ? value.slice(-100) : [];
   } catch {
     return [];
@@ -173,7 +175,7 @@ export function createAIPanel(
   panelElement
     .querySelector<HTMLElement>(".ai-close")!
     .addEventListener("click", deps.onClose);
-  const history: ChatMessage[] = loadHistory(deps.historyKey);
+  const history: ChatMessage[] = loadHistory(deps.historyKey, deps.legacyHistoryKey);
   const saveHistory = (): void => {
     localStorage.setItem(deps.historyKey, JSON.stringify(history.slice(-100)));
   };

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MDflow",
+  "productName": "Bugter",
   "version": "0.2.7",
-  "identifier": "com.kael.mdflow",
+  "identifier": "com.kael.bugter",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "MDflow",
+        "title": "Bugter",
         "width": 1100,
         "height": 740,
         "minWidth": 640,
@@ -27,7 +27,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/kael-wanderer/MDflow/releases/latest/download/latest.json"
+        "https://github.com/kael-wanderer/bugter/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMTREMzJEQ0MxOEYxNgpSV1FXajhIY01rMGhDSXlkK0dRYkdqaVY4SC81T1F2Q25obmFvZm9TbkdkVGtKeVNybXdBaWhiLwo="
     }

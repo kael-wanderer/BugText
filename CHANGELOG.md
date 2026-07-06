@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to MDflow are documented here. The format is based on
+All notable changes to Bugter are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -16,7 +16,7 @@ All notable changes to MDflow are documented here. The format is based on
 - **Per-page OCR** — scanned pages can be recognized in place with tesseract.js, with
   a configurable language (for example `eng` or `eng+vie`). A status line reports each
   document's edit capability (text vs. scanned vs. mixed).
-- **Safe saves** — the original file is copied to a hidden `.mdflow-pdf-backups/`
+- **Safe saves** — the original file is copied to a hidden `.bugter-pdf-backups/`
   folder (new `backup_file` command) before Save / Save As. PDF edits are drafted to
   local storage per file and cleared when the tab is saved or closed, and the tab's
   dirty indicator tracks unsaved PDF edits.
@@ -64,7 +64,7 @@ All notable changes to MDflow are documented here. The format is based on
 - **CLI permission profiles** — CLI agents can define named permission profiles that
   select which command template runs, generalizing the previous ask/bypass switch.
   Profiles can require confirmation on every run, and the legacy `bypassRun` is
-  migrated to a built-in full-access profile. (MDflow selects the command template;
+  migrated to a built-in full-access profile. (Bugter selects the command template;
   per-capability enforcement remains the CLI agent's own responsibility.)
 - **In-session AI Runs view** — the AI panel lists CLI agent runs with status
   (running / done / failed / cancelled), a Cancel action for a running agent, and the
@@ -73,7 +73,7 @@ All notable changes to MDflow are documented here. The format is based on
 ### Fixed
 
 - Explorer folders and clean open files now refresh from disk every 5 seconds, so
-  files moved or edited by other apps appear without restarting MDflow.
+  files moved or edited by other apps appear without restarting Bugter.
 - HTML previews now size the iframe canvas from measured document pixels, so wide
   standalone HTML files show real pane scrollbars and the wheel scrolls the preview.
 
@@ -144,7 +144,7 @@ All notable changes to MDflow are documented here. The format is based on
 - Clarified terminal terminology: **Agent command** identifies what runs, while
   **Terminal app** identifies where it runs; the AI tab is now **Agent Console**.
 - Increased the Agent Console resize ceiling from 560px to a responsive maximum of
-  80% of the MDflow window, while preserving minimum document space.
+  80% of the Bugter window, while preserving minimum document space.
 - Markdown table/task-list toolbar actions, command-palette heading navigation, Open
   Recent files/folders, and export dependency preflight guidance.
 
@@ -185,7 +185,7 @@ All notable changes to MDflow are documented here. The format is based on
 ### Fixed
 
 - Removed an upstream Excalidraw public Firebase key from the vendored board bundle
-  (it was never an MDflow credential; only third-party config dead to MDflow).
+  (it was never a Bugter credential; only third-party config dead to Bugter).
 
 ## [0.2.0] — 2026-06-21
 
@@ -210,7 +210,7 @@ All notable changes to MDflow are documented here. The format is based on
 - **Enter sends** in AI Chat (Shift+Enter inserts a newline).
 - **New Window** in the **File** menu.
 
-- **Native multi-window support** — create independent MDflow windows from
+- **Native multi-window support** — create independent Bugter windows from
   **View → New Window** (`⌘⇧N`) or **New Window** in the macOS Dock context menu.
   Each native window has its own tabs, Explorer workspace, AI panel, and optional
   in-window Main/Sub split.
@@ -248,7 +248,7 @@ All notable changes to MDflow are documented here. The format is based on
   Guide), zoom, and Font / Text Size / Explorer Text Size / Theme submenus.
 - **Native Window menu** — Enter Full Screen (`⌃⌘F`), Move to Left/Right Half (tiles
   to the active monitor).
-- **Set MDflow as Default** (app menu) — register as the Markdown/text editor or PDF
+- **Set Bugter as Default** (app menu) — register as the Markdown/text editor or PDF
   viewer via macOS LaunchServices; the bundle declares those document types so Finder
   opens route into the app.
 - **Update modes** — Manual or Automatic (once-daily) update checks; both always
@@ -289,7 +289,7 @@ All notable changes to MDflow are documented here. The format is based on
   is migrated automatically on first run.
 - Editor gains selection, range-replace, and set-text APIs to support AI apply / insert.
 - The command palette is now **`⌘K` only**; `⌘P` is the View ▸ Show/Hide Preview toggle.
-- New app icon (the "roomy" MDflow mark); new activity-bar icons for the AI panel,
+- New app icon (the "roomy" Bugter mark); new activity-bar icons for the AI panel,
   Excalidraw, and Mindmap.
 
 ### Fixed
@@ -300,7 +300,7 @@ All notable changes to MDflow are documented here. The format is based on
 - Markdown and HTML can once again show editor and preview simultaneously.
 - Mindmap Save is available directly from the board toolbar.
 - Agent `command` providers (e.g. `pi`, `opencode`) failed from the packaged app with
-  "No such file or directory" — MDflow now resolves the login-shell `PATH` so
+  "No such file or directory" — Bugter now resolves the login-shell `PATH` so
   Homebrew/npm-installed CLIs are found.
 - The Agent settings "Add local/API model" button could sit below the panel fold; the
   provider list now scrolls so the button stays visible.
