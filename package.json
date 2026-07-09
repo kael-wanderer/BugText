@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "vendor:excalidraw": "node scripts/build-excalidraw-vendor.mjs",
+    "vendor:tesseract": "node scripts/build-tesseract-vendor.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -45,6 +46,8 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/vie": "^1.0.0",
     "@types/katex": "^0.16.8",
     "@types/markdown-it": "^14.1.2",
     "@types/pako": "^2.0.4",

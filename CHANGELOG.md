@@ -6,6 +6,13 @@ All notable changes to Bugter are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Offline OCR** — the tesseract.js worker, core wasm, and English/Vietnamese
+  language data are now vendored into the app (`npm run vendor:tesseract`,
+  assets in `public/vendor/tesseract/`), so PDF OCR no longer downloads from a
+  CDN at runtime and works without a network connection.
+
 ### Fixed
 
 - **PDF editing at zoom** — placing, dragging, and resizing PDF edits (and

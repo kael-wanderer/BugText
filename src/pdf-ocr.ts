@@ -61,7 +61,14 @@ export async function recognizePdfPageCanvas(
   language = "eng",
 ): Promise<PdfOcrTextBlockOperation[]> {
   const tesseract = await import("tesseract.js");
-  const worker = await tesseract.createWorker(normalizeOcrLanguage(language));
+  // Vendored runtime + language data (npm run vendor:tesseract) so OCR works
+  // offline instead of fetching worker/core/traineddata from the CDN.
+  const worker = await tesseract.createWorker(normalizeOcrLanguage(language), 1, {
+    workerPath: "/vendor/tesseract/worker.min.js",
+    corePath: "/vendor/tesseract/tesseract-core-simd-lstm.wasm.js",
+    langPath: "/vendor/tesseract/lang",
+    gzip: true,
+  });
   try {
     const result = await worker.recognize(
       canvas,

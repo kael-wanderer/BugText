@@ -188,6 +188,11 @@ Rich preview and terminal dependencies include Mermaid, KaTeX, PDF.js, xterm, an
 the Rust `portable-pty` crate. Heavy engines are loaded on demand so the startup
 bundle remains below the release chunk-warning threshold.
 
+PDF OCR runs fully offline: the tesseract.js worker, simd-lstm core, and
+eng/vie traineddata are vendored under `public/vendor/tesseract` (rebuild with
+`npm run vendor:tesseract`; language list lives in
+`scripts/build-tesseract-vendor.mjs`, data from `@tesseract.js-data/*` dev deps).
+
 Excalidraw 0.18.0 is pinned in a self-contained board-only module under
 `public/vendor/excalidraw`. Rebuild it with `npm run vendor:excalidraw` after setting
 `EXCALIDRAW_BUILD_ROOT` to an exact-tag Excalidraw tree whose package dist has
