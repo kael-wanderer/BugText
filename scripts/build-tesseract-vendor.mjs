@@ -4,6 +4,11 @@ import { copyFile, mkdir, rm } from "node:fs/promises";
 // Copies the tesseract.js runtime and traineddata into public/vendor/tesseract
 // so OCR works offline. Language data comes from @tesseract.js-data/* dev
 // dependencies (4.0.0_best_int matches tesseract.js's lstm-only default).
+//
+// To add an OCR language:
+//   1. npm i -D @tesseract.js-data/<lang>   (ISO 639-3 code, e.g. fra, deu, jpn)
+//   2. add "<lang>" to LANGUAGES below
+//   3. npm run vendor:tesseract, then commit public/vendor/tesseract/lang/
 const LANGUAGES = ["eng", "vie"];
 
 const output = path.resolve("public/vendor/tesseract");

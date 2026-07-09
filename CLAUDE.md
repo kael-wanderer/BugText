@@ -190,8 +190,10 @@ bundle remains below the release chunk-warning threshold.
 
 PDF OCR runs fully offline: the tesseract.js worker, simd-lstm core, and
 eng/vie traineddata are vendored under `public/vendor/tesseract` (rebuild with
-`npm run vendor:tesseract`; language list lives in
-`scripts/build-tesseract-vendor.mjs`, data from `@tesseract.js-data/*` dev deps).
+`npm run vendor:tesseract`; data from `@tesseract.js-data/*` dev deps). To add
+an OCR language: `npm i -D @tesseract.js-data/<lang>`, add `<lang>` to
+`LANGUAGES` in `scripts/build-tesseract-vendor.mjs`, then rerun
+`npm run vendor:tesseract` and commit the new `.traineddata.gz`.
 
 Excalidraw 0.18.0 is pinned in a self-contained board-only module under
 `public/vendor/excalidraw`. Rebuild it with `npm run vendor:excalidraw` after setting

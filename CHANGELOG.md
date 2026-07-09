@@ -11,7 +11,10 @@ All notable changes to Bugter are documented here. The format is based on
 - **Offline OCR** — the tesseract.js worker, core wasm, and English/Vietnamese
   language data are now vendored into the app (`npm run vendor:tesseract`,
   assets in `public/vendor/tesseract/`), so PDF OCR no longer downloads from a
-  CDN at runtime and works without a network connection.
+  CDN at runtime and works without a network connection. To add a language:
+  `npm i -D @tesseract.js-data/<lang>`, add it to `LANGUAGES` in
+  `scripts/build-tesseract-vendor.mjs`, rerun the vendor script (guideline also
+  in `CLAUDE.md` and the script header).
 
 ### Fixed
 
