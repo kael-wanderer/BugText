@@ -131,6 +131,14 @@ function scaledRect(rect: PdfRect): Record<string, string> {
   };
 }
 
+// On-screen px per PDF unit. Derived from the live element size, not
+// RENDER_SCALE, so preview zoom (CSS zoom on .pdf-document) keeps pointer
+// math correct.
+function pageScreenScale(pageElement: HTMLElement, page: PdfPageBox): number {
+  const bounds = pageElement.getBoundingClientRect();
+  return bounds.width > 0 ? bounds.width / page.width : RENDER_SCALE;
+}
+
 function rectFromPointer(
   event: MouseEvent,
   pageElement: HTMLElement,
@@ -139,8 +147,9 @@ function rectFromPointer(
   height: number,
 ): PdfRect {
   const bounds = pageElement.getBoundingClientRect();
-  const x = (event.clientX - bounds.left) / RENDER_SCALE;
-  const y = (event.clientY - bounds.top) / RENDER_SCALE;
+  const scale = pageScreenScale(pageElement, page);
+  const x = (event.clientX - bounds.left) / scale;
+  const y = (event.clientY - bounds.top) / scale;
   return normalizePdfRect(
     { x, y, width, height },
     page,
@@ -542,8 +551,12 @@ export async function renderPdf(
   const opacityInput = window.document.createElement("input");
   const status = window.document.createElement("span");
   status.className = "pdf-edit-status";
-  const setStatus = (text: string): void => {
+  // Sticky statuses (save results/errors) survive the routine toolbar refresh,
+  // which otherwise stomps them with "Unsaved PDF edits" immediately.
+  let stickyStatus = false;
+  const setStatus = (text: string, options: { sticky?: boolean } = {}): void => {
     status.textContent = text;
+    stickyStatus = options.sticky ?? false;
   };
   const setTool = (tool: PdfEditTool): void => {
     activeTool = tool;
@@ -800,9 +813,10 @@ export async function renderPdf(
     const lineRects = Array.from(range.getClientRects());
     const textSpan = element?.closest?.(".pdf-text-layer span");
     const computed = textSpan ? window.getComputedStyle(textSpan) : null;
+    const screenScale = pageScreenScale(pageView.element, pageView.box);
     const fontSize = estimatePdfFontSizeFromSelectionRects(
       lineRects,
-      RENDER_SCALE,
+      screenScale,
       currentStyle.fontSize,
     );
     return {
@@ -812,13 +826,13 @@ export async function renderPdf(
         pageView.box,
         pageRect,
         selectionRect,
-        RENDER_SCALE,
+        screenScale,
       ),
       coverRects: pdfSelectionClientRectsToPageRects(
         pageView.box,
         pageRect,
         lineRects,
-        RENDER_SCALE,
+        screenScale,
       ),
       style: computed
         ? pdfTextStyleFromSelectionCss(
@@ -896,7 +910,7 @@ export async function renderPdf(
           ? `Review OCR ${ocrSummary.lowConfidence}/${ocrSummary.total}`
           : `Review OCR ${ocrSummary.total}`;
     options?.onEditDirtyChange?.(hasPdfEdits(editDocument));
-    if (hasPdfEdits(editDocument) && activeTool === "select" && !saving) {
+    if (hasPdfEdits(editDocument) && activeTool === "select" && !saving && !stickyStatus) {
       setStatus("Unsaved PDF edits");
     }
   };
@@ -1623,12 +1637,13 @@ export async function renderPdf(
             setSelectedOperation(operation.id);
             const startX = event.clientX;
             const startY = event.clientY;
+            const dragScale = pageScreenScale(pageView.element, pageView.box);
             const original = selectedOperation();
             if (!original) return;
             const beforeDrag = clonePdfEditDocument(editDocument);
             const onMove = (moveEvent: PointerEvent): void => {
-              const dx = (moveEvent.clientX - startX) / RENDER_SCALE;
-              const dy = (moveEvent.clientY - startY) / RENDER_SCALE;
+              const dx = (moveEvent.clientX - startX) / dragScale;
+              const dy = (moveEvent.clientY - startY) / dragScale;
               replaceOperation(
                 pageView.box,
                 resizeOperation(original, pageView.box, dx, dy),
@@ -1665,12 +1680,13 @@ export async function renderPdf(
             setSelectedOperation(operation.id);
             const startX = event.clientX;
             const startY = event.clientY;
+            const dragScale = pageScreenScale(pageView.element, pageView.box);
             const original = selectedOperation();
             if (!original) return;
             const beforeDrag = clonePdfEditDocument(editDocument);
             const onMove = (moveEvent: PointerEvent): void => {
-              const dx = (moveEvent.clientX - startX) / RENDER_SCALE;
-              const dy = (moveEvent.clientY - startY) / RENDER_SCALE;
+              const dx = (moveEvent.clientX - startX) / dragScale;
+              const dy = (moveEvent.clientY - startY) / dragScale;
               replaceOperation(
                 pageView.box,
                 moveOperation(original, pageView.box, dx, dy),
@@ -1736,31 +1752,34 @@ export async function renderPdf(
         ),
       );
     } else if (activeTool === "replace") {
-      const text = window.prompt("Replacement text");
-      if (!text) return;
+      // No window.prompt here: Tauri's WKWebView does not implement JS dialogs.
+      // Create the operation and drop straight into inline editing instead.
       const rect = rectFromPointer(event, pageView.element, pageView.box, 190, 34);
+      const operation: PdfEditOperation = {
+        id: operationId(),
+        type: "replacementText",
+        page: pageView.box.page,
+        sourceText: "",
+        cover: {
+          rect,
+          color: currentCoverColor,
+          opacity: Number(opacityInput.value) || 1,
+        },
+        text: {
+          rect,
+          value: "Replacement",
+          style: currentStyle,
+        },
+      };
       applyEditDocument(
         addPdfEditOperation(
           editDocument,
           pageView.box,
-          snapIfNeeded(pageView.box, {
-            id: operationId(),
-            type: "replacementText",
-            page: pageView.box.page,
-            sourceText: "",
-            cover: {
-              rect,
-              color: currentCoverColor,
-              opacity: Number(opacityInput.value) || 1,
-            },
-            text: {
-              rect,
-              value: text,
-              style: currentStyle,
-            },
-          }),
+          snapIfNeeded(pageView.box, operation),
         ),
       );
+      selectedOperationId = operation.id;
+      pendingInlineEditId = operation.id;
     } else if (activeTool === "image") {
       if (!pendingImage) {
         setStatus("Choose an image first");
@@ -2024,7 +2043,7 @@ export async function renderPdf(
       setStatus(`Saved. Backup: ${backupPath}`);
       options?.onReloadRequest?.();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
     } finally {
       saving = false;
       updateToolbarState();
@@ -2041,9 +2060,9 @@ export async function renderPdf(
       const { writeEditedPdf } = await import("./pdf-edit-writer");
       const output = await writeEditedPdf(new Uint8Array(bytes), editDocument);
       await invoke("save_bytes", { path: out, bytes: Array.from(output) });
-      setStatus("Edited PDF saved");
+      setStatus("Edited PDF saved", { sticky: true });
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : String(error));
+      setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
     } finally {
       saving = false;
       updateToolbarState();

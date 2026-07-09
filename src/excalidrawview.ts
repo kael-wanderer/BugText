@@ -110,24 +110,37 @@ export async function mountExcalidrawBoard(
   const stopAcceptingTimer = window.setTimeout(() => {
     acceptingChanges = true;
   }, 250);
+  // Excalidraw fires onChange on every pointer frame (pan/zoom included), and
+  // serializing a whole scene per frame stalls the board. Debounce the
+  // serialization; the trailing run emits once interaction settles.
+  let pending: { elements: readonly unknown[]; appState: unknown; files: unknown } | null =
+    null;
+  let flushTimer = 0;
+  const flush = (): void => {
+    window.clearTimeout(flushTimer);
+    flushTimer = 0;
+    if (!pending) return;
+    const { elements, appState, files } = pending;
+    pending = null;
+    const serialized = serializeExcalidrawDocument(elements, appState, files);
+    if (serialized === lastSerialized) return;
+    lastSerialized = serialized;
+    onChange(serialized);
+  };
   const handle = vendor.mountExcalidraw(host, {
     initialData: scene,
     theme,
     onChange: (elements, appState, files) => {
       if (!acceptingChanges) return;
-      const serialized = serializeExcalidrawDocument(
-        elements,
-        appState,
-        files,
-      );
-      if (serialized === lastSerialized) return;
-      lastSerialized = serialized;
-      onChange(serialized);
+      pending = { elements, appState, files };
+      window.clearTimeout(flushTimer);
+      flushTimer = window.setTimeout(flush, 250);
     },
   });
   return {
     destroy: () => {
       window.clearTimeout(stopAcceptingTimer);
+      flush();
       handle.destroy();
     },
     exportPng: handle.exportPng,

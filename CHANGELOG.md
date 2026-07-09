@@ -4,6 +4,26 @@ All notable changes to Bugter are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **PDF editing at zoom** — placing, dragging, and resizing PDF edits (and
+  selection-based Edit Text / Direct rects) now use the on-screen page scale, so
+  they land where clicked at any preview zoom. Previously all pointer math assumed
+  100% zoom and edits were offset by the zoom factor.
+- **PDF Replace tool** — no longer relies on `window.prompt` (not implemented in
+  Tauri's WKWebView, so the tool silently did nothing). Clicking with Replace now
+  creates the cover + replacement and opens inline editing directly.
+- **PDF save feedback** — save errors (and "Edited PDF saved") are no longer
+  immediately overwritten by the routine "Unsaved PDF edits" status, so a failed
+  save is visible instead of appearing to do nothing.
+- **Excalidraw pan/zoom lag** — board changes are now debounced before
+  serialization. Excalidraw fires a change on every pointer frame while panning,
+  and serializing the whole scene each frame stalled large boards. Debounced
+  writes also target the board's own tab, so a trailing write can't land in
+  another tab.
+
 ## [0.2.7] — 2026-07-02
 
 ### Added

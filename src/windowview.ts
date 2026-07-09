@@ -494,10 +494,13 @@ export function createWindowView(
       previewPane.innerHTML =
         '<div class="board-loading">Loading Excalidraw…</div>';
       wsWords.textContent = "Excalidraw board";
+      // Board changes are debounced, so a flush can land after the user switched
+      // tabs — write to the board's own tab, never whichever tab is now active.
+      const boardTabId = getWindow(windowId)?.activeTabId;
       void import("./excalidrawview")
         .then(({ mountExcalidrawBoard }) =>
           mountExcalidrawBoard(previewPane, text, (serialized) => {
-            editor.setText(serialized);
+            if (boardTabId) editor.setTextFor(boardTabId, serialized);
           }),
         )
         .then((handle) => {
