@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { check } from "@tauri-apps/plugin-updater";
 
-const LAST_CHECK_KEY = "bugter.updater.lastCheck";
+const LAST_CHECK_KEY = "mdflow.updater.lastCheck";
 const LEGACY_LAST_CHECK_KEY = "mdflow.updater.lastCheck";
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
@@ -39,7 +39,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     const update = await check({ timeout: 20_000 });
     if (!update) {
       if (interactive) {
-        await message("Bugter is up to date.", {
+        await message("mdFlow is up to date.", {
           title: "Check for Updates",
           kind: "info",
         });
@@ -48,7 +48,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     }
 
     const accepted = await confirm(
-      `Bugter ${update.version} is available${
+      `mdFlow ${update.version} is available${
         update.body ? `.\n\n${update.body}` : "."
       }\n\nDownload and install it now?`,
       {
@@ -61,7 +61,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     if (!accepted) return;
 
     await update.downloadAndInstall();
-    await message("The update is installed. Bugter will restart now.", {
+    await message("The update is installed. mdFlow will restart now.", {
       title: "Update Complete",
       kind: "info",
     });

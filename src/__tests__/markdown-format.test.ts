@@ -18,8 +18,8 @@ describe("applyMarkdownFormat", () => {
   });
 
   it("creates links and selects the URL for selected text", () => {
-    const result = applyMarkdownFormat("Bugter", 0, 6, "link");
-    expect(result.text).toBe("[Bugter](url)");
+    const result = applyMarkdownFormat("mdFlow", 0, 6, "link");
+    expect(result.text).toBe("[mdFlow](url)");
     expect(result.text.slice(result.anchor, result.head)).toBe("url");
   });
 

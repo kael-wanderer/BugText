@@ -65,6 +65,6 @@ function mountExcalidraw(
 
 (
   globalThis as typeof globalThis & {
-    BugterExcalidraw?: { mountExcalidraw: typeof mountExcalidraw };
+    mdFlowExcalidraw?: { mountExcalidraw: typeof mountExcalidraw };
   }
-).BugterExcalidraw = { mountExcalidraw };
+).mdFlowExcalidraw = { mountExcalidraw };

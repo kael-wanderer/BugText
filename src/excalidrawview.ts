@@ -35,7 +35,7 @@ function loadStyles(): Promise<void> {
   if (stylePromise) return stylePromise;
   stylePromise = new Promise((resolve, reject) => {
     const existing = document.querySelector<HTMLLinkElement>(
-      'link[data-bugter-excalidraw="true"]',
+      'link[data-mdflow-excalidraw="true"]',
     );
     if (existing) {
       if (existing.sheet) resolve();
@@ -48,7 +48,7 @@ function loadStyles(): Promise<void> {
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = "/vendor/excalidraw/bridge.css?v=0.18.0-m10-final";
-    link.dataset.bugterExcalidraw = "true";
+    link.dataset.mdflowExcalidraw = "true";
     link.addEventListener("load", () => resolve(), { once: true });
     link.addEventListener(
       "error",
@@ -64,21 +64,21 @@ async function loadVendor(): Promise<VendorModule> {
   if (vendorPromise) return vendorPromise;
   vendorPromise = new Promise((resolve, reject) => {
     const globalWindow = window as typeof window & {
-      BugterExcalidraw?: VendorModule;
+      mdFlowExcalidraw?: VendorModule;
     };
-    if (globalWindow.BugterExcalidraw) {
-      resolve(globalWindow.BugterExcalidraw);
+    if (globalWindow.mdFlowExcalidraw) {
+      resolve(globalWindow.mdFlowExcalidraw);
       return;
     }
     const script = document.createElement("script");
     script.type = "module";
     script.src = "/vendor/excalidraw/bridge.js?v=0.18.0-m10-final";
-    script.dataset.bugterExcalidraw = "true";
+    script.dataset.mdflowExcalidraw = "true";
     script.addEventListener(
       "load",
       () => {
-        if (globalWindow.BugterExcalidraw) {
-          resolve(globalWindow.BugterExcalidraw);
+        if (globalWindow.mdFlowExcalidraw) {
+          resolve(globalWindow.mdFlowExcalidraw);
         } else {
           reject(new Error("Excalidraw loaded without its mount API."));
         }

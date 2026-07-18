@@ -99,14 +99,38 @@ export function normalizeDocumentViewMode(
     : modes[0];
 }
 
-// Inject only a zoom style. The preview iframe runs no scripts (sandbox is
-// allow-same-origin), so the parent reads contentDocument to apply zoom and
-// auto-fit in place — no reload, no white flash.
+// Inject only a zoom style. The preview iframe is sandboxed to allow-scripts
+// (opaque origin), so interactive HTML runs while staying isolated from the
+// app; zoom is applied to the painted surface — no reload, no white flash.
 export function htmlWithPreviewZoom(html: string, zoom: number): string {
-  const injection = `<style data-bugter-preview-zoom>html{zoom:${zoom}!important}</style>`;
+  const injection = `<style data-mdflow-preview-zoom>html{zoom:${zoom}!important}</style>`;
   const headEnd = html.search(/<\/head\s*>/i);
   if (headEnd >= 0) {
     return `${html.slice(0, headEnd)}${injection}${html.slice(headEnd)}`;
+  }
+  return `${injection}${html}`;
+}
+
+// Base href for the folder containing an opened HTML file, served through the
+// native `preview://` protocol so relative scripts/styles/images resolve.
+// ponytail: posix absolute paths only; Windows needs http://preview.localhost.
+export function htmlPreviewBaseHref(
+  path: string | null | undefined,
+): string | null {
+  if (!path || !path.startsWith("/")) return null;
+  const dir = path.slice(0, path.lastIndexOf("/") + 1);
+  return `preview://localhost${dir.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+// Inject a <base> so relative URLs in the srcdoc preview resolve against the
+// file's real folder. Documents that declare their own <base> are left alone.
+export function htmlWithBaseHref(html: string, href: string): string {
+  if (/<base[\s>]/i.test(html)) return html;
+  const injection = `<base href="${href}">`;
+  const headStart = html.search(/<head[^>]*>/i);
+  if (headStart >= 0) {
+    const end = html.indexOf(">", headStart) + 1;
+    return `${html.slice(0, end)}${injection}${html.slice(end)}`;
   }
   return `${injection}${html}`;
 }

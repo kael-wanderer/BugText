@@ -37,13 +37,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let default_markdown =
         MenuItemBuilder::with_id("default.markdown", "As Markdown Editor").build(app)?;
     let default_pdf = MenuItemBuilder::with_id("default.pdf", "As PDF Reader").build(app)?;
-    let default_menu = SubmenuBuilder::new(app, "Set Bugter as Default")
+    let default_menu = SubmenuBuilder::new(app, "Set mdFlow as Default")
         .items(&[&default_markdown, &default_pdf])
         .build()?;
 
-    let app_menu = SubmenuBuilder::new(app, "Bugter")
+    let app_menu = SubmenuBuilder::new(app, "mdFlow")
         .about(Some(AboutMetadata {
-            name: Some("Bugter".into()),
+            name: Some("mdFlow".into()),
             version: Some(env!("CARGO_PKG_VERSION").into()),
             comments: Some("A fast, lightweight markdown editor".into()),
             ..Default::default()
@@ -221,7 +221,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .minimize()
         .build()?;
 
-    let help = MenuItemBuilder::with_id("help.guide", "Bugter Help").build(app)?;
+    let help = MenuItemBuilder::with_id("help.guide", "mdFlow Help").build(app)?;
     let check_updates =
         MenuItemBuilder::with_id("help.check_updates", "Check for Updates…").build(app)?;
     let automatic_updates =

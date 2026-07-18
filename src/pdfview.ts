@@ -72,8 +72,8 @@ export type PdfRenderOptions = {
   onReloadRequest?: () => void;
 };
 
-export const PDF_SAVE_EVENT = "bugter:pdf-save";
-export const PDF_SAVE_AS_EVENT = "bugter:pdf-save-as";
+export const PDF_SAVE_EVENT = "mdflow:pdf-save";
+export const PDF_SAVE_AS_EVENT = "mdflow:pdf-save-as";
 
 const RENDER_SCALE = 1.4;
 const PDF_EDIT_HISTORY_LIMIT = 80;
@@ -283,7 +283,7 @@ function snapOperation(operation: PdfEditOperation, page: PdfPageBox): PdfEditOp
 }
 
 function draftKey(path: string): string {
-  return `bugter.pdf.edits.${encodeURIComponent(path)}`;
+  return `mdflow.pdf.edits.${encodeURIComponent(path)}`;
 }
 
 function legacyDraftKey(path: string): string {
@@ -2005,7 +2005,7 @@ export async function renderPdf(
   const saveEditedPdf = async (): Promise<void> => {
     if (!hasPdfEdits(editDocument) || saving) return;
     const overwrite = await confirm(
-      "Save these edits into the original PDF? Bugter will create a backup copy first.",
+      "Save these edits into the original PDF? mdFlow will create a backup copy first.",
       {
         title: "Save edited PDF",
         kind: "warning",

@@ -315,7 +315,7 @@ mod tests {
             .as_nanos();
         let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
-            "bugter-rec-{}-{nanos}-{counter}",
+            "mdflow-rec-{}-{nanos}-{counter}",
             std::process::id()
         ));
         fs::create_dir_all(&dir).unwrap();

@@ -433,7 +433,7 @@ pub fn backup_path_for(path: &Path, timestamp_ms: u128) -> Result<PathBuf, Strin
     } else {
         format!("{stem}.{timestamp_ms}.{extension}")
     };
-    Ok(parent.join(".bugter-pdf-backups").join(backup_name))
+    Ok(parent.join(".mdflow-pdf-backups").join(backup_name))
 }
 
 pub fn backup_file_at(path: &Path, timestamp_ms: u128) -> Result<PathBuf, String> {
@@ -546,7 +546,7 @@ mod list_dir_tests {
 
     #[test]
     fn lists_dirs_first_then_files_sorted() {
-        let tmp = std::env::temp_dir().join("bugter_listdir_test");
+        let tmp = std::env::temp_dir().join("mdflow_listdir_test");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("zeta")).unwrap();
         fs::create_dir_all(tmp.join("alpha")).unwrap();
@@ -579,7 +579,7 @@ mod crud_tests {
 
     #[test]
     fn create_and_rename_reject_existing() {
-        let tmp = std::env::temp_dir().join("bugter_crud_test");
+        let tmp = std::env::temp_dir().join("mdflow_crud_test");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         let file = tmp.join("a.md");
@@ -638,7 +638,7 @@ mod duplicate_tests {
 
     #[test]
     fn duplicates_files_and_dotted_directories() {
-        let tmp = std::env::temp_dir().join("bugter_duplicate_test");
+        let tmp = std::env::temp_dir().join("mdflow_duplicate_test");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
 
@@ -673,13 +673,13 @@ mod backup_tests {
         let backup = backup_path_for(path, 12345).unwrap();
         assert_eq!(
             backup.to_string_lossy(),
-            "/tmp/.bugter-pdf-backups/report.final.12345.pdf"
+            "/tmp/.mdflow-pdf-backups/report.final.12345.pdf"
         );
     }
 
     #[test]
     fn copies_file_to_backup_directory() {
-        let tmp = std::env::temp_dir().join("bugter_pdf_backup_test");
+        let tmp = std::env::temp_dir().join("mdflow_pdf_backup_test");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
         let source = tmp.join("invoice.pdf");
@@ -687,7 +687,7 @@ mod backup_tests {
 
         let backup = backup_file_at(&source, 98765).unwrap();
         assert_eq!(fs::read(&backup).unwrap(), b"%PDF original");
-        assert!(backup.ends_with(".bugter-pdf-backups/invoice.98765.pdf"));
+        assert!(backup.ends_with(".mdflow-pdf-backups/invoice.98765.pdf"));
 
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -700,7 +700,7 @@ mod drop_copy_tests {
 
     #[test]
     fn copies_files_and_rejects_name_collisions() {
-        let tmp = std::env::temp_dir().join("bugter_drop_copy_test");
+        let tmp = std::env::temp_dir().join("mdflow_drop_copy_test");
         let _ = fs::remove_dir_all(&tmp);
         let source_dir = tmp.join("source");
         let destination_dir = tmp.join("destination");
@@ -733,7 +733,7 @@ mod walk_tests {
 
     #[test]
     fn walk_returns_relative_files_skipping_noise() {
-        let tmp = std::env::temp_dir().join("bugter_walk_test");
+        let tmp = std::env::temp_dir().join("mdflow_walk_test");
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("src")).unwrap();
         fs::create_dir_all(tmp.join(".git")).unwrap();
@@ -772,7 +772,7 @@ mod ai_settings_tests {
             .as_nanos();
         let counter = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(
-            "bugter_ai_settings_{}_{}_{}",
+            "mdflow_ai_settings_{}_{}_{}",
             std::process::id(),
             nanos,
             counter,

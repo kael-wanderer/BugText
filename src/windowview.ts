@@ -1,8 +1,11 @@
 import { createEditor, type EditorHandle } from "./editor";
+import { invoke } from "@tauri-apps/api/core";
 import {
   documentViewModes,
   fileLanguageInfo,
+  htmlPreviewBaseHref,
   htmlPreviewLayout,
+  htmlWithBaseHref,
   htmlWithPreviewZoom,
   isExcalidrawFile,
   isHtmlFile,
@@ -591,13 +594,29 @@ export function createWindowView(
       const frame = document.createElement("iframe");
       frame.className = "html-preview-frame";
       frame.title = `Preview of ${pathOrName ?? "HTML document"}`;
-      // allow-same-origin (no scripts) lets the parent read contentDocument to
-      // apply zoom/fit live; untrusted HTML still can't run scripts.
-      frame.setAttribute("sandbox", "allow-same-origin");
+      // allow-scripts (opaque origin, no allow-same-origin) lets interactive HTML
+      // run its own JS — buttons, etc. — while staying isolated: the iframe cannot
+      // reach window.parent or the Tauri IPC. Trade-off: contentDocument is now
+      // cross-origin/unreadable, so zoom-fit falls back to pane-size measurement.
+      frame.setAttribute("sandbox", "allow-scripts");
       // Keep the iframe document at native scale. Preview zoom is applied to the
       // already-painted iframe surface so WebKit does not relayout a large HTML/SVG
       // document and flash white on every zoom step.
-      frame.srcdoc = htmlWithPreviewZoom(text, 1);
+      const doc = htmlWithPreviewZoom(text, 1);
+      const baseHref = pathOrName ? htmlPreviewBaseHref(pathOrName) : null;
+      if (baseHref && pathOrName) {
+        // Register the file's folder with the preview:// protocol first so
+        // relative scripts/styles/images resolve when the srcdoc loads.
+        invoke("preview_allow", { path: pathOrName })
+          .then(() => {
+            frame.srcdoc = htmlWithBaseHref(doc, baseHref);
+          })
+          .catch(() => {
+            frame.srcdoc = doc;
+          });
+      } else {
+        frame.srcdoc = doc;
+      }
       frame.addEventListener("focus", () => {
         focusedPane = "preview";
       });
@@ -647,9 +666,7 @@ export function createWindowView(
   }
 
   function measureHtmlPreview(): void {
-    const doc = previewFrame?.contentDocument;
-    const rootEl = doc?.documentElement;
-    if (!previewFrame || !previewCanvas || !rootEl) return;
+    if (!previewFrame || !previewCanvas) return;
     const paneWidth = Math.max(1, previewPane.clientWidth);
     const paneHeight = Math.max(1, previewPane.clientHeight);
     previewFrame.style.transform = "scale(1)";
@@ -658,6 +675,14 @@ export function createWindowView(
     previewCanvas.style.width = `${paneWidth}px`;
     previewCanvas.style.height = `${paneHeight}px`;
 
+    // contentDocument is null/unreadable under the opaque-origin sandbox; the
+    // iframe scrolls its own content, so fall back to the pane size for zoom.
+    const doc = previewFrame.contentDocument;
+    const rootEl = doc?.documentElement;
+    if (!rootEl) {
+      htmlPreviewContentSize = { width: paneWidth, height: paneHeight };
+      return;
+    }
     const body = doc.body;
     htmlPreviewContentSize = {
       width: Math.max(

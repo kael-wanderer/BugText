@@ -61,5 +61,5 @@ PNG image. Configure one vision-capable HTTP model and one CLI agent.
 
 ### S7-12 — Export dependency preflight
 - Steps: Temporarily make Pandoc/Typst unavailable; export DOCX, then PDF.
-- Expected: No save dialog appears; Bugter lists the missing tool and install command.
+- Expected: No save dialog appears; mdFlow lists the missing tool and install command.
 - Status: [ ]  Notes:

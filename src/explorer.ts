@@ -323,7 +323,7 @@ function rowMenu(node: TreeNode): MenuItem[] {
         label: "Open to the Side",
         action: () =>
           (explorerActions.onOpenSide ??
-            ((path: string) => (window as any).bugterOpenInSub(path)))(node.path),
+            ((path: string) => (window as any).mdflowOpenInSub(path)))(node.path),
       },
       {
         label: "Reveal in Finder",
@@ -467,15 +467,19 @@ function render(): void {
     for (const child of tree.children) renderNode(child, 0, treeElement);
   }
 
-  // WKWebView can leave a stale paint of this overflow:auto container after all
-  // its children are replaced (e.g. switching folders), so the tree keeps
-  // showing the previous folder until a visibility change forces a repaint.
-  // Toggling display (as collapse/expand does) forces it; preserve scroll.
-  const scroll = treeElement.scrollTop;
-  treeElement.style.display = "none";
-  void treeElement.offsetHeight;
-  treeElement.style.display = "";
-  treeElement.scrollTop = scroll;
+  // WKWebView can keep a stale compositor tile for this overflow:auto container
+  // after its children are replaced (e.g. switching folders), so the tree keeps
+  // painting the previous folder even though the DOM already holds the new rows.
+  // Forcing layout (reading offsetHeight) does NOT fix it — the stale copy lives
+  // at the compositing stage, not layout. Briefly promoting the element to its
+  // own layer and dropping it on the next frame invalidates that tile. Transform
+  // does not affect scrollTop, so scroll position is preserved.
+  // ponytail: compositor nudge is empirical (WKWebView repaint quirk); if it ever
+  // regresses, recreate the #explorer-tree node to force a brand-new layer.
+  treeElement.style.transform = "translateZ(0)";
+  requestAnimationFrame(() => {
+    treeElement.style.transform = "";
+  });
 }
 
 export function initExplorer(

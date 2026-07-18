@@ -6,6 +6,7 @@ mod files;
 mod macos_dock;
 mod menu;
 mod native_windows;
+mod preview;
 mod pty;
 mod recovery;
 mod secrets;
@@ -142,6 +143,10 @@ pub fn run() {
         .manage(ai::AIState::default())
         .manage(OpenPathState::default())
         .manage(native_windows::FocusedWindowState::default())
+        .manage(preview::PreviewRoots::default())
+        .register_uri_scheme_protocol("preview", |ctx, request| {
+            preview::respond(ctx.app_handle(), request)
+        })
         .setup(|app| {
             #[cfg(desktop)]
             app.handle()
@@ -215,6 +220,7 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_kill,
+            preview::preview_allow,
             take_open_paths,
             sync_view_menu,
             set_accelerators,
@@ -224,7 +230,7 @@ pub fn run() {
             restart_app,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Bugter")
+        .expect("error while building mdFlow")
         .run(|app, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {

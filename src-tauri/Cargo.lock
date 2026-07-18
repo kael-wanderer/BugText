@@ -347,28 +347,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bugter"
-version = "0.2.7"
-dependencies = [
- "core-foundation 0.10.1",
- "keyring",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "portable-pty",
- "regex",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tauri-plugin-updater",
- "trash",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2193,6 +2171,28 @@ dependencies = [
  "log",
  "tendril",
  "web_atoms",
+]
+
+[[package]]
+name = "mdflow"
+version = "0.2.8"
+dependencies = [
+ "core-foundation 0.10.1",
+ "keyring",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "portable-pty",
+ "regex",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tauri-plugin-updater",
+ "trash",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ export function addRecent(list: string[], path: string, limit = 12): string[] {
   return [path, ...list.filter((item) => item !== path)].slice(0, limit);
 }
 
-const DEFAULT_RECENT_KEY = "bugter.recent";
+const DEFAULT_RECENT_KEY = "mdflow.recent";
 const LEGACY_RECENT_KEY = "mdflow.recent";
 
 export function loadRecent(key = DEFAULT_RECENT_KEY): RecentItems {

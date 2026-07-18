@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  htmlPreviewBaseHref,
   htmlPreviewLayout,
+  htmlWithBaseHref,
   htmlWithPreviewZoom,
   isExcalidrawFile,
   isHtmlFile,
@@ -21,6 +23,37 @@ describe("isHtmlFile", () => {
   it("does not treat markdown or missing names as html", () => {
     expect(isHtmlFile("/notes/page.md")).toBe(false);
     expect(isHtmlFile(null)).toBe(false);
+  });
+});
+
+describe("htmlPreviewBaseHref", () => {
+  it("builds a preview:// URL for the file's folder with encoded segments", () => {
+    expect(htmlPreviewBaseHref("/docs/status board/status.html")).toBe(
+      "preview://localhost/docs/status%20board/",
+    );
+  });
+
+  it("returns null for unsaved names and missing paths", () => {
+    expect(htmlPreviewBaseHref("Untitled 1")).toBeNull();
+    expect(htmlPreviewBaseHref(null)).toBeNull();
+  });
+});
+
+describe("htmlWithBaseHref", () => {
+  it("injects a base tag right after <head>", () => {
+    expect(
+      htmlWithBaseHref("<html><head><title>t</title></head></html>", "preview://localhost/d/"),
+    ).toBe(
+      '<html><head><base href="preview://localhost/d/"><title>t</title></head></html>',
+    );
+  });
+
+  it("prepends when there is no head and respects an existing base", () => {
+    expect(htmlWithBaseHref("<p>x</p>", "preview://localhost/d/")).toBe(
+      '<base href="preview://localhost/d/"><p>x</p>',
+    );
+    const withBase = '<head><base href="https://a/"></head>';
+    expect(htmlWithBaseHref(withBase, "preview://localhost/d/")).toBe(withBase);
   });
 });
 
@@ -134,13 +167,13 @@ describe("htmlWithPreviewZoom", () => {
       0.75,
     );
     expect(output).toContain(
-      "<style data-bugter-preview-zoom>html{zoom:0.75!important}</style></head>",
+      "<style data-mdflow-preview-zoom>html{zoom:0.75!important}</style></head>",
     );
   });
 
   it("prepends preview zoom when the document has no head", () => {
     expect(htmlWithPreviewZoom("<main>Y</main>", 1.25)).toMatch(
-      /^<style data-bugter-preview-zoom>/,
+      /^<style data-mdflow-preview-zoom>/,
     );
   });
 

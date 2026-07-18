@@ -1,6 +1,6 @@
 use keyring::{Entry, Error};
 
-const SERVICE: &str = "com.kael.bugter";
+const SERVICE: &str = "com.kael.mdflow";
 const LEGACY_SERVICE: &str = "com.kael.mdflow";
 
 fn entry(service: &str, id: &str) -> Result<Entry, String> {
