@@ -282,6 +282,43 @@ export function startRename(path: string, currentName: string): void {
   });
 }
 
+// Returns the destination path for moving sourcePath into targetDir, or null
+// when the move is a no-op (already there) or illegal (into itself/descendant).
+export function resolveMove(sourcePath: string, targetDir: string): string | null {
+  if (parentPath(sourcePath) === targetDir) return null; // already there
+  if (
+    targetDir === sourcePath ||
+    targetDir.startsWith(`${sourcePath}/`) ||
+    targetDir.startsWith(`${sourcePath}\\`)
+  ) {
+    return null; // into itself or a descendant
+  }
+  const name = sourcePath.split(/[\\/]/).filter(Boolean).pop()!;
+  return joinPath(targetDir, name);
+}
+
+async function moveInto(sourcePath: string, targetDir: string): Promise<void> {
+  const nextPath = resolveMove(sourcePath, targetDir);
+  if (!nextPath) return;
+  const sourceParent = parentPath(sourcePath);
+  await renamePath(sourcePath, nextPath);
+  if (activePath === sourcePath) {
+    activePath = nextPath;
+  } else if (activePath?.startsWith(`${sourcePath}/`) || activePath?.startsWith(`${sourcePath}\\`)) {
+    activePath = `${nextPath}${activePath.slice(sourcePath.length)}`;
+  }
+  if (
+    comparePath === sourcePath ||
+    comparePath?.startsWith(`${sourcePath}/`) ||
+    comparePath?.startsWith(`${sourcePath}\\`)
+  ) {
+    comparePath = nextPath + comparePath.slice(sourcePath.length);
+  }
+  pathChangeCallback(sourcePath, nextPath);
+  await refreshDir(sourceParent);
+  await refreshDir(targetDir);
+}
+
 async function deleteNode(path: string, name: string): Promise<void> {
   const approved = await confirm(`Move "${name}" to the Trash?`, {
     title: "Delete",
@@ -403,6 +440,76 @@ function rowMenu(node: TreeNode): MenuItem[] {
   ];
 }
 
+// The row (and destination dir) under the cursor that `sourcePath` can move
+// into, or null when the point is outside the tree or the move is illegal/no-op.
+function dropTargetAt(
+  x: number,
+  y: number,
+  sourcePath: string,
+): { row: HTMLElement | null; dir: string } | null {
+  const hit = document.elementFromPoint(x, y) as HTMLElement | null;
+  if (!hit?.closest("#explorer")) return null;
+  const row = hit.closest<HTMLElement>(".tree-row[data-path]");
+  const dir = row
+    ? row.dataset.isDir === "true"
+      ? row.dataset.path!
+      : parentPath(row.dataset.path!)
+    : getState().folder;
+  if (!dir || !resolveMove(sourcePath, dir)) return null;
+  return { row, dir };
+}
+
+function startPointerDrag(event: PointerEvent, node: TreeNode): void {
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let ghost: HTMLElement | null = null;
+  let highlighted: HTMLElement | null = null;
+  let dragging = false;
+
+  const clearHighlight = (): void => {
+    highlighted?.classList.remove("drop-target");
+    document.getElementById("explorer")?.classList.remove("drop-root-target");
+    highlighted = null;
+  };
+
+  const onMove = (moveEvent: PointerEvent): void => {
+    if (!dragging) {
+      if (Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY) < 5) {
+        return;
+      }
+      dragging = true;
+      window.getSelection()?.removeAllRanges();
+      ghost = document.createElement("div");
+      ghost.className = "tree-drag-ghost";
+      ghost.textContent = node.name;
+      document.body.appendChild(ghost);
+    }
+    ghost!.style.left = `${moveEvent.clientX + 10}px`;
+    ghost!.style.top = `${moveEvent.clientY + 10}px`;
+    clearHighlight();
+    const target = dropTargetAt(moveEvent.clientX, moveEvent.clientY, node.path);
+    if (target?.row) {
+      target.row.classList.add("drop-target");
+      highlighted = target.row;
+    } else if (target) {
+      document.getElementById("explorer")?.classList.add("drop-root-target");
+    }
+  };
+
+  const onUp = (upEvent: PointerEvent): void => {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    ghost?.remove();
+    clearHighlight();
+    if (!dragging) return;
+    const target = dropTargetAt(upEvent.clientX, upEvent.clientY, node.path);
+    if (target) void runAction(() => moveInto(node.path, target.dir));
+  };
+
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+}
+
 function createRow(node: TreeNode, depth: number): HTMLElement {
   const row = document.createElement("div");
   row.className = `tree-row${node.path === activePath ? " active" : ""}${
@@ -436,6 +543,14 @@ function createRow(node: TreeNode, depth: number): HTMLElement {
   } else {
     row.append(caret, icon, name);
   }
+  // Pointer-based drag (not HTML5 dnd): on macOS WKWebView a draggable element
+  // starts a native OS drag session that Tauri's onDragDropEvent hijacks, so the
+  // internal move never lands. Pointer events keep the whole gesture in JS.
+  row.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest(".tree-input")) return;
+    startPointerDrag(event, node);
+  });
   row.addEventListener("click", (event) => {
     if ((event.target as HTMLElement).closest(".tree-input")) return;
     void handleRowClick(node);

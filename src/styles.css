@@ -2165,6 +2165,29 @@ body.no-folder .explorer-empty {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.tree-row.drop-target {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+#explorer.drop-root-target .explorer-header {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tree-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--fg);
+  pointer-events: none;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 30%);
+}
+
 .tree-row.active {
   background: var(--selection);
 }

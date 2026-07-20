@@ -22,7 +22,13 @@ pub fn read_entries(path: &str) -> Result<Vec<Entry>, String> {
         .map_err(|e| e.to_string())?
         .filter_map(Result::ok)
         .map(|entry| {
-            let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
+            // fs::metadata follows symlinks, so a link to a directory is treated
+            // as a directory (expandable). entry.file_type() would not follow it.
+            // Broken links error here and fall back to the non-following type.
+            let is_dir = fs::metadata(entry.path())
+                .map(|meta| meta.is_dir())
+                .or_else(|_| entry.file_type().map(|kind| kind.is_dir()))
+                .unwrap_or(false);
             Entry {
                 name: entry.file_name().to_string_lossy().into_owned(),
                 path: entry.path().to_string_lossy().into_owned(),
@@ -568,6 +574,30 @@ mod list_dir_tests {
                 ("b.md".into(), false),
             ]
         );
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_to_dir_is_listed_as_dir() {
+        use std::os::unix::fs::symlink;
+        let tmp = std::env::temp_dir().join("mdflow_symlink_test");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("real")).unwrap();
+        fs::write(tmp.join("real/f.md"), "x").unwrap();
+        symlink(tmp.join("real"), tmp.join("link-dir")).unwrap();
+        symlink(tmp.join("real/f.md"), tmp.join("link-file")).unwrap();
+        symlink(tmp.join("nope"), tmp.join("broken")).unwrap();
+
+        let got: std::collections::HashMap<String, bool> = read_entries(tmp.to_str().unwrap())
+            .unwrap()
+            .into_iter()
+            .map(|e: Entry| (e.name, e.is_dir))
+            .collect();
+
+        assert_eq!(got.get("link-dir"), Some(&true)); // followed to a dir
+        assert_eq!(got.get("link-file"), Some(&false));
+        assert_eq!(got.get("broken"), Some(&false)); // broken link still shown
         let _ = fs::remove_dir_all(&tmp);
     }
 }

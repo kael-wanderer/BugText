@@ -6,6 +6,20 @@ All notable changes to mdFlow are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-07-20
+
+### Added
+
+- Explorer: drag a file or folder onto another folder (or the tree root) to
+  move it there. Moving a folder into itself or a descendant is rejected, and
+  dropping onto its current folder is a no-op.
+
+### Fixed
+
+- Explorer: symbolic links that point to a directory now appear as an
+  expandable folder instead of an unusable file (directory type is resolved by
+  following the link). Broken links are still listed.
+
 ## [0.2.8] - 2026-07-18
 
 ### Changed
