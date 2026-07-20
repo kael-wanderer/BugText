@@ -125,6 +125,10 @@ describe("document view modes", () => {
     expect(documentViewModes("config.yaml")).toEqual(["editor"]);
   });
 
+  it("gives SQL an editor and read-only view", () => {
+    expect(documentViewModes("schema.sql")).toEqual(["editor", "preview", "split"]);
+  });
+
   it("normalizes legacy split mode to a supported mode", () => {
     expect(normalizeDocumentViewMode("notes.md", "split")).toBe("split");
     expect(normalizeDocumentViewMode("paper.pdf", "editor")).toBe("preview");
@@ -142,6 +146,11 @@ describe("fileLanguageInfo", () => {
     });
     expect(fileLanguageInfo("config.yml").editor).toBe("yaml");
     expect(fileLanguageInfo("package.json").editor).toBe("json");
+    expect(fileLanguageInfo("schema.SQL")).toEqual({
+      editor: "sql",
+      icon: "sql",
+      label: "SQL",
+    });
   });
 });
 

@@ -5,6 +5,7 @@ import { html } from "@codemirror/lang-html";
 import { javascript } from "@codemirror/lang-javascript";
 import { json } from "@codemirror/lang-json";
 import { markdown } from "@codemirror/lang-markdown";
+import { sql } from "@codemirror/lang-sql";
 import { yaml } from "@codemirror/lang-yaml";
 import {
   search,
@@ -31,6 +32,7 @@ export type EditorDocumentKind =
   | "javascript"
   | "json"
   | "yaml"
+  | "sql"
   | "plain";
 
 export type CursorPosition = {
@@ -151,6 +153,7 @@ function languageExtension(kind: EditorDocumentKind): Extension {
   if (kind === "javascript") return javascript({ jsx: true });
   if (kind === "json") return json();
   if (kind === "yaml") return yaml();
+  if (kind === "sql") return sql();
   if (kind === "plain") return [];
   return markdown({ codeLanguages: languages });
 }

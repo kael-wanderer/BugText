@@ -18,6 +18,10 @@ export function isMindmapFile(
   return /\.mind$/i.test(pathOrName ?? "");
 }
 
+export function isSqlFile(pathOrName: string | null | undefined): boolean {
+  return /\.sql$/i.test(pathOrName ?? "");
+}
+
 export function isMarkdownFile(pathOrName: string | null | undefined): boolean {
   if (!pathOrName || !/[.]/.test(pathOrName.split(/[\\/]/).pop() ?? "")) {
     return true;
@@ -32,6 +36,7 @@ export type EditorLanguage =
   | "javascript"
   | "json"
   | "yaml"
+  | "sql"
   | "plain";
 
 export type FileLanguageInfo = {
@@ -61,6 +66,7 @@ export function fileLanguageInfo(
   }
   if (/\.json$/.test(name)) return { editor: "json", icon: "json", label: "JSON" };
   if (/\.ya?ml$/.test(name)) return { editor: "yaml", icon: "yaml", label: "YAML" };
+  if (/\.sql$/.test(name)) return { editor: "sql", icon: "sql", label: "SQL" };
   if (isMarkdownFile(pathOrName)) {
     return { editor: "markdown", icon: "md", label: "Markdown" };
   }
@@ -86,6 +92,7 @@ export function documentViewModes(
   if (isMarkdownFile(pathOrName) || isHtmlFile(pathOrName)) {
     return ["editor", "preview", "split"];
   }
+  if (isSqlFile(pathOrName)) return ["editor", "preview", "split"];
   return ["editor"];
 }
 

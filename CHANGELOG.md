@@ -10,6 +10,8 @@ All notable changes to mdFlow are documented here. The format is based on
 
 ### Added
 
+- SQL files (`.sql`): syntax highlighting in the editor and a read-only Reading
+  View (⌘E) / split preview that renders the same highlighted SQL.
 - Explorer: drag a file or folder onto another folder (or the tree root) to
   move it there. Moving a folder into itself or a descendant is rejected, and
   dropping onto its current folder is a no-op.

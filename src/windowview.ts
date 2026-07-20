@@ -12,6 +12,7 @@ import {
   isMarkdownFile,
   isMindmapFile,
   isPdfFile,
+  isSqlFile,
   normalizeDocumentViewMode,
 } from "./document-kind";
 import { glyphs } from "./glyphs";
@@ -586,6 +587,15 @@ export function createWindowView(
     pdfFind = null;
     previewPane.replaceChildren();
     if (!isMarkdownFile(pathOrName) && !isHtmlFile(pathOrName)) {
+      if (isSqlFile(pathOrName)) {
+        // Reading view: same syntax highlighting as the editor, read-only.
+        // Reuse the markdown preview's hljs pipeline via a fenced code block.
+        const article = document.createElement("article");
+        article.className = "doc";
+        article.style.zoom = String(previewZoom);
+        article.innerHTML = renderMarkdown(`\`\`\`sql\n${text}\n\`\`\``);
+        previewPane.appendChild(article);
+      }
       const count = countWords(text);
       wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
       return;
