@@ -1,8 +1,5 @@
 # CLAUDE.md
 
-> Starter file. Expand with build commands + architecture once the app is scaffolded
-> (tracked in `docs/tasks.md`).
-
 ## What is mdFlow
 
 A fast, lightweight markdown editor built with Tauri 2 + Rust. **Clean-room rewrite**
@@ -45,77 +42,22 @@ and never paste from it. Do not add Kaelio as a submodule or copy its files in.
 
 - `npm install` — install JS deps (run `npm approve-scripts esbuild fsevents`
   once after install; their native postinstalls are gated by the script allowlist)
-- `npm run tauri dev` — run the desktop app in dev (hot reload)
-- `npm run tauri build` — build a release bundle
-- `npm run test` — run Vitest unit tests (pure functions only)
-- `npm run build` — type-check + Vite production build (no native shell)
-- `cd src-tauri && cargo test` — run Rust unit tests
-- `cd src-tauri && cargo check` — fast compile-check the backend
+- Build/test/check commands are the standard ones — see `package.json` scripts and
+  `src-tauri/` for cargo. `npm run test` covers pure functions only.
 
 ## Architecture
 
 Tauri 2 + Rust native shell; plain-TypeScript frontend (no framework) wired by a
 thin `main.ts`. One responsibility per file.
 
-```
-src/
-  main.ts      bootstrap + document workflow + palette command registry
-  ai/
-    aisettings.ts AI provider/terminal settings model and parser
-    client.ts     HTTP SSE + native command streaming client
-    conversation.ts document/selection/attached-file context builder
-    diff.ts       LCS line diff for edit review
-    panel.ts      Chat/Terminal panel, file attachments + @mention, apply/insert
-    providers.ts  provider request/SSE/command helpers
-    terminal.ts   xterm view bound to the native PTY (configurable font/size)
-  capture.ts   rendered HTML/node capture to PNG canvas or SVG string
-  export-options.ts context-aware export menu model by document type
-  export-render.ts rendered standalone HTML builder for PDF/DOCX export
-  editor.ts    CodeMirror 6 (md highlight, soft-wrap) — createEditor()
-  markdown-format.ts pure bold/italic/heading/link/code/quote/list/rule edits
-  preview.ts   markdown-it + KaTeX render pipeline — renderMarkdown()
-  render-extras.ts lazy Mermaid enhancement
-  pdfview.ts   lazy PDF.js page renderer
-  excalidraw-document.ts Excalidraw JSON validation and safe serialization
-  excalidrawview.ts lazy loader for the isolated board runtime
-  mindmap-document.ts jsMind node_tree JSON parse/serialize
-  mindmapview.ts   lazy jsMind board loader (editable, screenshot-capable; per-node shape/color/size/bold in node data)
-  windowview.ts per-window tabs, toolbar, editor, preview, and status
-  explorer.ts  lazy folder tree + file management
-  fuzzy.ts     subsequence fuzzy match + ranking — fuzzyMatch(), rankItems()
-  keymap.ts    keyboard-shortcut registry + accelerator match/format/resolve
-  palette.ts   ⌘K command/file overlay — createPalette()
-  settings.ts  settings.json model — parseSettings(), applySettings()
-  updater.ts   signed update checks, prompts, restart, and daily schedule
-  themes.css   light/dark/catppuccin-mocha/everforest-dark/nord palettes
-  files.ts     IPC open/save + native file dialogs
-  filesys.ts   Explorer/settings/recursive-walk IPC wrappers
-  state.ts     persisted UI state (localStorage) — loadState(), saveState()
-  styles.css   shell layout and component styling (CSS variables)
-src-tauri/src/
-  lib.rs       Tauri builder: command registry + plugins (dialog, updater)
-  native_windows.rs independent native-window creation + focused routing
-  macos_dock.rs macOS Dock context-menu New Window bridge
-  ai.rs        command-provider process streaming
-  defaults.rs  macOS LaunchServices default-handler registration
-  export.rs    Pandoc/Typst rendered-HTML to PDF/DOCX export
-  files.rs     file IO/management, recursive walk, settings, byte IO
-  pty.rs       portable PTY lifecycle and terminal streaming
-  secrets.rs   macOS Keychain API-key storage via keyring
-```
-
 Data flow: edit → 300ms debounce → `renderMarkdown` → preview pane + word count.
 `Cmd+S` → `saveFile` → IPC `save_file`. `Cmd+O` → dialog → IPC `read_file` → editor.
 View mode + zoom persist to `localStorage` (`mdflow.ui`).
 
-The native **View** menu has: Show/Hide Explorer `⌘B`, Show/Hide Preview `⌘P`,
-New Window `⌘⇧N`, Reading View `⌘E`, Show/Hide Line Numbers, Soft Wrap ▸ (Off / Window Width / Page
-Guide), Zoom In/Out/Reset, and Font / Text Size / Explorer Text Size / Theme submenus
-(active value checked). Soft Wrap and the Font/Size/Theme submenus drive
-`settings.json`; `sync_view_menu` reflects the current settings into the menu checks.
-The **Window** menu adds Enter Full Screen `⌃⌘F`, Move to Left/Right Half (tile to the
-active monitor via `window_tile`). The command/file palette is **`⌘K` only** (`⌘P` is
-the preview toggle).
+Native menu contents live in `menu.rs`. Two non-obvious conventions: the View menu's
+Soft Wrap and Font/Size/Theme submenus drive `settings.json` (and `sync_view_menu`
+reflects settings back into the menu checks), and the command/file palette is **`⌘K`
+only** — `⌘P` is the preview toggle.
 
 mdFlow supports multiple independent native Tauri windows. View ▸ New Window and the
 macOS Dock context menu create fresh workspaces; menu and Finder-open events route to
@@ -184,21 +126,12 @@ PNG/SVG; HTML and Excalidraw offer PNG/SVG; mindmaps offer PNG; PDF is read-only
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
 
-Rich preview and terminal dependencies include Mermaid, KaTeX, PDF.js, xterm, and
-the Rust `portable-pty` crate. Heavy engines are loaded on demand so the startup
-bundle remains below the release chunk-warning threshold.
+Heavy render/terminal engines are loaded on demand so the startup bundle remains
+below the release chunk-warning threshold.
 
-PDF OCR runs fully offline: the tesseract.js worker, simd-lstm core, and
-eng/vie traineddata are vendored under `public/vendor/tesseract` (rebuild with
-`npm run vendor:tesseract`; data from `@tesseract.js-data/*` dev deps). To add
-an OCR language: `npm i -D @tesseract.js-data/<lang>`, add `<lang>` to
-`LANGUAGES` in `scripts/build-tesseract-vendor.mjs`, then rerun
-`npm run vendor:tesseract` and commit the new `.traineddata.gz`.
-
-Excalidraw 0.18.0 is pinned in a self-contained board-only module under
-`public/vendor/excalidraw`. Rebuild it with `npm run vendor:excalidraw` after setting
-`EXCALIDRAW_BUILD_ROOT` to an exact-tag Excalidraw tree whose package dist has
-already been built. React remains isolated from the plain-TypeScript shell.
+PDF OCR runs fully offline and Excalidraw is pinned as a vendored board-only module;
+both live under `public/vendor/` and React stays isolated from the plain-TypeScript
+shell. Rebuild steps: see the `vendored-assets` skill.
 
 Updater runtime and UI are active. Gear ▸ General offers Manual (no background
 checks) and Automatic (at most once per 24 hours); both modes always prompt before
