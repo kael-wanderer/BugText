@@ -157,6 +157,26 @@ table and a detail block below. Reference the failing test-case ID.
   enumerate and signal children) so cancel reaps the tree on Unix too.
 - **Status:** fixed (AI trustworthy plumbing, v0.2.3).
 
+### BUG-007 — Open file keeps showing stale content after another process edits it
+
+- **Feature / test case:** Recovery / external-change sync
+- **Severity:** Major
+- **Environment:** macOS, release build 2026-07-20, commit `c76f0fe`
+- **Steps to reproduce:**
+  1. Open a `.md` file and leave it unmodified
+  2. Change the same file from another process (another editor, an agent session)
+  3. Wait past the 3-second auto-refresh, then click Explorer ▸ Refresh
+- **Expected:** The tab and preview show the new content.
+- **Actual:** Stale content until the tab is closed and reopened.
+- **Notes:** Two causes. The auto-refresh decided "changed?" from a cached
+  `mtime`/`size` pair, so a stale or failed `file_stat` left the tab looking
+  unchanged forever (and a transient failure marked the tab dirty, which excluded
+  it from every later pass). The Explorer Refresh button only re-listed the root
+  folder — it never touched expanded subfolders or open documents.
+- **Status:** fixed (unreleased) — clean tabs now compare the file's actual text,
+  refresh also runs on native window focus, and the Refresh button runs the full
+  workspace refresh.
+
 ### BUG-000 (example — delete me)
 
 - **Feature / test case:** Export / EXP-02

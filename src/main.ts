@@ -1152,54 +1152,45 @@ async function checkActiveForExternalChange(windowId: string): Promise<void> {
   });
 }
 
+// Clean tabs are compared against the file's actual text rather than a cached
+// mtime/size: a stale or failed stat used to leave a tab permanently stale, and
+// re-reading the handful of open files is cheap. Board documents are skipped —
+// their serialized text differs harmlessly from disk and reloading would reset
+// the canvas mid-edit.
 async function refreshCleanOpenFilesFromDisk(): Promise<void> {
   for (const windowState of getState().windows) {
     const view = views.get(windowState.id);
     if (!view) continue;
 
     for (const tab of windowState.tabs) {
-      if (!tab.path || tab.dirty || isPdfFile(tab.path)) continue;
-      const bufferText = view.editor.getText(tab.id);
+      if (!tab.path || tab.dirty) continue;
+      if (
+        isPdfFile(tab.path) ||
+        isExcalidrawFile(tab.path) ||
+        isMindmapFile(tab.path)
+      ) {
+        continue;
+      }
+      let text: string;
+      try {
+        text = await invoke<string>("read_file", { path: tab.path });
+      } catch {
+        continue;
+      }
+      if (text === view.editor.getText(tab.id)) continue;
+
       const changeKey = `${windowState.id}:${tab.id}`;
-      await checkExternalChange(tab.path, false, bufferText, {
-        reload: (text) => {
-          cleanReloads.add(changeKey);
-          try {
-            view.editor.setTextFor(tab.id, text);
-          } finally {
-            cleanReloads.delete(changeKey);
-          }
-          clearDraft(tab.path, tab.id);
-          const current = getWindow(windowState.id);
-          if (current) {
-            patchWindow(windowState.id, {
-              tabs: current.tabs.map((item) =>
-                item.id === tab.id ? { ...item, dirty: false } : item,
-              ),
-            });
-          }
-          if (windowState.activeTabId === tab.id) {
-            view.renderPreview(text, tab.path!);
-          }
-        },
-        markDirty: () => {
-          const current = getWindow(windowState.id);
-          if (!current) return;
-          patchWindow(windowState.id, {
-            tabs: current.tabs.map((item) =>
-              item.id === tab.id ? { ...item, dirty: true } : item,
-            ),
-          });
-          scheduleDraft({
-            windowId: windowState.id,
-            tabId: tab.id,
-            path: tab.path,
-            name: tab.name,
-            contents: bufferText,
-          });
-        },
-        host: document.getElementById("editorarea")!,
-      });
+      cleanReloads.add(changeKey);
+      try {
+        view.editor.setTextFor(tab.id, text);
+      } finally {
+        cleanReloads.delete(changeKey);
+      }
+      clearDraft(tab.path, tab.id);
+      void recordStat(tab.path);
+      if (windowState.activeTabId === tab.id) {
+        view.renderPreview(text, tab.path);
+      }
     }
   }
   renderAll();
@@ -1207,8 +1198,8 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
 
 let autoRefreshRunning = false;
 
-async function refreshWorkspaceFromDisk(): Promise<void> {
-  if (autoRefreshRunning) return;
+async function refreshWorkspaceFromDisk(force = false): Promise<void> {
+  if (autoRefreshRunning && !force) return;
   autoRefreshRunning = true;
   try {
     if (getState().folder) {
@@ -2128,6 +2119,7 @@ initExplorer(
       if (getState().explorerVisible) document.getElementById("ab-explorer")!.click();
     },
     onToggleLineNumbers: () => toggleLineNumbers(),
+    onRefresh: () => void refreshWorkspaceFromDisk(true),
   },
 );
 
@@ -2162,13 +2154,16 @@ subscribe(() => {
   persistUiState();
 });
 
-window.addEventListener("focus", () => {
-  const folder = getState().folder;
-  if (folder) {
-    void refreshExpandedDirs().catch(() => {});
-    void refreshFileList();
-  }
+function refreshOnFocus(): void {
+  void refreshWorkspaceFromDisk(true);
   void checkActiveForExternalChange(getState().activeWindowId);
+}
+
+window.addEventListener("focus", refreshOnFocus);
+// The webview does not always get a DOM focus event when the app regains
+// focus, so listen on the native window too.
+void currentNativeWindow?.onFocusChanged(({ payload: focused }) => {
+  if (focused) refreshOnFocus();
 });
 
 window.setInterval(() => {

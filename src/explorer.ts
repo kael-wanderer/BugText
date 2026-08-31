@@ -37,6 +37,7 @@ export type ExplorerActions = {
   onAddToChat?: (path: string) => void;
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
+  onRefresh?: () => void;
 };
 
 export function setExplorerActivePath(path: string | null): void {
@@ -634,9 +635,14 @@ export function initExplorer(
     const tree = getState().tree;
     if (tree) setState({ tree: setAllExpanded(tree, false) });
   });
-  document
-    .getElementById("ex-refresh")!
-    .addEventListener("click", withFolder((folder) => void refreshDir(folder)));
+  document.getElementById("ex-refresh")!.addEventListener("click", () => {
+    if (explorerActions.onRefresh) {
+      explorerActions.onRefresh();
+      return;
+    }
+    const folder = getState().folder;
+    if (folder) void refreshDir(folder);
+  });
 
   const root = document.getElementById("ex-root")!;
   root.addEventListener("click", () => {

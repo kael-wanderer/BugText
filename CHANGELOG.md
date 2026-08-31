@@ -6,6 +6,16 @@ All notable changes to mdFlow are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- Open files now reload from disk when another process changes them: the 3-second
+  auto-refresh and the window-focus refresh compare the file's text instead of a
+  cached mtime/size, so a stale or failed stat can no longer leave a tab showing
+  old content until it is closed and reopened.
+- The explorer's Refresh button now refreshes the whole workspace — expanded
+  folders, the file index, and the contents of open, unmodified files — instead of
+  only re-listing the root folder.
+
 ## [0.2.9] - 2026-07-20
 
 ### Added
