@@ -130,13 +130,3 @@ export async function htmlToCanvas(html: string): Promise<HTMLCanvasElement> {
   const { svg, width, height } = await htmlToSvgAndSize(html);
   return rasterize(svg, width, height);
 }
-
-export async function toCanvas(
-  node: HTMLElement,
-): Promise<HTMLCanvasElement> {
-  const rect = node.getBoundingClientRect();
-  const width = Math.max(1, Math.ceil(rect.width || node.clientWidth || 0));
-  const height = Math.max(1, Math.ceil(node.scrollHeight || rect.height || 0));
-  const svg = nodeToSvg(node);
-  return rasterize(svg, width, height);
-}

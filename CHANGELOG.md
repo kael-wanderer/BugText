@@ -6,6 +6,12 @@ All notable changes to mdFlow are documented here. The format is based on
 
 ## [Unreleased]
 
+### Removed
+
+- Dead code: the unused `saveFile` helper in `src/files.ts` (the save path goes
+  through `pickSavePath` + `writeFile`) and the unused `toCanvas` export in
+  `src/capture.ts`.
+
 ### Fixed
 
 - Open files now reload from disk when another process changes them: the 3-second

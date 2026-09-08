@@ -51,7 +51,8 @@ Tauri 2 + Rust native shell; plain-TypeScript frontend (no framework) wired by a
 thin `main.ts`. One responsibility per file.
 
 Data flow: edit → 300ms debounce → `renderMarkdown` → preview pane + word count.
-`Cmd+S` → `saveFile` → IPC `save_file`. `Cmd+O` → dialog → IPC `read_file` → editor.
+`Cmd+S` → `pickSavePath` (when untitled) → `writeFile` → IPC `save_file`. `Cmd+O` →
+dialog → IPC `read_file` → editor.
 View mode + zoom persist to `localStorage` (`mdflow.ui`).
 
 Native menu contents live in `menu.rs`. Two non-obvious conventions: the View menu's
