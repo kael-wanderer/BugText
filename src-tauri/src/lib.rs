@@ -10,6 +10,7 @@ mod menu;
 mod mcp_paths;
 mod mcp_protocol;
 mod mcp_bridge;
+mod mcp_server;
 mod native_windows;
 mod preview;
 mod recovery;
@@ -150,6 +151,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(ai::AIState::default())
         .manage(OpenPathState::default())
+        .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
         .manage(preview::PreviewRoots::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
@@ -179,8 +181,17 @@ pub fn run() {
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 native_windows::remember_focus(window.app_handle(), window.label());
             }
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                if let Some(state) = window.app_handle().try_state::<mcp_server::McpState>() {
+                    mcp_server::drop_window(&state, window.label());
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
+            mcp_server::mcp_set_enabled,
+            mcp_server::mcp_report_window,
+            mcp_server::mcp_reply,
+            mcp_server::mcp_status,
             files::ai_models_cache_read,
             files::ai_models_cache_write,
             ai::ai_run,
