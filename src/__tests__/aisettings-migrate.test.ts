@@ -140,3 +140,8 @@ describe("migrateV1", () => {
     }
   });
 });
+
+it("omits none-engine uses so resolution can fall back to an installed CLI", () => {
+  const migrated = migrateV1({ providers: [] }, new Set());
+  expect(migrated.uses).toEqual({});
+});

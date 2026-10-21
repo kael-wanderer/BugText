@@ -210,7 +210,7 @@ it("inlines outside-folder CLI attachments instead of passing their paths", asyn
   panel.addAttachments(["/outside/private.md"]);
   send();
   await vi.waitFor(() => expect(streamChat).toHaveBeenCalled());
-  const [, , messages, , options] = vi.mocked(streamChat).mock.calls.at(-1)!;
+  const [, , messages, , options] = vi.mocked(streamChat).mock.calls[vi.mocked(streamChat).mock.calls.length - 1];
   expect(JSON.stringify(messages)).toContain("private attachment text");
   expect(options.attachmentPaths).toEqual([]);
 });

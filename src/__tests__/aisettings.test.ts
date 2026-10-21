@@ -184,3 +184,11 @@ it("keeps an IPv6 loopback connection after settings reload", () => {
       .connections,
   ).toEqual([connection]);
 });
+
+it("rejects unsupported explicit versions without attempting v1 migration", () => {
+  for (const version of ["2", 3, null]) {
+    const raw = JSON.stringify({ version, providers: [] });
+    expect(tryParseAISettings(raw)).toBeNull();
+    expect(parseAISettings(raw)).toEqual(DEFAULT_AI_SETTINGS);
+  }
+});

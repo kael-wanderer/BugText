@@ -242,7 +242,9 @@ export function tryParseAISettings(
 ): AISettings | null {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!record(parsed)) return null;
+    const value = record(parsed);
+    if (!value) return null;
+    if (Object.prototype.hasOwnProperty.call(value, "version") && value.version !== 2) return null;
   } catch {
     return null;
   }
@@ -262,7 +264,10 @@ export function parseAISettings(
   } catch {
     return { ...DEFAULT_AI_SETTINGS };
   }
-  if (data.version !== 2) {
+  if (Object.prototype.hasOwnProperty.call(data, "version") && data.version !== 2) {
+    return { ...DEFAULT_AI_SETTINGS };
+  }
+  if (!Object.prototype.hasOwnProperty.call(data, "version")) {
     return parseV2(
       migrateV1(data, savedKeyIds) as unknown as Record<string, unknown>,
     );

@@ -14,6 +14,7 @@ import {
   tryParseAISettings,
   type AISettings,
 } from "./ai/aisettings";
+import { moveLegacySecret } from "./ai/aisettings-secrets";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
@@ -155,6 +156,7 @@ let ui = { ...startupUi, aiVisible: false };
 let currentSettings = parseSettings("{}");
 let settingsPath = "";
 let aiSettingsPath = "";
+let aiSettingsMigrationReady = false;
 let currentAISettings: AISettings = parseAISettings("{}");
 let cliInfos: CliInfo[] = [];
 let modelsCache: Record<string, string[]> = {};
@@ -204,6 +206,13 @@ function writeSettings(next: Settings): void {
 }
 
 function writeAISettings(next: AISettings): void {
+  if (!aiSettingsMigrationReady) {
+    void message("Couldn't move API keys to the keychain — settings not saved", {
+      title: "AI settings",
+      kind: "error",
+    });
+    return;
+  }
   if (!aiSettingsPath) return;
   void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
     .then(() => broadcastSettingsChange("agent"))
@@ -225,6 +234,7 @@ async function loadSettings(): Promise<void> {
 }
 
 async function loadAISettings(): Promise<void> {
+  aiSettingsMigrationReady = false;
   try {
     const file = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
     aiSettingsPath = file.path;
@@ -235,7 +245,16 @@ async function loadAISettings(): Promise<void> {
       const stored: boolean[] = [];
       for (const { id, secret } of keys) {
         try {
-          await invoke("set_secret", { id, secret });
+          const normalizedId = id.trim().toLowerCase();
+          if (normalizedId !== id) {
+            await moveLegacySecret(id, normalizedId, secret, {
+              get: (secretId) => invoke<string | null>("get_secret", { id: secretId }),
+              set: (secretId, value) => invoke("set_secret", { id: secretId, secret: value }),
+              delete: (secretId) => invoke("delete_secret", { id: secretId }),
+            });
+          } else {
+            await invoke("set_secret", { id, secret });
+          }
           stored.push(true);
         } catch {
           /* Leave the plaintext key for a later migration attempt. */
@@ -267,8 +286,10 @@ async function loadAISettings(): Promise<void> {
         broadcastSettingsChange("agent");
       }
     }
+    aiSettingsMigrationReady = canPersistMigration;
     aiPanel?.render();
   } catch {
+    aiSettingsMigrationReady = false;
     aiSettingsPath = "";
     currentAISettings = parseAISettings("{}");
   }

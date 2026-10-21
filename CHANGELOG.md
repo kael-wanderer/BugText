@@ -49,6 +49,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- AI settings saves now wait for successful keychain migration, v1 backups omit plaintext keys, key ids are normalized in the keychain, and unsupported explicit settings versions preserve the last good state.
+- Version 1 AI migration leaves engine uses empty when no engine exists so runtime CLI fallback can work.
 - CLI chat now inlines readable attachments outside the run folder and explains when an attachment cannot be opened inside the sandbox.
 - AI commands now run asynchronously, cancellation schedules its forced kill off-thread, Node.js sandbox roots are limited to JavaScript shims, and exited process groups are cleaned up before output readers join.
 - Local CLI settings now describe Pi as answer-only and clear the saved CLI key when a proxy address changes.

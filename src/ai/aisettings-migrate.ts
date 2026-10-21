@@ -196,11 +196,13 @@ export function migrateV1(
     chatEngine = engines.get("ollama")!;
   }
 
-  const uses: Partial<Record<FeatureId, UseRow>> = { chat: row(chatEngine) };
+  const uses: Partial<Record<FeatureId, UseRow>> = {};
+  if (chatEngine.kind !== "none") uses.chat = row(chatEngine);
   const quickActionEngine = v1.quickActionProvider
     ? (engines.get(string(v1.quickActionProvider).toLowerCase()) ?? chatEngine)
     : chatEngine;
-  for (const feature of QUICK_ACTIONS) uses[feature] = row(quickActionEngine);
+  if (quickActionEngine.kind !== "none")
+    for (const feature of QUICK_ACTIONS) uses[feature] = row(quickActionEngine);
 
   const enabled = Object.fromEntries(FEATURES.map((feature) => [feature, true])) as
     AISettings["enabled"];
