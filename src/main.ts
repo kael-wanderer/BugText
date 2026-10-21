@@ -1,3 +1,4 @@
+import type { CliInfo } from "./ai/engines";
 import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -16,7 +17,7 @@ import {
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
-  QUICK_ACTIONS,
+  enabledQuickActions,
   runQuickAction,
   type QuickActionDeps,
 } from "./ai/quick-actions";
@@ -155,6 +156,16 @@ let currentSettings = parseSettings("{}");
 let settingsPath = "";
 let aiSettingsPath = "";
 let currentAISettings: AISettings = parseAISettings("{}");
+let cliInfos: CliInfo[] = [];
+async function rescanClis(): Promise<void> {
+  const local = currentAISettings.localCli;
+  cliInfos = await invoke<CliInfo[]>("cli_scan", { overrides: {
+    claudePath: local.claude.executablePath,
+    codexPath: local.codex.executablePath,
+    piPath: local.pi.executablePath,
+    codexHome: local.codex.codexHome,
+  }}).catch(() => []);
+}
 let aiPanel: AIPanel | null = null;
 let fileList: string[] = [];
 let indexedFolder: string | null = null;
@@ -383,7 +394,7 @@ function commandItems(): PaletteItem[] {
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
-    ...QUICK_ACTIONS.map((action) =>
+    ...enabledQuickActions(currentAISettings).map((action) =>
       command(action.id, `AI: ${action.label}`, () =>
         runQuickActionById(action.id),
       ),
@@ -476,7 +487,7 @@ const handlers = {
     showContextMenu(x, y, [
       {
         label: "AI",
-        children: QUICK_ACTIONS.map((action) => ({
+        children: enabledQuickActions(currentAISettings).map((action) => ({
           label: action.label,
           action: () => runQuickActionById(action.id),
         })),
@@ -1859,8 +1870,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
   const review = editReviewDeps(actionLabel);
   return {
     getSettings: () => currentAISettings,
-    getProviderById: (id) =>
-      currentAISettings.providers.find((p) => p.id === id),
+    getClis: () => cliInfos,
     getDoc: () => {
       const view = activeView();
       const tab = activeMeta();
@@ -1897,7 +1907,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
 }
 
 function runQuickActionById(id: string): void {
-  const action = QUICK_ACTIONS.find((a) => a.id === id);
+  const action = enabledQuickActions(currentAISettings).find((a) => a.id === id);
   if (!action) return;
   void runQuickAction(action, quickActionDeps(action.label));
 }
@@ -2434,6 +2444,7 @@ async function boot(): Promise<void> {
     void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
   }
   await loadAISettings();
+  await rescanClis();
   if (isPrimaryNativeWindow) {
     startDailyUpdateChecks(() => currentSettings.updateMode === "auto");
   }
