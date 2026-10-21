@@ -427,3 +427,79 @@
     transition: none;
   }
 }
+
+/* ---------- Theme cards, inline errors ---------- */
+
+.st-error {
+  grid-column: 1 / -1;
+  color: var(--st-danger);
+}
+
+.st-error:empty {
+  display: none;
+}
+
+.st-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.st-tcard {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  text-align: left;
+  background: var(--st-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.st-tcard[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.st-tprev {
+  display: grid;
+  grid-template-columns: 30% 1fr;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.st-tprev.split {
+  grid-template-columns: 1fr 1fr;
+}
+
+.st-tprev-half {
+  display: grid;
+  grid-template-columns: 30% 1fr;
+  min-width: 0;
+}
+
+.st-tprev div > i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+}
+
+.st-tprev div:not(.st-tprev-half) {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  padding: 8px;
+}
+
+.st-tname {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px;
+  font-size: var(--st-t-sm);
+}
+
+.st-tcheck {
+  color: var(--accent);
+}

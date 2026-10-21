@@ -14,6 +14,7 @@ import {
   KEYMAP_COMMANDS,
   resolveAccelerator,
 } from "./keymap";
+import { FONT_OPTIONS } from "./settings-screen/fonts";
 import { loadSavedKeyIds, markKeySaved } from "./state";
 
 type SettingsTab = "theme" | "format" | "general" | "agent" | "keys";
@@ -37,14 +38,6 @@ export type SettingsPanel = {
   close: () => void;
 };
 
-const FONT_OPTIONS = [
-  { label: "System", value: "" },
-  { label: "Inter", value: "Inter" },
-  { label: "Georgia", value: "Georgia" },
-  { label: "Merriweather", value: "Merriweather" },
-  { label: "JetBrains Mono", value: "JetBrains Mono" },
-  { label: "Iosevka Nerd Font Mono", value: "Iosevka Nerd Font Mono" },
-] as const;
 const SIZE_OPTIONS = [12, 14, 16, 18, 20, 24] as const;
 
 function cloneSettings(settings: Settings): Settings {

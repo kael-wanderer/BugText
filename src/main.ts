@@ -82,6 +82,9 @@ import {
 } from "./keymap";
 import { createSettingsPanel } from "./settingspanel";
 import { createSettingsScreen } from "./settings-screen/screen";
+import { generalPage } from "./settings-screen/page-general";
+import { editingPage } from "./settings-screen/page-editing";
+import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
 import {
@@ -1972,7 +1975,7 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [],
+  [generalPage, editingPage, themePage],
 );
 onSettingsSynced = () => settingsScreen.refresh();
 
