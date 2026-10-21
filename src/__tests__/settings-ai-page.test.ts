@@ -116,3 +116,13 @@ it("puts every feature control on the shared control grid", () => {
   expect(grids).toHaveLength(5);
   expect(Array.from(grids).every((grid) => grid.classList.contains("st-use-controls-grid"))).toBe(true);
 });
+
+it("keeps the engine badge outside the select text area", () => {
+  settings.uses.chat = { engine: { kind: "cli", tool: "claude" }, model: "", effort: "" };
+  const host = document.createElement("div");
+  renderUseFor(host, deps);
+  const control = host.querySelector(".st-engine-control")!;
+  const badge = control.querySelector(".st-engine-badge")!;
+  expect(badge.classList.contains("st-engine-badge-inline")).toBe(true);
+  expect(control.children[0]).toBe(badge);
+});

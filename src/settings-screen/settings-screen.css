@@ -684,18 +684,20 @@
   min-width: 0;
   position: relative;
 }
-.st-engine-control select {
-  width: 100%;
-  padding-left: 36px;
+.st-engine-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
-.st-engine-control:has(.st-engine-badge) select {
-  padding-left: 36px;
+.st-engine-control select {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  padding-left: 8px;
 }
 .st-engine-badge {
-  position: absolute;
-  top: 50%;
-  left: 7px;
-  transform: translateY(-50%);
+  position: static;
+  flex: 0 0 18px;
   border-radius: 50%;
   width: 18px;
   height: 18px;

@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- The engine letter badge now sits beside the select text, keeping engine names readable in Use for.
 - AI settings saves now wait for successful keychain migration, v1 backups omit plaintext keys, key ids are normalized in the keychain, and unsupported explicit settings versions preserve the last good state.
 - Version 1 AI migration leaves engine uses empty when no engine exists so runtime CLI fallback can work.
 - CLI chat now inlines readable attachments outside the run folder and explains when an attachment cannot be opened inside the sandbox.

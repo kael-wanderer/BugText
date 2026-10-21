@@ -94,7 +94,7 @@ export function renderUseFor(
             current.engine.kind === "api" ? "api" : current.engine.tool
           ];
         engineWrap.append(
-          text("span", badge.letter, `st-engine-badge ${badge.cls}`),
+          text("span", badge.letter, `st-engine-badge st-engine-badge-inline ${badge.cls}`),
         );
       }
       engineWrap.append(engine);
