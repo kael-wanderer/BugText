@@ -8,6 +8,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- The AI panel is Chat only, with automatic note context, per-feature engines, and
+  a changed-files summary after folder-confined coding-agent runs.
+
 - AI connections now validate server addresses, discover models without generating text,
   cache model lists locally, and use native provider formats for custom Anthropic endpoints.
   Keyed requests reject redirects and never include server response bodies in errors.
@@ -38,6 +41,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   `src/capture.ts`.
 
 ### Fixed
+
+- Changed-file checks after cancelling a coding-agent run wait for the process group
+  to stop, so late writes are included before open tabs reload or show a conflict.
 
 - API connection key badges now read the OS keychain. Changing a server address
   clears its saved key and model cache before the updated connection is saved.

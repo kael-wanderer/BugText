@@ -28,22 +28,32 @@ export async function runCli(o: CliRunOptions): Promise<void> {
   const requestId = `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const unlisteners: UnlistenFn[] = [];
   let output = "";
+  let launch: Promise<unknown> | null = null;
+  let cancellation: Promise<void> | null = null;
+  let cancelling = false;
   let resolve!: () => void, reject!: (error: unknown) => void;
   const complete = new Promise<void>((yes, no) => {
     resolve = yes;
     reject = no;
   });
   void complete.catch(() => {});
-  const abort = () => {
-    void invoke("ai_cancel", { requestId });
-    reject(new DOMException("AI request cancelled.", "AbortError"));
+  const abort = (): void => {
+    if (cancelling) return;
+    cancelling = true;
+    cancellation = (async () => {
+      if (launch) {
+        await launch.catch(() => {});
+        await invoke("ai_cancel", { requestId }).catch(() => {});
+      }
+      reject(new DOMException("AI request cancelled.", "AbortError"));
+    })();
   };
   try {
     if (o.signal?.aborted)
       throw new DOMException("AI request cancelled.", "AbortError");
     unlisteners.push(
       await listen<{ requestId: string; chunk: string }>("ai-chunk", (e) => {
-        if (e.payload.requestId === requestId) {
+        if (!cancelling && e.payload.requestId === requestId) {
           output += e.payload.chunk;
           o.onChunk(e.payload.chunk);
         }
@@ -51,7 +61,7 @@ export async function runCli(o: CliRunOptions): Promise<void> {
     );
     unlisteners.push(
       await listen<{ requestId: string }>("ai-done", (e) => {
-        if (e.payload.requestId === requestId) {
+        if (!cancelling && e.payload.requestId === requestId) {
           const message = signedOutMessage(o.tool, output);
           if (message) reject(new Error(message));
           else resolve();
@@ -60,7 +70,7 @@ export async function runCli(o: CliRunOptions): Promise<void> {
     );
     unlisteners.push(
       await listen<{ requestId: string; message: string }>("ai-error", (e) => {
-        if (e.payload.requestId === requestId)
+        if (!cancelling && e.payload.requestId === requestId)
           reject(
             new Error(
               signedOutMessage(o.tool, e.payload.message) ?? e.payload.message,
@@ -72,8 +82,10 @@ export async function runCli(o: CliRunOptions): Promise<void> {
     if (o.signal?.aborted)
       throw new DOMException("AI request cancelled.", "AbortError");
     o.onStart?.(requestId);
+    if (o.signal?.aborted)
+      throw new DOMException("AI request cancelled.", "AbortError");
     const local = o.local[o.tool];
-    await invoke("ai_run", {
+    launch = invoke("ai_run", {
       requestId,
       spec: {
         tool: o.tool,
@@ -92,8 +104,10 @@ export async function runCli(o: CliRunOptions): Promise<void> {
         proxyBaseUrl: "proxyBaseUrl" in local ? local.proxyBaseUrl : null,
       },
     });
+    await launch;
     await complete;
   } finally {
+    if (cancellation) await cancellation;
     o.signal?.removeEventListener("abort", abort);
     unlisteners.forEach((unlisten) => unlisten());
   }

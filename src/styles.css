@@ -2908,3 +2908,94 @@ body.resizing-ai {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Chat-only AI panel; the compose area survives settings changes. */
+#activities .ab-btn[hidden],
+#ab-ai[hidden] {
+  display: none;
+}
+.ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  min-height: 38px;
+  padding-left: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.ai-header .ai-close {
+  align-self: stretch;
+}
+.ai-chat-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-chat-picker select,
+.ai-chat-picker input {
+  flex: 1;
+  min-width: 100px;
+  max-width: 100%;
+  padding: 6px 7px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--bg);
+}
+.ai-chat-picker input[hidden] {
+  display: none;
+}
+.ai-compose-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.ai-reply-meta,
+.ai-note {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 10px;
+}
+.ai-reply-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ai-source {
+  padding: 2px 5px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.ai-actions {
+  flex-wrap: wrap;
+}
+.ai-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ai-header {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ai-header > strong {
+  flex: 1;
+}
+.ai-header .ai-chat-picker {
+  order: 3;
+  flex-basis: 100%;
+  min-width: 0;
+  padding: 0 10px 8px 0;
+  border: 0;
+}

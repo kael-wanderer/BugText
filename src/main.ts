@@ -290,14 +290,14 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       applyKeymap();
       syncViewMenu();
       requestWindowMeasure();
-      aiPanel?.refreshTheme();
-      aiPanel?.syncWorkspaceContext();
       if (themeChanged) renderAll();
     } else {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
       if (!next) return;
       currentAISettings = next;
+      if (!next.enabled.chat) setAIVisible(false);
+      applyAIVisibility();
       aiPanel?.render();
     }
     onSettingsSynced?.();
@@ -335,14 +335,15 @@ function saveSettingsFromPanel(settings: Settings): void {
   applyKeymap();
   syncViewMenu();
   requestWindowMeasure();
-  aiPanel?.refreshTheme();
-  aiPanel?.syncWorkspaceContext();
   if (themeChanged) renderAll();
   writeSettings(settings);
 }
 
 function saveAISettingsFromPanel(settings: AISettings): void {
+  const disabledChat = currentAISettings.enabled.chat && !settings.enabled.chat;
   currentAISettings = settings;
+  if (disabledChat) setAIVisible(false);
+  applyAIVisibility();
   aiPanel?.render();
   writeAISettings(settings);
 }
@@ -1120,6 +1121,8 @@ async function doSave(saveAs = false): Promise<void> {
     }
     if (target === aiSettingsPath) {
       currentAISettings = tryParseAISettings(text) ?? currentAISettings;
+      if (!currentAISettings.enabled.chat) setAIVisible(false);
+      applyAIVisibility();
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
@@ -1200,11 +1203,14 @@ function showActiveHistory(): void {
   });
 }
 
-async function checkActiveForExternalChange(windowId: string): Promise<void> {
+async function checkActiveForExternalChange(
+  windowId: string,
+  tabId?: string,
+): Promise<void> {
   const windowState = getWindow(windowId);
   if (!windowState) return;
   const tab = windowState.tabs.find(
-    (item) => item.id === windowState.activeTabId,
+    (item) => item.id === (tabId ?? windowState.activeTabId),
   );
   if (!tab?.path || isPdfFile(tab.path)) return;
   const view = views.get(windowId);
@@ -1225,7 +1231,9 @@ async function checkActiveForExternalChange(windowId: string): Promise<void> {
           item.id === tab.id ? { ...item, dirty: false } : item,
         ),
       });
-      view.renderPreview(text, tab.path!);
+      if (getWindow(windowId)?.activeTabId === tab.id) {
+        view.renderPreview(text, tab.path!);
+      }
       renderAll();
     },
     markDirty: () => {
@@ -1593,7 +1601,6 @@ function setMenuTheme(theme: string): void {
   };
   persistCurrentSettings();
   renderAll();
-  aiPanel?.refreshTheme();
 }
 
 function toggleAutomaticUpdates(): void {
@@ -1784,6 +1791,43 @@ function buildAIPanel(): void {
   aiPanel = createAIPanel(aiPanelElement, {
     getSettings: () => currentAISettings,
     onSettingsChange: saveAISettingsFromPanel,
+    getClis: () => cliInfos,
+    getModelsCache: () => modelsCache,
+    guard: {
+      tabsInFolder: (folder) => {
+        const prefix = folder.replace(/[\\/]$/, "") + "/";
+        return getState().windows.flatMap((windowState) => {
+          const view = views.get(windowState.id);
+          return windowState.tabs.flatMap((tab) => {
+            if (!tab.path || isPdfFile(tab.path) || !view) return [];
+            if (folder && !tab.path.startsWith(prefix)) return [];
+            return [{
+              path: tab.path,
+              dirty: tab.dirty,
+              text: view.editor.getText(tab.id),
+            }];
+          });
+        });
+      },
+      snapshot: (path, text, label) => manualSnapshot(path, text, label),
+      checkTab: async (path) => {
+        for (const windowState of getState().windows) {
+          for (const tab of windowState.tabs) {
+            if (tab.path === path) {
+              await checkActiveForExternalChange(windowState.id, tab.id);
+            }
+          }
+        }
+      },
+    },
+    onNewNote: (text) => {
+      const windowId = getState().activeWindowId;
+      openInWindow(windowId, { path: null, name: "Untitled", text });
+      const tab = activeMeta();
+      if (tab) onDocChange(windowId, tab.id, text);
+      renderAll();
+    },
+    onOpenNote: (path) => void doOpenPath(path),
     getDoc: () => {
       const view = activeView();
       const tab = activeMeta();
@@ -1801,16 +1845,6 @@ function buildAIPanel(): void {
     lookupTabText: panelReview.lookupTabText,
     applyEditTo: panelReview.applyEditTo,
     beforeApply: panelReview.beforeApply,
-    confirmPermission: (providerLabel, profileLabel) =>
-      confirm(
-        `Run ${providerLabel} with "${profileLabel}" permissions? BugText will start the selected CLI command; the agent enforces its own permission flags.`,
-        {
-          title: "Confirm AI run",
-          kind: "warning",
-          okLabel: "Run once",
-          cancelLabel: "Cancel",
-        },
-      ),
     onInsert: (text) => {
       const editor = activeView().editor;
       const selection = editor.getSelection();
@@ -1819,12 +1853,7 @@ function buildAIPanel(): void {
     onOpenChangedFile: (dir, rel) => void doOpenPath(joinPath(dir, rel)),
     onClose: () => setAIVisible(false),
     getSendAccelerator: () => resolvedAccel("ai.send"),
-    getWorkingDir: () => {
-      const folder = getState().folder;
-      if (folder) return folder;
-      const path = activeMeta()?.path;
-      return path ? path.replace(/[\\/][^\\/]*$/, "") || null : null;
-    },
+    getWorkingDir: () => getState().folder,
     getFileList: () => {
       const folder = getState().folder;
       if (!folder) return [];
@@ -1834,15 +1863,8 @@ function buildAIPanel(): void {
       }));
     },
     getWorkspaceContext: () => ({
-      enabled: currentSettings.workspaceContext,
       k: currentSettings.workspaceContextK,
     }),
-    onWorkspaceContextChange: (enabled) => {
-      saveSettingsFromPanel({
-        ...currentSettings,
-        workspaceContext: enabled,
-      });
-    },
     historyKey: `bugtext.ai.history.${nativeWindowLabel}`,
     legacyHistoryKey: `bugtext.ai.history.${nativeWindowLabel}`,
   });
@@ -1851,6 +1873,7 @@ function buildAIPanel(): void {
 function applyAIVisibility(): void {
   document.body.classList.toggle("ai-hidden", !ui.aiVisible);
   const button = document.getElementById("ab-ai")!;
+  button.hidden = !currentAISettings.enabled.chat;
   button.classList.toggle("active", ui.aiVisible);
   button.setAttribute("aria-pressed", String(ui.aiVisible));
 }
@@ -1865,6 +1888,7 @@ function setAIVisible(aiVisible: boolean): void {
 }
 
 function toggleAI(): void {
+  if (!currentAISettings.enabled.chat) return;
   setAIVisible(!ui.aiVisible);
 }
 
@@ -2449,6 +2473,7 @@ async function boot(): Promise<void> {
     void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
   }
   await loadAISettings();
+  applyAIVisibility();
   await rescanClis();
   modelsCache = await loadModelsCache();
   if (isPrimaryNativeWindow) {
