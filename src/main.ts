@@ -90,6 +90,7 @@ import { generalPage } from "./settings-screen/page-general";
 import { editingPage } from "./settings-screen/page-editing";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
+import { appendMcpActivity, type McpPageDeps } from "./settings-screen/page-ai-mcp";
 import { loadModelsCache } from "./ai/models-cache";
 import { createWorkspaceIndex } from "./ai/workspace-index";
 import { createMcpHandler, type McpRequest } from "./mcp/handler";
@@ -446,7 +447,10 @@ void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
 function syncMcpEnabled(): void {
   if (!isPrimaryNativeWindow) return;
   const enabled = (currentSettings as Settings & { mcp?: { enabled?: boolean } }).mcp?.enabled === true;
-  void invoke<void>("mcp_set_enabled", { enabled }).catch(() => {});
+  void invoke<void>("mcp_set_enabled", { enabled })
+    .then(() => invoke<typeof mcpStatus>("mcp_status"))
+    .then((status) => { mcpStatus = status; settingsScreen.refresh(); })
+    .catch(() => {});
 }
 
 void listenScoped<McpRequest>("bugtext://mcp-request", async ({ payload }) => {
@@ -2163,6 +2167,20 @@ applyAgentPanelWidth();
 applyAIVisibility();
 
 const isMac = /Mac/.test(navigator.userAgent);
+let mcpStatus = { enabled: false, connected: 0, roots: [] as { folder: string; window: string }[] };
+async function refreshMcpStatus(): Promise<void> {
+  mcpStatus = await invoke<typeof mcpStatus>("mcp_status").catch(() => mcpStatus);
+  settingsScreen.refresh();
+}
+const mcpPageDeps: McpPageDeps = {
+  getSettings: () => currentSettings,
+  onSettingsChange: saveSettingsFromPanel,
+  getStatus: () => mcpStatus,
+  getClientStatus: (client) => invoke("mcp_client_status", { client }),
+  register: async (client) => { await invoke("mcp_register", { client }); await refreshMcpStatus(); },
+  unregister: async (client) => { await invoke("mcp_unregister", { client }); await refreshMcpStatus(); },
+  copy: copyText,
+};
 
 const settingsScreen = createSettingsScreen(
   {
@@ -2171,6 +2189,7 @@ const settingsScreen = createSettingsScreen(
     getClis: () => cliInfos,
     rescan: rescanClis,
     getModelsCache: () => modelsCache,
+    mcp: mcpPageDeps,
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
@@ -2184,6 +2203,14 @@ const settingsScreen = createSettingsScreen(
   [generalPage, editingPage, themePage, shortcutsPage, aiPage],
 );
 onSettingsSynced = () => settingsScreen.refresh();
+void listenScoped<typeof mcpStatus>("bugtext://mcp-status", ({ payload }) => {
+  mcpStatus = payload;
+  settingsScreen.refresh();
+});
+void listenScoped<{ time: number; client: string; text: string }>("bugtext://mcp-activity", ({ payload }) => {
+  appendMcpActivity(payload);
+  settingsScreen.refresh();
+});
 
 async function setAsDefault(role: "markdown" | "pdf"): Promise<void> {
   const label = role === "pdf" ? "PDF" : "Markdown";
@@ -2639,6 +2666,7 @@ async function restoreWindows(): Promise<void> {
 
 async function boot(): Promise<void> {
   await loadSettings();
+  await refreshMcpStatus();
   reportWindow();
   // The Dock forgets a custom icon on quit; re-apply it (app-wide, idempotent).
   if (isMac && currentSettings.appIcon !== DEFAULT_APP_ICON) {

@@ -27,6 +27,7 @@ export type AppIconId = (typeof APP_ICON_IDS)[number];
 export const DEFAULT_APP_ICON: AppIconId = "page-bug";
 
 export type Settings = {
+  mcp: { enabled: boolean };
   theme: ThemeName;
   restoreSession: boolean;
   updateMode: "manual" | "auto";
@@ -63,6 +64,7 @@ const THEMES: ThemeName[] = [
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
+  mcp: { enabled: false },
   theme: "dark",
   restoreSession: true,
   updateMode: "manual",
@@ -177,6 +179,7 @@ export function parseSettings(raw: string): Settings {
       : DEFAULT_SETTINGS.workspaceContextK;
 
   return {
+    mcp: { enabled: (data.mcp as { enabled?: unknown } | undefined)?.enabled === true },
     theme,
     restoreSession:
       typeof data.restoreSession === "boolean"

@@ -6,11 +6,12 @@ mod dock_icon;
 mod export;
 mod files;
 mod macos_dock;
-mod menu;
+mod mcp_bridge;
+mod mcp_clients;
 mod mcp_paths;
 mod mcp_protocol;
-mod mcp_bridge;
 mod mcp_server;
+mod menu;
 mod native_windows;
 mod preview;
 mod recovery;
@@ -192,6 +193,9 @@ pub fn run() {
             mcp_server::mcp_report_window,
             mcp_server::mcp_reply,
             mcp_server::mcp_status,
+            mcp_clients::mcp_client_status,
+            mcp_clients::mcp_register,
+            mcp_clients::mcp_unregister,
             files::ai_models_cache_read,
             files::ai_models_cache_write,
             ai::ai_run,

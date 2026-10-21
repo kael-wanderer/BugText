@@ -106,6 +106,7 @@ it("shows rail subitems in order", () => {
     "Use for",
     "Local CLI",
     "API providers",
+    "MCP server",
   ]);
 });
 
