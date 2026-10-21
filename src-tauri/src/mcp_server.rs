@@ -7,7 +7,7 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::io::AsRawFd;
-use std::os::unix::net::{UnixListener, UnixStream};
+use std::os::unix::net::{SocketAddr, UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
@@ -95,6 +95,12 @@ pub struct McpStatus {
 }
 
 pub fn accept_peer(peer_uid: u32, my_uid: u32) -> bool { peer_uid == my_uid }
+
+fn accept_blocking(listener: &UnixListener) -> std::io::Result<(UnixStream, SocketAddr)> {
+    let (stream, address) = listener.accept()?;
+    stream.set_nonblocking(false)?;
+    Ok((stream, address))
+}
 
 #[cfg(target_os = "macos")]
 extern "C" {
@@ -261,7 +267,7 @@ pub fn mcp_set_enabled(app: tauri::AppHandle, state: State<'_, McpState>, enable
     let listener_stop = stop.clone();
     let handle = thread::spawn(move || loop {
         if listener_stop.load(Ordering::SeqCst) { break; }
-        match listener.accept() {
+        match accept_blocking(&listener) {
             Ok((stream, _)) => {
                 let Some(uid) = peer_uid(&stream) else { continue };
                 if !accept_peer(uid, current_uid()) { continue; }
@@ -398,10 +404,14 @@ fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value)
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_peer, list_files_from_registry, owner, McpCore, TabReport, WindowReport};
+    use super::{accept_blocking, accept_peer, list_files_from_registry, owner, McpCore, TabReport, WindowReport};
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::thread;
+    use std::time::Duration;
 
     struct TempDir(PathBuf);
     impl TempDir {
@@ -508,5 +518,38 @@ mod tests {
         let core = McpCore::default();
         let response = core.dispatch_disabled("read_note", json!({}));
         assert_eq!(response.error.as_deref(), Some("MCP is turned off in BugText Settings ▸ AI ▸ MCP server."));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn accepted_socket_waits_for_request_and_reads_large_reply_completely() {
+        let dir = TempDir::new("blocking-accept");
+        let socket = dir.0.join("server.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = loop {
+                match accept_blocking(&listener) {
+                    Ok(pair) => break pair,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => thread::sleep(Duration::from_millis(2)),
+                    Err(error) => panic!("accept failed: {error}"),
+                }
+            };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut request = String::new();
+            reader.read_line(&mut request).unwrap();
+            assert_eq!(request, "delayed request\n");
+            let reply = format!("{}\n", "x".repeat(600 * 1024));
+            stream.write_all(reply.as_bytes()).unwrap();
+            reply
+        });
+
+        let mut client = UnixStream::connect(&socket).unwrap();
+        thread::sleep(Duration::from_millis(150));
+        client.write_all(b"delayed request\n").unwrap();
+        client.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+        let mut reply = String::new();
+        client.read_to_string(&mut reply).unwrap();
+        assert_eq!(reply, server.join().unwrap());
     }
 }

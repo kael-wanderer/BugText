@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Accepted MCP socket connections now use blocking reads and writes on macOS.
 - MCP bridge now reports the app as not running when its socket closes before replying.
 - Malformed or unsupported AI settings files remain untouched at startup, and saves stay blocked until key migration succeeds.
 - The engine letter badge now sits beside the select text, keeping engine names readable in Use for.
