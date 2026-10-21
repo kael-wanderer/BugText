@@ -69,6 +69,8 @@ export type AIPanel = {
   resize: () => void;
   addAttachments: (paths: string[]) => void;
   refreshTheme: () => void;
+  /** Re-reads the workspace-context checkbox after settings change elsewhere. */
+  syncWorkspaceContext: () => void;
   appendBubble: (role: string, text: string) => HTMLElement;
   resetWorkspaceContext: () => void;
   updateWorkspaceFile: (path: string, text: string) => void;
@@ -911,6 +913,10 @@ export function createAIPanel(
     render,
     resize: () => terminalView?.resize(),
     refreshTheme: () => terminalView?.setTheme(),
+    syncWorkspaceContext: () => {
+      const box = body.querySelector<HTMLInputElement>(".ai-workspace-context");
+      if (box) box.checked = deps.getWorkspaceContext().enabled;
+    },
     addAttachments: (paths) => {
       if (activeTab !== "chat") {
         activeTab = "chat";

@@ -80,10 +80,11 @@ import {
   menuAccelerators,
   resolveAccelerator,
 } from "./keymap";
-import { createSettingsPanel } from "./settingspanel";
 import { createSettingsScreen } from "./settings-screen/screen";
 import { generalPage } from "./settings-screen/page-general";
 import { editingPage } from "./settings-screen/page-editing";
+import { shortcutsPage } from "./settings-screen/page-shortcuts";
+import { aiPage } from "./settings-screen/page-ai";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
@@ -261,6 +262,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       syncViewMenu();
       requestWindowMeasure();
       aiPanel?.refreshTheme();
+      aiPanel?.syncWorkspaceContext();
     } else {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
@@ -268,7 +270,6 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       currentAISettings = next;
       aiPanel?.render();
     }
-    settingsPanel.refresh();
     onSettingsSynced?.();
   } catch {
     /* Keep current settings when the file cannot be read. */
@@ -304,6 +305,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   aiPanel?.refreshTheme();
+  aiPanel?.syncWorkspaceContext();
   writeSettings(settings);
 }
 
@@ -1562,7 +1564,6 @@ function toggleAutomaticUpdates(): void {
     updateMode: currentSettings.updateMode === "auto" ? "manual" : "auto",
   };
   persistCurrentSettings();
-  settingsPanel.refresh();
   settingsScreen.refresh();
 }
 
@@ -1949,16 +1950,6 @@ function applyAgentPanelWidth(width = ui.aiWidth): void {
 applyAgentPanelWidth();
 applyAIVisibility();
 
-const settingsPanel = createSettingsPanel({
-  getSettings: () => currentSettings,
-  getAISettings: () => currentAISettings,
-  onSettingsChange: saveSettingsFromPanel,
-  onAISettingsChange: saveAISettingsFromPanel,
-  onOpenSettingsFile: openSettings,
-  onOpenAISettingsFile: openAISettings,
-  onCheckForUpdates: () => void checkForUpdates(),
-});
-
 const isMac = /Mac/.test(navigator.userAgent);
 
 const settingsScreen = createSettingsScreen(
@@ -1975,7 +1966,7 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [generalPage, editingPage, themePage],
+  [generalPage, editingPage, themePage, shortcutsPage, aiPage],
 );
 onSettingsSynced = () => settingsScreen.refresh();
 

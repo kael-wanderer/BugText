@@ -27,6 +27,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 - Changing a setting in one window no longer gets undone when another window saves; all
   windows pick up the change.
+- The AI panel's Workspace context checkbox now follows changes made in Settings or in
+  another window instead of showing a stale value.
 
 - Open files now reload from disk when another process changes them: the 3-second
   auto-refresh and the window-focus refresh compare the file's text instead of a
