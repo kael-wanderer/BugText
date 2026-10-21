@@ -32,6 +32,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- MCP server for Claude Code and Codex: terminal clients can list, search, read,
+  update and create notes through the running app. Paths are confined to open
+  folders, edits snapshot before saving, and Settings ▸ AI ▸ MCP server controls
+  the socket and client registration.
 - App icon picker in Settings ▸ General: choose among icon designs and the Dock icon
   changes immediately. `npm run icons:app` regenerates the icon assets.
 - BugText ▸ Settings… menu item (`⌘,`).
@@ -50,12 +54,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ### Fixed
 
 - The MCP bridge now reports when the server switch is off after a refused socket connection.
-- MCP activity now reflects actual snapshots, search returns retrieval scores, and selection works without a focused window.
-- The MCP bridge now reuses its socket connection across requests and reconnects after transport failures.
-- MCP Undo now restores the first pre-edit text after merged edits and follows the latest edit state.
-- MCP now checks hidden paths relative to the open folder, allowing folders inside hidden ancestors.
-- MCP now matches open tabs through the path reported by their owning window, including symlinked roots.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.
+- MCP now matches open tabs through the path reported by their owning window, including symlinked roots.
+- MCP now checks hidden paths relative to the open folder, allowing folders inside hidden ancestors.
+- MCP Undo now restores the first pre-edit text after merged edits and follows the latest edit state.
+- The MCP bridge now reuses its socket connection across requests and reconnects after transport failures.
+- MCP activity now reflects actual snapshots, search returns retrieval scores, and selection works without a focused window.
 - Accepted MCP socket connections now use blocking reads and writes on macOS.
 - MCP bridge now reports the app as not running when its socket closes before replying.
 - Malformed or unsupported AI settings files remain untouched at startup, and saves stay blocked until key migration succeeds.
