@@ -1,4 +1,5 @@
 mod ai;
+mod cli_scan;
 mod defaults;
 mod dock_icon;
 mod export;
@@ -175,6 +176,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             ai::ai_run,
+            cli_scan::cli_scan,
             dock_icon::set_dock_icon,
             ai::ai_cancel,
             export::export_pdf,
@@ -188,6 +190,7 @@ pub fn run() {
             defaults::open_default_apps_settings,
             secrets::set_secret,
             secrets::get_secret,
+            secrets::has_secret,
             secrets::delete_secret,
             files::read_file,
             files::read_file_bytes,

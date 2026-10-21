@@ -1,32 +1,12 @@
+use crate::cli_scan::login_shell_path;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::process::{Command, Stdio};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 
 #[derive(Default)]
 pub struct AIState(Mutex<HashMap<String, u32>>);
-
-/// GUI apps on macOS launch with a minimal PATH that omits Homebrew, npm, and
-/// other user bin dirs, so `Command::new("pi")` fails with "No such file or
-/// directory". Resolve the user's real PATH from their login shell once and
-/// reuse it for every spawned agent command.
-fn login_shell_path() -> Option<&'static String> {
-    static PATH: OnceLock<Option<String>> = OnceLock::new();
-    PATH.get_or_init(|| {
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-        let output = Command::new(shell)
-            .args(["-lic", "printf %s \"$PATH\""])
-            .output()
-            .ok()?;
-        if !output.status.success() {
-            return None;
-        }
-        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        (!path.is_empty()).then_some(path)
-    })
-    .as_ref()
-}
 
 #[derive(Clone, serde::Serialize)]
 struct Chunk {
