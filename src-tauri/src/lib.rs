@@ -9,6 +9,7 @@ mod macos_dock;
 mod menu;
 mod mcp_paths;
 mod mcp_protocol;
+mod mcp_bridge;
 mod native_windows;
 mod preview;
 mod recovery;
@@ -18,6 +19,10 @@ mod secrets;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+
+pub fn mcp_bridge_main() -> i32 {
+    mcp_bridge::mcp_bridge_main()
+}
 
 #[derive(Default)]
 struct OpenPathState {
