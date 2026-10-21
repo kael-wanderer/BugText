@@ -15,6 +15,7 @@ import {
   type AISettings,
 } from "./ai/aisettings";
 import { moveLegacySecret } from "./ai/aisettings-secrets";
+import { permitAISettingsSave } from "./ai/aisettings-write-guard";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
@@ -206,17 +207,21 @@ function writeSettings(next: Settings): void {
 }
 
 function writeAISettings(next: AISettings): void {
-  if (!aiSettingsMigrationReady) {
-    void message("Couldn't move API keys to the keychain — settings not saved", {
-      title: "AI settings",
-      kind: "error",
-    });
-    return;
-  }
-  if (!aiSettingsPath) return;
-  void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
-    .then(() => broadcastSettingsChange("agent"))
-    .catch(() => {});
+  permitAISettingsSave(
+    aiSettingsMigrationReady,
+    () => {
+      if (!aiSettingsPath) return;
+      void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
+        .then(() => broadcastSettingsChange("agent"))
+        .catch(() => {});
+    },
+    () => {
+      void message("Couldn't move API keys to the keychain — settings not saved", {
+        title: "AI settings",
+        kind: "error",
+      });
+    },
+  );
 }
 
 async function loadSettings(): Promise<void> {
@@ -239,6 +244,12 @@ async function loadAISettings(): Promise<void> {
     const file = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
     aiSettingsPath = file.path;
     const savedKeyIds = await getSavedAIKeyIds();
+    // Keep the current state and source file intact when the JSON is malformed
+    // or declares an unsupported version, matching the live reload path.
+    if (!tryParseAISettings(file.contents, savedKeyIds)) {
+      aiPanel?.render();
+      return;
+    }
     const { cleaned, keys } = extractLegacyKeys(file.contents);
     let canPersistMigration = true;
     if (keys.length) {
