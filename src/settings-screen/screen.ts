@@ -261,7 +261,12 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     const recording = pages.some((p) => p.blocksEscape?.() ?? false);
     if (event.key === "Escape") {
       const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldLeaveOnEscape(target, recording)) return;
+      const info = target && {
+        tagName: target.tagName,
+        isContentEditable: target.isContentEditable,
+        type: target instanceof HTMLInputElement ? target.type : undefined,
+      };
+      if (!shouldLeaveOnEscape(info, recording)) return;
       event.preventDefault();
       close();
       return;

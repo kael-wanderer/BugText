@@ -9,8 +9,9 @@ For two-window cases open a second window with `⌘⇧N`.
 ### SET-01 — Open and leave, four ways, state preserved
 - Steps: In Main type unsaved text, split and type unsaved text in Sub, scroll and
   place cursors. Open Settings with `⌘,`, then leave with each of: `Esc`; the Back
-  button; the activity-bar gear; `⌘,` again. Repeat opening via BugText ▸ Settings…
-  and the gear.
+  button; the activity-bar gear; `⌘,` again; `⌘[`; the Explorer, Search and AI
+  activity-bar buttons (each leaves settings and shows that panel). Repeat opening
+  via BugText ▸ Settings… and the gear.
 - Expected: Every open/leave works. Main and Sub text stay unsaved and intact; cursor,
   scroll, split and tabs are exactly as before; the editor never visibly resizes.
 - Status: [ ]  Notes:
@@ -58,14 +59,15 @@ For two-window cases open a second window with `⌘⇧N`.
 ### SET-08 — Esc inside a text field
 - Steps: Focus the search box (with text), a font-family field, or a wrap-column field
   and press `Esc`.
-- Expected: Settings does not close. Search `Esc` clears or blurs per field only.
+- Expected: `Esc` inside a text field does not leave settings. `Esc` in the search
+  box clears it (a second `Esc` with focus outside a text field leaves).
 - Status: [ ]  Notes:
 
 ### SET-09 — PDF loading state
-- Steps: Open the PDF, open Settings, leave, switch to the PDF tab; also open a PDF
-  while the screen is open then leave.
-- Expected: The PDF shows its normal loading state and then renders pages; no blank or
-  stuck viewer.
+- Steps: Open the PDF, open Settings, leave, switch to the PDF tab. Also, with
+  settings open, use File ▸ Open and choose a PDF.
+- Expected: Settings closes and the PDF shows its loading state, then renders pages;
+  no blank or stuck viewer.
 - Status: [ ]  Notes:
 
 ### SET-10 — Boards removed

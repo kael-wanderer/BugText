@@ -67,7 +67,7 @@ panel, a PDF reader, and document export.
   the whole document). Proofread and Rewrite replace text through the diff review;
   Summarize and Generate outline stream into the panel. Applying an AI edit snapshots
   the file first (revert from Version History), and CLI agent runs show a changed-files
-  summary afterward. The quick-actions model is set in Agent ▸ Models.
+  summary afterward. The quick-actions model is set in Settings ▸ AI.
 - **Settings** — a full-window screen (`⌘,` or **BugText → Settings…**) with General,
   Editing, Theme, Shortcuts and AI pages and a search box, plus raw `settings.json` /
   `agent.json` for advanced edits. Changes apply live and sync across windows. General

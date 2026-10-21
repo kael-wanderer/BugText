@@ -15,7 +15,6 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - New app icon ("Page Bug": a document page with a ladybug on blue). Source SVG at
   `docs/design/bugtext-icon.svg`; all icons in `src-tauri/icons/` regenerated from it
   with `tauri icon`. Other concepts kept in `docs/design/logo-concepts/`.
-
 - Settings is now a full-window screen (`⌘,`) with General, Editing, Theme, Shortcuts
   and AI pages and a search box, replacing the settings popover. Your editor state
   (tabs, unsaved text, split) is untouched while it is open.
@@ -40,7 +39,6 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   windows pick up the change.
 - The AI panel's Workspace context checkbox now follows changes made in Settings or in
   another window instead of showing a stale value.
-
 - Open files now reload from disk when another process changes them: the 3-second
   auto-refresh and the window-focus refresh compare the file's text instead of a
   cached mtime/size, so a stale or failed stat can no longer leave a tab showing

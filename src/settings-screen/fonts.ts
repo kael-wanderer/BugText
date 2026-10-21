@@ -1,4 +1,4 @@
-// Font choices shared by the settings screen and the legacy settings panel.
+// Font choices used by the settings screen pages.
 export const FONT_OPTIONS = [
   { label: "System", value: "" },
   { label: "Inter", value: "Inter" },

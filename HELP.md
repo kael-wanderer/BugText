@@ -118,7 +118,7 @@ BugText chooses the command template — the CLI agent still enforces its own pe
 
 Open Settings with `⌘,` or **BugText → Settings…** (or the activity-bar gear). It fills
 the window with five pages: General, Editing, Theme, Shortcuts and AI. The search box
-jumps to any setting. Leave with `Esc`, the Back button, the gear, or `⌘,` again; your
+jumps to any setting. Leave with `Esc`, `⌘[`, the Back button, the gear, or `⌘,` again; your
 tabs, unsaved text, cursor and split are exactly as you left them. Changes apply
 immediately and show up in every open window. General has the app-icon picker, which
 changes the Dock icon, and buttons to edit `settings.json` / `agent.json` as text.

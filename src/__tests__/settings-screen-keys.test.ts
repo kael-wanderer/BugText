@@ -10,9 +10,12 @@ describe("settings screen keys", () => {
     expect(shouldLeaveOnEscape(null, false)).toBe(true);
   });
 
-  it("stays on Escape in textarea and select", () => {
+  it("blocks Escape only for text entry", () => {
     expect(shouldLeaveOnEscape({ tagName: "TEXTAREA" }, false)).toBe(false);
-    expect(shouldLeaveOnEscape({ tagName: "SELECT" }, false)).toBe(false);
+    expect(shouldLeaveOnEscape({ tagName: "SELECT" }, false)).toBe(true);
+    expect(shouldLeaveOnEscape({ tagName: "INPUT", type: "checkbox" }, false)).toBe(true);
+    expect(shouldLeaveOnEscape({ tagName: "INPUT", type: "search" }, false)).toBe(false);
+    expect(shouldLeaveOnEscape({ tagName: "INPUT" }, false)).toBe(false);
     expect(shouldLeaveOnEscape({ tagName: "BUTTON" }, false)).toBe(true);
   });
 });

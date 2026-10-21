@@ -75,8 +75,8 @@ live at `<app config dir>/agent.json` (legacy `ai.json` is auto-migrated on firs
 run), while API keys live in the OS keychain and never in that file.
 
 Settings is a full-window screen (`src/settings-screen/`) laid over the workbench:
-`⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, Back, the gear
-or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
+`⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, `⌘[`, Back, the
+gear or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
 tabs, unsaved text, cursor, scroll and split survive. Pages in fixed order: General,
 Editing, Theme, Shortcuts, AI (flat rail, plus search over `registry.ts`; every row
 carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
@@ -91,7 +91,7 @@ Settings changes broadcast the Tauri event `bugtext://settings-changed`
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,
 and a file that no longer parses (half-edited JSON tab) leaves current settings
 untouched. The General page's app-icon carousel sets the macOS Dock icon at runtime
-(`macos_dock.rs`; the choice persists in `settings.json`); `npm run icons:app`
+(`src-tauri/src/dock_icon.rs`; `macos_dock.rs` is the Dock context menu; the choice persists in `settings.json`); `npm run icons:app`
 regenerates the icon assets from the local-only `docs/design/logo-concepts/`.
 
 Keyboard shortcuts are fully customizable. `keymap.ts` is the command registry
@@ -121,7 +121,7 @@ Before an AI edit lands on a saved document, a labeled snapshot is written via t
 Recovery store (revert from Version History). After a CLI agent run in the open
 folder, a changed-files summary (`src/ai/run-summary.ts`) lists added/modified/
 deleted files. The model used for quick actions is `quickActionProvider`
-(Agent ▸ Models; defaults to the default provider).
+(Settings ▸ AI; defaults to the default provider).
 
 Document PDF/DOCX export requires Pandoc and Typst:
 

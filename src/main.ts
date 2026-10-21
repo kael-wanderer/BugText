@@ -256,6 +256,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
+      const themeChanged = next.theme !== currentSettings.theme;
       currentSettings = next;
       applySettings(currentSettings);
       applySoftWrap();
@@ -264,6 +265,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       requestWindowMeasure();
       aiPanel?.refreshTheme();
       aiPanel?.syncWorkspaceContext();
+      if (themeChanged) renderAll();
     } else {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
@@ -299,6 +301,7 @@ function openAISettings(): void {
 }
 
 function saveSettingsFromPanel(settings: Settings): void {
+  const themeChanged = settings.theme !== currentSettings.theme;
   currentSettings = settings;
   applySettings(currentSettings);
   applySoftWrap();
@@ -307,6 +310,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   requestWindowMeasure();
   aiPanel?.refreshTheme();
   aiPanel?.syncWorkspaceContext();
+  if (themeChanged) renderAll();
   writeSettings(settings);
 }
 
@@ -1074,16 +1078,21 @@ async function doSave(saveAs = false): Promise<void> {
     void recordStat(target);
     void snapshotOnSave(target, text);
     if (target === settingsPath) {
-      currentSettings = parseSettings(text);
+      const previous = currentSettings;
+      currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
       applySoftWrap();
       applyKeymap();
       syncViewMenu();
       requestWindowMeasure();
+      if (isMac && currentSettings.appIcon !== previous.appIcon) {
+        void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
+      }
+      if (currentSettings.theme !== previous.theme) renderAll();
       broadcastSettingsChange("settings");
     }
     if (target === aiSettingsPath) {
-      currentAISettings = parseAISettings(text);
+      currentAISettings = tryParseAISettings(text) ?? currentAISettings;
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
@@ -1509,6 +1518,7 @@ function persistCurrentSettings(): void {
   requestWindowMeasure();
   syncViewMenu();
   writeSettings(currentSettings);
+  settingsScreen.refresh();
 }
 
 function setWrapMode(mode: SoftWrapMode): void {
@@ -1565,7 +1575,6 @@ function toggleAutomaticUpdates(): void {
     updateMode: currentSettings.updateMode === "auto" ? "manual" : "auto",
   };
   persistCurrentSettings();
-  settingsScreen.refresh();
 }
 
 function ensureSubWindow(): void {
@@ -2281,7 +2290,7 @@ listenScoped<string>("menu", (event) => {
     case "view.toggle_lines":
       return toggleLineNumbers();
     case "app.settings":
-      return settingsScreen.open();
+      return settingsScreen.toggle();
     case "view.keymap":
       return settingsScreen.open("shortcuts");
     case "view.zoom_in":

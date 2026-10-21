@@ -91,14 +91,18 @@ export function searchSettings(query: string): SearchHit[] {
   return [...pageHits, ...settingHits];
 }
 
-/** Whether Esc should leave settings: not while typing in a field or recording a shortcut. */
+const TEXT_INPUT_TYPES = new Set(["text", "search", "email", "url", "password", "number", "tel"]);
+
+/** Whether Esc should leave settings: not while typing text or recording a shortcut. */
 export function shouldLeaveOnEscape(
-  target: { tagName?: string; isContentEditable?: boolean } | null,
+  target: { tagName?: string; isContentEditable?: boolean; type?: string } | null,
   recording: boolean,
 ): boolean {
   if (recording) return false;
   if (!target) return true;
   if (target.isContentEditable) return false;
   const tag = (target.tagName ?? "").toUpperCase();
-  return tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT";
+  if (tag === "TEXTAREA") return false;
+  if (tag === "INPUT") return !TEXT_INPUT_TYPES.has((target.type ?? "text").toLowerCase());
+  return true;
 }
