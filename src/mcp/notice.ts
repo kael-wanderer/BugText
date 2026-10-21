@@ -33,6 +33,7 @@ export function showAgentNotice(host: HTMLElement, options: NoticeOptions): void
   const existing = notices.get(key);
   if (existing) {
     clearTimeout(existing.timer);
+    existing.options.undoAvailable = options.undoAvailable;
     existing.timer = setTimeout(() => remove(key, existing), 6000);
     refresh(existing);
     return;

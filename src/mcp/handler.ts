@@ -122,7 +122,7 @@ export function createMcpHandler(deps: HandlerDeps): {
       req.client,
       path.split(/[\\/]/).pop() || path,
       async () => {
-        deps.applyChanges(tab.id, [{ from: 0, to: finalText.length, insert: before }]);
+        deps.applyChanges(tab.id, [{ from: 0, to: deps.getText(tab.id).length, insert: before }]);
         await deps.saveTab(tab.id);
       },
       () => deps.getText(tab.id) === finalText,

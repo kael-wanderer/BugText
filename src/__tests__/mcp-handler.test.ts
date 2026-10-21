@@ -125,6 +125,15 @@ describe("MCP webview handler", () => {
     expect(f.deps.saveTab).toHaveBeenCalledTimes(2);
   });
 
+  it("undoes merged edits back to the first text across the latest document length", async () => {
+    const f = fixture({ text: "before" });
+    await f.handler.handle(request("update_note", { path, edits: [{ old: "before", new: "one" }] }));
+    await f.handler.handle(request("update_note", { path, edits: [{ old: "one", new: "a much longer latest result" }] }));
+    const undo = vi.mocked(f.notice).mock.calls[0][2];
+    await undo();
+    expect(f.getText()).toBe("before");
+  });
+
   it("snapshots and atomically writes a closed note without showing a notice", async () => {
     const f = fixture({ open: false, disk: "old" });
     await f.handler.handle(request("update_note", { path, edits: [{ old: "old", new: "new" }] }));

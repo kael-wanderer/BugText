@@ -27,6 +27,13 @@ describe("agent edit notice", () => {
     expect(secondUndo).not.toHaveBeenCalled();
   });
 
+  it("refreshes Undo availability from the latest merged edit", () => {
+    const host = document.createElement("div");
+    showAgentNotice(host, { client: "Agent", name: "b.md", onUndo: vi.fn(), undoAvailable: () => true });
+    showAgentNotice(host, { client: "Agent", name: "b.md", onUndo: vi.fn(), undoAvailable: () => false });
+    expect(host.querySelector<HTMLButtonElement>(".agent-notice-undo")!.hidden).toBe(true);
+  });
+
   it("hides Undo after owner changes and auto-hides after 6000 ms", () => {
     const host = document.createElement("div");
     let available = true;
