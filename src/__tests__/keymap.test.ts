@@ -100,3 +100,9 @@ describe("conflictingIds", () => {
     expect(conflicts.size).toBe(0);
   });
 });
+
+describe("app.settings command", () => {
+  it("keymap has app.settings on Cmd+,", () => {
+    expect(KEYMAP_COMMANDS.find((c) => c.id === "app.settings")?.default).toBe("CmdOrCtrl+,");
+  });
+});

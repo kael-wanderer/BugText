@@ -11,6 +11,21 @@ export type ZoneSettings = {
   size: number;
 };
 
+export const APP_ICON_IDS = [
+  "page-bug",
+  "cursor-ladybug",
+  "hash-beetle",
+  "bt-lettermark",
+  "line-bug",
+  "markdown-bug",
+  "b-wings",
+  "nib-bug",
+  "firefly-cursor",
+  "pixel-bug",
+] as const;
+export type AppIconId = (typeof APP_ICON_IDS)[number];
+export const DEFAULT_APP_ICON: AppIconId = "page-bug";
+
 export type Settings = {
   theme: ThemeName;
   restoreSession: boolean;
@@ -23,6 +38,7 @@ export type Settings = {
   keymap: Record<string, string>;
   workspaceContext: boolean;
   workspaceContextK: number;
+  appIcon: AppIconId;
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{
@@ -58,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keymap: {},
   workspaceContext: true,
   workspaceContextK: 5,
+  appIcon: DEFAULT_APP_ICON,
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
@@ -177,6 +194,9 @@ export function parseSettings(raw: string): Settings {
         ? data.workspaceContext
         : DEFAULT_SETTINGS.workspaceContext,
     workspaceContextK,
+    appIcon: (APP_ICON_IDS as readonly unknown[]).includes(data.appIcon)
+      ? (data.appIcon as AppIconId)
+      : DEFAULT_APP_ICON,
   };
 }
 

@@ -41,6 +41,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .items(&[&default_markdown, &default_pdf])
         .build()?;
 
+    let settings_item = MenuItemBuilder::with_id("app.settings", "Settings\u{2026}")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+
     let app_menu = SubmenuBuilder::new(app, "BugText")
         .about(Some(AboutMetadata {
             name: Some("BugText".into()),
@@ -48,6 +52,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             comments: Some("A fast, lightweight markdown editor".into()),
             ..Default::default()
         }))
+        .separator()
+        .item(&settings_item)
         .separator()
         .item(&default_menu)
         .separator()

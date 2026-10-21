@@ -31,6 +31,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "window.fullscreen", label: "Enter Full Screen", category: "Window", default: "Ctrl+Cmd+F", scope: "menu" },
   { id: "window.left_half", label: "Move to Left Half", category: "Window", default: "", scope: "menu" },
   { id: "window.right_half", label: "Move to Right Half", category: "Window", default: "", scope: "menu" },
+  { id: "app.settings", label: "Settings", category: "App", default: "CmdOrCtrl+,", scope: "menu" },
   { id: "palette.open", label: "Command Palette", category: "App", default: "CmdOrCtrl+K", scope: "app" },
   { id: "search.find_in_files", label: "Find in Folder", category: "App", default: "CmdOrCtrl+Shift+F", scope: "app" },
   { id: "history.show", label: "Show Version History", category: "App", default: "", scope: "app" },

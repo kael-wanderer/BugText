@@ -112,3 +112,13 @@ describe("tryParseSettings", () => {
     expect(tryParseSettings(raw)).toEqual(parseSettings(raw));
   });
 });
+
+describe("appIcon", () => {
+  it("parses appIcon with fallback", () => {
+    expect(parseSettings(JSON.stringify({ appIcon: "nib-bug" })).appIcon).toBe("nib-bug");
+    for (const v of ["", "../etc/passwd", 3, null, "NIB-BUG"]) {
+      expect(parseSettings(JSON.stringify({ appIcon: v })).appIcon).toBe("page-bug");
+    }
+    expect(parseSettings("{}").appIcon).toBe("page-bug");
+  });
+});

@@ -2229,6 +2229,9 @@ listenScoped<string>("menu", (event) => {
       return setMode(wid, activeWindow().mode === "preview" ? "split" : "preview");
     case "view.toggle_lines":
       return toggleLineNumbers();
+    case "app.settings":
+      // Temporary: opens the settings popover; the settings screen replaces it.
+      return settingsPanel.open(window.innerWidth / 2 - 220, window.innerHeight / 2 + 240);
     case "view.keymap":
       return settingsPanel.openKeys();
     case "view.zoom_in":
