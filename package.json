@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "vendor:tesseract": "node scripts/build-tesseract-vendor.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "icons:app": "node scripts/build-app-icons.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

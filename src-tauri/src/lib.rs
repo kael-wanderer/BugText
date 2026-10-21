@@ -1,5 +1,6 @@
 mod ai;
 mod defaults;
+mod dock_icon;
 mod export;
 mod external_terminal;
 mod files;
@@ -174,6 +175,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             ai::ai_run,
+            dock_icon::set_dock_icon,
             ai::ai_cancel,
             export::export_pdf,
             export::export_tools,

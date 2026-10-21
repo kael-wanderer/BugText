@@ -1,3 +1,4 @@
+import { mountAppIconPicker } from "./app-icon-picker";
 import { button, caption, group, pageHeader, row, segmented, toggle } from "./controls";
 import type { SettingsPage } from "./screen";
 
@@ -65,5 +66,6 @@ export const generalPage: SettingsPage = {
     const slot = document.createElement("div");
     slot.dataset.slot = "app-icon";
     host.append(slot);
+    mountAppIconPicker(slot, deps);
   },
 };

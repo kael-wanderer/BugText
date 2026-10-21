@@ -67,6 +67,7 @@ import { initResize } from "./resize";
 import { clearPdfEditDraft } from "./pdfview";
 import {
   applySettings,
+  DEFAULT_APP_ICON,
   DEFAULT_SETTINGS_JSON,
   normalizeThemeName,
   parseSettings,
@@ -2405,6 +2406,10 @@ async function restoreWindows(): Promise<void> {
 
 async function boot(): Promise<void> {
   await loadSettings();
+  // The Dock forgets a custom icon on quit; re-apply it (app-wide, idempotent).
+  if (isMac && currentSettings.appIcon !== DEFAULT_APP_ICON) {
+    void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
+  }
   await loadAISettings();
   if (isPrimaryNativeWindow) {
     startDailyUpdateChecks(() => currentSettings.updateMode === "auto");
