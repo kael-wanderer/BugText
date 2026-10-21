@@ -1,15 +1,16 @@
 mod ai;
+mod cli_args;
+mod cli_scan;
 mod defaults;
 mod dock_icon;
 mod export;
-mod external_terminal;
 mod files;
 mod macos_dock;
 mod menu;
 mod native_windows;
 mod preview;
-mod pty;
 mod recovery;
+mod sandbox;
 mod secrets;
 
 use std::collections::{HashMap, HashSet};
@@ -140,7 +141,6 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(pty::PtyState::default())
         .manage(ai::AIState::default())
         .manage(OpenPathState::default())
         .manage(native_windows::FocusedWindowState::default())
@@ -174,7 +174,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            files::ai_models_cache_read,
+            files::ai_models_cache_write,
             ai::ai_run,
+            cli_scan::cli_scan,
             dock_icon::set_dock_icon,
             ai::ai_cancel,
             export::export_pdf,
@@ -183,11 +186,11 @@ pub fn run() {
             export::export_pdf_html,
             export::export_docx_html,
             export::export_html,
-            external_terminal::launch_external_terminal,
             defaults::set_default_handler,
             defaults::open_default_apps_settings,
             secrets::set_secret,
             secrets::get_secret,
+            secrets::has_secret,
             secrets::delete_secret,
             files::read_file,
             files::read_file_bytes,
@@ -218,10 +221,6 @@ pub fn run() {
             recovery::recovery_read_snapshot,
             recovery::recovery_read_snapshot_bytes,
             recovery::recovery_delete_snapshots,
-            pty::pty_open,
-            pty::pty_write,
-            pty::pty_resize,
-            pty::pty_kill,
             preview::preview_allow,
             take_open_paths,
             sync_view_menu,

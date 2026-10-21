@@ -1,53 +1,56 @@
-# Agent Console — commands, terminal apps, font/size, theme
+# AI settings — local coding CLIs and folder safety
 
-Agent Console pickers + the Agent ▸ Agent Console settings section. Pre-req: Claude CLI
-installed and on PATH; app open.
+The AI panel is Chat only. Interactive agent sessions run in the user's own
+terminal. These checks cover Settings ▸ AI ▸ Local CLI and Chat's safe agent runs.
 
-### TERM-01 — Terminal runs and finds the CLI
-- Steps: AI panel ▸ Agent Console tab (default command "Claude Code").
-- Expected: The agent CLI launches (no "command not found"); colored TUI renders.
-- Status: [ ]  Notes:
+### CLI-01 — Detection and rescan
+- Steps: Open Local CLI, then click Rescan.
+- Expected: Claude Code, Codex CLI and Pi cards appear in that order. Pending cards
+  say “Looking…”; missing tools say “Not found on PATH” without a Test button.
+  Test and Rescan cannot run concurrently.
+- Status: [ ] Notes:
 
-### TERM-02 — Live picker switches program
-- Steps: Use the Agent command dropdown to switch to "Shell".
-- Expected: The terminal relaunches running zsh (a plain shell prompt).
-- Status: [ ]  Notes:
+### CLI-02 — Claude accounts
+- Steps: With two detected Claude config directories, select another Account.
+- Expected: `localCli.claude.configDir` persists. The Account select is hidden when
+  there is only one account. The selected account is used by Test and Chat.
+- Status: [ ] Notes:
 
-### TERM-03 — Add a terminal
-- Steps: Gear ▸ Agent ▸ Agent Console ▸ add { Name, Command }.
-- Expected: New entry appears and shows in the Agent command dropdown.
-- Status: [ ]  Notes:
+### CLI-03 — Per-feature usage
+- Steps: Choose Codex CLI for Rewrite under Use for, then open Local CLI.
+- Expected: Codex's usage tags include Rewrite. Features without an explicit
+  engine inherit Chat/default resolution. Disabling a feature keeps its choices.
+- Status: [ ] Notes:
 
-### TERM-04 — Edit / Remove / Use
-- Steps: Edit an entry's command; Use another; Remove one.
-- Expected: Changes persist to agent.json; default updates; removed entry gone.
-- Status: [ ]  Notes:
+### CLI-04 — Advanced paths and proxy
+- Steps: Edit config/home, executable path and proxy. Try `http://evil.com`, then
+  an HTTPS address or `http://localhost:1234/v1`.
+- Expected: Valid changes save on blur; the non-local HTTP address is rejected
+  without saving. Changing an executable path rescans the tools.
+- Status: [ ] Notes:
 
-### TERM-05 — Font and size
-- Steps: Terminals section ▸ change Font and Size.
-- Expected: The terminal re-renders with the chosen font/size.
-- Status: [ ]  Notes:
+### CLI-05 — Keychain controls
+- Steps: Save, replace and remove a CLI proxy API key.
+- Expected: The password input clears after save and stays empty when reopening.
+  “A key is saved” reflects the keychain. The key never appears in `agent.json`.
+- Status: [ ] Notes:
 
-### TERM-06 — Theme colors
-- Steps: Keep a terminal open and switch between light and dark themes.
-- Expected: Plain output, cursor, and selection colors update live with readable
-  contrast.
-- Status: [ ]  Notes:
+### CLI-06 — Answer-only tests and sign-out
+- Steps: Click Test for an installed tool, including a signed-out account.
+- Expected: Test uses the first matching feature's model/effort in answer-only
+  mode, returning “It answered: ok” or the tool's sign-in instructions.
+- Status: [ ] Notes:
 
-### TERM-07 — Aliases resolve (login shell)
-- Steps: With a shell alias in ~/.zshrc (e.g. `claude-skip`), run it in a Shell
-  terminal.
-- Expected: The alias resolves (login interactive shell).
-- Status: [ ]  Notes:
+### CLI-07 — Folder writes and escape denial
+- Steps: Chat with Claude Code and Codex in an open folder. Request a note inside
+  the folder and an attempted write to the home directory.
+- Expected: The folder note succeeds; the escape is denied. The changed-files
+  card lists the note. Without a folder both tools are answer-only; Pi is always
+  answer-only. Cancellation waits for termination before checking changed files.
+- Status: [ ] Notes:
 
-### TERM-08 — Pi built-in program
-- Steps: Open AI → Terminal and inspect the Program dropdown.
-- Expected: Pi appears alongside Claude Code, Codex, OpenCode, and Shell.
-- Status: [ ]  Notes:
-
-### TERM-09 — External terminal application
-- Steps: Select Apple Terminal, Ghostty, then cmux from Terminal app; click Open
-  terminal for a configured program.
-- Expected: The selected program opens in the chosen native terminal at the current
-  folder. Missing applications show a friendly error.
-- Status: [ ]  Notes:
+### CLI-08 — Unsaved text recovery
+- Steps: Edit a saved note without saving. Ask an agent to modify that file.
+- Expected: Version History includes “Before <tool> run” with the unsaved text.
+  The existing Reload / Keep mine dialog protects the open dirty tab afterward.
+- Status: [ ] Notes:

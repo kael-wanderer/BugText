@@ -1,48 +1,50 @@
-# AI Chat — attachments, @mention, send key
+# AI Chat — attachments, @mention, send shortcut
 
-File attachments (📎 / drag-drop / @mention), Enter-to-send, and provider-aware
-file handling. Pre-req: a folder open; one CLI agent (e.g. Claude) and one HTTP
-model configured; a `.png` and a `.txt` in the folder.
+Pre-req: open a folder containing a text file and image, install a supported coding
+CLI, and configure an API connection under Settings ▸ AI ▸ API providers.
 
 ### ATT-01 — Attach via 📎 picker
-- Steps: Chat tab ▸ 📎 ▸ select one or more files.
+- Steps: Chat ▸ 📎 ▸ select one or more files.
 - Expected: Each file appears as a removable chip above the input.
-- Status: [ ]  Notes:
+- Status: [ ] Notes:
 
 ### ATT-02 — Drag-drop onto the panel
-- Steps: Drag a file from Finder onto the AI panel.
-- Expected: It's added as a chip (panel switches to Chat if on Terminal).
-- Status: [ ]  Notes:
+- Steps: Drag a file from Finder onto Chat.
+- Expected: The file becomes an attachment chip.
+- Status: [ ] Notes:
 
 ### ATT-03 — @mention picker
-- Steps: Type `@` then part of a filename.
-- Expected: A fuzzy dropdown of folder files; ↑/↓ + Enter/Tab selects; the `@token`
-  is removed and the file becomes a chip.
-- Status: [ ]  Notes:
+- Steps: Type `@` and part of a filename; choose with ↑/↓ and Enter/Tab.
+- Expected: The matching file becomes a chip and the `@token` is removed.
+- Status: [ ] Notes:
 
 ### ATT-04 — Remove a chip
 - Steps: Click ✕ on a chip.
-- Expected: The chip is removed; it won't be sent.
-- Status: [ ]  Notes:
+- Expected: The chip disappears and is omitted from the next request.
+- Status: [ ] Notes:
 
-### ATT-05 — CLI agent receives paths + runs in folder
-- Steps: With a CLI agent selected, attach an image, ask "describe this image and
-  write the description to notes.md".
-- Expected: The agent reads the image and writes `notes.md` into the open folder.
-- Status: [ ]  Notes:
+### ATT-05 — Coding CLI receives paths and stays in the folder
+- Steps: Select Claude Code or Codex CLI, attach a text file and request a new
+  `notes.md`. Also ask it to read `~/.zshrc` or write a note outside the folder.
+- Expected: The folder note is created and the changed-files card opens it. The
+  outside read/write is denied. Pi remains answer-only.
+- Status: [ ] Notes:
 
-### ATT-06 — HTTP model text + vision attachments
-- Steps: With an HTTP model selected, attach a `.txt` and a `.png`; send.
-- Expected: The `.txt` contents are included as context and the PNG is sent as a
-  multimodal image input (using a vision-capable model).
-- Status: [ ]  Notes:
+### ATT-06 — API connections accept text attachments
+- Steps: Select an API connection, attach a `.txt` and `.png`, then send.
+- Expected: The text is included as context; the image is skipped with a message.
+  No image bytes or binary content are sent to the API connection.
+- Status: [ ] Notes:
 
-### ATT-07 — Enter sends, Shift+Enter newline
-- Steps: Type a message, press Enter. Then type, press Shift+Enter.
-- Expected: Enter sends; Shift+Enter inserts a newline.
-- Status: [ ]  Notes:
+### ATT-07 — Configured send shortcut
+- Steps: Send with the AI send binding listed in Settings ▸ Shortcuts. Insert a
+  newline using a key combination that does not match that binding.
+- Expected: Only the configured binding sends; IME composition never sends early.
+- Status: [ ] Notes:
 
-### ATT-08 — Attachments clear after send
-- Steps: Send a message with chips attached.
-- Expected: Chips clear; the user bubble notes the attached filenames.
-- Status: [ ]  Notes:
+### ATT-08 — Compose state survives settings refresh
+- Steps: Send with attachments, then type a draft while a reply streams. Change
+  a setting in another native window.
+- Expected: Sent chips clear and appear in the user message. The new draft and
+  running reply survive the settings refresh.
+- Status: [ ] Notes:

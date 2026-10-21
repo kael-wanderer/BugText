@@ -8,6 +8,17 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- AI settings now has Use for, Local CLI and API providers pages, with an engine,
+  model, effort and enabled flag for each feature. Coding agents are sandboxed to
+  the open folder; Pi and runs without a folder stay answer-only.
+
+- The AI panel is Chat only, with automatic note context, per-feature engines, and
+  a changed-files summary after folder-confined coding-agent runs.
+
+- AI connections now validate server addresses, discover models without generating text,
+  cache model lists locally, and use native provider formats for custom Anthropic endpoints.
+  Keyed requests reject redirects and never include server response bodies in errors.
+
 - Renamed the app from mdFlow to BugText. The bundle identifier is now
   `com.kael.bugtext`, so this is a clean break: settings, recent files, UI state and
   keychain API keys from mdFlow are not carried over. The GitHub repository and the
@@ -28,6 +39,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Removed
 
+- Agent Console, Runs tab, embedded/external terminal launchers, xterm and the
+  native PTY dependency. Interactive coding agents can run in a separate terminal.
+
 - Excalidraw boards and jsMind mindmaps. `.excalidraw` and `.mind` files now open as plain text.
 - Dead code: the unused `saveFile` helper in `src/files.ts` (the save path goes
   through `pickSavePath` + `writeFile`) and the unused `toCanvas` export in
@@ -35,10 +49,36 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Malformed or unsupported AI settings files remain untouched at startup, and saves stay blocked until key migration succeeds.
+- The engine letter badge now sits beside the select text, keeping engine names readable in Use for.
+- AI settings saves now wait for successful keychain migration, v1 backups omit plaintext keys, key ids are normalized in the keychain, and unsupported explicit settings versions preserve the last good state.
+- Version 1 AI migration leaves engine uses empty when no engine exists so runtime CLI fallback can work.
+- CLI chat now inlines readable attachments outside the run folder and explains when an attachment cannot be opened inside the sandbox.
+- AI commands now run asynchronously, cancellation schedules its forced kill off-thread, Node.js sandbox roots are limited to JavaScript shims, and exited process groups are cleaned up before output readers join.
+- Local CLI settings now describe Pi as answer-only and clear the saved CLI key when a proxy address changes.
+- AI Use for controls now share a fitted grid with room for engine badges and gaps.
+
+- Startup persists completed v1-to-v2 AI settings migration after all legacy API
+  keys transfer successfully. Malformed files and failed key transfers keep the
+  original file intact for a later retry, with the v1 backup preserved.
+
+- Custom Anthropic endpoints use native Messages format. IPv6 loopback server
+  addresses survive settings reloads. Native agent argument construction keeps
+  quoted paths and prompts intact.
+
+- Changed-file checks after cancelling a coding-agent run wait for the process group
+  to stop, so late writes are included before open tabs reload or show a conflict.
+
+- API connection key badges now read the OS keychain. Changing a server address
+  clears its saved key and model cache before the updated connection is saved.
+
+- Coding CLI runs use a folder sandbox with private temporary files, restricted
+  environment variables, and the system reads required for CLI sign-in and startup.
+
 - Changing a setting in one window no longer gets undone when another window saves; all
   windows pick up the change.
-- The AI panel's Workspace context checkbox now follows changes made in Settings or in
-  another window instead of showing a stale value.
+- Workspace context settings stay in sync across windows. Chat now includes note
+  context automatically.
 - Open files now reload from disk when another process changes them: the 3-second
   auto-refresh and the window-focus refresh compare the file's text instead of a
   cached mtime/size, so a stale or failed stat can no longer leave a tab showing

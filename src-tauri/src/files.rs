@@ -271,11 +271,48 @@ pub fn resolve_ai_settings_at(dir: &Path, default: &str) -> Result<SettingsFile,
     if !file.exists() {
         fs::write(&file, default).map_err(|error| error.to_string())?;
     }
+    let backup = dir.join("agent.v1.json");
+    if !backup.exists() {
+        let contents = fs::read_to_string(&file).map_err(|error| error.to_string())?;
+        let is_v2 = serde_json::from_str::<serde_json::Value>(&contents)
+            .ok()
+            .and_then(|value| value.get("version").and_then(serde_json::Value::as_u64))
+            == Some(2);
+        if !is_v2 {
+            if let Some(backup_contents) = strip_key_fields(&contents) {
+                fs::write(backup, backup_contents).map_err(|error| error.to_string())?;
+            }
+        }
+    }
     let contents = fs::read_to_string(&file).map_err(|error| error.to_string())?;
     Ok(SettingsFile {
         path: file.to_string_lossy().into_owned(),
         contents,
     })
+}
+
+fn strip_key_fields(contents: &str) -> Option<String> {
+    fn strip(value: &mut serde_json::Value) -> bool {
+        match value {
+            serde_json::Value::Object(object) => {
+                let mut changed = object.remove("key").is_some();
+                for value in object.values_mut() {
+                    changed |= strip(value);
+                }
+                changed
+            }
+            serde_json::Value::Array(values) => values
+                .iter_mut()
+                .fold(false, |changed, value| strip(value) | changed),
+            _ => false,
+        }
+    }
+    let mut value: serde_json::Value = serde_json::from_str(contents).ok()?;
+    if strip(&mut value) {
+        serde_json::to_string_pretty(&value).ok()
+    } else {
+        Some(contents.to_owned())
+    }
 }
 
 pub fn count_words(text: &str) -> usize {
@@ -813,4 +850,67 @@ mod ai_settings_tests {
         );
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn strips_plaintext_provider_keys_from_v1_backup() {
+        let dir = tmp();
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("agent.json"),
+            r#"{"providers":[{"id":"OpenAI","type":"http","key":"plaintext"}]}"#,
+        )
+        .unwrap();
+        resolve_ai_settings_at(&dir, "{}").unwrap();
+        let backup = fs::read_to_string(dir.join("agent.v1.json")).unwrap();
+        assert!(!backup.contains("plaintext"));
+        assert!(backup.contains("providers"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn backs_up_v1_agent_json_once_before_upgrade() {
+        let dir = tmp();
+        fs::create_dir_all(&dir).unwrap();
+        let original = r#"{"providers":[],"defaultProvider":"ollama"}"#;
+        fs::write(dir.join("agent.json"), original).unwrap();
+        resolve_ai_settings_at(&dir, "{\"version\":2}").unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.join("agent.v1.json")).unwrap(),
+            original
+        );
+
+        fs::write(dir.join("agent.v1.json"), "preserve this backup").unwrap();
+        resolve_ai_settings_at(&dir, "{\"version\":2}").unwrap();
+        assert_eq!(
+            fs::read_to_string(dir.join("agent.v1.json")).unwrap(),
+            "preserve this backup"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[tauri::command]
+pub fn ai_models_cache_read(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let path = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join("ai-models-cache.json");
+    match fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn ai_models_cache_write(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    fs::write(dir.join("ai-models-cache.json"), contents).map_err(|error| error.to_string())
 }

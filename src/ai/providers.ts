@@ -1,4 +1,8 @@
-import type { CommandProvider, HttpProvider, PermissionProfile } from "./aisettings";
+export type HttpBodyOptions = {
+  model: string;
+  anthropic: boolean;
+  maxTokens?: number;
+};
 
 export type ChatContentPart =
   | { type: "text"; text: string }
@@ -17,36 +21,30 @@ export type AnthropicBody = {
   stream: boolean;
 };
 
-export type ResolvedPermissionProfile = {
-  id: string;
-  label: string;
-  run: string;
-  confirmEachRun: boolean;
-};
-
 export function chatContentText(content: ChatMessage["content"]): string {
   return typeof content === "string"
     ? content
     : content
-        .filter((part): part is Extract<ChatContentPart, { type: "text" }> =>
-          part.type === "text",
+        .filter(
+          (part): part is Extract<ChatContentPart, { type: "text" }> =>
+            part.type === "text",
         )
         .map((part) => part.text)
         .join("\n");
 }
 
 export function buildHttpBody(
-  provider: HttpProvider,
+  provider: HttpBodyOptions,
   messages: ChatMessage[],
 ): object {
-  if (provider.api === "anthropic") {
+  if (provider.anthropic) {
     return buildAnthropicBody(provider, messages);
   }
   return { model: provider.model, messages, stream: true };
 }
 
 export function buildAnthropicBody(
-  provider: HttpProvider,
+  provider: HttpBodyOptions,
   messages: ChatMessage[],
 ): AnthropicBody {
   const system = messages
@@ -59,9 +57,7 @@ export function buildAnthropicBody(
     max_tokens: provider.maxTokens ?? 4096,
     messages: messages
       .filter(
-        (
-          message,
-        ): message is ChatMessage & { role: "user" | "assistant" } =>
+        (message): message is ChatMessage & { role: "user" | "assistant" } =>
           message.role === "user" || message.role === "assistant",
       )
       .map((message) => ({
@@ -106,57 +102,4 @@ export function parseAnthropicSSEDelta(line: string): string | null | "DONE" {
   } catch {
     return null;
   }
-}
-
-export function substitutePrompt(run: string, prompt: string): string[] {
-  return run
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => (token === "{prompt}" ? prompt : token));
-}
-
-export function commandPermissionProfiles(
-  provider: CommandProvider,
-): ResolvedPermissionProfile[] {
-  if (provider.permissionProfiles?.length) {
-    return provider.permissionProfiles.map(normalizeCustomProfile);
-  }
-  const profiles: ResolvedPermissionProfile[] = [
-    {
-      id: "ask",
-      label: "Ask before doing",
-      run: provider.run,
-      confirmEachRun: false,
-    },
-  ];
-  if (provider.bypassRun) {
-    profiles.push({
-      id: "full-access",
-      label: "Full access",
-      run: provider.bypassRun,
-      confirmEachRun: true,
-    });
-  }
-  return profiles;
-}
-
-export function resolveCommandPermissionProfile(
-  provider: CommandProvider,
-  selectedProfileId: string,
-): ResolvedPermissionProfile {
-  const profiles = commandPermissionProfiles(provider);
-  return (
-    profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0]
-  );
-}
-
-function normalizeCustomProfile(
-  profile: PermissionProfile,
-): ResolvedPermissionProfile {
-  return {
-    id: profile.id,
-    label: profile.label,
-    run: profile.run,
-    confirmEachRun: profile.confirmEachRun ?? false,
-  };
 }

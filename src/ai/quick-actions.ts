@@ -1,4 +1,5 @@
-import type { AISettings, Provider } from "./aisettings";
+import type { AISettings, FeatureId } from "./aisettings";
+import { resolveUse, type CliInfo } from "./engines";
 import { hashText } from "../hash";
 import { buildMessages } from "./conversation";
 import { streamChat } from "./client";
@@ -14,9 +15,10 @@ export type QuickAction = {
   prompt: string;
 };
 
-export const QUICK_ACTIONS: QuickAction[] = [
+export const QUICK_ACTIONS: (QuickAction & { feature: FeatureId })[] = [
   {
     id: "ai.quick.proofread",
+    feature: "proofread",
     label: "Proofread",
     kind: "edit",
     prompt:
@@ -24,6 +26,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     id: "ai.quick.rewrite",
+    feature: "rewrite",
     label: "Rewrite",
     kind: "edit",
     prompt:
@@ -31,12 +34,14 @@ export const QUICK_ACTIONS: QuickAction[] = [
   },
   {
     id: "ai.quick.summarize",
+    feature: "summarize",
     label: "Summarize",
     kind: "chat",
     prompt: "Summarize the text concisely.",
   },
   {
     id: "ai.quick.outline",
+    feature: "outline",
     label: "Generate outline",
     kind: "chat",
     prompt:
@@ -53,10 +58,8 @@ export function actionScope(
     : { text: docText, whole: true };
 }
 
-export function resolveQuickProvider(settings: AISettings): string {
-  const wanted = settings.quickActionProvider;
-  if (wanted && settings.providers.some((p) => p.id === wanted)) return wanted;
-  return settings.defaultProvider;
+export function enabledQuickActions(settings: AISettings): typeof QUICK_ACTIONS {
+  return QUICK_ACTIONS.filter(action => settings.enabled[action.feature]);
 }
 
 /** Minimal handle the runner needs to stream text into a chat bubble. */
@@ -64,7 +67,7 @@ export type BubbleHandle = { textContent: string | null };
 
 export type QuickActionDeps = {
   getSettings: () => AISettings;
-  getProviderById: (id: string) => Provider | undefined;
+  getClis: () => CliInfo[];
   getDoc: () => {
     text: string;
     selection: string;
@@ -81,7 +84,7 @@ export type QuickActionDeps = {
 };
 
 export async function runQuickAction(
-  action: QuickAction,
+  action: QuickAction & { feature: FeatureId },
   deps: QuickActionDeps,
 ): Promise<void> {
   const doc = deps.getDoc();
@@ -91,11 +94,12 @@ export async function runQuickAction(
     return;
   }
   const settings = deps.getSettings();
-  const provider = deps.getProviderById(resolveQuickProvider(settings));
-  if (!provider) {
+  if (!settings.enabled[action.feature]) return;
+  const row = resolveUse(settings, action.feature, deps.getClis());
+  if (row.engine.kind === "none") {
     deps.appendBubble(
-      "error",
-      "No AI provider configured. Add one in AI Settings.",
+      "system",
+      `Choose an engine for ${action.label} in Settings ▸ AI ▸ Use for.`,
     );
     return;
   }
@@ -118,14 +122,14 @@ export async function runQuickAction(
   const abort = deps.makeAbort();
   try {
     await streamChat(
-      provider,
+      row,
+      settings,
       built.messages,
       (chunk) => {
         reply += chunk;
         bubble.textContent = reply;
       },
-      "ask",
-      { cwd: deps.getWorkingDir(), signal: abort.signal },
+      { write: false, folder: null, signal: abort.signal },
     );
   } catch (error) {
     const cancelled =

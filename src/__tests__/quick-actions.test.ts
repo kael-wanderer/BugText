@@ -2,13 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import {
   QUICK_ACTIONS,
   actionScope,
-  resolveQuickProvider,
+  enabledQuickActions,
   runQuickAction,
 } from "../ai/quick-actions";
+import { streamChat } from "../ai/client";
 import { DEFAULT_AI_SETTINGS } from "../ai/aisettings";
 
 vi.mock("../ai/client", () => ({
-  streamChat: vi.fn(async (_p, _m, onChunk) => {
+  streamChat: vi.fn(async (_row, _settings, _messages, onChunk) => {
     onChunk("REVISED");
   }),
 }));
@@ -42,21 +43,25 @@ describe("actionScope", () => {
   });
 });
 
-describe("resolveQuickProvider", () => {
-  it("returns quickActionProvider when it names a real provider", () => {
-    const settings = { ...DEFAULT_AI_SETTINGS, quickActionProvider: "openai" };
-    expect(resolveQuickProvider(settings)).toBe("openai");
+describe("per-feature engines", () => {
+  it("excludes disabled rewrite", () => {
+    const settings = structuredClone(DEFAULT_AI_SETTINGS);
+    settings.enabled.rewrite = false;
+    expect(enabledQuickActions(settings).map(a => a.feature)).not.toContain("rewrite");
   });
-  it("falls back to defaultProvider when unset", () => {
-    expect(resolveQuickProvider(DEFAULT_AI_SETTINGS)).toBe(
-      DEFAULT_AI_SETTINGS.defaultProvider,
-    );
+  it("uses the proofread row and forces answer-only without a folder", async () => {
+    const settings = structuredClone(DEFAULT_AI_SETTINGS);
+    const row = { engine: {kind: "cli" as const, tool: "claude" as const}, model: "sonnet", effort: "low" };
+    settings.uses.proofread = row;
+    await runQuickAction(QUICK_ACTIONS[0], {...baseDeps(), getSettings: () => settings});
+    expect(streamChat).toHaveBeenLastCalledWith(row, settings, expect.any(Array), expect.any(Function), expect.objectContaining({write: false, folder: null}));
   });
-  it("falls back when quickActionProvider names a missing provider", () => {
-    const settings = { ...DEFAULT_AI_SETTINGS, quickActionProvider: "nope" };
-    expect(resolveQuickProvider(settings)).toBe(
-      DEFAULT_AI_SETTINGS.defaultProvider,
-    );
+  it("reports an unconfigured engine without sending", async () => {
+    vi.mocked(streamChat).mockClear();
+    const append = vi.fn(() => bubble());
+    await runQuickAction(QUICK_ACTIONS[0], {...baseDeps(), getSettings: () => ({...DEFAULT_AI_SETTINGS, uses: {proofread: {engine: {kind: "none"}, model: "", effort: ""}}}), appendBubble: append});
+    expect(append).toHaveBeenCalledWith("system", "Choose an engine for Proofread in Settings ▸ AI ▸ Use for.");
+    expect(streamChat).not.toHaveBeenCalled();
   });
 });
 
@@ -67,8 +72,7 @@ function bubble() {
 function baseDeps(overrides = {}) {
   return {
     getSettings: () => DEFAULT_AI_SETTINGS,
-    getProviderById: (id: string) =>
-      DEFAULT_AI_SETTINGS.providers.find((p) => p.id === id),
+    getClis: () => [{tool: "claude" as const, found: true, path: "/claude", version: "1", accounts: [], models: []}],
     getDoc: () => ({
       text: "hello world",
       selection: "hello",
@@ -104,16 +108,6 @@ describe("runQuickAction", () => {
       "system",
       expect.stringContaining("Nothing to"),
     );
-  });
-
-  it("errors when the resolved provider is missing", async () => {
-    const append = vi.fn(() => bubble());
-    await runQuickAction(QUICK_ACTIONS[0], {
-      ...baseDeps(),
-      getProviderById: () => undefined,
-      appendBubble: append,
-    });
-    expect(append).toHaveBeenCalledWith("error", expect.any(String));
   });
 
   it("renders a chat-kind reply into a bubble", async () => {

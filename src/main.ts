@@ -1,3 +1,4 @@
+import type { CliInfo } from "./ai/engines";
 import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -7,15 +8,18 @@ import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { initActivityBar } from "./activitybar";
 import {
   DEFAULT_AI_SETTINGS_JSON,
+  BUILTIN_V1_IDS,
   extractLegacyKeys,
   parseAISettings,
   tryParseAISettings,
   type AISettings,
 } from "./ai/aisettings";
+import { moveLegacySecret } from "./ai/aisettings-secrets";
+import { permitAISettingsSave } from "./ai/aisettings-write-guard";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
-  QUICK_ACTIONS,
+  enabledQuickActions,
   runQuickAction,
   type QuickActionDeps,
 } from "./ai/quick-actions";
@@ -86,6 +90,7 @@ import { generalPage } from "./settings-screen/page-general";
 import { editingPage } from "./settings-screen/page-editing";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
+import { loadModelsCache } from "./ai/models-cache";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
@@ -107,7 +112,6 @@ import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
   freshState,
   loadState,
-  markKeySaved,
   saveState,
   type ViewMode,
 } from "./state";
@@ -153,7 +157,19 @@ let ui = { ...startupUi, aiVisible: false };
 let currentSettings = parseSettings("{}");
 let settingsPath = "";
 let aiSettingsPath = "";
+let aiSettingsMigrationReady = false;
 let currentAISettings: AISettings = parseAISettings("{}");
+let cliInfos: CliInfo[] = [];
+let modelsCache: Record<string, string[]> = {};
+async function rescanClis(): Promise<void> {
+  const local = currentAISettings.localCli;
+  cliInfos = await invoke<CliInfo[]>("cli_scan", { overrides: {
+    claudePath: local.claude.executablePath,
+    codexPath: local.codex.executablePath,
+    piPath: local.pi.executablePath,
+    codexHome: local.codex.codexHome,
+  }}).catch(() => []);
+}
 let aiPanel: AIPanel | null = null;
 let fileList: string[] = [];
 let indexedFolder: string | null = null;
@@ -191,10 +207,21 @@ function writeSettings(next: Settings): void {
 }
 
 function writeAISettings(next: AISettings): void {
-  if (!aiSettingsPath) return;
-  void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
-    .then(() => broadcastSettingsChange("agent"))
-    .catch(() => {});
+  permitAISettingsSave(
+    aiSettingsMigrationReady,
+    () => {
+      if (!aiSettingsPath) return;
+      void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
+        .then(() => broadcastSettingsChange("agent"))
+        .catch(() => {});
+    },
+    () => {
+      void message("Couldn't move API keys to the keychain — settings not saved", {
+        title: "AI settings",
+        kind: "error",
+      });
+    },
+  );
 }
 
 async function loadSettings(): Promise<void> {
@@ -212,16 +239,33 @@ async function loadSettings(): Promise<void> {
 }
 
 async function loadAISettings(): Promise<void> {
+  aiSettingsMigrationReady = false;
   try {
     const file = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
     aiSettingsPath = file.path;
+    const savedKeyIds = await getSavedAIKeyIds();
+    // Keep the current state and source file intact when the JSON is malformed
+    // or declares an unsupported version, matching the live reload path.
+    if (!tryParseAISettings(file.contents, savedKeyIds)) {
+      aiPanel?.render();
+      return;
+    }
     const { cleaned, keys } = extractLegacyKeys(file.contents);
+    let canPersistMigration = true;
     if (keys.length) {
       const stored: boolean[] = [];
       for (const { id, secret } of keys) {
         try {
-          await invoke("set_secret", { id, secret });
-          markKeySaved(id, true);
+          const normalizedId = id.trim().toLowerCase();
+          if (normalizedId !== id) {
+            await moveLegacySecret(id, normalizedId, secret, {
+              get: (secretId) => invoke<string | null>("get_secret", { id: secretId }),
+              set: (secretId, value) => invoke("set_secret", { id: secretId, secret: value }),
+              delete: (secretId) => invoke("delete_secret", { id: secretId }),
+            });
+          } else {
+            await invoke("set_secret", { id, secret });
+          }
           stored.push(true);
         } catch {
           /* Leave the plaintext key for a later migration attempt. */
@@ -231,22 +275,47 @@ async function loadAISettings(): Promise<void> {
       if (stored.every(Boolean)) {
         await writeFile(aiSettingsPath, cleaned);
         broadcastSettingsChange("agent");
-        currentAISettings = parseAISettings(cleaned);
+        currentAISettings = parseAISettings(cleaned, savedKeyIds);
       } else {
-        currentAISettings = parseAISettings(file.contents);
+        canPersistMigration = false;
+        currentAISettings = parseAISettings(file.contents, savedKeyIds);
       }
     } else {
       if (cleaned !== file.contents) {
         await writeFile(aiSettingsPath, cleaned);
         broadcastSettingsChange("agent");
       }
-      currentAISettings = parseAISettings(cleaned);
+      currentAISettings = parseAISettings(cleaned, savedKeyIds);
     }
+    // Rust already saved agent.v1.json. Persist a completed migration once,
+    // while preserving malformed files and keys that could not be migrated.
+    const parsed = tryParseAISettings(cleaned, savedKeyIds);
+    if (parsed && canPersistMigration) {
+      const source = JSON.parse(cleaned) as { version?: unknown };
+      if (source.version !== 2) {
+        await writeFile(aiSettingsPath, JSON.stringify(currentAISettings, null, 2));
+        broadcastSettingsChange("agent");
+      }
+    }
+    aiSettingsMigrationReady = canPersistMigration;
     aiPanel?.render();
   } catch {
+    aiSettingsMigrationReady = false;
     aiSettingsPath = "";
     currentAISettings = parseAISettings("{}");
   }
+}
+
+async function getSavedAIKeyIds(): Promise<ReadonlySet<string>> {
+  const ids = new Set<string>();
+  for (const id of BUILTIN_V1_IDS) {
+    try {
+      if (await invoke<boolean>("has_secret", { id })) ids.add(id);
+    } catch {
+      // A locked keychain leaves the saved-key state unknown until the next load.
+    }
+  }
+  return ids;
 }
 
 /** Reload one settings file after another window changed it. Never writes or re-broadcasts. */
@@ -263,14 +332,14 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       applyKeymap();
       syncViewMenu();
       requestWindowMeasure();
-      aiPanel?.refreshTheme();
-      aiPanel?.syncWorkspaceContext();
       if (themeChanged) renderAll();
     } else {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
       if (!next) return;
       currentAISettings = next;
+      if (!next.enabled.chat) setAIVisible(false);
+      applyAIVisibility();
       aiPanel?.render();
     }
     onSettingsSynced?.();
@@ -308,14 +377,15 @@ function saveSettingsFromPanel(settings: Settings): void {
   applyKeymap();
   syncViewMenu();
   requestWindowMeasure();
-  aiPanel?.refreshTheme();
-  aiPanel?.syncWorkspaceContext();
   if (themeChanged) renderAll();
   writeSettings(settings);
 }
 
 function saveAISettingsFromPanel(settings: AISettings): void {
+  const disabledChat = currentAISettings.enabled.chat && !settings.enabled.chat;
   currentAISettings = settings;
+  if (disabledChat) setAIVisible(false);
+  applyAIVisibility();
   aiPanel?.render();
   writeAISettings(settings);
 }
@@ -369,7 +439,7 @@ function commandItems(): PaletteItem[] {
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
-    ...QUICK_ACTIONS.map((action) =>
+    ...enabledQuickActions(currentAISettings).map((action) =>
       command(action.id, `AI: ${action.label}`, () =>
         runQuickActionById(action.id),
       ),
@@ -462,7 +532,7 @@ const handlers = {
     showContextMenu(x, y, [
       {
         label: "AI",
-        children: QUICK_ACTIONS.map((action) => ({
+        children: enabledQuickActions(currentAISettings).map((action) => ({
           label: action.label,
           action: () => runQuickActionById(action.id),
         })),
@@ -1093,6 +1163,8 @@ async function doSave(saveAs = false): Promise<void> {
     }
     if (target === aiSettingsPath) {
       currentAISettings = tryParseAISettings(text) ?? currentAISettings;
+      if (!currentAISettings.enabled.chat) setAIVisible(false);
+      applyAIVisibility();
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
@@ -1173,11 +1245,14 @@ function showActiveHistory(): void {
   });
 }
 
-async function checkActiveForExternalChange(windowId: string): Promise<void> {
+async function checkActiveForExternalChange(
+  windowId: string,
+  tabId?: string,
+): Promise<void> {
   const windowState = getWindow(windowId);
   if (!windowState) return;
   const tab = windowState.tabs.find(
-    (item) => item.id === windowState.activeTabId,
+    (item) => item.id === (tabId ?? windowState.activeTabId),
   );
   if (!tab?.path || isPdfFile(tab.path)) return;
   const view = views.get(windowId);
@@ -1198,7 +1273,9 @@ async function checkActiveForExternalChange(windowId: string): Promise<void> {
           item.id === tab.id ? { ...item, dirty: false } : item,
         ),
       });
-      view.renderPreview(text, tab.path!);
+      if (getWindow(windowId)?.activeTabId === tab.id) {
+        view.renderPreview(text, tab.path!);
+      }
       renderAll();
     },
     markDirty: () => {
@@ -1566,7 +1643,6 @@ function setMenuTheme(theme: string): void {
   };
   persistCurrentSettings();
   renderAll();
-  aiPanel?.refreshTheme();
 }
 
 function toggleAutomaticUpdates(): void {
@@ -1757,6 +1833,43 @@ function buildAIPanel(): void {
   aiPanel = createAIPanel(aiPanelElement, {
     getSettings: () => currentAISettings,
     onSettingsChange: saveAISettingsFromPanel,
+    getClis: () => cliInfos,
+    getModelsCache: () => modelsCache,
+    guard: {
+      tabsInFolder: (folder) => {
+        const prefix = folder.replace(/[\\/]$/, "") + "/";
+        return getState().windows.flatMap((windowState) => {
+          const view = views.get(windowState.id);
+          return windowState.tabs.flatMap((tab) => {
+            if (!tab.path || isPdfFile(tab.path) || !view) return [];
+            if (folder && !tab.path.startsWith(prefix)) return [];
+            return [{
+              path: tab.path,
+              dirty: tab.dirty,
+              text: view.editor.getText(tab.id),
+            }];
+          });
+        });
+      },
+      snapshot: (path, text, label) => manualSnapshot(path, text, label),
+      checkTab: async (path) => {
+        for (const windowState of getState().windows) {
+          for (const tab of windowState.tabs) {
+            if (tab.path === path) {
+              await checkActiveForExternalChange(windowState.id, tab.id);
+            }
+          }
+        }
+      },
+    },
+    onNewNote: (text) => {
+      const windowId = getState().activeWindowId;
+      openInWindow(windowId, { path: null, name: "Untitled", text });
+      const tab = activeMeta();
+      if (tab) onDocChange(windowId, tab.id, text);
+      renderAll();
+    },
+    onOpenNote: (path) => void doOpenPath(path),
     getDoc: () => {
       const view = activeView();
       const tab = activeMeta();
@@ -1774,16 +1887,6 @@ function buildAIPanel(): void {
     lookupTabText: panelReview.lookupTabText,
     applyEditTo: panelReview.applyEditTo,
     beforeApply: panelReview.beforeApply,
-    confirmPermission: (providerLabel, profileLabel) =>
-      confirm(
-        `Run ${providerLabel} with "${profileLabel}" permissions? BugText will start the selected CLI command; the agent enforces its own permission flags.`,
-        {
-          title: "Confirm AI run",
-          kind: "warning",
-          okLabel: "Run once",
-          cancelLabel: "Cancel",
-        },
-      ),
     onInsert: (text) => {
       const editor = activeView().editor;
       const selection = editor.getSelection();
@@ -1792,12 +1895,7 @@ function buildAIPanel(): void {
     onOpenChangedFile: (dir, rel) => void doOpenPath(joinPath(dir, rel)),
     onClose: () => setAIVisible(false),
     getSendAccelerator: () => resolvedAccel("ai.send"),
-    getWorkingDir: () => {
-      const folder = getState().folder;
-      if (folder) return folder;
-      const path = activeMeta()?.path;
-      return path ? path.replace(/[\\/][^\\/]*$/, "") || null : null;
-    },
+    getWorkingDir: () => getState().folder,
     getFileList: () => {
       const folder = getState().folder;
       if (!folder) return [];
@@ -1807,15 +1905,8 @@ function buildAIPanel(): void {
       }));
     },
     getWorkspaceContext: () => ({
-      enabled: currentSettings.workspaceContext,
       k: currentSettings.workspaceContextK,
     }),
-    onWorkspaceContextChange: (enabled) => {
-      saveSettingsFromPanel({
-        ...currentSettings,
-        workspaceContext: enabled,
-      });
-    },
     historyKey: `bugtext.ai.history.${nativeWindowLabel}`,
     legacyHistoryKey: `bugtext.ai.history.${nativeWindowLabel}`,
   });
@@ -1824,6 +1915,7 @@ function buildAIPanel(): void {
 function applyAIVisibility(): void {
   document.body.classList.toggle("ai-hidden", !ui.aiVisible);
   const button = document.getElementById("ab-ai")!;
+  button.hidden = !currentAISettings.enabled.chat;
   button.classList.toggle("active", ui.aiVisible);
   button.setAttribute("aria-pressed", String(ui.aiVisible));
 }
@@ -1838,6 +1930,7 @@ function setAIVisible(aiVisible: boolean): void {
 }
 
 function toggleAI(): void {
+  if (!currentAISettings.enabled.chat) return;
   setAIVisible(!ui.aiVisible);
 }
 
@@ -1845,8 +1938,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
   const review = editReviewDeps(actionLabel);
   return {
     getSettings: () => currentAISettings,
-    getProviderById: (id) =>
-      currentAISettings.providers.find((p) => p.id === id),
+    getClis: () => cliInfos,
     getDoc: () => {
       const view = activeView();
       const tab = activeMeta();
@@ -1883,7 +1975,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
 }
 
 function runQuickActionById(id: string): void {
-  const action = QUICK_ACTIONS.find((a) => a.id === id);
+  const action = enabledQuickActions(currentAISettings).find((a) => a.id === id);
   if (!action) return;
   void runQuickAction(action, quickActionDeps(action.label));
 }
@@ -1966,6 +2058,9 @@ const settingsScreen = createSettingsScreen(
   {
     getSettings: () => currentSettings,
     getAISettings: () => currentAISettings,
+    getClis: () => cliInfos,
+    rescan: rescanClis,
+    getModelsCache: () => modelsCache,
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
@@ -2420,6 +2515,9 @@ async function boot(): Promise<void> {
     void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
   }
   await loadAISettings();
+  applyAIVisibility();
+  await rescanClis();
+  modelsCache = await loadModelsCache();
   if (isPrimaryNativeWindow) {
     startDailyUpdateChecks(() => currentSettings.updateMode === "auto");
   }
