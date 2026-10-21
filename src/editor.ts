@@ -11,7 +11,7 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, Transaction, type Extension } from "@codemirror/state";
 import {
   drawSelection,
   EditorView,
@@ -49,6 +49,7 @@ export type EditorHandle = {
   setDocumentKind(id: string, kind: EditorDocumentKind): void;
   applyMarkdownFormat(format: MarkdownFormat): void;
   getText(id: string): string;
+  applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
   setText(text: string): void;
@@ -60,6 +61,16 @@ export type EditorHandle = {
   gotoLine(line: number): void;
   focus(): void;
 };
+
+export function agentChangeTransaction(
+  state: EditorState,
+  changes: { from: number; to: number; insert: string }[],
+): Transaction {
+  return state.update({
+    changes,
+    annotations: Transaction.userEvent.of("input.agent"),
+  });
+}
 
 const theme = EditorView.theme(
   {
@@ -288,6 +299,17 @@ export function createEditor(
     getText(id) {
       if (id === activeId) return view.state.doc.toString();
       return states.get(id)?.doc.toString() ?? "";
+    },
+    applyChanges(id, changes) {
+      if (id === activeId) {
+        view.dispatch(agentChangeTransaction(view.state, changes));
+        return;
+      }
+      const state = states.get(id);
+      if (!state) return;
+      const updated = agentChangeTransaction(state, changes).state;
+      states.set(id, updated);
+      onChange(id, updated.doc.toString());
     },
     getSelection() {
       const selection = view.state.selection.main;
