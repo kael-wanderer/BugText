@@ -7,6 +7,7 @@ mod export;
 mod files;
 mod macos_dock;
 mod menu;
+mod mcp_paths;
 mod native_windows;
 mod preview;
 mod recovery;
