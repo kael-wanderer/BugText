@@ -1,18 +1,18 @@
 # CLAUDE.md
 
-## What is mdFlow
+## What is BugText
 
 A fast, lightweight markdown editor built with Tauri 2 + Rust. **Clean-room rewrite**
 — independent, MIT-licensed. Same eventual feature set as the Kaelio editor, but
 written from scratch with a modular architecture and refined UI. License: MIT.
-Identifier: `com.kael.mdflow`. Current status: M1 + shell Phase 5 + AI/render/export
+Identifier: `com.kael.bugtext`. Current status: M1 + shell Phase 5 + AI/render/export
 Phases 6–7 implemented.
 
 **Always read `docs/spec.md` and `docs/tasks.md` before starting work.**
 
 ## Clean-room rule (do not violate — this is the legal basis of the project)
 
-mdFlow must stay legally independent of Kaelio / mx / Vibery Studio (those are
+BugText must stay legally independent of Kaelio / mx / Vibery Studio (those are
 GPL-3.0). Therefore:
 
 - **Never copy, paste, or port code or CSS from Kaelio.** Not a single line.
@@ -27,7 +27,7 @@ GPL-3.0). Therefore:
 
 When you want a feature to behave like Kaelio's: open the relevant Kaelio file by
 absolute path, study the behavior, describe it in your own words / as a spec, then
-implement fresh in mdFlow. Do not keep Kaelio source open while typing mdFlow code,
+implement fresh in BugText. Do not keep Kaelio source open while typing BugText code,
 and never paste from it. Do not add Kaelio as a submodule or copy its files in.
 
 ## Working style (from global rules)
@@ -53,14 +53,14 @@ thin `main.ts`. One responsibility per file.
 Data flow: edit → 300ms debounce → `renderMarkdown` → preview pane + word count.
 `Cmd+S` → `pickSavePath` (when untitled) → `writeFile` → IPC `save_file`. `Cmd+O` →
 dialog → IPC `read_file` → editor.
-View mode + zoom persist to `localStorage` (`mdflow.ui`).
+View mode + zoom persist to `localStorage` (`bugtext.ui`).
 
 Native menu contents live in `menu.rs`. Two non-obvious conventions: the View menu's
 Soft Wrap and Font/Size/Theme submenus drive `settings.json` (and `sync_view_menu`
 reflects settings back into the menu checks), and the command/file palette is **`⌘K`
 only** — `⌘P` is the preview toggle.
 
-mdFlow supports multiple independent native Tauri windows. View ▸ New Window and the
+BugText supports multiple independent native Tauri windows. View ▸ New Window and the
 macOS Dock context menu create fresh workspaces; menu and Finder-open events route to
 the focused native window. Only the original `main` native window writes the persisted
 restore-session snapshot. Each native window can still use the in-window Main/Sub split.
@@ -68,7 +68,7 @@ restore-session snapshot. Each native window can still use the in-window Main/Su
 The macOS bundle declares Markdown, plain-text, and PDF document types. Finder opens
 arrive through Tauri's opened event, are queued until the frontend listener is ready,
 then use the same document-opening workflow as File ▸ Open. The application menu can
-register mdFlow as the Markdown/text editor or PDF viewer through LaunchServices.
+register BugText as the Markdown/text editor or PDF viewer through LaunchServices.
 
 Special-pane document types: `.excalidraw` files open as an editable Excalidraw board
 (single pane, React-isolated); `.mind` files open as an editable jsMind mindmap board
@@ -76,7 +76,7 @@ Special-pane document types: `.excalidraw` files open as an editable Excalidraw 
 per-node shape (rect/rounded/pill/circle), fill/text color, font size, and bold, stored
 in node `data` and persisted in the `.mind` file (no format change). Dedicated activity-bar
 buttons create untitled boards of either type. jsMind nodes and connector lines derive
-their colors from the active mdFlow theme and update when the theme changes. Mindmaps
+their colors from the active BugText theme and update when the theme changes. Mindmaps
 support transient multi-selection via shift/⌘-click or marquee drag; Delete/Backspace
 and the toolbar Delete action remove the selected subtrees without changing the
 `.mind` format.

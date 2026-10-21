@@ -176,13 +176,13 @@ describe("htmlWithPreviewZoom", () => {
       0.75,
     );
     expect(output).toContain(
-      "<style data-mdflow-preview-zoom>html{zoom:0.75!important}</style></head>",
+      "<style data-bugtext-preview-zoom>html{zoom:0.75!important}</style></head>",
     );
   });
 
   it("prepends preview zoom when the document has no head", () => {
     expect(htmlWithPreviewZoom("<main>Y</main>", 1.25)).toMatch(
-      /^<style data-mdflow-preview-zoom>/,
+      /^<style data-bugtext-preview-zoom>/,
     );
   });
 

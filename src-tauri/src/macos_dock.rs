@@ -28,7 +28,7 @@ mod platform {
         _sender: *mut NSApplication,
     ) -> *mut NSMenu {
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
-        let title = NSString::from_str("mdFlow");
+        let title = NSString::from_str("BugText");
         let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &title);
         let item_title = NSString::from_str("New Window");
         let empty = NSString::from_str("");
@@ -36,7 +36,7 @@ mod platform {
             NSMenuItem::initWithTitle_action_keyEquivalent(
                 NSMenuItem::alloc(mtm),
                 &item_title,
-                Some(sel!(mdflowNewWindow:)),
+                Some(sel!(bugtextNewWindow:)),
                 &empty,
             )
         };
@@ -75,7 +75,7 @@ mod platform {
             );
             class_addMethod(
                 class_ptr,
-                sel!(mdflowNewWindow:),
+                sel!(bugtextNewWindow:),
                 std::mem::transmute::<
                     unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut AnyObject),
                     Imp,

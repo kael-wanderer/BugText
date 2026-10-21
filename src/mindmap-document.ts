@@ -15,7 +15,7 @@ const DEFAULT_ROOT_TOPIC = "Central Idea";
 
 function defaultMindmap(): Mindmap {
   return {
-    meta: { name: "mdflow", version: "1.0" },
+    meta: { name: "bugtext", version: "1.0" },
     format: "node_tree",
     data: {
       id: "root",
@@ -60,7 +60,7 @@ export function serializeMindmap(mind: unknown): string {
   const root = obj && plainObject(obj.data);
   return JSON.stringify(
     {
-      meta: (obj && plainObject(obj.meta)) ?? { name: "mdflow", version: "1.0" },
+      meta: (obj && plainObject(obj.meta)) ?? { name: "bugtext", version: "1.0" },
       format: "node_tree",
       data: root ?? {
         id: "root",

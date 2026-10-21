@@ -90,7 +90,7 @@ export function serializeExcalidrawDocument(
     {
       type: "excalidraw",
       version: 2,
-      source: "mdflow",
+      source: "bugtext",
       elements,
       appState: safeAppState(objectValue(appState)),
       files: objectValue(files),

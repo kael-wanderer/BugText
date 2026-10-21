@@ -1,4 +1,4 @@
-# mdFlow — Bug Log
+# BugText — Bug Log
 
 Bugs found during manual testing (see [`test-cases/`](test-cases/)). Add a row to the
 table and a detail block below. Reference the failing test-case ID.
@@ -35,7 +35,7 @@ table and a detail block below. Reference the failing test-case ID.
   1. Save an API key for one or more HTTP model providers.
   2. Open Gear ▸ Agent ▸ Models.
 - **Expected:** The tab opens without asking for the login Keychain password.
-- **Actual:** macOS prompts "mdFlow wants to use your confidential information"
+- **Actual:** macOS prompts "BugText wants to use your confidential information"
   once per HTTP provider that has a saved key. Clicking **Always Allow** does not
   stop it on the next open in dev builds.
 - **Cause:**
@@ -48,7 +48,7 @@ table and a detail block below. Reference the failing test-case ID.
      are re-signed on every rebuild, so each build is a new, untrusted app to the
      Keychain and the grant never persists. A stable signed release keeps it.
 - **Fix:** Stopped reading the Keychain just to show the cosmetic badge. Key
-  presence is now tracked in a small `localStorage` marker (`mdflow.savedKeys`),
+  presence is now tracked in a small `localStorage` marker (`bugtext.savedKeys`),
   updated on save/remove and during the legacy-key migration. The Keychain is now
   only read when a key is actually *used* (sending to an HTTP provider) — one
   expected prompt at point of use instead of N prompts every time settings open.
@@ -90,7 +90,7 @@ table and a detail block below. Reference the failing test-case ID.
   (`aisettings.ts:68`) is a **retired** model (Haiku 3.5 was retired 2026-02-19).
 - **Cause:** Stale default model ID. The request *shape* is fine: Anthropic provides an
   OpenAI-compatibility layer at `…/v1/chat/completions` that accepts
-  `Authorization: Bearer <key>` and the OpenAI body mdFlow sends, so the integration
+  `Authorization: Bearer <key>` and the OpenAI body BugText sends, so the integration
   itself is not broken — only the model string is dead. (Earlier note that the endpoint
   itself was wrong was incorrect; corrected.) Anthropic is a bundled **preset**, not the
   selected default — `defaultProvider` is `ollama` (`aisettings.ts:107`).
@@ -138,7 +138,7 @@ table and a detail block below. Reference the failing test-case ID.
   attachment as `role:"system"` messages, so a malicious instruction inside an opened
   file is elevated to system authority (prompt-injection seam).
 - **Fix:** Move document/selection/attachment content to `role:"user"` (or a clearly
-  delimited data block); reserve `system` for mdFlow's own instructions.
+  delimited data block); reserve `system` for BugText's own instructions.
 - **Notes:** Lower real-world risk for a single-user local tool, but a clean correctness
   fix and cheap.
 - **Status:** fixed (AI trustworthy plumbing, v0.2.3).

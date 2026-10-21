@@ -110,7 +110,7 @@ export function normalizeDocumentViewMode(
 // (opaque origin), so interactive HTML runs while staying isolated from the
 // app; zoom is applied to the painted surface — no reload, no white flash.
 export function htmlWithPreviewZoom(html: string, zoom: number): string {
-  const injection = `<style data-mdflow-preview-zoom>html{zoom:${zoom}!important}</style>`;
+  const injection = `<style data-bugtext-preview-zoom>html{zoom:${zoom}!important}</style>`;
   const headEnd = html.search(/<\/head\s*>/i);
   if (headEnd >= 0) {
     return `${html.slice(0, headEnd)}${injection}${html.slice(headEnd)}`;

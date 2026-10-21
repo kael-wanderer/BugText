@@ -7,7 +7,7 @@ mod platform {
     type OSStatus = i32;
     type LSRolesMask = u32;
 
-    const BUNDLE_ID: &str = "com.kael.mdflow";
+    const BUNDLE_ID: &str = "com.kael.bugtext";
     const EDITOR_ROLE: LSRolesMask = 0x0000_0004;
     const VIEWER_ROLE: LSRolesMask = 0x0000_0002;
 

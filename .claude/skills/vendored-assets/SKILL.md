@@ -1,6 +1,6 @@
 ---
 name: vendored-assets
-description: Rebuild mdFlow's vendored offline assets — the tesseract.js OCR runtime under public/vendor/tesseract (including adding an OCR language) and the pinned Excalidraw board module under public/vendor/excalidraw. Use when adding an OCR language, bumping Excalidraw, or regenerating anything under public/vendor.
+description: Rebuild BugText's vendored offline assets — the tesseract.js OCR runtime under public/vendor/tesseract (including adding an OCR language) and the pinned Excalidraw board module under public/vendor/excalidraw. Use when adding an OCR language, bumping Excalidraw, or regenerating anything under public/vendor.
 ---
 
 # Vendored assets

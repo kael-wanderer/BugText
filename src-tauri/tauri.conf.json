@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "mdFlow",
+  "productName": "BugText",
   "version": "0.2.9",
-  "identifier": "com.kael.mdflow",
+  "identifier": "com.kael.bugtext",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "mdFlow",
+        "title": "BugText",
         "width": 1100,
         "height": 740,
         "minWidth": 640,
@@ -27,7 +27,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/kael-wanderer/mdFlow/releases/latest/download/latest.json"
+        "https://github.com/kael-wanderer/BugText/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMTREMzJEQ0MxOEYxNgpSV1FXajhIY01rMGhDSXlkK0dRYkdqaVY4SC81T1F2Q25obmFvZm9TbkdkVGtKeVNybXdBaWhiLwo="
     }

@@ -1,6 +1,6 @@
-# mdFlow — Roadmap
+# BugText — Roadmap
 
-The full picture: where mdFlow has been and where it's going. Shipped work is
+The full picture: where BugText has been and where it's going. Shipped work is
 marked **done**; planned/deferred work is at the bottom. For the live task tracker
 see `docs/tasks.md`; for release notes see `CHANGELOG.md`.
 
@@ -95,7 +95,7 @@ Legend: ✅ done · 🔜 planned/deferred
   and the `latest.json` endpoint set in `tauri.conf.json`. In-app Check for Updates
   reaches the feed ("up to date"). First signed feed lands with the next tag (v0.2.1).
 - ✅ Removed the upstream Excalidraw public Firebase key from the vendored bundle
-  (GitHub secret-scan alert; dismissed as false positive — not a mdFlow credential).
+  (GitHub secret-scan alert; dismissed as false positive — not a BugText credential).
 
 ## Stage 7 — Search, AI, terminal, and workflow polish ✅ (2026-06-21)
 
@@ -121,9 +121,9 @@ choices clearly:
   commands/aliases such as `codex-skip`
 - **Terminal app** — Embedded, Apple Terminal, Ghostty, or cmux
 
-External terminal apps launch outside mdFlow in the active project directory;
+External terminal apps launch outside BugText in the active project directory;
 Embedded remains the in-app xterm.js renderer. Agent Console can resize up to 80%
-of the mdFlow window while preserving a minimum document area.
+of the BugText window while preserving a minimum document area.
 
 ### Workflow polish ✅
 

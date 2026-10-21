@@ -230,7 +230,7 @@ pub fn run() {
             restart_app,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building mdFlow")
+        .expect("error while building BugText")
         .run(|app, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {

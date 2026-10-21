@@ -1,7 +1,7 @@
 use keyring::{Entry, Error};
 
-const SERVICE: &str = "com.kael.mdflow";
-const LEGACY_SERVICE: &str = "com.kael.mdflow";
+const SERVICE: &str = "com.kael.bugtext";
+const LEGACY_SERVICE: &str = "com.kael.bugtext";
 
 fn entry(service: &str, id: &str) -> Result<Entry, String> {
     Entry::new(service, id).map_err(|error| error.to_string())

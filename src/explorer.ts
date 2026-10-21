@@ -361,7 +361,7 @@ function rowMenu(node: TreeNode): MenuItem[] {
         label: "Open to the Side",
         action: () =>
           (explorerActions.onOpenSide ??
-            ((path: string) => (window as any).mdflowOpenInSub(path)))(node.path),
+            ((path: string) => (window as any).bugtextOpenInSub(path)))(node.path),
       },
       {
         label: "Reveal in Finder",

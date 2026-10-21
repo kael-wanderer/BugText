@@ -2,8 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { check } from "@tauri-apps/plugin-updater";
 
-const LAST_CHECK_KEY = "mdflow.updater.lastCheck";
-const LEGACY_LAST_CHECK_KEY = "mdflow.updater.lastCheck";
+const LAST_CHECK_KEY = "bugtext.updater.lastCheck";
+const LEGACY_LAST_CHECK_KEY = "bugtext.updater.lastCheck";
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export function shouldCheckForUpdates(
@@ -39,7 +39,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     const update = await check({ timeout: 20_000 });
     if (!update) {
       if (interactive) {
-        await message("mdFlow is up to date.", {
+        await message("BugText is up to date.", {
           title: "Check for Updates",
           kind: "info",
         });
@@ -48,7 +48,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     }
 
     const accepted = await confirm(
-      `mdFlow ${update.version} is available${
+      `BugText ${update.version} is available${
         update.body ? `.\n\n${update.body}` : "."
       }\n\nDownload and install it now?`,
       {
@@ -61,7 +61,7 @@ export async function checkForUpdates(interactive = true): Promise<void> {
     if (!accepted) return;
 
     await update.downloadAndInstall();
-    await message("The update is installed. mdFlow will restart now.", {
+    await message("The update is installed. BugText will restart now.", {
       title: "Update Complete",
       kind: "info",
     });

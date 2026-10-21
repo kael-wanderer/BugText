@@ -1,10 +1,20 @@
 # Changelog
 
-All notable changes to mdFlow are documented here. The format is based on
+All notable changes to BugText (formerly mdFlow) are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+
+- Renamed the app from mdFlow to BugText. The bundle identifier is now
+  `com.kael.bugtext`, so this is a clean break: settings, recent files, UI state and
+  keychain API keys from mdFlow are not carried over. The GitHub repository and the
+  updater feed moved to `kael-wanderer/BugText`.
+- New app icon ("Page Bug": a document page with a ladybug on blue). Source SVG at
+  `docs/design/bugtext-icon.svg`; all icons in `src-tauri/icons/` regenerated from it
+  with `tauri icon`. Other concepts kept in `docs/design/logo-concepts/`.
 
 ### Removed
 

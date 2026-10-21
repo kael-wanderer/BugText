@@ -49,7 +49,7 @@ describe("state", () => {
   });
 
   it("falls back to defaults on corrupt json", () => {
-    localStorage.setItem("mdflow.ui", "{not json");
+    localStorage.setItem("bugtext.ui", "{not json");
     expect(loadState()).toEqual({
       viewMode: "editor",
       zoom: 1,
@@ -66,7 +66,7 @@ describe("state", () => {
   });
 
   it("merges partial stored state over defaults", () => {
-    localStorage.setItem("mdflow.ui", JSON.stringify({ viewMode: "editor" }));
+    localStorage.setItem("bugtext.ui", JSON.stringify({ viewMode: "editor" }));
     expect(loadState()).toEqual({
       viewMode: "editor",
       zoom: 1,

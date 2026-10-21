@@ -13,8 +13,8 @@ export type UIState = {
   lineNumbers: boolean;
 };
 
-const KEY = "mdflow.ui";
-const LEGACY_KEY = "mdflow.ui";
+const KEY = "bugtext.ui";
+const LEGACY_KEY = "bugtext.ui";
 const DEFAULTS: UIState = {
   viewMode: "editor",
   zoom: 1,
@@ -56,8 +56,8 @@ export function saveState(s: UIState): void {
 // Tracks which HTTP providers have an API key saved, so the settings UI can show
 // a "Key saved" badge without reading the OS keychain (which prompts for the
 // login password on macOS). The keychain is only read when a key is actually used.
-const SAVED_KEYS = "mdflow.savedKeys";
-const LEGACY_SAVED_KEYS = "mdflow.savedKeys";
+const SAVED_KEYS = "bugtext.savedKeys";
+const LEGACY_SAVED_KEYS = "bugtext.savedKeys";
 
 export function loadSavedKeyIds(): Set<string> {
   try {

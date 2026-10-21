@@ -335,8 +335,8 @@ export function createSettingsPanel(deps: SettingsPanelDeps): SettingsPanel {
     modeDescription.className = "settings-help";
     modeDescription.textContent =
       settings.updateMode === "auto"
-        ? "Checks once per day. mdFlow always asks before downloading and installing."
-        : "Checks only when you use Check for Updates. mdFlow never installs silently.";
+        ? "Checks once per day. BugText always asks before downloading and installing."
+        : "Checks only when you use Check for Updates. BugText never installs silently.";
     content.appendChild(
       renderChoiceList([
         {
@@ -764,7 +764,7 @@ export function createSettingsPanel(deps: SettingsPanelDeps): SettingsPanel {
     content.appendChild(
       renderChoiceList([
         {
-          label: "Embedded in mdFlow",
+          label: "Embedded in BugText",
           selected: settings.terminalApp === "embedded",
           run: () =>
             updateAI((next) => {
@@ -801,7 +801,7 @@ export function createSettingsPanel(deps: SettingsPanelDeps): SettingsPanel {
     appHelp.className = "settings-help";
     appHelp.textContent =
       settings.terminalApp === "embedded"
-        ? "Runs inside mdFlow. Font and size settings below apply to this mode."
+        ? "Runs inside BugText. Font and size settings below apply to this mode."
         : "Agent Console will offer a button that launches the selected command in this terminal app.";
     content.appendChild(appHelp);
 

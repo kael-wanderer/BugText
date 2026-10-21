@@ -1,16 +1,16 @@
-# mdFlow
+# BugText
 
 A fast, lightweight markdown editor built with Tauri 2 + Rust and a plain-TypeScript
-frontend. mdFlow is an IDE-style workspace for markdown: a file explorer, split
+frontend. BugText is an IDE-style workspace for markdown: a file explorer, split
   windows, a command palette, rich preview (mermaid, math, raw HTML), a built-in AI
 panel, a PDF reader, editable Excalidraw and mindmap boards, and document export.
 
-**License:** MIT · **Identifier:** `com.kael.mdflow`
+**License:** MIT · **Identifier:** `com.kael.bugtext`
 
 > Clean-room, independent project. Written from scratch; not derived from any
 > GPL-licensed editor.
 
-![mdFlow main interface](images/screenshots/mdflow-main.png)
+![BugText main interface](images/screenshots/bugtext-main.png)
 
 ## Features
 
@@ -36,7 +36,7 @@ panel, a PDF reader, editable Excalidraw and mindmap boards, and document export
 - **Compare** — select two files and view a side-by-side diff.
 - **Recovery & version history** — unsaved edits are continuously drafted in the
   background and offered back after a crash or quit (restore / discard banner on
-  launch), without changing the explicit-save model. mdFlow detects when an open file
+  launch), without changing the explicit-save model. BugText detects when an open file
   changes on disk (reload when clean, conflict prompt when dirty, overwrite
   protection on save) and keeps per-file local snapshots on save plus manual
   snapshots, browsable in a version-history panel with Compare and Restore.
@@ -51,7 +51,7 @@ panel, a PDF reader, editable Excalidraw and mindmap boards, and document export
   Text) or a real in-document rewrite (Direct) via pdf-lib — plus per-page OCR
   (tesseract.js, configurable language such as `eng` or `eng+vie`) for scanned pages.
   Edits draft locally until saved; the original is backed up to a hidden
-  `.mdflow-pdf-backups/` folder before Save / Save As.
+  `.bugtext-pdf-backups/` folder before Save / Save As.
 - **Excalidraw boards** — open and edit `.excalidraw` files in a focused full-pane
   canvas. Boards use the normal tab, save, dirty-close, and session workflows.
 - **Mindmap boards** — open and edit `.mind` files (jsMind) with an on-board toolbar:
@@ -93,7 +93,7 @@ panel, a PDF reader, editable Excalidraw and mindmap boards, and document export
 - **Export only:** [pandoc](https://pandoc.org) and [typst](https://typst.app) —
   install with `brew install pandoc typst`. They are located at runtime, not bundled.
 - **AI:** a local OpenAI-compatible server (e.g. [Ollama](https://ollama.com) or
-  LM Studio) and/or an agent CLI (Claude Code, Codex, OpenCode, Pi). mdFlow resolves
+  LM Studio) and/or an agent CLI (Claude Code, Codex, OpenCode, Pi). BugText resolves
   your login-shell `PATH` to find CLIs installed via Homebrew, npm, etc.
 
 ## Getting started
@@ -135,7 +135,7 @@ templates ship by default. The Models tab also controls the inline context cap
 `terminals` entries define interactive commands for the Terminal tab.
 
 > **Security note:** API keys are stored in your macOS Keychain under service
-> `com.kael.mdflow`, never in `agent.json`.
+> `com.kael.bugtext`, never in `agent.json`.
 
 ## Architecture
 
