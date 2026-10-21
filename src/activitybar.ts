@@ -4,7 +4,7 @@ import { glyphs } from "./glyphs";
 export function initActivityBar(
   onLayoutChange: () => void = () => {},
   onSearch: () => void = () => {},
-  onSettings: (x: number, y: number) => void = () => {},
+  onSettings: () => void = () => {},
   onAI: () => void = () => {},
   onExport: (x: number, y: number) => void = () => {},
 ): void {
@@ -28,10 +28,7 @@ export function initActivityBar(
 
   const settingsButton = document.getElementById("ab-settings")!;
   settingsButton.innerHTML = glyphs.gear;
-  settingsButton.addEventListener("click", () => {
-    const rect = settingsButton.getBoundingClientRect();
-    onSettings(rect.right + 4, rect.top);
-  });
+  settingsButton.addEventListener("click", () => onSettings());
 
   const applyVisibility = (visible: boolean): void => {
     document.body.classList.toggle("explorer-hidden", !visible);

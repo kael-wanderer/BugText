@@ -81,6 +81,8 @@ import {
   resolveAccelerator,
 } from "./keymap";
 import { createSettingsPanel } from "./settingspanel";
+import { createSettingsScreen } from "./settings-screen/screen";
+import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
 import {
   checkExternalChange,
@@ -280,11 +282,14 @@ async function refreshFileList(): Promise<void> {
   fileList = folder ? await listFilesRecursive(folder).catch(() => []) : [];
 }
 
+// Opening a settings file shows it as a tab, so leave the settings screen first.
 function openSettings(): void {
+  settingsScreen.close();
   if (settingsPath) void doOpenPath(settingsPath);
 }
 
 function openAISettings(): void {
+  settingsScreen.close();
   if (aiSettingsPath) void doOpenPath(aiSettingsPath);
 }
 
@@ -349,7 +354,8 @@ function commandItems(): PaletteItem[] {
     command("explorer", "Toggle Explorer", () => {
       document.getElementById("ab-explorer")?.click();
     }),
-    command("settings", "Open Settings", openSettings),
+    command("settings", "Settings", () => settingsScreen.open()),
+    command("settingsJson", "Open settings.json", openSettings),
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
@@ -1551,6 +1557,7 @@ function toggleAutomaticUpdates(): void {
   };
   persistCurrentSettings();
   settingsPanel.refresh();
+  settingsScreen.refresh();
 }
 
 function ensureSubWindow(): void {
@@ -1946,6 +1953,27 @@ const settingsPanel = createSettingsPanel({
   onCheckForUpdates: () => void checkForUpdates(),
 });
 
+const isMac = /Mac/.test(navigator.userAgent);
+
+const settingsScreen = createSettingsScreen(
+  {
+    getSettings: () => currentSettings,
+    getAISettings: () => currentAISettings,
+    onSettingsChange: saveSettingsFromPanel,
+    onAISettingsChange: saveAISettingsFromPanel,
+    onOpenSettingsFile: openSettings,
+    onOpenAISettingsFile: openAISettings,
+    onCheckForUpdates: () => void checkForUpdates(),
+    getActiveTabName: () => activeMeta()?.name ?? null,
+    getAppVersion: () => getVersion(),
+    setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
+    isMac,
+    onLayoutChange: requestWindowMeasure,
+  },
+  [],
+);
+onSettingsSynced = () => settingsScreen.refresh();
+
 async function setAsDefault(role: "markdown" | "pdf"): Promise<void> {
   const label = role === "pdf" ? "PDF" : "Markdown";
   try {
@@ -2051,10 +2079,28 @@ function toggleSearch(): void {
 
 initActivityBar(
   requestWindowMeasure,
-  toggleSearch,
-  (x, y) => settingsPanel.open(x, y),
-  toggleAI,
+  () => {
+    settingsScreen.close();
+    toggleSearch();
+  },
+  () => settingsScreen.toggle(),
+  () => {
+    settingsScreen.close();
+    toggleAI();
+  },
   openExportMenu,
+);
+
+// Clicking Explorer while settings is open leaves settings; it only toggles the
+// explorer when the explorer was hidden (so the click always ends on the tree).
+document.getElementById("ab-explorer")!.addEventListener(
+  "click",
+  (event) => {
+    if (!settingsScreen.isOpen()) return;
+    settingsScreen.close();
+    if (getState().explorerVisible) event.stopImmediatePropagation();
+  },
+  true,
 );
 
 // Clicking Explorer while search is open should just return to the tree.
@@ -2230,10 +2276,9 @@ listenScoped<string>("menu", (event) => {
     case "view.toggle_lines":
       return toggleLineNumbers();
     case "app.settings":
-      // Temporary: opens the settings popover; the settings screen replaces it.
-      return settingsPanel.open(window.innerWidth / 2 - 220, window.innerHeight / 2 + 240);
+      return settingsScreen.open();
     case "view.keymap":
-      return settingsPanel.openKeys();
+      return settingsScreen.open("shortcuts");
     case "view.zoom_in":
       return activeView().adjustFocusedZoom(0.1);
     case "view.zoom_out":
