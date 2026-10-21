@@ -255,10 +255,10 @@ const mcpHandler = createMcpHandler({
   searchIndex: async (q, k) => {
     const folder = getState().folder;
     if (!folder) return [];
-    return (await workspaceIndex.query(folder, q, k)).map((chunk) => ({
+    return (await workspaceIndex.queryScored(folder, q, k)).map(({ chunk, score }) => ({
       path: chunk.path,
       snippet: chunk.text.slice(0, 240),
-      score: 1,
+      score,
     }));
   },
   activeSelection() {

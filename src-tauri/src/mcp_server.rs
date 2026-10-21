@@ -167,6 +167,21 @@ fn reported_tab_path(path: &Path, report: &WindowReport) -> Option<String> {
     })
 }
 
+fn empty_selection() -> Value { json!({"path":null,"selections":[],"revision":null}) }
+
+fn activity_text(tool: &str, args: &Value, result: &Value) -> String {
+    let path = args.get("path").and_then(Value::as_str).and_then(|path| Path::new(path).file_name()).and_then(|name| name.to_str()).unwrap_or("");
+    match tool {
+        "read_note" => format!("Read {path}"),
+        "update_note" if result.get("snapshot").and_then(Value::as_bool) == Some(true) => format!("Updated {path} · snapshot saved"),
+        "update_note" => format!("Updated {path}"),
+        "create_note" => format!("Created {path}"),
+        "search" => "Searched · results returned".to_string(),
+        "get_selection" => "Read current selection".to_string(),
+        _ => "Listed files".to_string(),
+    }
+}
+
 pub fn list_files_from_registry(windows: &[(String, WindowReport)], folder: Option<&str>) -> Vec<Value> {
     let selected_folder = folder.and_then(|path| canonical(Path::new(path)));
     let mut result = Vec::new();
@@ -332,7 +347,10 @@ fn dispatch(app: &tauri::AppHandle, state: &McpState, request: SocketRequest) ->
                 Ok(Value::Array(list_files_from_registry(&windows, None)))
             }
         }
-        "get_selection" => focused.as_deref().ok_or_else(|| "No active text tab.".to_string()).and_then(|label| forward(app, state, label, &request.client, &request.tool, request.args.clone())),
+        "get_selection" => match focused.as_deref() {
+            Some(label) => forward(app, state, label, &request.client, &request.tool, request.args.clone()),
+            None => Ok(empty_selection()),
+        },
         "search" => dispatch_search(app, state, &windows, &request),
         "read_note" | "update_note" | "create_note" => {
             let Some(path) = request.args.get("path").and_then(Value::as_str) else { return WireResponse::error(id, "A path is required."); };
@@ -359,7 +377,7 @@ fn dispatch(app: &tauri::AppHandle, state: &McpState, request: SocketRequest) ->
     };
     match result {
         Ok(value) => {
-            emit_activity(app, &request.client, &request.tool, &activity_args);
+            emit_activity(app, &request.client, &request.tool, &activity_args, &value);
             WireResponse::success(id, value)
         }
         Err(error) => WireResponse::error(id, &error),
@@ -401,23 +419,15 @@ fn forward(app: &tauri::AppHandle, state: &McpState, label: &str, client: &str, 
     }
 }
 
-fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value) {
-    let path = args.get("path").and_then(Value::as_str).and_then(|path| Path::new(path).file_name()).and_then(|name| name.to_str()).unwrap_or("");
-    let text = match tool {
-        "read_note" => format!("Read {path}"),
-        "update_note" => format!("Updated {path} · snapshot saved"),
-        "create_note" => format!("Created {path}"),
-        "search" => format!("Searched · results returned"),
-        "get_selection" => "Read current selection".to_string(),
-        _ => "Listed files".to_string(),
-    };
+fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value, result: &Value) {
+    let text = activity_text(tool, args, result);
     let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
     let _ = app.emit("bugtext://mcp-activity", json!({"time":time,"client":client,"text":text}));
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_blocking, accept_peer, checked_note_path, list_files_from_registry, owner, reported_tab_path, Access, McpCore, Roots, TabReport, WindowReport};
+    use super::{accept_blocking, accept_peer, activity_text, checked_note_path, empty_selection, list_files_from_registry, owner, reported_tab_path, Access, McpCore, Roots, TabReport, WindowReport};
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
@@ -528,6 +538,18 @@ mod tests {
         let roots = Roots { folders: vec![root.clone()], open_files: vec![], config_dir: dir.0.join("config") };
         assert_eq!(checked_note_path(root.join("visible.md").to_str().unwrap(), &roots, Access::Read).unwrap(), root.join("visible.md").canonicalize().unwrap());
         assert_eq!(checked_note_path(root.join(".hidden/x.md").to_str().unwrap(), &roots, Access::Read).unwrap_err(), "That path is outside the folders open in BugText.");
+    }
+
+    #[test]
+    fn activity_reports_snapshot_only_when_one_was_created() {
+        let args = json!({"path":"/notes/a.md"});
+        assert_eq!(activity_text("update_note", &args, &json!({"snapshot":true})), "Updated a.md · snapshot saved");
+        assert_eq!(activity_text("update_note", &args, &json!({"snapshot":false})), "Updated a.md");
+    }
+
+    #[test]
+    fn empty_selection_has_null_path_and_revision() {
+        assert_eq!(empty_selection(), json!({"path":null,"selections":[],"revision":null}));
     }
 
     #[test]

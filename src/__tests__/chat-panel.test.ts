@@ -14,6 +14,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 vi.mock("../ai/workspace-index", () => ({
   createWorkspaceIndex: () => ({
     query: vi.fn().mockResolvedValue([]),
+    queryScored: vi.fn().mockResolvedValue([]),
     reset: vi.fn(),
     onFileChanged: vi.fn(),
     onFileRemoved: vi.fn(),
@@ -40,6 +41,7 @@ beforeEach(() => {
   deps = {
     workspaceIndex: {
       query: vi.fn().mockResolvedValue([]),
+      queryScored: vi.fn().mockResolvedValue([]),
       reset: vi.fn(),
       onFileChanged: vi.fn(),
       onFileRemoved: vi.fn(),

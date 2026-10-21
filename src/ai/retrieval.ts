@@ -101,12 +101,12 @@ export function buildIndex(chunks: Chunk[]): RetrievalIndex {
   };
 }
 
-export function retrieve(
+export function retrieveScored(
   index: RetrievalIndex,
   query: string,
   k: number,
   excludePath?: string,
-): Chunk[] {
+): { chunk: Chunk; score: number }[] {
   if (index.n === 0) return [];
   const terms = tokenize(query);
   const scored: { i: number; score: number }[] = [];
@@ -128,5 +128,14 @@ export function retrieve(
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, Math.max(0, k)).map((hit) => index.chunks[hit.i]);
+  return scored.slice(0, Math.max(0, k)).map((hit) => ({ chunk: index.chunks[hit.i], score: hit.score }));
+}
+
+export function retrieve(
+  index: RetrievalIndex,
+  query: string,
+  k: number,
+  excludePath?: string,
+): Chunk[] {
+  return retrieveScored(index, query, k, excludePath).map((hit) => hit.chunk);
 }

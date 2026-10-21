@@ -79,7 +79,7 @@ describe("MCP webview handler", () => {
     expect(f.deps.applyChanges).toHaveBeenCalledTimes(1);
     expect(f.deps.saveTab).toHaveBeenCalledTimes(1);
     expect(f.notice).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ ok: true, result: { revision: hashText("after"), saved: true } });
+    expect(result).toEqual({ ok: true, result: { revision: hashText("after"), saved: true, snapshot: true } });
   });
 
   it("refuses a whole-note replacement with a stale revision before snapshotting", async () => {
@@ -102,6 +102,9 @@ describe("MCP webview handler", () => {
     await f.handler.handle(request("update_note", { path, edits: [{ old: "one", new: "two" }] }));
     await f.handler.handle(request("update_note", { path, edits: [{ old: "two", new: "three" }] }));
     expect(f.deps.snapshot).toHaveBeenCalledTimes(1);
+    expect(await f.handler.handle(request("update_note", { path, edits: [{ old: "three", new: "four" }] }))).toMatchObject({
+      ok: true, result: { snapshot: false },
+    });
   });
 
   it("snapshots disk changes before the open-tab snapshot and save", async () => {

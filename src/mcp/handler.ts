@@ -102,19 +102,25 @@ export function createMcpHandler(deps: HandlerDeps): {
     }
     if (byteLength(next) > MAX_BYTES) return failure(TOO_LARGE);
 
+    let snapshot = false;
     if (!tab) {
-      if (throttle.shouldSnapshot(operationPath, req.client, false))
+      if (throttle.shouldSnapshot(operationPath, req.client, false)) {
         await deps.snapshot(operationPath, before, `Before ${req.client} edit`);
+        snapshot = true;
+      }
       await deps.writeDiskAtomic(path, next);
-      return success({ revision: hashText(next), saved: true });
+      return success({ revision: hashText(next), saved: true, snapshot });
     }
 
     if (await deps.diskChanged(operationPath)) {
       const diskText = await deps.readDisk(operationPath);
       await deps.snapshot(operationPath, diskText, `Before ${req.client} edit (disk version)`);
+      snapshot = true;
     }
-    if (throttle.shouldSnapshot(operationPath, req.client, tab.dirty))
+    if (throttle.shouldSnapshot(operationPath, req.client, tab.dirty)) {
       await deps.snapshot(operationPath, before, `Before ${req.client} edit`);
+      snapshot = true;
+    }
     deps.applyChanges(tab.id, changes);
     await deps.saveTab(tab.id);
     const finalText = next;
@@ -127,7 +133,7 @@ export function createMcpHandler(deps: HandlerDeps): {
       },
       () => deps.getText(tab.id) === finalText,
     );
-    return success({ revision: hashText(next), saved: true });
+    return success({ revision: hashText(next), saved: true, snapshot });
   }
 
   async function handle(req: McpRequest): Promise<McpResult> {
