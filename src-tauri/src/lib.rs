@@ -213,6 +213,7 @@ pub fn run() {
             files::read_file,
             files::read_file_bytes,
             files::save_file,
+            files::write_file_atomic,
             files::save_bytes,
             files::backup_file,
             files::get_initial_file,

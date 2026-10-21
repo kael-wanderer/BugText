@@ -92,6 +92,8 @@ import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
 import { loadModelsCache } from "./ai/models-cache";
 import { createWorkspaceIndex } from "./ai/workspace-index";
+import { createMcpHandler, type McpRequest } from "./mcp/handler";
+import { refreshAgentNotices, showAgentNotice } from "./mcp/notice";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
@@ -196,6 +198,89 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 
 const views = new Map<string, WindowView>();
 
+const mcpHandler = createMcpHandler({
+  findOpenTab(path) {
+    const normalized = (value: string) => value.startsWith("/private/") ? value.slice("/private".length) : value;
+    for (const windowState of getState().windows) {
+      const tab = windowState.tabs.find((candidate) => candidate.path && normalized(candidate.path) === normalized(path));
+      if (tab) return { id: tab.id, dirty: tab.dirty, kind: isPdfFile(tab.path ?? tab.name) ? "other" : "text" };
+    }
+    return null;
+  },
+  getText(id) {
+    for (const view of views.values()) {
+      try { return view.editor.getText(id); } catch { /* try the next window */ }
+    }
+    return "";
+  },
+  applyChanges(id, changes) {
+    for (const view of views.values()) {
+      try { view.editor.applyChanges(id, changes); return; } catch { /* try the next window */ }
+    }
+  },
+  async saveTab(id) {
+    for (const windowState of getState().windows) {
+      const tab = windowState.tabs.find((candidate) => candidate.id === id);
+      const view = views.get(windowState.id);
+      if (!tab || !view || !tab.path) continue;
+      const text = view.editor.getText(id);
+      await invoke<void>("save_file", { path: tab.path, contents: text });
+      await recordStat(tab.path);
+      clearDraft(tab.path, id);
+      const recoveredId = recoveredDraftIds.get(id);
+      if (recoveredId) clearDraftById(recoveredId);
+      recoveredDraftIds.delete(id);
+      workspaceIndex.onFileChanged(tab.path, text);
+      aiPanel?.updateWorkspaceFile(tab.path, text);
+      patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === id ? { ...item, dirty: false } : item) });
+      return;
+    }
+  },
+  readDisk: (path) => invoke<string>("read_file", { path }),
+  writeDiskAtomic: async (path, text) => {
+    await invoke<void>("write_file_atomic", { path, contents: text });
+    workspaceIndex.onFileChanged(path, text);
+  },
+  exists: async (path) => {
+    try { await invoke("file_stat", { path }); return true; } catch { return false; }
+  },
+  snapshot: (path, text, label) => manualSnapshot(path, text, label),
+  diskChanged: (path) => hasDiskChanged(path),
+  refreshExplorer() {
+    void refreshExpandedDirs().then(refreshFileList).catch(() => {});
+  },
+  searchIndex: async (q, k) => {
+    const folder = getState().folder;
+    if (!folder) return [];
+    return (await workspaceIndex.query(folder, q, k)).map((chunk) => ({
+      path: chunk.path,
+      snippet: chunk.text.slice(0, 240),
+      score: 1,
+    }));
+  },
+  activeSelection() {
+    const windowState = getWindow(getState().activeWindowId);
+    const tab = windowState?.tabs.find((item) => item.id === windowState.activeTabId);
+    if (!windowState || !tab) return null;
+    const view = views.get(windowState.id);
+    if (!view) return null;
+    const kind = isPdfFile(tab.path ?? tab.name) ? "other" : "text";
+    if (kind === "other") return { path: tab.path, kind, text: "", selections: [] };
+    const text = view.editor.getText(tab.id);
+    const selection = view.editor.getSelection();
+    const selected = selection.text ? [{
+      text: selection.text,
+      fromLine: text.slice(0, selection.from).split("\n").length,
+      toLine: text.slice(0, selection.to).split("\n").length,
+    }] : [];
+    return { path: tab.path, kind, text, selections: selected };
+  },
+  notice(client, name, undo, stillAgentResult) {
+    const host = document.getElementById("agent-notices");
+    if (host) showAgentNotice(host, { client, name, onUndo: () => { void undo(); }, undoAvailable: stillAgentResult });
+  },
+});
+
 let onSettingsSynced: (() => void) | null = null;
 
 function broadcastSettingsChange(file: SettingsFile): void {
@@ -205,7 +290,7 @@ function broadcastSettingsChange(file: SettingsFile): void {
 function writeSettings(next: Settings): void {
   if (!settingsPath) return;
   void writeFile(settingsPath, JSON.stringify(next, null, 2))
-    .then(() => broadcastSettingsChange("settings"))
+    .then(() => { syncMcpEnabled(); broadcastSettingsChange("settings"); })
     .catch(() => {});
 }
 
@@ -236,6 +321,7 @@ async function loadSettings(): Promise<void> {
     currentSettings = parseSettings("{}");
   }
   applySettings(currentSettings);
+  syncMcpEnabled();
   applySoftWrap();
   applyKeymap();
   syncViewMenu();
@@ -331,6 +417,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const themeChanged = next.theme !== currentSettings.theme;
       currentSettings = next;
       applySettings(currentSettings);
+      syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
       syncViewMenu();
@@ -356,6 +443,22 @@ void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
   if (file) void reloadSettingsFromDisk(file);
 });
 
+function syncMcpEnabled(): void {
+  if (!isPrimaryNativeWindow) return;
+  const enabled = (currentSettings as Settings & { mcp?: { enabled?: boolean } }).mcp?.enabled === true;
+  void invoke<void>("mcp_set_enabled", { enabled }).catch(() => {});
+}
+
+void listenScoped<McpRequest>("bugtext://mcp-request", async ({ payload }) => {
+  const response = await mcpHandler.handle(payload);
+  void invoke<void>("mcp_reply", {
+    requestId: payload.requestId,
+    ok: response.ok,
+    result: response.ok ? response.result : null,
+    error: response.ok ? null : response.error,
+  }).catch(() => {});
+});
+
 async function refreshFileList(): Promise<void> {
   const folder = getState().folder;
   fileList = folder ? await listFilesRecursive(folder).catch(() => []) : [];
@@ -376,6 +479,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   const themeChanged = settings.theme !== currentSettings.theme;
   currentSettings = settings;
   applySettings(currentSettings);
+  syncMcpEnabled();
   applySoftWrap();
   applyKeymap();
   syncViewMenu();
@@ -831,6 +935,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
 }
 
 function onDocChange(windowId: string, tabId: string, text: string): void {
+  refreshAgentNotices();
   const w = getWindow(windowId)!;
   const t = w.tabs.find((x) => x.id === tabId);
   const changeKey = `${windowId}:${tabId}`;
@@ -1154,6 +1259,7 @@ async function doSave(saveAs = false): Promise<void> {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
+      syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
       syncViewMenu();
@@ -2292,6 +2398,24 @@ for (const v of views.values()) {
 }
 renderAll();
 
+let reportTimer: number | undefined;
+function reportWindow(): void {
+  const state = getState();
+  void invoke<void>("mcp_report_window", {
+    folder: state.folder,
+    openTabs: state.windows.flatMap((windowState) => windowState.tabs.flatMap((tab) => tab.path ? [{
+      path: tab.path,
+      dirty: tab.dirty,
+      active: tab.id === windowState.activeTabId,
+    }] : [])),
+  }).catch(() => {});
+}
+
+function scheduleWindowReport(): void {
+  if (reportTimer !== undefined) window.clearTimeout(reportTimer);
+  reportTimer = window.setTimeout(() => { reportTimer = undefined; reportWindow(); }, 200);
+}
+
 subscribe(() => {
   const s = getState();
   if (s.folder !== indexedFolder) {
@@ -2312,6 +2436,7 @@ subscribe(() => {
     activeWindowIndex: s.windows.findIndex((w) => w.id === s.activeWindowId),
   };
   persistUiState();
+  scheduleWindowReport();
 });
 
 function refreshOnFocus(): void {
@@ -2514,6 +2639,7 @@ async function restoreWindows(): Promise<void> {
 
 async function boot(): Promise<void> {
   await loadSettings();
+  reportWindow();
   // The Dock forgets a custom icon on quit; re-apply it (app-wide, idempotent).
   if (isMac && currentSettings.appIcon !== DEFAULT_APP_ICON) {
     void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
