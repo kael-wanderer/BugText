@@ -94,6 +94,7 @@ import { appendMcpActivity, type McpPageDeps } from "./settings-screen/page-ai-m
 import { loadModelsCache } from "./ai/models-cache";
 import { createWorkspaceIndex } from "./ai/workspace-index";
 import { createMcpHandler, type McpRequest } from "./mcp/handler";
+import { paneForTab } from "./mcp/pane-for-tab";
 import { refreshAgentNotices, showAgentNotice } from "./mcp/notice";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
@@ -199,6 +200,13 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 
 const views = new Map<string, WindowView>();
 
+function editorForTab(id: string): WindowView["editor"] {
+  const paneId = paneForTab(getState().windows, id);
+  const view = paneId ? views.get(paneId) : undefined;
+  if (!view) throw new Error("The note is no longer open.");
+  return view.editor;
+}
+
 const mcpHandler = createMcpHandler({
   findOpenTab(path) {
     const normalized = (value: string) => value.startsWith("/private/") ? value.slice("/private".length) : value;
@@ -209,15 +217,10 @@ const mcpHandler = createMcpHandler({
     return null;
   },
   getText(id) {
-    for (const view of views.values()) {
-      try { return view.editor.getText(id); } catch { /* try the next window */ }
-    }
-    return "";
+    return editorForTab(id).getText(id);
   },
   applyChanges(id, changes) {
-    for (const view of views.values()) {
-      try { view.editor.applyChanges(id, changes); return; } catch { /* try the next window */ }
-    }
+    editorForTab(id).applyChanges(id, changes);
   },
   async saveTab(id) {
     for (const windowState of getState().windows) {

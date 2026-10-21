@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMcpHandler, type HandlerDeps } from "../mcp/handler";
 import { hashText } from "../hash";
+import { paneForTab } from "../mcp/pane-for-tab";
 
 const path = "/notes/a.md";
 
@@ -150,5 +151,20 @@ describe("MCP webview handler", () => {
     expect(f.deps.searchIndex).toHaveBeenLastCalledWith("q", 8);
     await f.handler.handle(request("search", { query: "q", limit: 99 }));
     expect(f.deps.searchIndex).toHaveBeenLastCalledWith("q", 20);
+  });
+
+  it("refuses to report a saved update when the owning pane is missing", async () => {
+    const f = fixture();
+    const pane = paneForTab([], "tab-1");
+    vi.mocked(f.deps.getText).mockImplementation(() => {
+      if (pane === null) throw new Error("The note is no longer open.");
+      return f.getText();
+    });
+    expect(await f.handler.handle(request("update_note", { path, edits: [{ old: "before", new: "after" }] }))).toEqual({
+      ok: false,
+      error: "The note is no longer open.",
+    });
+    expect(f.deps.saveTab).not.toHaveBeenCalled();
+    expect(f.deps.writeDiskAtomic).not.toHaveBeenCalled();
   });
 });
