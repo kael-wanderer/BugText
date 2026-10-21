@@ -38,6 +38,12 @@ beforeEach(() => {
     effort: "",
   };
   deps = {
+    workspaceIndex: {
+      query: vi.fn().mockResolvedValue([]),
+      reset: vi.fn(),
+      onFileChanged: vi.fn(),
+      onFileRemoved: vi.fn(),
+    },
     getSettings: () => settings,
     onSettingsChange: vi.fn((next) => Object.assign(settings, next)),
     getClis: () => [

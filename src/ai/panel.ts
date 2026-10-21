@@ -7,7 +7,7 @@ import {
   type AttachedFile,
   type RetrievedChunk,
 } from "./conversation";
-import { createWorkspaceIndex } from "./workspace-index";
+import type { WorkspaceIndex } from "./workspace-index";
 import { showDiff } from "./edit-review";
 import type { EditBinding } from "./edit-binding";
 import {
@@ -37,6 +37,7 @@ import { chatContentText, type ChatMessage } from "./providers";
 import { contextTrimWarning } from "./context-budget";
 import { prepareCliAttachments } from "./attachments";
 export type AIPanelDeps = {
+  workspaceIndex: WorkspaceIndex;
   getSettings(): AISettings;
   onSettingsChange(settings: AISettings): void;
   getClis(): CliInfo[];
@@ -179,7 +180,7 @@ export function createAIPanel(
     body.replaceChildren(messagesElement, inputRow);
   } else body.replaceChildren(picker, messagesElement, inputRow);
   const history = loadHistory(deps.historyKey, deps.legacyHistoryKey);
-  const workspaceIndex = createWorkspaceIndex();
+  const workspaceIndex = deps.workspaceIndex;
   let referencedFiles: string[] = [];
   let activeRequest: AbortController | null = null;
   function appendBubble(role: string, text: string): HTMLElement {

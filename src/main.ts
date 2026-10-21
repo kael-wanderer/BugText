@@ -91,6 +91,7 @@ import { editingPage } from "./settings-screen/page-editing";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
 import { loadModelsCache } from "./ai/models-cache";
+import { createWorkspaceIndex } from "./ai/workspace-index";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
@@ -137,6 +138,8 @@ import { findNode } from "./treeops";
 import { findTabByPath } from "./windowops";
 import { createWindowView, type WindowView } from "./windowview";
 import helpDoc from "../HELP.md?raw";
+
+const workspaceIndex = createWorkspaceIndex();
 
 const windowsHost = document.getElementById("windows")!;
 
@@ -1831,6 +1834,7 @@ function editReviewDeps(actionLabel: string): EditReviewDeps {
 function buildAIPanel(): void {
   const panelReview = editReviewDeps("AI edit");
   aiPanel = createAIPanel(aiPanelElement, {
+    workspaceIndex,
     getSettings: () => currentAISettings,
     onSettingsChange: saveAISettingsFromPanel,
     getClis: () => cliInfos,
