@@ -50,7 +50,7 @@ struct ErrorMsg {
 }
 
 #[tauri::command]
-pub fn ai_run(app: tauri::AppHandle, request_id: String, spec: CliRunSpec) -> Result<(), String> {
+pub async fn ai_run(app: tauri::AppHandle, request_id: String, spec: CliRunSpec) -> Result<(), String> {
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (app, request_id, spec);
@@ -159,20 +159,15 @@ fn prepare_command(
     } else {
         Vec::new()
     };
-    let mut exec_roots = vec![executable_root(&executable)];
-    if spec.tool == "codex" {
-        let node = login_shell_path()
-            .into_iter()
-            .flat_map(std::env::split_paths)
-            .map(|prefix| prefix.join("node"))
-            .find(|path| path.is_file())
-            .and_then(|path| resolve_executable("node", path.to_str()))
-            .and_then(|path| std::fs::canonicalize(path).ok())
-            .ok_or_else(|| "Node.js was not found or is not executable".to_string())?;
-        if let Some(prefix) = node.parent().and_then(Path::parent) {
-            exec_roots.push(prefix.to_path_buf());
-        }
-    }
+    let shebang = std::fs::read_to_string(&executable)
+        .ok()
+        .and_then(|contents| contents.lines().next().map(str::to_owned));
+    let node_prefix = if requires_node(&executable, shebang.as_deref()) {
+        Some(resolve_node_prefix()?)
+    } else {
+        None
+    };
+    let exec_roots = exec_roots_for(&executable, shebang.as_deref(), node_prefix.as_deref());
     let paths = SandboxPaths {
         workdir: workdir.clone(),
         tmpdir: private_tmp.clone(),
@@ -282,7 +277,6 @@ fn cli_config_dir(tool: &str, selected: Option<&str>, home: &Path) -> PathBuf {
     }
 }
 
-#[cfg(target_os = "macos")]
 fn executable_root(executable: &Path) -> PathBuf {
     let components: Vec<_> = executable.components().collect();
     if let Some(index) = components
@@ -302,6 +296,48 @@ fn executable_root(executable: &Path) -> PathBuf {
         }
     }
     executable.parent().unwrap_or(executable).to_path_buf()
+}
+
+fn requires_node(executable: &Path, shebang: Option<&str>) -> bool {
+    executable.extension().is_some_and(|extension| extension == "js")
+        || shebang.is_some_and(|line| line.starts_with("#!/usr/bin/env node"))
+}
+
+fn exec_roots_for(
+    executable: &Path,
+    shebang: Option<&str>,
+    node_prefix: Option<&Path>,
+) -> Vec<PathBuf> {
+    let mut roots = vec![executable_root(executable)];
+    if requires_node(executable, shebang) {
+        if let Some(prefix) = node_prefix {
+            if !roots.iter().any(|root| root.as_path() == prefix) {
+                roots.push(prefix.to_path_buf());
+            }
+        }
+    }
+    roots
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_node_prefix() -> Result<PathBuf, String> {
+    let node = login_shell_path()
+        .into_iter()
+        .flat_map(std::env::split_paths)
+        .map(|prefix| prefix.join("node"))
+        .find(|path| path.is_file())
+        .and_then(|path| resolve_executable("node", path.to_str()))
+        .and_then(|path| std::fs::canonicalize(path).ok())
+        .ok_or_else(|| "Node.js was not found or is not executable".to_string())?;
+    node.parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Node.js install prefix could not be resolved".into())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resolve_node_prefix() -> Result<PathBuf, String> {
+    Err("Node.js was not found or is not executable".into())
 }
 
 #[cfg(target_os = "macos")]
@@ -376,6 +412,8 @@ fn run_child(
             Err(_) => break None,
         }
     };
+    // The leader can exit while grandchildren still hold the output pipes open.
+    kill_group(child.id());
     let _ = stdout_thread.join();
     while let Ok(chunk) = receiver.try_recv() {
         all_output.push_str(&chunk);
@@ -505,7 +543,7 @@ fn emit_error(app: &tauri::AppHandle, request_id: &str, message: String) {
 }
 
 #[tauri::command]
-pub fn ai_cancel(app: tauri::AppHandle, request_id: String) -> Result<(), String> {
+pub async fn ai_cancel(app: tauri::AppHandle, request_id: String) -> Result<(), String> {
     let pid = app
         .state::<AIState>()
         .0
@@ -515,10 +553,16 @@ pub fn ai_cancel(app: tauri::AppHandle, request_id: String) -> Result<(), String
     let Some(pid) = pid else {
         return Ok(());
     };
-    terminate_group(pid);
-    thread::sleep(Duration::from_secs(2));
-    kill_group(pid);
+    terminate_and_schedule_kill(pid);
     Ok(())
+}
+
+fn terminate_and_schedule_kill(pid: u32) {
+    terminate_group(pid);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_secs(2));
+        kill_group(pid);
+    });
 }
 
 #[cfg(unix)]
@@ -545,3 +589,60 @@ fn terminate_group(_pid: u32) {}
 
 #[cfg(not(unix))]
 fn kill_group(_pid: u32) {}
+
+#[cfg(test)]
+mod review_tests {
+    use super::{exec_roots_for, kill_group, terminate_and_schedule_kill};
+    use std::path::{Path, PathBuf};
+    use std::time::Instant;
+    use std::thread;
+
+    #[test]
+    fn node_roots_are_added_only_for_node_shims() {
+        let node_prefix = Path::new("/opt/node");
+        assert_eq!(
+            exec_roots_for(Path::new("/tools/codex"), None, Some(node_prefix)),
+            vec![PathBuf::from("/tools")],
+        );
+        assert_eq!(
+            exec_roots_for(Path::new("/tools/codex.js"), None, Some(node_prefix)),
+            vec![PathBuf::from("/tools"), PathBuf::from("/opt/node")],
+        );
+        assert_eq!(
+            exec_roots_for(Path::new("/tools/codex"), Some("#!/usr/bin/env node"), Some(node_prefix)),
+            vec![PathBuf::from("/tools"), PathBuf::from("/opt/node")],
+        );
+        assert_eq!(
+            exec_roots_for(Path::new("/tools/codex"), None, None),
+            vec![PathBuf::from("/tools")],
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kills_pipe_holding_grandchildren_after_leader_exit() {
+        use std::io::Read;
+        use std::os::unix::process::CommandExt;
+        let mut command = std::process::Command::new("sh");
+        command.args(["-c", "sleep 30 & echo hi"]);
+        command.process_group(0).stdout(std::process::Stdio::piped());
+        let mut child = command.spawn().unwrap();
+        let pid = child.id();
+        let mut stdout = child.stdout.take().unwrap();
+        let reader = thread::spawn(move || {
+            let mut output = String::new();
+            let _ = stdout.read_to_string(&mut output);
+            output
+        });
+        child.wait().unwrap();
+        kill_group(pid);
+        assert_eq!(reader.join().unwrap().trim(), "hi");
+    }
+
+    #[test]
+    fn cancel_schedules_the_kill_without_waiting_two_seconds() {
+        let start = Instant::now();
+        terminate_and_schedule_kill(u32::MAX);
+        assert!(start.elapsed().as_millis() < 500);
+    }
+}
