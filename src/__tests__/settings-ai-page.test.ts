@@ -1,54 +1,110 @@
-import { describe, expect, it } from "vitest";
-import { DEFAULT_AI_SETTINGS } from "../ai/aisettings";
+import { beforeEach, expect, it, vi } from "vitest";
+import { installTestDom } from "./setup";
+import { DEFAULT_AI_SETTINGS, type AISettings } from "../ai/aisettings";
+import { DEFAULT_SETTINGS } from "../settings";
+import { renderUseFor } from "../settings-screen/page-ai-use-for";
+import { aiPage } from "../settings-screen/page-ai";
 import {
-  clampContextChars,
-  cloneAISettings,
-  isLocalBaseUrl,
-  stepContextK,
-  terminalUniqueId,
-  uniqueId,
-} from "../settings-screen/ai-helpers";
-
-describe("AI page helpers", () => {
-  it("files-per-chat stepper clamps 1..20", () => {
-    expect(stepContextK(20, +1)).toBe(20);
-    expect(stepContextK(1, -1)).toBe(1);
-    expect(stepContextK(5, +1)).toBe(6);
-  });
-
-  it("uniqueId still de-duplicates", () => {
-    expect(uniqueId("Claude Code", { ...DEFAULT_AI_SETTINGS, providers: [{ id: "claude-code" } as any] })).toBe(
-      "claude-code-2",
-    );
-    expect(uniqueId("  !!  ", { ...DEFAULT_AI_SETTINGS, providers: [] })).toBe("provider");
-  });
-
-  it("terminalUniqueId suffixes -term and de-duplicates", () => {
-    const settings = { ...DEFAULT_AI_SETTINGS, terminals: [{ id: "zsh-term", label: "zsh", run: "zsh" }] };
-    expect(terminalUniqueId("zsh", settings)).toBe("zsh-term-2");
-    expect(terminalUniqueId("", { ...DEFAULT_AI_SETTINGS, terminals: [] })).toBe("terminal-term");
-  });
-
-  it("cloneAISettings copies providers and terminals", () => {
-    const copy = cloneAISettings(DEFAULT_AI_SETTINGS);
-    copy.providers[0].label = "changed";
-    copy.terminals.push({ id: "x", label: "x", run: "x" });
-    expect(DEFAULT_AI_SETTINGS.providers[0].label).not.toBe("changed");
-    expect(DEFAULT_AI_SETTINGS.terminals.some((t) => t.id === "x")).toBe(false);
-  });
-
-  it("max context characters clamps 4,000..2,000,000 and rejects non-numbers", () => {
-    expect(clampContextChars(10)).toBe(4_000);
-    expect(clampContextChars(5_000_000)).toBe(2_000_000);
-    expect(clampContextChars(150_000.4)).toBe(150_000);
-    expect(clampContextChars(Number.NaN)).toBe(120_000);
-    expect(clampContextChars(Number.POSITIVE_INFINITY)).toBe(120_000);
-  });
-
-  it("isLocalBaseUrl recognises loopback hosts only", () => {
-    expect(isLocalBaseUrl("http://localhost:11434/v1")).toBe(true);
-    expect(isLocalBaseUrl("http://127.0.0.1:1234/v1")).toBe(true);
-    expect(isLocalBaseUrl("https://api.openai.com/v1")).toBe(false);
-    expect(isLocalBaseUrl("not a url")).toBe(false);
-  });
+  createSettingsScreen,
+  type ScreenDeps,
+} from "../settings-screen/screen";
+import type { AiPageDeps } from "../settings-screen/page-ai";
+let settings: AISettings;
+let deps: ScreenDeps & AiPageDeps;
+beforeEach(() => {
+  installTestDom();
+  settings = structuredClone(DEFAULT_AI_SETTINGS);
+  settings.connections = [
+    {
+      id: "evil",
+      name: "<img onerror>",
+      provider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "bearer",
+      textModel: "m",
+    },
+  ];
+  settings.uses.rewrite = {
+    engine: { kind: "api", connectionId: "evil" },
+    model: "custom",
+    effort: "",
+  };
+  deps = {
+    getSettings: () => DEFAULT_SETTINGS,
+    getAISettings: () => settings,
+    onAISettingsChange: vi.fn((next) => {
+      settings = next;
+    }),
+    onSettingsChange: vi.fn(),
+    getClis: () => [],
+    rescan: vi.fn(),
+    getModelsCache: () => ({}),
+    onOpenSettingsFile: vi.fn(),
+    onOpenAISettingsFile: vi.fn(),
+    onCheckForUpdates: vi.fn(),
+    getActiveTabName: () => null,
+    getAppVersion: async () => "1",
+    setDockIcon: async () => {},
+    isMac: true,
+  };
+});
+it("renders five aligned feature rows and safe connection text", () => {
+  const host = document.createElement("div");
+  renderUseFor(host, deps);
+  const rows = host.querySelectorAll(".st-use-row");
+  expect(
+    Array.from(rows).map((r) => (r as HTMLElement).dataset.setting),
+  ).toEqual([
+    "use-chat",
+    "use-proofread",
+    "use-rewrite",
+    "use-summarize",
+    "use-outline",
+  ]);
+  for (const r of rows)
+    expect((r as HTMLElement).style.gridTemplateColumns).toBeFalsy();
+  expect(host.querySelector("img")).toBeNull();
+  expect(host.textContent).toContain("<img onerror>");
+});
+it("toggles rewrite and resets model when its engine changes", () => {
+  const host = document.createElement("div");
+  renderUseFor(host, deps);
+  const toggle = host.querySelector(
+    '[aria-label="Enable Rewrite"]',
+  ) as HTMLInputElement;
+  toggle.checked = false;
+  toggle.dispatchEvent(new Event("change"));
+  expect(settings.enabled.rewrite).toBe(false);
+  const engine = host.querySelector(
+    '[aria-label="Rewrite engine"]',
+  ) as HTMLSelectElement;
+  engine.value = "none";
+  engine.dispatchEvent(new Event("change"));
+  expect(settings.uses.rewrite?.model).toBe("");
+});
+it("disables effort for API engines", () => {
+  const host = document.createElement("div");
+  renderUseFor(host, deps);
+  const effort = host.querySelector(
+    '[aria-label="Rewrite effort"]',
+  ) as HTMLSelectElement;
+  expect(effort.disabled).toBe(true);
+  expect(effort.textContent).toContain("No effort");
+});
+it("shows rail subitems in order", () => {
+  for (const id of ["settings-rail", "settings-pane", "ab-settings"]) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+  const screen = createSettingsScreen(deps, [aiPage]);
+  screen.open("ai");
+  const items = document
+    .getElementById("settings-rail")!
+    .querySelectorAll(".st-sub-nav");
+  expect(Array.from(items).map((x) => x.textContent)).toEqual([
+    "Use for",
+    "Local CLI",
+    "API providers",
+  ]);
 });

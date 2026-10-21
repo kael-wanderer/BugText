@@ -3,6 +3,8 @@
 // class; the workbench grid and editor size never change, so tabs, unsaved
 // text, scroll and split come back exactly as they were.
 
+import type { AiPageDeps } from "./page-ai";
+import type { AiSubPage } from "./registry";
 import type { AISettings } from "../ai/aisettings";
 import type { AppIconId, Settings } from "../settings";
 import { pageHeader } from "./controls";
@@ -15,7 +17,8 @@ import {
 } from "./registry";
 import "./settings-screen.css";
 
-export type ScreenDeps = {
+export type ScreenDeps = AiPageDeps & {
+  openAiPage?: (sub: AiSubPage) => void;
   getSettings: () => Settings;
   getAISettings: () => AISettings;
   onSettingsChange: (settings: Settings) => void;
@@ -32,13 +35,13 @@ export type ScreenDeps = {
 
 export type SettingsPage = {
   id: SettingsPageId;
-  render(host: HTMLElement, deps: ScreenDeps): void;
+  render(host: HTMLElement, deps: ScreenDeps, sub?: AiSubPage): void;
   /** True while the page owns Esc (e.g. recording a shortcut). */
   blocksEscape?(): boolean;
 };
 
 export type SettingsScreen = {
-  open(page?: SettingsPageId): void;
+  open(page?: SettingsPageId, sub?: AiSubPage): void;
   close(): void;
   isOpen(): boolean;
   refresh(): void;
@@ -64,12 +67,16 @@ const FLASH_MS = 1200;
 
 // Last page shown, remembered for the session only.
 let lastPage: SettingsPageId = "general";
+let lastSub: AiSubPage = "use-for";
 
 function pageLabel(id: SettingsPageId): string {
   return SETTINGS_PAGES.find((p) => p.id === id)?.label ?? id;
 }
 
-export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): SettingsScreen {
+export function createSettingsScreen(
+  deps: ScreenDeps,
+  pages: SettingsPage[],
+): SettingsScreen {
   const rail = document.getElementById("settings-rail")!;
   const pane = document.getElementById("settings-pane")!;
   const gear = document.getElementById("ab-settings");
@@ -100,6 +107,7 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
   nav.className = "st-nav";
   nav.setAttribute("aria-label", "Settings pages");
   const navButtons = new Map<SettingsPageId, HTMLButtonElement>();
+  const subButtons = new Map<AiSubPage, HTMLButtonElement>();
   for (const page of SETTINGS_PAGES) {
     const b = document.createElement("button");
     b.type = "button";
@@ -108,6 +116,27 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     b.addEventListener("click", () => showPage(page.id));
     navButtons.set(page.id, b);
     nav.append(b);
+    if (page.id === "ai") {
+      for (const [sub, label, section] of [
+        ["use-for", "Use for", "FEATURES"],
+        ["local-cli", "Local CLI", "ENGINES"],
+        ["api", "API providers", ""],
+      ] as const) {
+        if (section) {
+          const heading = document.createElement("div");
+          heading.className = "st-nav-caption";
+          heading.textContent = section;
+          nav.append(heading);
+        }
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "st-sub-nav";
+        item.textContent = label;
+        item.addEventListener("click", () => showPage("ai", sub));
+        subButtons.set(sub, item);
+        nav.append(item);
+      }
+    }
   }
 
   const back = document.createElement("button");
@@ -142,7 +171,12 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     const section = document.createElement("section");
     section.className = "st-page";
     section.dataset.page = id;
-    if (page) page.render(section, deps);
+    if (page)
+      page.render(
+        section,
+        { ...deps, openAiPage: (sub) => showPage("ai", sub) },
+        lastSub,
+      );
     else pageHeader(section, id);
     pane.replaceChildren(section);
   }
@@ -176,7 +210,7 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     where.textContent = hit.kind === "page" ? "Page" : pageLabel(hit.page);
     b.append(label, where);
     b.addEventListener("click", () => {
-      showPage(hit.page);
+      showPage(hit.page, hit.sub);
       if (hit.kind === "setting") revealSetting(hit.id);
     });
     item.append(b);
@@ -184,19 +218,31 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
   }
 
   function revealSetting(id: string): void {
-    const target = pane.querySelector<HTMLElement>(`[data-setting="${CSS.escape(id)}"]`);
+    const target = pane.querySelector<HTMLElement>(
+      `[data-setting="${CSS.escape(id)}"]`,
+    );
     if (!target) return;
     target.scrollIntoView({ block: "center" });
-    pane.querySelectorAll(".flash").forEach((node) => node.classList.remove("flash"));
+    pane
+      .querySelectorAll(".flash")
+      .forEach((node) => node.classList.remove("flash"));
     target.classList.add("flash");
     window.clearTimeout(flashTimer);
-    flashTimer = window.setTimeout(() => target.classList.remove("flash"), FLASH_MS);
+    flashTimer = window.setTimeout(
+      () => target.classList.remove("flash"),
+      FLASH_MS,
+    );
   }
 
   function syncRail(): void {
     const searching = query.trim() !== "";
     for (const [id, b] of navButtons) {
       if (!searching && id === lastPage) b.setAttribute("aria-current", "page");
+      else b.removeAttribute("aria-current");
+    }
+    for (const [sub, b] of subButtons) {
+      if (!searching && lastPage === "ai" && lastSub === sub)
+        b.setAttribute("aria-current", "page");
       else b.removeAttribute("aria-current");
     }
     const name = deps.getActiveTabName();
@@ -210,7 +256,8 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     else renderPage(lastPage);
   }
 
-  function showPage(id: SettingsPageId): void {
+  function showPage(id: SettingsPageId, sub: AiSubPage = "use-for"): void {
+    if (id === "ai") lastSub = sub;
     lastPage = id;
     query = "";
     searchInput.value = "";
@@ -228,13 +275,16 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     gear?.setAttribute("aria-pressed", String(next));
   }
 
-  function openScreen(page?: SettingsPageId): void {
+  function openScreen(page?: SettingsPageId, sub?: AiSubPage): void {
     if (!open) {
       const active = document.activeElement;
-      returnFocus = active instanceof HTMLElement && active !== document.body ? active : null;
+      returnFocus =
+        active instanceof HTMLElement && active !== document.body
+          ? active
+          : null;
       setOpen(true);
     }
-    if (page) showPage(page);
+    if (page) showPage(page, sub);
     else render();
     // Take focus off the (now hidden) editor so typing cannot reach it.
     pane.focus({ preventScroll: true });
@@ -271,8 +321,16 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
       close();
       return;
     }
-    const mod = deps.isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-    if (event.key === "[" && mod && !event.shiftKey && !event.altKey && !recording) {
+    const mod = deps.isMac
+      ? event.metaKey && !event.ctrlKey
+      : event.ctrlKey && !event.metaKey;
+    if (
+      event.key === "[" &&
+      mod &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !recording
+    ) {
       event.preventDefault();
       close();
     }

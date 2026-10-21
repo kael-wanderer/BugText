@@ -88,6 +88,7 @@ import { generalPage } from "./settings-screen/page-general";
 import { editingPage } from "./settings-screen/page-editing";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
+import { loadModelsCache } from "./ai/models-cache";
 import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
@@ -157,6 +158,7 @@ let settingsPath = "";
 let aiSettingsPath = "";
 let currentAISettings: AISettings = parseAISettings("{}");
 let cliInfos: CliInfo[] = [];
+let modelsCache: Record<string, string[]> = {};
 async function rescanClis(): Promise<void> {
   const local = currentAISettings.localCli;
   cliInfos = await invoke<CliInfo[]>("cli_scan", { overrides: {
@@ -1990,6 +1992,9 @@ const settingsScreen = createSettingsScreen(
   {
     getSettings: () => currentSettings,
     getAISettings: () => currentAISettings,
+    getClis: () => cliInfos,
+    rescan: rescanClis,
+    getModelsCache: () => modelsCache,
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
@@ -2445,6 +2450,7 @@ async function boot(): Promise<void> {
   }
   await loadAISettings();
   await rescanClis();
+  modelsCache = await loadModelsCache();
   if (isPrimaryNativeWindow) {
     startDailyUpdateChecks(() => currentSettings.updateMode === "auto");
   }
