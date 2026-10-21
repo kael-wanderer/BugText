@@ -177,6 +177,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            files::ai_models_cache_read,
+            files::ai_models_cache_write,
             ai::ai_run,
             cli_scan::cli_scan,
             dock_icon::set_dock_icon,

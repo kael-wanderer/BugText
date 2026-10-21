@@ -843,3 +843,29 @@ mod ai_settings_tests {
         let _ = fs::remove_dir_all(&dir);
     }
 }
+
+#[tauri::command]
+pub fn ai_models_cache_read(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let path = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join("ai-models-cache.json");
+    match fs::read_to_string(path) {
+        Ok(contents) => Ok(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok("{}".to_string()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn ai_models_cache_write(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    fs::write(dir.join("ai-models-cache.json"), contents).map_err(|error| error.to_string())
+}

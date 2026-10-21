@@ -8,6 +8,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- AI connections now validate server addresses, discover models without generating text,
+  cache model lists locally, and use native provider formats for custom Anthropic endpoints.
+  Keyed requests reject redirects and never include server response bodies in errors.
+
 - Renamed the app from mdFlow to BugText. The bundle identifier is now
   `com.kael.bugtext`, so this is a clean break: settings, recent files, UI state and
   keychain API keys from mdFlow are not carried over. The GitHub repository and the

@@ -7,7 +7,6 @@ import {
   parseAnthropicSSEDelta,
   parseSSEDelta,
   resolveCommandPermissionProfile,
-  substitutePrompt,
 } from "../ai/providers";
 
 const provider: HttpProvider = {
@@ -20,9 +19,7 @@ const provider: HttpProvider = {
 
 describe("buildHttpBody", () => {
   it("produces a streaming OpenAI-compatible body", () => {
-    const body = buildHttpBody(provider, [
-      { role: "user", content: "hi" },
-    ]) as {
+    const body = buildHttpBody(provider, [{ role: "user", content: "hi" }]) as {
       model: string;
       stream: boolean;
       messages: unknown[];
@@ -63,9 +60,7 @@ describe("buildHttpBody", () => {
 describe("parseSSEDelta", () => {
   it("extracts delta content", () => {
     expect(
-      parseSSEDelta(
-        'data: {"choices":[{"delta":{"content":"He"}}]}',
-      ),
+      parseSSEDelta('data: {"choices":[{"delta":{"content":"He"}}]}'),
     ).toBe("He");
   });
 
@@ -89,24 +84,14 @@ describe("parseAnthropicSSEDelta", () => {
   });
 
   it("returns DONE on message_stop", () => {
-    expect(
-      parseAnthropicSSEDelta('data: {"type":"message_stop"}'),
-    ).toBe("DONE");
+    expect(parseAnthropicSSEDelta('data: {"type":"message_stop"}')).toBe(
+      "DONE",
+    );
   });
 
   it("ignores non-text events", () => {
-    expect(
-      parseAnthropicSSEDelta('data: {"type":"message_start"}'),
-    ).toBeNull();
+    expect(parseAnthropicSSEDelta('data: {"type":"message_start"}')).toBeNull();
     expect(parseAnthropicSSEDelta("event: ping")).toBeNull();
-  });
-});
-
-describe("substitutePrompt", () => {
-  it("replaces the {prompt} token with the full prompt as one arg", () => {
-    expect(
-      substitutePrompt("claude -p {prompt}", "hello world"),
-    ).toEqual(["claude", "-p", "hello world"]);
   });
 });
 

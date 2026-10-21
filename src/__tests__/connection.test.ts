@@ -7,14 +7,16 @@ describe("connectionDetail", () => {
   });
 
   it("explains rejected credentials and missing endpoints", () => {
-    expect(connectionDetail(401, "nope").detail).toContain("API key rejected");
-    expect(connectionDetail(404, "nope").detail).toContain("not found");
+    expect(connectionDetail(401, "nope").detail).toContain(
+      "The key was rejected.",
+    );
+    expect(connectionDetail(404, "nope").detail).toContain("No such endpoint");
   });
 
-  it("includes the status and bounded response text for other errors", () => {
+  it("includes the status without leaking response text", () => {
     const result = connectionDetail(500, "boom");
     expect(result.ok).toBe(false);
     expect(result.detail).toContain("500");
-    expect(result.detail).toContain("boom");
+    expect(result.detail).not.toContain("boom");
   });
 });

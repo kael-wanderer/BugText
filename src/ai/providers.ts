@@ -1,4 +1,8 @@
-import type { CommandProvider, HttpProvider, PermissionProfile } from "./aisettings";
+import type {
+  CommandProvider,
+  HttpProvider,
+  PermissionProfile,
+} from "./aisettings";
 
 export type ChatContentPart =
   | { type: "text"; text: string }
@@ -28,8 +32,9 @@ export function chatContentText(content: ChatMessage["content"]): string {
   return typeof content === "string"
     ? content
     : content
-        .filter((part): part is Extract<ChatContentPart, { type: "text" }> =>
-          part.type === "text",
+        .filter(
+          (part): part is Extract<ChatContentPart, { type: "text" }> =>
+            part.type === "text",
         )
         .map((part) => part.text)
         .join("\n");
@@ -59,9 +64,7 @@ export function buildAnthropicBody(
     max_tokens: provider.maxTokens ?? 4096,
     messages: messages
       .filter(
-        (
-          message,
-        ): message is ChatMessage & { role: "user" | "assistant" } =>
+        (message): message is ChatMessage & { role: "user" | "assistant" } =>
           message.role === "user" || message.role === "assistant",
       )
       .map((message) => ({
@@ -108,13 +111,7 @@ export function parseAnthropicSSEDelta(line: string): string | null | "DONE" {
   }
 }
 
-export function substitutePrompt(run: string, prompt: string): string[] {
-  return run
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => (token === "{prompt}" ? prompt : token));
-}
-
+// Temporary legacy panel permission controls; removed with the Task 10 panel rewrite.
 export function commandPermissionProfiles(
   provider: CommandProvider,
 ): ResolvedPermissionProfile[] {
