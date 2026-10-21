@@ -8,6 +8,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- AI settings now has Use for, Local CLI and API providers pages, with an engine,
+  model, effort and enabled flag for each feature. Coding agents are sandboxed to
+  the open folder; Pi and runs without a folder stay answer-only.
+
 - The AI panel is Chat only, with automatic note context, per-feature engines, and
   a changed-files summary after folder-confined coding-agent runs.
 
@@ -35,12 +39,23 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Removed
 
+- Agent Console, Runs tab, embedded/external terminal launchers, xterm and the
+  native PTY dependency. Interactive coding agents can run in a separate terminal.
+
 - Excalidraw boards and jsMind mindmaps. `.excalidraw` and `.mind` files now open as plain text.
 - Dead code: the unused `saveFile` helper in `src/files.ts` (the save path goes
   through `pickSavePath` + `writeFile`) and the unused `toCanvas` export in
   `src/capture.ts`.
 
 ### Fixed
+
+- Startup persists completed v1-to-v2 AI settings migration after all legacy API
+  keys transfer successfully. Malformed files and failed key transfers keep the
+  original file intact for a later retry, with the v1 backup preserved.
+
+- Custom Anthropic endpoints use native Messages format. IPv6 loopback server
+  addresses survive settings reloads. Native agent argument construction keeps
+  quoted paths and prompts intact.
 
 - Changed-file checks after cancelling a coding-agent run wait for the process group
   to stop, so late writes are included before open tabs reload or show a conflict.
@@ -53,8 +68,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 - Changing a setting in one window no longer gets undone when another window saves; all
   windows pick up the change.
-- The AI panel's Workspace context checkbox now follows changes made in Settings or in
-  another window instead of showing a stale value.
+- Workspace context settings stay in sync across windows. Chat now includes note
+  context automatically.
 - Open files now reload from disk when another process changes them: the 3-second
   auto-refresh and the window-focus refresh compare the file's text instead of a
   cached mtime/size, so a stale or failed stat can no longer leave a tab showing

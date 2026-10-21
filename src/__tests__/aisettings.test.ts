@@ -57,7 +57,9 @@ describe("parseAISettings", () => {
       auth: "bearer",
       textModel: "m1",
     }));
-    const settings = parseAISettings(JSON.stringify({ version: 2, connections }));
+    const settings = parseAISettings(
+      JSON.stringify({ version: 2, connections }),
+    );
     expect(settings.connections).toHaveLength(20);
     expect(settings.connections[0].id).toBe("connection-0");
   });
@@ -166,4 +168,19 @@ describe("tryParseAISettings", () => {
     const raw = JSON.stringify({ version: 2, connections: [] });
     expect(tryParseAISettings(raw)).toEqual(parseAISettings(raw));
   });
+});
+
+it("keeps an IPv6 loopback connection after settings reload", () => {
+  const connection = {
+    id: "ipv6",
+    name: "Local IPv6",
+    provider: "openai-compatible",
+    baseUrl: "http://[::1]:8080/v1",
+    auth: "none",
+    textModel: "m",
+  };
+  expect(
+    parseAISettings(JSON.stringify({ version: 2, connections: [connection] }))
+      .connections,
+  ).toEqual([connection]);
 });

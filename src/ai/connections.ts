@@ -188,12 +188,8 @@ function body(
 ): Record<string, unknown> {
   return buildHttpBody(
     {
-      id: c.id,
-      label: c.name,
-      type: "http",
-      baseUrl: c.baseUrl,
       model,
-      api: isAnthropicStyle(c) ? "anthropic" : "openai",
+      anthropic: isAnthropicStyle(c),
     },
     messages,
   ) as Record<string, unknown>;

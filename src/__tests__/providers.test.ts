@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { HttpProvider } from "../ai/aisettings";
+import type { HttpBodyOptions } from "../ai/providers";
 import {
   buildAnthropicBody,
   buildHttpBody,
@@ -7,13 +7,7 @@ import {
   parseSSEDelta,
 } from "../ai/providers";
 
-const provider: HttpProvider = {
-  id: "x",
-  label: "X",
-  type: "http",
-  baseUrl: "u",
-  model: "m",
-};
+const provider: HttpBodyOptions = { model: "m", anthropic: false };
 
 describe("buildHttpBody", () => {
   it("produces a streaming OpenAI-compatible body", () => {
@@ -29,7 +23,7 @@ describe("buildHttpBody", () => {
 
   it("produces a native Anthropic Messages body", () => {
     const body = buildHttpBody(
-      { ...provider, api: "anthropic", maxTokens: 2048 },
+      { ...provider, anthropic: true, maxTokens: 2048 },
       [
         { role: "system", content: "System A" },
         { role: "user", content: "hi" },
@@ -50,7 +44,7 @@ describe("buildHttpBody", () => {
   });
 
   it("defaults native Anthropic max tokens to 4096", () => {
-    const body = buildAnthropicBody({ ...provider, api: "anthropic" }, []);
+    const body = buildAnthropicBody({ ...provider, anthropic: true }, []);
     expect(body.max_tokens).toBe(4096);
   });
 });

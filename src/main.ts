@@ -110,7 +110,6 @@ import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
   freshState,
   loadState,
-  markKeySaved,
   saveState,
   type ViewMode,
 } from "./state";
@@ -231,12 +230,12 @@ async function loadAISettings(): Promise<void> {
     aiSettingsPath = file.path;
     const savedKeyIds = await getSavedAIKeyIds();
     const { cleaned, keys } = extractLegacyKeys(file.contents);
+    let canPersistMigration = true;
     if (keys.length) {
       const stored: boolean[] = [];
       for (const { id, secret } of keys) {
         try {
           await invoke("set_secret", { id, secret });
-          markKeySaved(id, true);
           stored.push(true);
         } catch {
           /* Leave the plaintext key for a later migration attempt. */
@@ -248,6 +247,7 @@ async function loadAISettings(): Promise<void> {
         broadcastSettingsChange("agent");
         currentAISettings = parseAISettings(cleaned, savedKeyIds);
       } else {
+        canPersistMigration = false;
         currentAISettings = parseAISettings(file.contents, savedKeyIds);
       }
     } else {
@@ -256,6 +256,16 @@ async function loadAISettings(): Promise<void> {
         broadcastSettingsChange("agent");
       }
       currentAISettings = parseAISettings(cleaned, savedKeyIds);
+    }
+    // Rust already saved agent.v1.json. Persist a completed migration once,
+    // while preserving malformed files and keys that could not be migrated.
+    const parsed = tryParseAISettings(cleaned, savedKeyIds);
+    if (parsed && canPersistMigration) {
+      const source = JSON.parse(cleaned) as { version?: unknown };
+      if (source.version !== 2) {
+        await writeFile(aiSettingsPath, JSON.stringify(currentAISettings, null, 2));
+        broadcastSettingsChange("agent");
+      }
     }
     aiPanel?.render();
   } catch {
@@ -270,7 +280,7 @@ async function getSavedAIKeyIds(): Promise<ReadonlySet<string>> {
     try {
       if (await invoke<boolean>("has_secret", { id })) ids.add(id);
     } catch {
-      // The command is registered with the native CLI scan in the next task.
+      // A locked keychain leaves the saved-key state unknown until the next load.
     }
   }
   return ids;

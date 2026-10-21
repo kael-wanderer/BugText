@@ -43,7 +43,7 @@ and never paste from it. Do not add Kaelio as a submodule or copy its files in.
 - `npm install` — install JS deps (run `npm approve-scripts esbuild fsevents`
   once after install; their native postinstalls are gated by the script allowlist)
 - Build/test/check commands are the standard ones — see `package.json` scripts and
-  `src-tauri/` for cargo. `npm run test` covers pure functions only.
+  `src-tauri/` for cargo. `npm run test` covers pure functions and UI behavior with a small DOM fixture.
 
 ## Architecture
 
@@ -70,21 +70,29 @@ arrive through Tauri's opened event, are queued until the frontend listener is r
 then use the same document-opening workflow as File ▸ Open. The application menu can
 register BugText as the Markdown/text editor or PDF viewer through LaunchServices.
 
-Editor settings live at `<app config dir>/settings.json`; AI providers and terminals
-live at `<app config dir>/agent.json` (legacy `ai.json` is auto-migrated on first
-run), while API keys live in the OS keychain and never in that file.
+Editor settings live at `<app config dir>/settings.json`. AI settings live in
+`<app config dir>/agent.json` version 2: `connections`, per-feature `enabled` and
+`uses`, `localCli`, and `maxContextChars`. Legacy `ai.json` migrates to that name;
+v1 settings receive an `agent.v1.json` backup. Startup persists v2 only after
+legacy key transfers succeed; malformed files and failed transfers retain the
+original for a retry. API keys stay in the OS keychain, never in the v2 file.
 
 Settings is a full-window screen (`src/settings-screen/`) laid over the workbench:
 `⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, `⌘[`, Back, the
 gear or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
 tabs, unsaved text, cursor, scroll and split survive. Pages in fixed order: General,
-Editing, Theme, Shortcuts, AI (flat rail, plus search over `registry.ts`; every row
-carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
+Editing, Theme, Shortcuts, AI (Use for, Local CLI, API providers sub-pages, plus
+search over `registry.ts`; every row carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
 no page is recording a shortcut (`blocksEscape`) and focus is not in a text field. User
 strings (font, theme, agent, model names) render via `textContent`/`.value`, never
 `innerHTML`. General's "Open settings.json / agent.json" buttons open the file as a
-normal tab and leave the screen; saving applies it. AI settings (CLI agents, models,
-console) live on the AI page; CLI agent rows edit inline.
+normal tab and leave the screen; saving applies it. AI ▸ Use for has aligned
+engine/model/effort controls and on/off switches for Chat, Proofread, Rewrite,
+Summarize, and Generate outline. Local CLI detects Claude Code, Codex CLI and Pi,
+including Claude accounts and advanced proxy/custom paths. API providers offers
+connection presets, model discovery and text-model tests. UI key badges use
+`has_secret`; key inputs are never prefilled. Connection addresses require HTTPS,
+except loopback HTTP. Changing an address clears its key and cached models.
 
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
@@ -103,25 +111,38 @@ runtime via the `set_accelerators` command (`item.set_accelerator`); app-scoped
 shortcuts (palette, AI send) and the JS fallback handlers match against the
 resolved keymap.
 
-The AI Chat tab accepts file references via a 📎 picker, drag-drop onto the panel,
-or `@`-mention (fuzzy picker over the open folder). CLI agents receive the file
-**paths** (and run with cwd = the open folder, so they can read attachments and
-write output files); HTTP models get text-file contents inlined and skip
-binary/image files. The Terminal tab has a live terminal picker; terminals (and
-their font/size) are edited on the Settings AI page (Terminals section). `ai_run`
-takes an optional `cwd`.
+The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
+The open note is always context; when a folder is open, keyword retrieval adds the
+top `workspaceContextK` chunks on every question. Replies show timing, model and
+source links, with Copy, Insert at cursor, Replace selection (source-bound diff
+review), and Save as new note. The compose input and running reply survive settings
+refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents
+receive file paths; API connections inline text files and skip binary/image files.
 
-The AI panel also offers inline **quick actions** (Proofread / Rewrite / Summarize
-/ Generate outline) from the command palette (`⌘K`) and the editor right-click
-menu. Edit-kind actions (Proofread, Rewrite) replace the selection — or the whole
-document when nothing is selected — through the source-bound diff review
-(`src/ai/edit-review.ts`); chat-kind actions (Summarize, Generate outline) stream
-into the panel. `src/ai/quick-actions.ts` holds the catalog + a DOM-free runner.
-Before an AI edit lands on a saved document, a labeled snapshot is written via the
-Recovery store (revert from Version History). After a CLI agent run in the open
-folder, a changed-files summary (`src/ai/run-summary.ts`) lists added/modified/
-deleted files. The model used for quick actions is `quickActionProvider`
-(Settings ▸ AI; defaults to the default provider).
+Coding CLIs run through the typed `ai_run` spec. Rust builds arguments; prompts go
+on stdin. On macOS every run uses a Seatbelt sandbox confined to the open folder,
+per-run temporary directory, tool config/install paths and required system reads.
+Sandbox paths are passed as parameters, with no unsandboxed fallback. No folder
+means answer-only in a private temporary directory; Pi is always answer-only.
+The child environment is cleared and rebuilt from an allowlist. Runs time out at
+10 minutes, and cancellation stops the process group before file reconciliation.
+Before a folder-writing run, dirty open tabs receive labeled Recovery snapshots;
+afterward the changed-files card lists added/modified/deleted files, and affected
+open tabs use the existing Reload / Keep mine conflict flow.
+
+Quick actions (Proofread / Rewrite / Summarize / Generate outline) use their own
+`uses` rows and are hidden when disabled. CLI quick actions always run answer-only
+without folder access. Proofread and Rewrite review edits against the original
+source binding; saved documents receive a Recovery snapshot before applying.
+Summarize and Generate outline stream into Chat. The catalog and runner live in
+`src/ai/quick-actions.ts`.
+
+Connection requests live in `src/ai/connections.ts`: native Anthropic Messages or
+OpenAI-compatible chat bodies, SSE streaming, and GET `/models` discovery. Keys
+are fetched immediately before requests; keyed requests reject redirects and
+errors omit response bodies. `ai-models-cache.json` stores
+`{connectionId: {models, fetchedAt}}` beside settings; successful discovery replaces
+the list, address changes/deletion drop it, and model menus load it on startup.
 
 Document PDF/DOCX export requires Pandoc and Typst:
 
@@ -134,7 +155,7 @@ PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
 
-Heavy render/terminal engines are loaded on demand so the startup bundle remains
+Heavy rendering engines are loaded on demand so the startup bundle remains
 below the release chunk-warning threshold.
 
 PDF OCR runs fully offline; its tesseract runtime lives under `public/vendor/`.

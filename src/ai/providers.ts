@@ -1,4 +1,8 @@
-import type { HttpProvider } from "./aisettings";
+export type HttpBodyOptions = {
+  model: string;
+  anthropic: boolean;
+  maxTokens?: number;
+};
 
 export type ChatContentPart =
   | { type: "text"; text: string }
@@ -30,17 +34,17 @@ export function chatContentText(content: ChatMessage["content"]): string {
 }
 
 export function buildHttpBody(
-  provider: HttpProvider,
+  provider: HttpBodyOptions,
   messages: ChatMessage[],
 ): object {
-  if (provider.api === "anthropic") {
+  if (provider.anthropic) {
     return buildAnthropicBody(provider, messages);
   }
   return { model: provider.model, messages, stream: true };
 }
 
 export function buildAnthropicBody(
-  provider: HttpProvider,
+  provider: HttpBodyOptions,
   messages: ChatMessage[],
 ): AnthropicBody {
   const system = messages

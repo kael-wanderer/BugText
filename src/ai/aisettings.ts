@@ -20,11 +20,7 @@ export type Engine =
   | { kind: "cli"; tool: CliTool }
   | { kind: "none" };
 export type FeatureId =
-  | "chat"
-  | "proofread"
-  | "rewrite"
-  | "summarize"
-  | "outline";
+  "chat" | "proofread" | "rewrite" | "summarize" | "outline";
 export const FEATURE_IDS: readonly FeatureId[] = [
   "chat",
   "proofread",
@@ -38,34 +34,6 @@ export type LocalCli = {
   codex: { codexHome: string; executablePath: string; proxyBaseUrl: string };
   pi: { executablePath: string };
 };
-// Temporary transition types for callers replaced by the later panel/settings tasks.
-export type HttpProvider = {
-  id: string;
-  label: string;
-  type: "http";
-  baseUrl: string;
-  model: string;
-  api?: "openai" | "anthropic";
-  maxTokens?: number;
-};
-export type CommandProvider = {
-  id: string;
-  label: string;
-  type: "command";
-  run: string;
-  bypassRun?: string;
-  permissionProfiles?: PermissionProfile[];
-};
-export type Provider = HttpProvider | CommandProvider;
-export type PermissionProfile = {
-  id: string;
-  label: string;
-  run: string;
-  confirmEachRun?: boolean;
-};
-export type TerminalEntry = { id: string; label: string; run: string };
-export type TerminalApp = "embedded" | "terminal" | "ghostty" | "cmux";
-export type PermissionMode = string;
 export type AISettings = {
   version: 2;
   connections: Connection[];
@@ -73,16 +41,6 @@ export type AISettings = {
   uses: Partial<Record<FeatureId, UseRow>>;
   localCli: LocalCli;
   maxContextChars: number;
-  /** @deprecated Removed when the legacy panel and AI settings page are replaced. */
-  providers: Provider[];
-  terminals: TerminalEntry[];
-  defaultProvider: string;
-  defaultTerminal: string;
-  permissionMode: PermissionMode;
-  terminalFont: string;
-  terminalFontSize: number;
-  terminalApp: TerminalApp;
-  quickActionProvider?: string;
 };
 
 export const DEFAULT_AI_SETTINGS: AISettings = {
@@ -102,18 +60,6 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
     pi: { executablePath: "" },
   },
   maxContextChars: 120_000,
-  providers: [
-    { id: "ollama", label: "Ollama (local)", type: "http", baseUrl: "http://localhost:11434/v1", model: "llama3" },
-    { id: "openai", label: "OpenAI", type: "http", baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
-    { id: "anthropic", label: "Anthropic", type: "http", baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-6", api: "anthropic", maxTokens: 4096 },
-  ],
-  terminals: [],
-  defaultProvider: "ollama",
-  defaultTerminal: "",
-  permissionMode: "ask",
-  terminalFont: "",
-  terminalFontSize: 13,
-  terminalApp: "embedded",
 };
 
 export const DEFAULT_AI_SETTINGS_JSON = JSON.stringify(
@@ -162,7 +108,9 @@ function validBaseUrl(value: string): boolean {
     if (url.protocol === "https:") return true;
     return (
       url.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase())
+      ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
+        url.hostname.toLowerCase(),
+      )
     );
   } catch {
     return false;
@@ -207,10 +155,7 @@ function parseEngine(raw: unknown): Engine | null {
   if (value.kind === "api" && typeof value.connectionId === "string") {
     return { kind: "api", connectionId: value.connectionId };
   }
-  if (
-    value.kind === "cli" &&
-    CLI_TOOLS.includes(value.tool as CliTool)
-  ) {
+  if (value.kind === "cli" && CLI_TOOLS.includes(value.tool as CliTool)) {
     return { kind: "cli", tool: value.tool as CliTool };
   }
   return null;
@@ -288,15 +233,6 @@ function parseV2(data: Record<string, unknown>): AISettings {
     uses,
     localCli: parseLocalCli(data.localCli),
     maxContextChars,
-    providers: [],
-    terminals: [],
-    defaultProvider: "",
-    defaultTerminal: "",
-    permissionMode: "ask",
-    terminalFont: "",
-    terminalFontSize: 13,
-    terminalApp: "embedded",
-    quickActionProvider: undefined,
   };
 }
 
@@ -327,7 +263,9 @@ export function parseAISettings(
     return { ...DEFAULT_AI_SETTINGS };
   }
   if (data.version !== 2) {
-    return parseV2(migrateV1(data, savedKeyIds) as unknown as Record<string, unknown>);
+    return parseV2(
+      migrateV1(data, savedKeyIds) as unknown as Record<string, unknown>,
+    );
   }
   return parseV2(data);
 }
