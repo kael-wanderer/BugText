@@ -1,4 +1,5 @@
 mod ai;
+mod cli_args;
 mod cli_scan;
 mod defaults;
 mod dock_icon;
@@ -11,6 +12,7 @@ mod native_windows;
 mod preview;
 mod pty;
 mod recovery;
+mod sandbox;
 mod secrets;
 
 use std::collections::{HashMap, HashSet};

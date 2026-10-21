@@ -35,6 +35,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Coding CLI runs use a folder sandbox with private temporary files, restricted
+  environment variables, and the system reads required for CLI sign-in and startup.
+
 - Changing a setting in one window no longer gets undone when another window saves; all
   windows pick up the change.
 - The AI panel's Workspace context checkbox now follows changes made in Settings or in
