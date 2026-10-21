@@ -8,6 +8,7 @@ mod files;
 mod macos_dock;
 mod menu;
 mod mcp_paths;
+mod mcp_protocol;
 mod native_windows;
 mod preview;
 mod recovery;
