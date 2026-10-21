@@ -208,6 +208,10 @@ fn checked_folder(path: &str, windows: &[(String, WindowReport)]) -> Result<Path
     Err(OUTSIDE.to_string())
 }
 
+fn checked_note_path(path: &str, roots: &Roots, access: Access) -> Result<PathBuf, String> {
+    check(path, roots, access)
+}
+
 fn current_status(state: &McpState) -> McpStatus {
     let core = state.core.lock().expect("MCP state poisoned");
     let mut roots: Vec<_> = core.windows.iter().filter_map(|(window, report)| report.folder.as_ref().map(|folder| RootInfo { folder: folder.to_string_lossy().into_owned(), window: window.clone() })).collect();
@@ -339,7 +343,7 @@ fn dispatch(app: &tauri::AppHandle, state: &McpState, request: SocketRequest) ->
                 config_dir: config_dir(),
             };
             let access = match request.tool.as_str() { "read_note" => Access::Read, "update_note" => Access::Write, _ => Access::Create };
-            check(path, &roots, access).and_then(|canonical| {
+            checked_note_path(path, &roots, access).and_then(|canonical| {
                 let owner = owner(&canonical, &windows, focused.as_deref()).ok_or_else(|| OUTSIDE.to_string())?;
                 let mut args = request.args.clone();
                 args["path"] = Value::String(canonical.to_string_lossy().into_owned());
@@ -413,7 +417,7 @@ fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value)
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_blocking, accept_peer, list_files_from_registry, owner, reported_tab_path, McpCore, TabReport, WindowReport};
+    use super::{accept_blocking, accept_peer, checked_note_path, list_files_from_registry, owner, reported_tab_path, Access, McpCore, Roots, TabReport, WindowReport};
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
@@ -511,6 +515,19 @@ mod tests {
         }]))];
         assert_eq!(owner(&canonical, &windows, None).as_deref(), Some("tab"));
         assert_eq!(reported_tab_path(&canonical, &windows[0].1).as_deref(), Some(reported.to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn checked_note_path_allows_hidden_ancestor_but_refuses_hidden_child() {
+        let dir = TempDir::new("hidden-root");
+        let root = dir.0.join(".parent").join("vault");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("visible.md"), "ok").unwrap();
+        fs::create_dir_all(root.join(".hidden")).unwrap();
+        fs::write(root.join(".hidden/x.md"), "no").unwrap();
+        let roots = Roots { folders: vec![root.clone()], open_files: vec![], config_dir: dir.0.join("config") };
+        assert_eq!(checked_note_path(root.join("visible.md").to_str().unwrap(), &roots, Access::Read).unwrap(), root.join("visible.md").canonicalize().unwrap());
+        assert_eq!(checked_note_path(root.join(".hidden/x.md").to_str().unwrap(), &roots, Access::Read).unwrap_err(), "That path is outside the folders open in BugText.");
     }
 
     #[test]

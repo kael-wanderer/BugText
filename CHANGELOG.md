@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- MCP now checks hidden paths relative to the open folder, allowing folders inside hidden ancestors.
 - MCP now matches open tabs through the path reported by their owning window, including symlinked roots.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.
 - Accepted MCP socket connections now use blocking reads and writes on macOS.
