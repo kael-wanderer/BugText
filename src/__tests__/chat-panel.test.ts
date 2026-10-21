@@ -202,3 +202,15 @@ it("checks changed open files after a cancelled run", async () => {
   expect(root.textContent).toContain("Changed 1 file");
   expect(root.textContent).toContain("Reply cancelled.");
 });
+
+it("inlines outside-folder CLI attachments instead of passing their paths", async () => {
+  const panel = createAIPanel(root, deps);
+  const { invoke } = await import("@tauri-apps/api/core");
+  vi.mocked(invoke).mockResolvedValue("private attachment text");
+  panel.addAttachments(["/outside/private.md"]);
+  send();
+  await vi.waitFor(() => expect(streamChat).toHaveBeenCalled());
+  const [, , messages, , options] = vi.mocked(streamChat).mock.calls.at(-1)!;
+  expect(JSON.stringify(messages)).toContain("private attachment text");
+  expect(options.attachmentPaths).toEqual([]);
+});

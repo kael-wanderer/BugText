@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- CLI chat now inlines readable attachments outside the run folder and explains when an attachment cannot be opened inside the sandbox.
 - AI commands now run asynchronously, cancellation schedules its forced kill off-thread, Node.js sandbox roots are limited to JavaScript shims, and exited process groups are cleaned up before output readers join.
 - Local CLI settings now describe Pi as answer-only and clear the saved CLI key when a proxy address changes.
 - AI Use for controls now share a fitted grid with room for engine badges and gaps.

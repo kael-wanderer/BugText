@@ -35,6 +35,7 @@ import { rankItems } from "../fuzzy";
 import { hashText } from "../hash";
 import { chatContentText, type ChatMessage } from "./providers";
 import { contextTrimWarning } from "./context-budget";
+import { prepareCliAttachments } from "./attachments";
 export type AIPanelDeps = {
   getSettings(): AISettings;
   onSettingsChange(settings: AISettings): void;
@@ -79,50 +80,6 @@ export type AIPanel = {
   updateWorkspaceFile(path: string, text: string): void;
   removeWorkspaceFile(path: string): void;
 };
-const TEXT_EXTENSIONS = new Set([
-  "md",
-  "markdown",
-  "txt",
-  "text",
-  "json",
-  "jsonc",
-  "csv",
-  "tsv",
-  "yaml",
-  "yml",
-  "toml",
-  "ini",
-  "cfg",
-  "conf",
-  "html",
-  "htm",
-  "xml",
-  "svg",
-  "css",
-  "scss",
-  "js",
-  "jsx",
-  "ts",
-  "tsx",
-  "mjs",
-  "cjs",
-  "py",
-  "rb",
-  "rs",
-  "go",
-  "java",
-  "c",
-  "h",
-  "cpp",
-  "hpp",
-  "cs",
-  "sh",
-  "bash",
-  "zsh",
-  "sql",
-  "log",
-  "env",
-]);
 function basename(path: string): string {
   return path.split(/[\\/]/).pop() || path;
 }
@@ -493,12 +450,11 @@ export function createAIPanel(
     );
     try {
       const files: AttachedFile[] = [];
+      let cliAttachmentPaths: string[] = [];
       if (!isCli) {
         const skipped: string[] = [];
         for (const path of attached) {
-          if (
-            !TEXT_EXTENSIONS.has(path.split(".").pop()?.toLowerCase() ?? "")
-          ) {
+          if (!/\.(md|markdown|txt|text|jsonc?|csv|tsv|ya?ml|toml|ini|cfg|conf|html?|xml|svg|css|scss|jsx?|tsx?|mjs|cjs|py|rb|rs|go|java|c|h|cpp|hpp|cs|sh|bash|zsh|sql|log|env)$/i.test(path)) {
             skipped.push(basename(path));
             continue;
           }
@@ -516,6 +472,20 @@ export function createAIPanel(
           appendBubble(
             "system",
             `Skipped unsupported attachment: ${skipped.join(", ")}. API connections accept text files.`,
+          );
+      }
+      if (isCli) {
+        const prepared = await prepareCliAttachments(
+          attached,
+          workingDir,
+          (path) => invoke<string>("read_file", { path }),
+        );
+        files.push(...prepared.files);
+        cliAttachmentPaths = prepared.paths;
+        for (const name of prepared.skipped)
+          appendBubble(
+            "system",
+            `${name} is outside the folder, so the agent can't open it.`,
           );
       }
       if (workingDir) {
@@ -561,7 +531,7 @@ export function createAIPanel(
         {
           folder: isCli ? runDir : workingDir,
           write,
-          attachmentPaths: isCli ? attached : [],
+          attachmentPaths: isCli ? cliAttachmentPaths : [],
           signal: request.signal,
         },
       );
