@@ -227,6 +227,16 @@ function parseTerminal(raw: unknown): TerminalEntry | null {
   return { id: value.id, label: value.label, run: value.run };
 }
 
+export function tryParseAISettings(raw: string): AISettings | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  } catch {
+    return null;
+  }
+  return parseAISettings(raw);
+}
+
 export function parseAISettings(raw: string): AISettings {
   let data: Record<string, unknown>;
   try {

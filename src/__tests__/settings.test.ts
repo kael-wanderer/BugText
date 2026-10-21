@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS,
   normalizeThemeName,
   parseSettings,
+  tryParseSettings,
   THEME_OPTIONS,
 } from "../settings";
 
@@ -98,5 +99,16 @@ describe("soft wrap", () => {
   it("clamps an out-of-range column", () => {
     expect(parseSettings('{"wrapColumn":5}').wrapColumn).toBe(20);
     expect(parseSettings('{"wrapColumn":500}').wrapColumn).toBe(200);
+  });
+});
+
+describe("tryParseSettings", () => {
+  it("returns null on invalid JSON", () => {
+    expect(tryParseSettings("{ not json")).toBeNull();
+    expect(tryParseSettings("[]")).toBeNull();
+  });
+  it("parses valid JSON like parseSettings", () => {
+    const raw = JSON.stringify({ theme: "nord", wrapColumn: 100 });
+    expect(tryParseSettings(raw)).toEqual(parseSettings(raw));
   });
 });

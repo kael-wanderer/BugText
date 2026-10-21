@@ -3,6 +3,7 @@ import {
   DEFAULT_AI_SETTINGS,
   extractLegacyKeys,
   parseAISettings,
+  tryParseAISettings,
 } from "../ai/aisettings";
 
 describe("parseAISettings", () => {
@@ -279,5 +280,16 @@ describe("extractLegacyKeys", () => {
       providers: [{ id: "c", label: "C", type: "command", run: "r" }],
     });
     expect(extractLegacyKeys(raw).keys).toEqual([]);
+  });
+});
+
+describe("tryParseAISettings", () => {
+  it("returns null on invalid JSON", () => {
+    expect(tryParseAISettings("{ not json")).toBeNull();
+    expect(tryParseAISettings("[]")).toBeNull();
+  });
+  it("parses valid JSON like parseAISettings", () => {
+    const raw = JSON.stringify({ providers: [] });
+    expect(tryParseAISettings(raw)).toEqual(parseAISettings(raw));
   });
 });

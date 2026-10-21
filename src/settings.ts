@@ -116,6 +116,16 @@ function parseKeymap(raw: unknown): Record<string, string> {
   return out;
 }
 
+export function tryParseSettings(raw: string): Settings | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  } catch {
+    return null;
+  }
+  return parseSettings(raw);
+}
+
 export function parseSettings(raw: string): Settings {
   let data: Record<string, unknown>;
   try {

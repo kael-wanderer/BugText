@@ -25,6 +25,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Changing a setting in one window no longer gets undone when another window saves; all
+  windows pick up the change.
+
 - Open files now reload from disk when another process changes them: the 3-second
   auto-refresh and the window-focus refresh compare the file's text instead of a
   cached mtime/size, so a stale or failed stat can no longer leave a tab showing

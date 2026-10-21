@@ -1,6 +1,7 @@
 import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
+import { SETTINGS_CHANGED_EVENT, shouldReload, type SettingsFile } from "./settings-sync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { initActivityBar } from "./activitybar";
@@ -8,6 +9,7 @@ import {
   DEFAULT_AI_SETTINGS_JSON,
   extractLegacyKeys,
   parseAISettings,
+  tryParseAISettings,
   type AISettings,
 } from "./ai/aisettings";
 import { createAIPanel, type AIPanel } from "./ai/panel";
@@ -68,6 +70,7 @@ import {
   DEFAULT_SETTINGS_JSON,
   normalizeThemeName,
   parseSettings,
+  tryParseSettings,
   type ThemeName,
   type Settings,
 } from "./settings";
@@ -167,6 +170,26 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 
 const views = new Map<string, WindowView>();
 
+let onSettingsSynced: (() => void) | null = null;
+
+function broadcastSettingsChange(file: SettingsFile): void {
+  void emit(SETTINGS_CHANGED_EVENT, { file, from: nativeWindowLabel }).catch(() => {});
+}
+
+function writeSettings(next: Settings): void {
+  if (!settingsPath) return;
+  void writeFile(settingsPath, JSON.stringify(next, null, 2))
+    .then(() => broadcastSettingsChange("settings"))
+    .catch(() => {});
+}
+
+function writeAISettings(next: AISettings): void {
+  if (!aiSettingsPath) return;
+  void writeFile(aiSettingsPath, JSON.stringify(next, null, 2))
+    .then(() => broadcastSettingsChange("agent"))
+    .catch(() => {});
+}
+
 async function loadSettings(): Promise<void> {
   try {
     const file = await getSettingsFile(DEFAULT_SETTINGS_JSON);
@@ -200,6 +223,7 @@ async function loadAISettings(): Promise<void> {
       }
       if (stored.every(Boolean)) {
         await writeFile(aiSettingsPath, cleaned);
+        broadcastSettingsChange("agent");
         currentAISettings = parseAISettings(cleaned);
       } else {
         currentAISettings = parseAISettings(file.contents);
@@ -207,6 +231,7 @@ async function loadAISettings(): Promise<void> {
     } else {
       if (cleaned !== file.contents) {
         await writeFile(aiSettingsPath, cleaned);
+        broadcastSettingsChange("agent");
       }
       currentAISettings = parseAISettings(cleaned);
     }
@@ -216,6 +241,39 @@ async function loadAISettings(): Promise<void> {
     currentAISettings = parseAISettings("{}");
   }
 }
+
+/** Reload one settings file after another window changed it. Never writes or re-broadcasts. */
+async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
+  try {
+    if (file === "settings") {
+      const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
+      const next = tryParseSettings(raw.contents);
+      if (!next) return;
+      currentSettings = next;
+      applySettings(currentSettings);
+      applySoftWrap();
+      applyKeymap();
+      syncViewMenu();
+      requestWindowMeasure();
+      aiPanel?.refreshTheme();
+    } else {
+      const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
+      const next = tryParseAISettings(raw.contents);
+      if (!next) return;
+      currentAISettings = next;
+      aiPanel?.render();
+    }
+    settingsPanel.refresh();
+    onSettingsSynced?.();
+  } catch {
+    /* Keep current settings when the file cannot be read. */
+  }
+}
+
+void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
+  const file = shouldReload(event.payload, nativeWindowLabel);
+  if (file) void reloadSettingsFromDisk(file);
+});
 
 async function refreshFileList(): Promise<void> {
   const folder = getState().folder;
@@ -238,17 +296,13 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   aiPanel?.refreshTheme();
-  if (settingsPath) {
-    void writeFile(settingsPath, JSON.stringify(settings, null, 2));
-  }
+  writeSettings(settings);
 }
 
 function saveAISettingsFromPanel(settings: AISettings): void {
   currentAISettings = settings;
   aiPanel?.render();
-  if (aiSettingsPath) {
-    void writeFile(aiSettingsPath, JSON.stringify(settings, null, 2));
-  }
+  writeAISettings(settings);
 }
 
 function commandItems(): PaletteItem[] {
@@ -1011,10 +1065,12 @@ async function doSave(saveAs = false): Promise<void> {
       applyKeymap();
       syncViewMenu();
       requestWindowMeasure();
+      broadcastSettingsChange("settings");
     }
     if (target === aiSettingsPath) {
       currentAISettings = parseAISettings(text);
       aiPanel?.render();
+      broadcastSettingsChange("agent");
     }
     patchWindow(getState().activeWindowId, {
       tabs: activeWindow().tabs.map((x) =>
@@ -1437,9 +1493,7 @@ function persistCurrentSettings(): void {
   applySettings(currentSettings);
   requestWindowMeasure();
   syncViewMenu();
-  if (settingsPath) {
-    void writeFile(settingsPath, JSON.stringify(currentSettings, null, 2));
-  }
+  writeSettings(currentSettings);
 }
 
 function setWrapMode(mode: SoftWrapMode): void {
