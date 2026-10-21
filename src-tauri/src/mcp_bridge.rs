@@ -22,6 +22,13 @@ impl CallError {
     fn display(self) -> String {
         match self {
             Self::NotRunning => NOT_RUNNING.to_string(),
+            Self::Io(error) if matches!(
+                error.kind(),
+                io::ErrorKind::ConnectionReset
+                    | io::ErrorKind::ConnectionAborted
+                    | io::ErrorKind::BrokenPipe
+                    | io::ErrorKind::UnexpectedEof
+            ) => NOT_RUNNING.to_string(),
             Self::Io(_) => "BugText couldn't complete the request.".to_string(),
             Self::InvalidReply => INVALID_REPLY.to_string(),
             Self::App(error) => error,
@@ -39,19 +46,7 @@ impl CallError {
     }
 }
 
-fn read_error(error: io::Error) -> CallError {
-    if matches!(
-        error.kind(),
-        io::ErrorKind::ConnectionReset
-            | io::ErrorKind::ConnectionAborted
-            | io::ErrorKind::BrokenPipe
-            | io::ErrorKind::UnexpectedEof
-    ) {
-        CallError::NotRunning
-    } else {
-        CallError::Io(error)
-    }
-}
+fn read_error(error: io::Error) -> CallError { CallError::Io(error) }
 
 pub fn socket_path(config_dir: &Path) -> Result<PathBuf, String> {
     let path = config_dir.join("mcp.sock");
@@ -89,22 +84,26 @@ pub fn config_dir() -> PathBuf {
 
 pub struct SocketForward {
     path: PathBuf,
+    stream: Option<UnixStream>,
 }
 
 impl SocketForward {
-    pub fn new(path: PathBuf) -> Self { Self { path } }
+    pub fn new(path: PathBuf) -> Self { Self { path, stream: None } }
 
-    fn call_once(&self, client: &str, tool: &str, args: Value) -> Result<Value, CallError> {
-        let mut stream = UnixStream::connect(&self.path).map_err(|_| CallError::NotRunning)?;
-        stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
-        stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
+    fn call_once(&mut self, client: &str, tool: &str, args: Value) -> Result<Value, CallError> {
+        if self.stream.is_none() {
+            let stream = UnixStream::connect(&self.path).map_err(|_| CallError::NotRunning)?;
+            stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
+            stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
+            self.stream = Some(stream);
+        }
+        let stream = self.stream.as_mut().expect("connected stream");
         let id = REQUEST_ID.fetch_add(1, Ordering::Relaxed);
         let request = json!({"id":id,"client":client,"tool":tool,"args":args});
         writeln!(stream, "{request}").map_err(CallError::Io)?;
         stream.flush().map_err(CallError::Io)?;
-        let mut reader = BufReader::new(stream);
         let mut line = String::new();
-        let bytes = reader.read_line(&mut line).map_err(read_error)?;
+        let bytes = BufReader::new(&mut *stream).read_line(&mut line).map_err(read_error)?;
         if bytes == 0 || line.trim().is_empty() {
             return Err(CallError::NotRunning);
         }
@@ -123,7 +122,10 @@ impl SocketForward {
 impl Forward for SocketForward {
     fn call(&mut self, client: &str, tool: &str, args: Value) -> Result<Value, String> {
         match self.call_once(client, tool, args.clone()) {
-            Err(error) if error.should_retry() => self.call_once(client, tool, args).map_err(CallError::display),
+            Err(error) if error.should_retry() => {
+                self.stream = None;
+                self.call_once(client, tool, args).map_err(CallError::display)
+            }
             Err(error) => Err(error.display()),
             Ok(value) => Ok(value),
         }
@@ -262,6 +264,33 @@ mod tests {
         thread.join().unwrap();
         let _ = std::fs::remove_file(path);
         assert_eq!(result.unwrap_err(), "BugText sent an invalid reply.");
+    }
+
+    #[test]
+    fn two_calls_reuse_one_connection() {
+        let path = temp_socket("reuse");
+        let listener = UnixListener::bind(&path).unwrap();
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            drop(listener);
+            stream.set_read_timeout(Some(std::time::Duration::from_secs(1))).unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut requests = Vec::new();
+            for _ in 0..2 {
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                requests.push(request);
+                let response = json!({"id":requests.last().unwrap()["id"],"ok":true,"result":"ok"});
+                writeln!(stream, "{response}").unwrap();
+            }
+            requests.len()
+        });
+        let mut forward = SocketForward::new(path.clone());
+        assert_eq!(forward.call("Agent", "read_note", json!({})).unwrap(), json!("ok"));
+        assert_eq!(forward.call("Agent", "read_note", json!({})).unwrap(), json!("ok"));
+        assert_eq!(thread.join().unwrap(), 2);
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

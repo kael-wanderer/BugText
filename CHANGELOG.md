@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- The MCP bridge now reuses its socket connection across requests and reconnects after transport failures.
 - MCP Undo now restores the first pre-edit text after merged edits and follows the latest edit state.
 - MCP now checks hidden paths relative to the open folder, allowing folders inside hidden ancestors.
 - MCP now matches open tabs through the path reported by their owning window, including symlinked roots.
