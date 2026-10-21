@@ -65,9 +65,9 @@ export function createMcpHandler(deps: HandlerDeps): {
     return current;
   }
 
-  async function readNote(path: string): Promise<McpResult> {
+  async function readNote(path: string, tabPath = path): Promise<McpResult> {
     if (!isTextPath(path)) return failure(EXTENSION);
-    const tab = deps.findOpenTab(path);
+    const tab = deps.findOpenTab(tabPath);
     if (tab?.kind === "other") return failure(EXTENSION);
     const text = tab ? deps.getText(tab.id) : await deps.readDisk(path);
     if (byteLength(text) > MAX_BYTES) return failure(TOO_LARGE);
@@ -80,7 +80,9 @@ export function createMcpHandler(deps: HandlerDeps): {
     const hasText = typeof req.args?.text === "string";
     if (hasEdits === hasText) return failure("Pass either edits or text.");
     if (typeof path !== "string" || !isTextPath(path)) return failure(EXTENSION);
-    const tab = deps.findOpenTab(path);
+    const tabPath = typeof req.args?.tabPath === "string" ? req.args.tabPath : path;
+    const tab = deps.findOpenTab(tabPath);
+    const operationPath = tab ? tabPath : path;
     if (tab?.kind === "other") return failure(EXTENSION);
     const before = tab ? deps.getText(tab.id) : await deps.readDisk(path);
     if (byteLength(before) > MAX_BYTES) return failure(TOO_LARGE);
@@ -101,18 +103,18 @@ export function createMcpHandler(deps: HandlerDeps): {
     if (byteLength(next) > MAX_BYTES) return failure(TOO_LARGE);
 
     if (!tab) {
-      if (throttle.shouldSnapshot(path, req.client, false))
-        await deps.snapshot(path, before, `Before ${req.client} edit`);
+      if (throttle.shouldSnapshot(operationPath, req.client, false))
+        await deps.snapshot(operationPath, before, `Before ${req.client} edit`);
       await deps.writeDiskAtomic(path, next);
       return success({ revision: hashText(next), saved: true });
     }
 
-    if (await deps.diskChanged(path)) {
-      const diskText = await deps.readDisk(path);
-      await deps.snapshot(path, diskText, `Before ${req.client} edit (disk version)`);
+    if (await deps.diskChanged(operationPath)) {
+      const diskText = await deps.readDisk(operationPath);
+      await deps.snapshot(operationPath, diskText, `Before ${req.client} edit (disk version)`);
     }
-    if (throttle.shouldSnapshot(path, req.client, tab.dirty))
-      await deps.snapshot(path, before, `Before ${req.client} edit`);
+    if (throttle.shouldSnapshot(operationPath, req.client, tab.dirty))
+      await deps.snapshot(operationPath, before, `Before ${req.client} edit`);
     deps.applyChanges(tab.id, changes);
     await deps.saveTab(tab.id);
     const finalText = next;
@@ -134,7 +136,7 @@ export function createMcpHandler(deps: HandlerDeps): {
         case "read_note": {
           const path = req.args?.path;
           if (typeof path !== "string") return failure(OUTSIDE);
-          return await readNote(path);
+          return await readNote(path, typeof req.args?.tabPath === "string" ? req.args.tabPath : path);
         }
         case "update_note": {
           const path = req.args?.path;

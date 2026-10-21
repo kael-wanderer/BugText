@@ -209,9 +209,8 @@ function editorForTab(id: string): WindowView["editor"] {
 
 const mcpHandler = createMcpHandler({
   findOpenTab(path) {
-    const normalized = (value: string) => value.startsWith("/private/") ? value.slice("/private".length) : value;
     for (const windowState of getState().windows) {
-      const tab = windowState.tabs.find((candidate) => candidate.path && normalized(candidate.path) === normalized(path));
+      const tab = windowState.tabs.find((candidate) => candidate.path === path);
       if (tab) return { id: tab.id, dirty: tab.dirty, kind: isPdfFile(tab.path ?? tab.name) ? "other" : "text" };
     }
     return null;

@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- MCP now matches open tabs through the path reported by their owning window, including symlinked roots.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.
 - Accepted MCP socket connections now use blocking reads and writes on macOS.
 - MCP bridge now reports the app as not running when its socket closes before replying.

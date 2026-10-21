@@ -160,6 +160,13 @@ pub fn owner(path: &Path, windows: &[(String, WindowReport)], focused: Option<&s
     candidates.first().map(|candidate| candidate.0.clone())
 }
 
+fn reported_tab_path(path: &Path, report: &WindowReport) -> Option<String> {
+    let canonical_path = canonical_even_if_missing(path)?;
+    report.open_tabs.iter().find_map(|tab| {
+        (canonical(Path::new(&tab.path)).as_ref() == Some(&canonical_path)).then(|| tab.path.clone())
+    })
+}
+
 pub fn list_files_from_registry(windows: &[(String, WindowReport)], folder: Option<&str>) -> Vec<Value> {
     let selected_folder = folder.and_then(|path| canonical(Path::new(path)));
     let mut result = Vec::new();
@@ -333,12 +340,14 @@ fn dispatch(app: &tauri::AppHandle, state: &McpState, request: SocketRequest) ->
             };
             let access = match request.tool.as_str() { "read_note" => Access::Read, "update_note" => Access::Write, _ => Access::Create };
             check(path, &roots, access).and_then(|canonical| {
-                if canonical.components().any(|component| component.as_os_str().to_str().is_some_and(crate::files::should_skip)) {
-                    return Err(OUTSIDE.to_string());
-                }
                 let owner = owner(&canonical, &windows, focused.as_deref()).ok_or_else(|| OUTSIDE.to_string())?;
                 let mut args = request.args.clone();
                 args["path"] = Value::String(canonical.to_string_lossy().into_owned());
+                if let Some(reported) = windows.iter().find(|(label, _)| label == &owner)
+                    .and_then(|(_, report)| reported_tab_path(&canonical, report))
+                {
+                    args["tabPath"] = Value::String(reported);
+                }
                 forward(app, state, &owner, &request.client, &request.tool, args)
             })
         }
@@ -404,7 +413,7 @@ fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value)
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_blocking, accept_peer, list_files_from_registry, owner, McpCore, TabReport, WindowReport};
+    use super::{accept_blocking, accept_peer, list_files_from_registry, owner, reported_tab_path, McpCore, TabReport, WindowReport};
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
@@ -484,6 +493,24 @@ mod tests {
         let noncanonical = path.to_string_lossy().replace("/private", "");
         let windows = vec![("tab".into(), report(Some(root), vec![TabReport { path: noncanonical, dirty: false, active: true }]))];
         assert_eq!(owner(&path, &windows, None).as_deref(), Some("tab"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_reports_the_open_tab_path_for_a_symlinked_root() {
+        let dir = TempDir::new("owner-symlink-tab");
+        let real = dir.0.join("real");
+        let alias = dir.0.join("notes");
+        fs::create_dir_all(&real).unwrap();
+        std::os::unix::fs::symlink(&real, &alias).unwrap();
+        let reported = alias.join("a.md");
+        let canonical = real.join("a.md");
+        fs::write(&canonical, "note").unwrap();
+        let windows = vec![("tab".into(), report(Some(alias.clone()), vec![TabReport {
+            path: reported.to_string_lossy().into(), dirty: false, active: true,
+        }]))];
+        assert_eq!(owner(&canonical, &windows, None).as_deref(), Some("tab"));
+        assert_eq!(reported_tab_path(&canonical, &windows[0].1).as_deref(), Some(reported.to_string_lossy().as_ref()));
     }
 
     #[test]

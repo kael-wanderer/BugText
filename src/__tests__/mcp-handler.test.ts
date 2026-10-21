@@ -59,6 +59,19 @@ describe("MCP webview handler", () => {
     });
   });
 
+  it("uses the owner-reported tab path to find and snapshot an open symlinked tab", async () => {
+    const f = fixture({ text: "before" });
+    const reportedPath = "/Users/me/Notes/a.md";
+    await f.handler.handle(request("update_note", {
+      path: "/private/var/mobile/Notes/a.md",
+      tabPath: reportedPath,
+      edits: [{ old: "before", new: "after" }],
+    }));
+    expect(f.deps.findOpenTab).toHaveBeenCalledWith(reportedPath);
+    expect(f.deps.diskChanged).toHaveBeenCalledWith(reportedPath);
+    expect(f.deps.snapshot).toHaveBeenCalledWith(reportedPath, "before", "Before Claude Code edit");
+  });
+
   it("snapshots and applies one open-tab edit, saves, then shows Undo", async () => {
     const f = fixture({ text: "before" });
     const result = await f.handler.handle(request("update_note", { path, edits: [{ old: "before", new: "after" }] }));
