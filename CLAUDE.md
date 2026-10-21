@@ -72,13 +72,31 @@ register BugText as the Markdown/text editor or PDF viewer through LaunchService
 
 Editor settings live at `<app config dir>/settings.json`; AI providers and terminals
 live at `<app config dir>/agent.json` (legacy `ai.json` is auto-migrated on first
-run), while API keys live in the OS keychain and never in that file. The Gear button opens either file as a normal tab, and saving applies
-the relevant configuration. Agent settings are split into CLI Agents and Models
-(local and hosted) tabs; CLI Agent rows can be edited inline.
+run), while API keys live in the OS keychain and never in that file.
+
+Settings is a full-window screen (`src/settings-screen/`) laid over the workbench:
+`⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, Back, the gear
+or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
+tabs, unsaved text, cursor, scroll and split survive. Pages in fixed order: General,
+Editing, Theme, Shortcuts, AI (flat rail, plus search over `registry.ts`; every row
+carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
+no page is recording a shortcut (`blocksEscape`) and focus is not in a text field. User
+strings (font, theme, agent, model names) render via `textContent`/`.value`, never
+`innerHTML`. General's "Open settings.json / agent.json" buttons open the file as a
+normal tab and leave the screen; saving applies it. AI settings (CLI agents, models,
+console) live on the AI page; CLI agent rows edit inline.
+
+Settings changes broadcast the Tauri event `bugtext://settings-changed`
+(`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
+refresh the screen; the sender ignores its own event so reloads never re-broadcast,
+and a file that no longer parses (half-edited JSON tab) leaves current settings
+untouched. The General page's app-icon carousel sets the macOS Dock icon at runtime
+(`macos_dock.rs`; the choice persists in `settings.json`); `npm run icons:app`
+regenerates the icon assets from the local-only `docs/design/logo-concepts/`.
 
 Keyboard shortcuts are fully customizable. `keymap.ts` is the command registry
 (ids match the native menu item ids in `menu.rs`); overrides persist in
-`settings.json` under `keymap`. The settings panel's **Keys** tab (also View ▸
+`settings.json` under `keymap`. The Settings **Shortcuts** page (also View ▸
 Keyboard Shortcuts) lists every command grouped by category with record / reset /
 Restore Defaults. Menu-scoped accelerators are pushed to the native menu at
 runtime via the `set_accelerators` command (`item.set_accelerator`); app-scoped
@@ -90,7 +108,7 @@ or `@`-mention (fuzzy picker over the open folder). CLI agents receive the file
 **paths** (and run with cwd = the open folder, so they can read attachments and
 write output files); HTTP models get text-file contents inlined and skip
 binary/image files. The Terminal tab has a live terminal picker; terminals (and
-their font/size) are edited in the settings Agent ▸ Terminals section. `ai_run`
+their font/size) are edited on the Settings AI page (Terminals section). `ai_run`
 takes an optional `cwd`.
 
 The AI panel also offers inline **quick actions** (Proofread / Rewrite / Summarize
@@ -122,7 +140,7 @@ below the release chunk-warning threshold.
 PDF OCR runs fully offline; its tesseract runtime lives under `public/vendor/`.
 Rebuild steps: see the `vendored-assets` skill.
 
-Updater runtime and UI are active. Gear ▸ General offers Manual (no background
+Updater runtime and UI are active. Settings ▸ General offers Manual (no background
 checks) and Automatic (at most once per 24 hours); both modes always prompt before
 installing, and manual checks remain available. Production release checks still
 require the signed release feed (`latest.json`) and public key in `tauri.conf.json`;

@@ -1,10 +1,9 @@
 # Search (in-editor find + Find in Folder)
 
 In-editor find via CodeMirror (⌘F); folder content search (⌘⇧F / activity-bar
-Search button) over text files and drawing text.
+Search button) over text files and PDFs.
 
-Pre-req: a folder open with a few `.md`/`.txt`, one `.mind`, one `.excalidraw`, and
-a `.pdf`.
+Pre-req: a folder open with a few `.md`/`.txt`, and a `.pdf`.
 
 ### SRCH-01 — In-editor find (⌘F)
 - Steps: Focus the editor, press ⌘F, type a term present in the doc.
@@ -36,11 +35,9 @@ a `.pdf`.
 - Expected: The file opens (active tab) and the cursor/scroll jumps to that line.
 - Status: [ ]  Notes:
 
-### SRCH-05 — Mindmap / Excalidraw text searched
-- Steps: Search for a word that exists only in a `.mind` node topic or `.excalidraw`
-  text element.
-- Expected: The drawing file appears as a result (its text, not raw JSON noise).
-- Status: [ ]  Notes:
+### SRCH-05 — (removed)
+Mindmap / Excalidraw boards were removed; `.mind` and `.excalidraw` files are plain text
+and are searched like any other text file. Id kept so later ids stay stable.
 
 ### SRCH-06 — PDF text searched by page
 - Steps: Search for a term that exists only inside a PDF.

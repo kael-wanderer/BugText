@@ -63,9 +63,9 @@ unsaved edits.
   find bar when viewing rendered Markdown or a text-based PDF. Enter/Shift+Enter
   moves forward/backward through highlighted matches.
 - **Find in Folder:** `⌘⇧F` (or the activity-bar Search button) searches the contents
-  of every text file in the open folder, plus PDFs. Use the Aa, whole-word, and `.*` controls for
-  case-sensitive, whole-word, or regular-expression matching. Results show highlighted
-  snippets and counts per file; PDF hits open at the matching page.
+  of every text file in the open folder, plus PDFs. Use the Aa, whole-word, and `.*`
+  controls for case-sensitive, whole-word, or regular-expression matching. Results show
+  highlighted snippets and counts per file; PDF hits open at the matching page.
 
 ## AI assistant
 
@@ -83,7 +83,7 @@ Toggle the right-side panel with the activity-bar agent button. It has two tabs:
     retrieves the most relevant passages from the open folder using a local keyword
     search (no extra service or key) and lists which files were used. Turn it off for
     a focused chat. The amount of inline context is capped by the **Max context
-    characters** setting (Gear → Agent → Models); oversized context is trimmed,
+    characters** setting (Settings → AI); oversized context is trimmed,
     keeping the document/selection first.
 - **Runs** — lists CLI agent runs from this session with their status (running, done,
   failed, cancelled), a Cancel action for an in-progress run, and the changed-files
@@ -91,17 +91,17 @@ Toggle the right-side panel with the activity-bar agent button. It has two tabs:
 - **Agent Console** — choose an **Agent command** such as Claude Code, Codex, Pi,
   Shell, or a custom alias, then choose the **Terminal app** that runs it: Embedded,
   Apple Terminal, Ghostty, or cmux. Manage commands and the default terminal app under
-  **Gear → Agent → Agent Console**. Embedded font/size and live theme settings apply
+  **Settings → AI**. Embedded font/size and live theme settings apply
   only to the embedded renderer.
   Drag the divider to resize the panel. With Explorer hidden, Agent Console can use
   up to 80% of the BugText window while retaining a narrow document workspace.
 
 Agents, models, and terminals are configured in `agent.json` (open it from
-**Gear → Open agent.json**). API keys are stored in the macOS Keychain. HTTP model
+**Settings → General → Open agent.json**). API keys are stored in the macOS Keychain. HTTP model
 providers can use an OpenAI-compatible endpoint or Anthropic's native Messages API
 (`"api": "anthropic"`); the bundled Anthropic preset uses the native path.
 
-Under **Gear → Agent → Models**, use **Test connection** to check a provider's
+Under **Settings → AI → Models**, use **Test connection** to check a provider's
 saved key, endpoint, and model before starting a chat.
 
 Document text and attachments are sent as untrusted user context, never as system
@@ -114,9 +114,18 @@ profiles are **Ask before doing** and full-access; an agent can define more in
 not persisted as the default, and BugText starts in **Ask before doing** after launch.
 BugText chooses the command template — the CLI agent still enforces its own permissions.
 
+## Settings
+
+Open Settings with `⌘,` or **BugText → Settings…** (or the activity-bar gear). It fills
+the window with five pages: General, Editing, Theme, Shortcuts and AI. The search box
+jumps to any setting. Leave with `Esc`, the Back button, the gear, or `⌘,` again; your
+tabs, unsaved text, cursor and split are exactly as you left them. Changes apply
+immediately and show up in every open window. General has the app-icon picker, which
+changes the Dock icon, and buttons to edit `settings.json` / `agent.json` as text.
+
 ## Keyboard shortcuts
 
-All shortcuts are customizable: **View → Keyboard Shortcuts** (or the **Keys** tab in
+All shortcuts are customizable: **View → Keyboard Shortcuts** (or the **Shortcuts** page in
 Settings) lists every command and lets you rebind, reset, or restore defaults.
 
 | Shortcut | Action |
@@ -145,7 +154,7 @@ also shows the file type, cursor line/column, and word count where applicable.
 ## Updates
 
 Choose **Help → Check for Updates…** for a manual check. Enable automatic checks
-from Gear → General → Updates or **Help → Automatically Check for Updates**.
+from Settings → General → Update checks or **Help → Automatically Check for Updates**.
 BugText checks at most once per 24 hours and always asks before installation.
 
 ## Export

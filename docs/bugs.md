@@ -15,7 +15,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-007 | 2026-07-09 | PDF editor | Major | PDFE-00-05 | All PDF edit pointer math (place/drag/resize/selection rects) divided by the fixed `RENDER_SCALE` only, so at any preview zoom ≠ 100% edits landed offset by the zoom factor (verified 1.5× offset in a browser harness) | fixed |
 | BUG-008 | 2026-07-09 | PDF editor | Major | PDFE-02-02 | Replace tool used `window.prompt`, which Tauri's WKWebView doesn't implement — the tool silently created nothing | fixed |
 | BUG-009 | 2026-07-09 | PDF editor | Minor | PDFE-03-06 | Save/Save As error status was immediately overwritten by "Unsaved PDF edits" in `updateToolbarState`, so failed saves looked like the button did nothing | fixed |
-| BUG-010 | 2026-07-09 | Excalidraw | Major | — | Excalidraw fires `onChange` every pointer frame during pan/zoom; the board serialized the whole scene (pretty-printed JSON incl. base64 files) per frame to dedupe, stalling space+drag panning on large boards | fixed |
+| BUG-010 | 2026-07-09 | Excalidraw (since removed) | Major | — | Excalidraw fires `onChange` every pointer frame during pan/zoom; the board serialized the whole scene (pretty-printed JSON incl. base64 files) per frame to dedupe, stalling space+drag panning on large boards | fixed |
 
 > Delete the example row once real bugs are logged.
 

@@ -40,9 +40,8 @@ Legend: ✅ done · 🔜 planned/deferred
 - ✅ PDF preview zoom and pan: fit-to-width reset, instant CSS scale plus crisp
   re-render, horizontal wheel navigation, and Space/middle-mouse drag panning.
 - ✅ Document-aware export: PDF/DOCX (Pandoc + Typst), HTML, PNG/JPG
-- ✅ **M10** — Excalidraw boards (`.excalidraw`, isolated React runtime)
-- ✅ **M11** — jsMind mindmaps (`.mind`) with on-board toolbar, per-node shape /
-  color / size / bold, drag-to-reparent, theme-aware connectors
+- ❌ **M10** — Excalidraw boards (`.excalidraw`, isolated React runtime); removed
+- ❌ **M11** — jsMind mindmaps (`.mind`); removed (both file types now open as text)
 
 ## Stage 3 — AI & agents ✅
 
@@ -51,6 +50,8 @@ Legend: ✅ done · 🔜 planned/deferred
   xterm.js + Rust PTY) tabs
 - ✅ Configurable providers: `http` (OpenAI-compatible) and `command` (CLI agents:
   Claude Code, Codex, OpenCode, Pi) with optional `bypassRun`
+- ✅ Full-window Settings screen (`⌘,`): General, Editing, Theme, Shortcuts, AI pages with
+  search, cross-window sync, and an app-icon picker that sets the Dock icon
 - ✅ Settings split into **CLI Agents** and **Models** tabs; inline editing of CLI
   agents; login-shell PATH resolution so packaged agents run
 - ✅ API keys in the macOS Keychain (never on disk); legacy plaintext keys migrate
@@ -66,10 +67,10 @@ Legend: ✅ done · 🔜 planned/deferred
 
 - ✅ Menu-bar rebuild; soft-wrap modes (off / window / page-guide); New Window in
   the File menu; window-scoped menu + open-path events
-- ✅ **Customizable keyboard shortcuts** — registry + Keys settings tab (record /
+- ✅ **Customizable keyboard shortcuts** — registry + Shortcuts settings page (record /
   reset / Restore Defaults), applied to native menu and app shortcuts
 - ✅ **Search** — in-editor find (⌘F) and **Find in Folder** (⌘⇧F) across text files
-  and `.mind` / `.excalidraw` text; results grouped, click-to-line
+  and PDFs; results grouped, click-to-line
 - ✅ **AI file attachments** — 📎 picker, drag-drop, and `@`-mention; CLI agents get
   paths + run in the open folder; HTTP models get text-file contents inlined
 - ✅ **Terminal upgrades** — live picker, Terminals editor (add/edit/remove +
@@ -136,8 +137,7 @@ of the BugText window while preserving a minimum document area.
 - ✅ In-file Markdown outline / heading jump in the command palette
 - ✅ Open Recent files/folders in the command palette
 - ✅ Export: preflight check for `pandoc` / `typst` with install guidance
-- ✅ Mindmap multi-select via shift/⌘-click and marquee, with theme-aware
-  highlights and safe bulk subtree deletion
+- ❌ Mindmap multi-select (removed with boards)
 - ⏳ Cleanup: keep the `ai.json → agent.json` migration shim for a few more releases,
   as originally planned, so users upgrading from older versions are not stranded.
 

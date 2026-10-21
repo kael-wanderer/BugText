@@ -27,9 +27,8 @@ panel, a PDF reader, and document export.
   (split, move between windows, close variants, copy paths).
 - **Command palette** — `⌘K` to fuzzy-find files or run commands.
 - **Search** — in-editor find (`⌘F`) and **Find in Folder** (`⌘⇧F`): content search
-  across text files, with
-  results grouped by file (click to open at the line).
-- **Customizable keyboard shortcuts** — the **Keys** settings tab (or **View →
+  across text files and PDFs, with results grouped by file (click to open at the line).
+- **Customizable keyboard shortcuts** — the **Shortcuts** settings page (or **View →
   Keyboard Shortcuts**) lists every command; rebind, reset, or restore defaults.
 - **Finder drag/drop** — open files by dropping onto a document pane, copy them
   into Explorer folders/file locations, or drop onto the AI panel to attach them.
@@ -69,8 +68,10 @@ panel, a PDF reader, and document export.
   Summarize and Generate outline stream into the panel. Applying an AI edit snapshots
   the file first (revert from Version History), and CLI agent runs show a changed-files
   summary afterward. The quick-actions model is set in Agent ▸ Models.
-- **Settings** — an in-app panel (Theme, Font, Size, Session, Update, Agent) plus raw
-  `settings.json` / `agent.json` for advanced edits.
+- **Settings** — a full-window screen (`⌘,` or **BugText → Settings…**) with General,
+  Editing, Theme, Shortcuts and AI pages and a search box, plus raw `settings.json` /
+  `agent.json` for advanced edits. Changes apply live and sync across windows. General
+  includes an app-icon picker that sets the Dock icon.
 - **Updates** — manual checks from Help and optional once-daily automatic checks;
   installation always requires confirmation.
 - **Themes** — System, Light, Dark, Catppuccin Mocha, Everforest Dark, Nord — recoloring
@@ -114,9 +115,9 @@ cd src-tauri && cargo check  # fast backend compile-check
 
 ## Configuring the AI panel
 
-AI providers are configured in `agent.json` (in the app config directory; open it from the
-gear menu → **Open agent.json**). The Agent panel has **CLI Agents** and **Models** tabs;
-Models combines local and hosted endpoints. OpenAI, Anthropic, and OpenRouter
+AI providers are configured in `agent.json` (in the app config directory; open it from
+Settings → General → **Open agent.json**). The AI settings page lists CLI agents and
+models; models combine local and hosted endpoints. OpenAI, Anthropic, and OpenRouter
 templates ship by default. The Models tab also controls the inline context cap
 (120,000 characters by default, roughly 30,000 tokens). Each provider is one of:
 
@@ -149,7 +150,8 @@ src/
   palette.ts       ⌘K command/file overlay
   search.ts        Find in Folder results panel
   keymap.ts        shortcut registry + accelerator match/format
-  settingspanel.ts in-app settings panel (incl. Keys tab)
+  settings-screen/ full-window settings screen (pages, search registry, app icons)
+  settings-sync.ts cross-window settings change event
   settings.ts      settings.json model (themes, fonts, sizes, session, keymap)
   updater.ts       manual and once-daily signed update checks
   compareview.ts   side-by-side diff surface

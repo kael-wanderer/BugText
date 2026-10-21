@@ -16,6 +16,17 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   `docs/design/bugtext-icon.svg`; all icons in `src-tauri/icons/` regenerated from it
   with `tauri icon`. Other concepts kept in `docs/design/logo-concepts/`.
 
+- Settings is now a full-window screen (`⌘,`) with General, Editing, Theme, Shortcuts
+  and AI pages and a search box, replacing the settings popover. Your editor state
+  (tabs, unsaved text, split) is untouched while it is open.
+
+### Added
+
+- App icon picker in Settings ▸ General: choose among icon designs and the Dock icon
+  changes immediately. `npm run icons:app` regenerates the icon assets.
+- BugText ▸ Settings… menu item (`⌘,`).
+- Soft wrap and workspace context controls in Settings (Editing and AI pages).
+
 ### Removed
 
 - Excalidraw boards and jsMind mindmaps. `.excalidraw` and `.mind` files now open as plain text.
