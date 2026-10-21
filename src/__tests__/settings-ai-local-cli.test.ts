@@ -125,3 +125,22 @@ it("tests answer-only with feature model and effort", async () => {
     }),
   );
 });
+
+it("describes Pi as answer-only", async () => {
+  const host = await render();
+  expect(host.querySelector('[data-setting="cli-pi"]')?.textContent).toContain(
+    "Answers only — never changes files",
+  );
+});
+it("deletes the Claude CLI key when its proxy URL changes", async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  const host = await render();
+  const input = host.querySelector(
+    '[aria-label="Claude Code Proxy base URL"]',
+  ) as HTMLInputElement;
+  input.value = "https://proxy.example/v1";
+  input.dispatchEvent(new Event("blur"));
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("delete_secret", { id: "cli-claude" }),
+  );
+});

@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Local CLI settings now describe Pi as answer-only and clear the saved CLI key when a proxy address changes.
 - AI Use for controls now share a fitted grid with room for engine badges and gaps.
 
 - Startup persists completed v1-to-v2 AI settings migration after all legacy API

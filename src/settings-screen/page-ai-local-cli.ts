@@ -163,7 +163,13 @@ export function renderLocalCli(
       );
       card.append(
         legend,
-        text("p", "Reads and writes only the open folder", "st-note"),
+        text(
+          "p",
+          tool === "pi"
+            ? "Answers only — never changes files"
+            : "Reads and writes only the open folder",
+          "st-note",
+        ),
       );
       if (tool === "claude" && (info?.accounts.length ?? 0) > 1) {
         card.append(
@@ -227,6 +233,14 @@ export function renderLocalCli(
             return;
           }
           error.textContent = "";
+          if (field === "proxyBaseUrl") {
+            void invoke("delete_secret", { id: `cli-${tool}` })
+              .then(() => update(tool, field, value))
+              .catch(() => {
+                error.textContent = "Could not remove the saved key; proxy was not changed.";
+              });
+            return;
+          }
           update(tool, field, value);
           if (field === "executablePath") void scan();
         });
