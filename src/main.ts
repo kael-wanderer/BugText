@@ -7,6 +7,7 @@ import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { initActivityBar } from "./activitybar";
 import {
   DEFAULT_AI_SETTINGS_JSON,
+  BUILTIN_V1_IDS,
   extractLegacyKeys,
   parseAISettings,
   tryParseAISettings,
@@ -215,6 +216,7 @@ async function loadAISettings(): Promise<void> {
   try {
     const file = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
     aiSettingsPath = file.path;
+    const savedKeyIds = await getSavedAIKeyIds();
     const { cleaned, keys } = extractLegacyKeys(file.contents);
     if (keys.length) {
       const stored: boolean[] = [];
@@ -231,22 +233,34 @@ async function loadAISettings(): Promise<void> {
       if (stored.every(Boolean)) {
         await writeFile(aiSettingsPath, cleaned);
         broadcastSettingsChange("agent");
-        currentAISettings = parseAISettings(cleaned);
+        currentAISettings = parseAISettings(cleaned, savedKeyIds);
       } else {
-        currentAISettings = parseAISettings(file.contents);
+        currentAISettings = parseAISettings(file.contents, savedKeyIds);
       }
     } else {
       if (cleaned !== file.contents) {
         await writeFile(aiSettingsPath, cleaned);
         broadcastSettingsChange("agent");
       }
-      currentAISettings = parseAISettings(cleaned);
+      currentAISettings = parseAISettings(cleaned, savedKeyIds);
     }
     aiPanel?.render();
   } catch {
     aiSettingsPath = "";
     currentAISettings = parseAISettings("{}");
   }
+}
+
+async function getSavedAIKeyIds(): Promise<ReadonlySet<string>> {
+  const ids = new Set<string>();
+  for (const id of BUILTIN_V1_IDS) {
+    try {
+      if (await invoke<boolean>("has_secret", { id })) ids.add(id);
+    } catch {
+      // The command is registered with the native CLI scan in the next task.
+    }
+  }
+  return ids;
 }
 
 /** Reload one settings file after another window changed it. Never writes or re-broadcasts. */

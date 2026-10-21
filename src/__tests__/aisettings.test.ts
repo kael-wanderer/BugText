@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_AI_SETTINGS,
-  extractLegacyKeys,
   parseAISettings,
   tryParseAISettings,
 } from "../ai/aisettings";
@@ -11,275 +10,149 @@ describe("parseAISettings", () => {
     expect(parseAISettings("nope")).toEqual(DEFAULT_AI_SETTINGS);
   });
 
-  it("keeps valid providers and drops malformed ones", () => {
-    const raw = JSON.stringify({
-      providers: [
-        {
-          id: "a",
-          label: "A",
-          type: "http",
-          baseUrl: "u",
-          model: "m",
-          key: "",
-        },
-        { id: "bad", type: "http" },
-        {
-          id: "c",
-          label: "C",
-          type: "command",
-          run: "claude {prompt}",
-        },
-      ],
-      terminals: [{ id: "t", label: "T", run: "claude" }],
-      defaultProvider: "a",
-      defaultTerminal: "t",
-    });
-    const settings = parseAISettings(raw);
-    expect(settings.providers.map((provider) => provider.id)).toEqual([
-      "a",
-      "c",
+  it("drops only the bad connection", () => {
+    const settings = parseAISettings(
+      JSON.stringify({
+        version: 2,
+        connections: [
+          {
+            id: "valid",
+            name: "Valid",
+            provider: "openai-compatible",
+            baseUrl: "https://example.com/v1",
+            auth: "bearer",
+            textModel: "m1",
+          },
+          { id: "x" },
+          {
+            id: "cli-claude",
+            name: "Bad id",
+            provider: "openai-compatible",
+            baseUrl: "https://example.com/v1",
+            auth: "bearer",
+            textModel: "m1",
+          },
+          {
+            id: "unknown-provider",
+            name: "Bad provider",
+            provider: "weird",
+            baseUrl: "https://example.com/v1",
+            auth: "bearer",
+            textModel: "m1",
+          },
+        ],
+      }),
+    );
+    expect(settings.connections.map((connection) => connection.id)).toEqual([
+      "valid",
     ]);
-    expect(settings.terminals.map((terminal) => terminal.id)).toEqual([
-      "t",
-      "pi-term",
+  });
+
+  it("lowercases ids and caps at 20", () => {
+    const connections = Array.from({ length: 25 }, (_, index) => ({
+      id: `CONNECTION-${index}`,
+      name: `Connection ${index}`,
+      provider: "openai-compatible",
+      baseUrl: "https://example.com/v1",
+      auth: "bearer",
+      textModel: "m1",
+    }));
+    const settings = parseAISettings(JSON.stringify({ version: 2, connections }));
+    expect(settings.connections).toHaveLength(20);
+    expect(settings.connections[0].id).toBe("connection-0");
+  });
+
+  it("rejects http to non-localhost", () => {
+    const settings = parseAISettings(
+      JSON.stringify({
+        version: 2,
+        connections: [
+          {
+            id: "remote",
+            name: "Remote",
+            provider: "openai-compatible",
+            baseUrl: "http://10.0.0.5/v1",
+            auth: "none",
+            textModel: "m1",
+          },
+          {
+            id: "local",
+            name: "Local",
+            provider: "openai-compatible",
+            baseUrl: "http://localhost:1234/v1",
+            auth: "none",
+            textModel: "m1",
+          },
+          {
+            id: "secure",
+            name: "Secure",
+            provider: "openai-compatible",
+            baseUrl: "https://x.y/v1",
+            auth: "bearer",
+            textModel: "m1",
+          },
+        ],
+      }),
+    );
+    expect(settings.connections.map((connection) => connection.id)).toEqual([
+      "local",
+      "secure",
     ]);
-    expect(settings.defaultProvider).toBe("a");
-    expect(settings.permissionMode).toBe("ask");
   });
 
-  it("falls back defaultProvider to first provider when unknown", () => {
-    const raw = JSON.stringify({
-      providers: [
-        { id: "x", label: "X", type: "command", run: "r {prompt}" },
-      ],
-      defaultProvider: "missing",
-    });
-    expect(parseAISettings(raw).defaultProvider).toBe("x");
-  });
-
-  it("keeps the bypass command but never restores bypass mode", () => {
+  it("keeps a use row pointing at a missing connection", () => {
     const settings = parseAISettings(
       JSON.stringify({
-        providers: [
-          {
-            id: "x",
-            label: "X",
-            type: "command",
-            run: "x {prompt}",
-            bypassRun: "x --yes {prompt}",
+        version: 2,
+        uses: {
+          chat: {
+            engine: { kind: "api", connectionId: "gone" },
+            model: "",
+            effort: "",
           },
-        ],
-        permissionMode: "bypass",
-      }),
-    );
-    expect(settings.permissionMode).toBe("ask");
-    expect(settings.providers[0]).toMatchObject({
-      bypassRun: "x --yes {prompt}",
-    });
-  });
-
-  it("parses custom command permission profiles", () => {
-    const settings = parseAISettings(
-      JSON.stringify({
-        providers: [
-          {
-            id: "x",
-            label: "X",
-            type: "command",
-            run: "x {prompt}",
-            permissionProfiles: [
-              {
-                id: "read",
-                label: "Read only",
-                run: "x --read {prompt}",
-              },
-              { id: "bad" },
-            ],
-          },
-        ],
-      }),
-    );
-    expect(settings.providers[0]).toMatchObject({
-      permissionProfiles: [
-        { id: "read", label: "Read only", run: "x --read {prompt}" },
-      ],
-    });
-  });
-
-  it("bundles the current Anthropic model id", () => {
-    const provider = DEFAULT_AI_SETTINGS.providers.find(
-      (candidate) => candidate.id === "anthropic",
-    );
-    expect(provider).toMatchObject({
-      type: "http",
-      api: "anthropic",
-      model: "claude-sonnet-4-6",
-      maxTokens: 4096,
-    });
-  });
-
-  it("parses http api shape and max tokens", () => {
-    const settings = parseAISettings(
-      JSON.stringify({
-        providers: [
-          {
-            id: "a",
-            label: "A",
-            type: "http",
-            baseUrl: "u",
-            model: "m",
-            api: "anthropic",
-            maxTokens: 1234,
-          },
-          {
-            id: "b",
-            label: "B",
-            type: "http",
-            baseUrl: "u",
-            model: "m",
-            api: "bogus",
-          },
-        ],
-      }),
-    );
-    expect(settings.providers[0]).toMatchObject({
-      api: "anthropic",
-      maxTokens: 1234,
-    });
-    expect(settings.providers[1]).toMatchObject({ api: "openai" });
-  });
-});
-
-describe("http providers carry no key", () => {
-  it("parses an http provider without a key field", () => {
-    const raw = JSON.stringify({
-      providers: [
-        {
-          id: "a",
-          label: "A",
-          type: "http",
-          baseUrl: "u",
-          model: "m",
-          key: "sekret",
         },
-      ],
-    });
-    const provider = parseAISettings(raw).providers[0];
-    expect(provider).not.toHaveProperty("key");
-  });
-
-  it("ships OpenAI, Anthropic, and OpenRouter templates", () => {
-    const ids = DEFAULT_AI_SETTINGS.providers.map((provider) => provider.id);
-    expect(ids).toEqual(
-      expect.arrayContaining(["openai", "anthropic", "openrouter"]),
+      }),
     );
-    const openai = DEFAULT_AI_SETTINGS.providers.find(
-      (provider) => provider.id === "openai",
+    expect(settings.uses.chat?.engine).toEqual({
+      kind: "api",
+      connectionId: "gone",
+    });
+  });
+
+  it("keeps unknown effort/model strings and replaces non-strings", () => {
+    const settings = parseAISettings(
+      JSON.stringify({
+        version: 2,
+        uses: {
+          chat: {
+            engine: { kind: "none" },
+            model: "future-model",
+            effort: "future-effort",
+          },
+          rewrite: {
+            engine: { kind: "none" },
+            model: 42,
+            effort: null,
+          },
+        },
+      }),
     );
-    expect(openai).not.toHaveProperty("key");
-  });
-
-  it("ships Pi as an interactive terminal program", () => {
-    expect(DEFAULT_AI_SETTINGS.terminals).toContainEqual({
-      id: "pi-term",
-      label: "Pi",
-      run: "pi",
+    expect(settings.uses.chat).toMatchObject({
+      model: "future-model",
+      effort: "future-effort",
     });
+    expect(settings.uses.rewrite).toMatchObject({ model: "", effort: "" });
   });
 
-  it("parses the selected external terminal app", () => {
+  it("clamps maxContextChars", () => {
     expect(
-      parseAISettings(JSON.stringify({ terminalApp: "ghostty" })).terminalApp,
-    ).toBe("ghostty");
-    expect(
-      parseAISettings(JSON.stringify({ terminalApp: "unknown" })).terminalApp,
-    ).toBe("embedded");
-  });
-
-  it("keeps a valid quickActionProvider", () => {
-    const raw = JSON.stringify({
-      ...DEFAULT_AI_SETTINGS,
-      quickActionProvider: "openai",
-    });
-    expect(parseAISettings(raw).quickActionProvider).toBe("openai");
-  });
-
-  it("drops a quickActionProvider that names no provider", () => {
-    const raw = JSON.stringify({
-      ...DEFAULT_AI_SETTINGS,
-      quickActionProvider: "ghost",
-    });
-    expect(parseAISettings(raw).quickActionProvider).toBeUndefined();
-  });
-
-  it("leaves quickActionProvider undefined when absent", () => {
-    const raw = JSON.stringify({ ...DEFAULT_AI_SETTINGS });
-    expect(parseAISettings(raw).quickActionProvider).toBeUndefined();
-  });
-
-  it("uses the default context cap when absent or invalid", () => {
-    expect(parseAISettings("{}").maxContextChars).toBe(
-      DEFAULT_AI_SETTINGS.maxContextChars,
-    );
-    expect(
-      parseAISettings(JSON.stringify({ maxContextChars: "many" }))
+      parseAISettings(JSON.stringify({ version: 2, maxContextChars: 10 }))
         .maxContextChars,
-    ).toBe(DEFAULT_AI_SETTINGS.maxContextChars);
-  });
-
-  it("rounds and clamps the context cap", () => {
+    ).toBe(4000);
     expect(
-      parseAISettings(JSON.stringify({ maxContextChars: 50_000.7 }))
-        .maxContextChars,
-    ).toBe(50_001);
-    expect(
-      parseAISettings(JSON.stringify({ maxContextChars: 10 })).maxContextChars,
-    ).toBe(4_000);
-    expect(
-      parseAISettings(JSON.stringify({ maxContextChars: 9_000_000 }))
+      parseAISettings(JSON.stringify({ version: 2, maxContextChars: 9e9 }))
         .maxContextChars,
     ).toBe(2_000_000);
-  });
-});
-
-describe("extractLegacyKeys", () => {
-  it("pulls non-empty http keys and strips them", () => {
-    const raw = JSON.stringify({
-      providers: [
-        {
-          id: "a",
-          label: "A",
-          type: "http",
-          baseUrl: "u",
-          model: "m",
-          key: "k1",
-        },
-        {
-          id: "b",
-          label: "B",
-          type: "http",
-          baseUrl: "u",
-          model: "m",
-          key: "",
-        },
-        { id: "c", label: "C", type: "command", run: "r {prompt}" },
-      ],
-    });
-    const { cleaned, keys } = extractLegacyKeys(raw);
-    expect(keys).toEqual([{ id: "a", secret: "k1" }]);
-    expect(cleaned).not.toContain("k1");
-    expect(JSON.parse(cleaned).providers[0]).not.toHaveProperty("key");
-  });
-
-  it("returns the raw string unchanged on invalid JSON", () => {
-    expect(extractLegacyKeys("nope")).toEqual({ cleaned: "nope", keys: [] });
-  });
-
-  it("returns no keys when none are present", () => {
-    const raw = JSON.stringify({
-      providers: [{ id: "c", label: "C", type: "command", run: "r" }],
-    });
-    expect(extractLegacyKeys(raw).keys).toEqual([]);
   });
 });
 
@@ -288,8 +161,9 @@ describe("tryParseAISettings", () => {
     expect(tryParseAISettings("{ not json")).toBeNull();
     expect(tryParseAISettings("[]")).toBeNull();
   });
+
   it("parses valid JSON like parseAISettings", () => {
-    const raw = JSON.stringify({ providers: [] });
+    const raw = JSON.stringify({ version: 2, connections: [] });
     expect(tryParseAISettings(raw)).toEqual(parseAISettings(raw));
   });
 });
