@@ -65,7 +65,7 @@ export function renderUseFor(
     row.append(enabled, name);
     page.append(row);
     const controls = document.createElement("div");
-    controls.className = "st-use-controls";
+    controls.className = "st-use-controls st-use-controls-grid";
     row.append(controls);
     const note = document.createElement("div");
     note.className = "st-use-warning";

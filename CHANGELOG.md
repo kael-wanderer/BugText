@@ -49,6 +49,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- AI Use for controls now share a fitted grid with room for engine badges and gaps.
+
 - Startup persists completed v1-to-v2 AI settings migration after all legacy API
   keys transfer successfully. Malformed files and failed key transfers keep the
   original file intact for a later retry, with the v1 backup preserved.

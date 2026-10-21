@@ -108,3 +108,11 @@ it("shows rail subitems in order", () => {
     "API providers",
   ]);
 });
+
+it("puts every feature control on the shared control grid", () => {
+  const host = document.createElement("div");
+  renderUseFor(host, deps);
+  const grids = host.querySelectorAll(".st-use-controls-grid");
+  expect(grids).toHaveLength(5);
+  expect(Array.from(grids).every((grid) => grid.classList.contains("st-use-controls-grid"))).toBe(true);
+});
