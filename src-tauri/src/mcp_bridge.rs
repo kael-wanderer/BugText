@@ -8,7 +8,50 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 const NOT_RUNNING: &str = "BugText isn't running. Open it and try again.";
+const INVALID_REPLY: &str = "BugText sent an invalid reply.";
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
+
+enum CallError {
+    NotRunning,
+    Io(io::Error),
+    InvalidReply,
+    App(String),
+}
+
+impl CallError {
+    fn display(self) -> String {
+        match self {
+            Self::NotRunning => NOT_RUNNING.to_string(),
+            Self::Io(_) => "BugText couldn't complete the request.".to_string(),
+            Self::InvalidReply => INVALID_REPLY.to_string(),
+            Self::App(error) => error,
+        }
+    }
+
+    fn should_retry(&self) -> bool {
+        matches!(self, Self::Io(error) if matches!(
+            error.kind(),
+            io::ErrorKind::ConnectionReset
+                | io::ErrorKind::ConnectionAborted
+                | io::ErrorKind::BrokenPipe
+                | io::ErrorKind::UnexpectedEof
+        ))
+    }
+}
+
+fn read_error(error: io::Error) -> CallError {
+    if matches!(
+        error.kind(),
+        io::ErrorKind::ConnectionReset
+            | io::ErrorKind::ConnectionAborted
+            | io::ErrorKind::BrokenPipe
+            | io::ErrorKind::UnexpectedEof
+    ) {
+        CallError::NotRunning
+    } else {
+        CallError::Io(error)
+    }
+}
 
 pub fn socket_path(config_dir: &Path) -> Result<PathBuf, String> {
     let path = config_dir.join("mcp.sock");
@@ -51,25 +94,28 @@ pub struct SocketForward {
 impl SocketForward {
     pub fn new(path: PathBuf) -> Self { Self { path } }
 
-    fn call_once(&self, client: &str, tool: &str, args: Value) -> Result<Value, String> {
-        let mut stream = UnixStream::connect(&self.path).map_err(|_| NOT_RUNNING.to_string())?;
-        stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(|error| error.to_string())?;
-        stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(|error| error.to_string())?;
+    fn call_once(&self, client: &str, tool: &str, args: Value) -> Result<Value, CallError> {
+        let mut stream = UnixStream::connect(&self.path).map_err(|_| CallError::NotRunning)?;
+        stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
+        stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
         let id = REQUEST_ID.fetch_add(1, Ordering::Relaxed);
         let request = json!({"id":id,"client":client,"tool":tool,"args":args});
-        writeln!(stream, "{request}").map_err(|error| error.to_string())?;
-        stream.flush().map_err(|error| error.to_string())?;
+        writeln!(stream, "{request}").map_err(CallError::Io)?;
+        stream.flush().map_err(CallError::Io)?;
         let mut reader = BufReader::new(stream);
         let mut line = String::new();
-        reader.read_line(&mut line).map_err(|error| error.to_string())?;
-        let response: Value = serde_json::from_str(&line).map_err(|error| error.to_string())?;
+        let bytes = reader.read_line(&mut line).map_err(read_error)?;
+        if bytes == 0 || line.trim().is_empty() {
+            return Err(CallError::NotRunning);
+        }
+        let response: Value = serde_json::from_str(&line).map_err(|_| CallError::InvalidReply)?;
         if response.get("id").and_then(Value::as_u64) != Some(id) {
-            return Err("Invalid socket response".to_string());
+            return Err(CallError::InvalidReply);
         }
         if response.get("ok").and_then(Value::as_bool) == Some(true) {
             Ok(response.get("result").cloned().unwrap_or(Value::Null))
         } else {
-            Err(response.get("error").and_then(Value::as_str).unwrap_or("MCP request failed.").to_string())
+            Err(CallError::App(response.get("error").and_then(Value::as_str).unwrap_or("MCP request failed.").to_string()))
         }
     }
 }
@@ -77,8 +123,9 @@ impl SocketForward {
 impl Forward for SocketForward {
     fn call(&mut self, client: &str, tool: &str, args: Value) -> Result<Value, String> {
         match self.call_once(client, tool, args.clone()) {
-            Err(error) if error.contains("broken pipe") || error.contains("Broken pipe") || error.contains("Connection reset") => self.call_once(client, tool, args),
-            result => result,
+            Err(error) if error.should_retry() => self.call_once(client, tool, args).map_err(CallError::display),
+            Err(error) => Err(error.display()),
+            Ok(value) => Ok(value),
         }
     }
 }
@@ -112,9 +159,15 @@ mod tests {
     use serde_json::{json, Value};
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixListener;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static SOCKET_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     fn temp_socket(label: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!("bugtext-mcp-{label}-{}.sock", std::process::id()))
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let counter = SOCKET_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("bugtext-mcp-{label}-{}-{nanos}-{counter}.sock", std::process::id()))
     }
 
     #[test]
@@ -176,6 +229,39 @@ mod tests {
         thread.join().unwrap();
         let _ = std::fs::remove_file(path);
         assert_eq!(result.unwrap_err(), "MCP is turned off in BugText Settings ▸ AI ▸ MCP server.");
+    }
+
+    #[test]
+    fn closed_without_reply_says_not_running() {
+        let path = temp_socket("closed");
+        let listener = UnixListener::bind(&path).unwrap();
+        let thread = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream);
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+        });
+        let result = SocketForward::new(path.clone()).call("Agent", "read_note", json!({}));
+        thread.join().unwrap();
+        let _ = std::fs::remove_file(path);
+        assert_eq!(result.unwrap_err(), "BugText isn't running. Open it and try again.");
+    }
+
+    #[test]
+    fn garbage_reply_is_invalid_reply() {
+        let path = temp_socket("garbage");
+        let listener = UnixListener::bind(&path).unwrap();
+        let thread = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            writeln!(stream, "not json").unwrap();
+        });
+        let result = SocketForward::new(path.clone()).call("Agent", "read_note", json!({}));
+        thread.join().unwrap();
+        let _ = std::fs::remove_file(path);
+        assert_eq!(result.unwrap_err(), "BugText sent an invalid reply.");
     }
 
     #[test]

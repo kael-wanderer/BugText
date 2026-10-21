@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- MCP bridge now reports the app as not running when its socket closes before replying.
 - Malformed or unsupported AI settings files remain untouched at startup, and saves stay blocked until key migration succeeds.
 - The engine letter badge now sits beside the select text, keeping engine names readable in Use for.
 - AI settings saves now wait for successful keychain migration, v1 backups omit plaintext keys, key ids are normalized in the keychain, and unsupported explicit settings versions preserve the last good state.
