@@ -39,9 +39,15 @@
 
 /* ---------- Rail ---------- */
 
+/* Overlays: fixed to the viewport right of the 48px activity bar, so the
+   workbench grid underneath keeps its exact layout. */
 #settings-rail {
-  grid-area: explorer;
-  z-index: 1;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 48px;
+  width: var(--explorer-w, 240px);
+  z-index: 40;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -163,10 +169,12 @@
 /* ---------- Pane ---------- */
 
 #settings-pane {
-  /* Covers the resize handle, editor and AI columns. */
-  grid-row: 1;
-  grid-column: 3 / -1;
-  z-index: 1;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(48px + var(--explorer-w, 240px));
+  z-index: 40;
   min-width: 0;
   min-height: 0;
   padding: 34px 36px 40px;

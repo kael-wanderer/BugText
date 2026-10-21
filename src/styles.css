@@ -745,18 +745,13 @@ body.ai-hidden #ai-resize {
   display: none;
 }
 
-/* Settings screen: the rail takes the explorer column (at explorer width even
-   when the explorer is hidden) and the pane covers the editor and AI columns.
-   The workbench regions are only hidden, never removed, so editor state stays. */
+/* Settings screen: rail and pane are overlays right of the activity bar (the
+   rail at explorer width even when the explorer is hidden). The workbench grid
+   is never changed and its regions are only hidden, so editor size, scroll and
+   state stay exactly as they were. */
 #settings-rail,
 #settings-pane {
   display: none;
-}
-
-body.settings-active #app .workbench {
-  grid-template-columns:
-    48px var(--explorer-w, 240px) 0 minmax(0, 1fr)
-    0 0;
 }
 
 body.settings-active #settings-rail {

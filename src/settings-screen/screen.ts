@@ -1,6 +1,7 @@
-// Full-window settings screen: a rail in the explorer column and a pane over
-// the editor area. Opening only toggles a body class, so the editor, its tabs,
-// unsaved text, scroll and split stay mounted and come back unchanged.
+// Full-window settings screen: a rail over the explorer column and a pane over
+// the editor area, laid on top of the workbench. Opening only toggles a body
+// class; the workbench grid and editor size never change, so tabs, unsaved
+// text, scroll and split come back exactly as they were.
 
 import type { AISettings } from "../ai/aisettings";
 import type { AppIconId, Settings } from "../settings";
@@ -27,8 +28,6 @@ export type ScreenDeps = {
   getAppVersion(): Promise<string>;
   setDockIcon(id: AppIconId): Promise<void>;
   isMac: boolean;
-  /** Called after the screen opens or closes, so editors can re-measure. */
-  onLayoutChange?(): void;
 };
 
 export type SettingsPage = {
@@ -227,7 +226,6 @@ export function createSettingsScreen(deps: ScreenDeps, pages: SettingsPage[]): S
     pane.hidden = !next;
     gear?.classList.toggle("active", next);
     gear?.setAttribute("aria-pressed", String(next));
-    deps.onLayoutChange?.();
   }
 
   function openScreen(page?: SettingsPageId): void {

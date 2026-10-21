@@ -681,6 +681,8 @@ function activateTab(windowId: string, tabId: string): void {
 }
 
 function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }): void {
+  // Every document-opening path ends here: leave settings so the tab is visible.
+  settingsScreen.close();
   if (opts.path) {
     const found = findTabByPath(getState().windows, opts.path);
     if (found) {
@@ -741,6 +743,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
       renderAll();
     }
   }
+  settingsScreen.refresh(); // keeps the back link naming the active tab
   return true;
 }
 
@@ -1968,7 +1971,6 @@ const settingsScreen = createSettingsScreen(
     getAppVersion: () => getVersion(),
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
-    onLayoutChange: requestWindowMeasure,
   },
   [],
 );
@@ -2059,18 +2061,22 @@ function setSearchActive(on: boolean): void {
   const button = document.getElementById("ab-search")!;
   button.classList.toggle("active", on);
   button.setAttribute("aria-pressed", String(on));
-  if (on && !getState().explorerVisible) {
-    setState({ explorerVisible: true });
-    document.body.classList.remove("explorer-hidden");
-    const explorer = document.getElementById("ab-explorer")!;
-    explorer.classList.add("active");
-    explorer.setAttribute("aria-pressed", "true");
-  }
+  if (on) showExplorerColumn();
   requestWindowMeasure();
   if (on) {
     searchPanel.focus();
     searchPanel.refresh();
   }
+}
+
+function showExplorerColumn(): void {
+  if (getState().explorerVisible) return;
+  setState({ explorerVisible: true });
+  document.body.classList.remove("explorer-hidden");
+  const explorer = document.getElementById("ab-explorer")!;
+  explorer.classList.add("active");
+  explorer.setAttribute("aria-pressed", "true");
+  requestWindowMeasure();
 }
 
 function toggleSearch(): void {
@@ -2080,25 +2086,29 @@ function toggleSearch(): void {
 initActivityBar(
   requestWindowMeasure,
   () => {
+    // Leaving settings through a panel button shows that panel, never hides it.
+    if (!settingsScreen.isOpen()) return toggleSearch();
     settingsScreen.close();
-    toggleSearch();
+    setSearchActive(true);
   },
   () => settingsScreen.toggle(),
   () => {
+    if (!settingsScreen.isOpen()) return toggleAI();
     settingsScreen.close();
-    toggleAI();
+    setAIVisible(true);
   },
   openExportMenu,
 );
 
-// Clicking Explorer while settings is open leaves settings; it only toggles the
-// explorer when the explorer was hidden (so the click always ends on the tree).
+// Clicking Explorer while settings is open leaves settings and shows the tree.
 document.getElementById("ab-explorer")!.addEventListener(
   "click",
   (event) => {
     if (!settingsScreen.isOpen()) return;
+    event.stopImmediatePropagation();
     settingsScreen.close();
-    if (getState().explorerVisible) event.stopImmediatePropagation();
+    if (document.body.classList.contains("search-active")) setSearchActive(false);
+    showExplorerColumn();
   },
   true,
 );
