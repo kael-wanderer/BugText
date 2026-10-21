@@ -3,7 +3,7 @@
 
 import { KEYMAP_COMMANDS } from "../keymap";
 
-export type AiSubPage = "use-for" | "local-cli" | "api";
+export type AiSubPage = "use-for" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
   "general" | "editing" | "theme" | "shortcuts" | "ai";
@@ -245,6 +245,10 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     sub: "api",
     keywords: "api server",
   },
+  { id: "mcp-enabled", page: "ai", label: "MCP server", sub: "mcp", keywords: "agents socket notes bridge" },
+  { id: "mcp-claude", page: "ai", label: "Claude Code", sub: "mcp", keywords: "register connect cli" },
+  { id: "mcp-codex", page: "ai", label: "Codex CLI", sub: "mcp", keywords: "register connect cli" },
+  { id: "mcp-activity", page: "ai", label: "Recent agent activity", sub: "mcp", keywords: "history events" },
 ];
 
 export type SearchHit = {

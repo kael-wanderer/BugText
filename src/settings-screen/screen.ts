@@ -121,6 +121,7 @@ export function createSettingsScreen(
         ["use-for", "Use for", "FEATURES"],
         ["local-cli", "Local CLI", "ENGINES"],
         ["api", "API providers", ""],
+        ["mcp", "MCP server", "AGENTS"],
       ] as const) {
         if (section) {
           const heading = document.createElement("div");

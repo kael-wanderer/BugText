@@ -94,6 +94,14 @@ connection presets, model discovery and text-model tests. UI key badges use
 `has_secret`; key inputs are never prefilled. Connection addresses require HTTPS,
 except loopback HTTP. Changing an address clears its key and cached models.
 
+The MCP bridge runs as `--mcp` on stdio and forwards tool calls over a private
+Unix socket to the running app. Rust confines every path to reported open folders,
+routes requests to the owning native window, and answers file listings; webviews
+read live tabs, snapshot and save edits, and report recent activity. The socket is
+available only while `settings.json` has `mcp.enabled: true`; Settings ▸ AI ▸ MCP
+server also manages terminal client registration.
+`codex exec` requires per-tool approval before using MCP tools.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,

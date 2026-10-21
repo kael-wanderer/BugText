@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listFilesRecursive } from "../filesys";
-import { buildIndex, chunkDocument, retrieve, type Chunk } from "./retrieval";
+import { buildIndex, chunkDocument, retrieve, retrieveScored, type Chunk } from "./retrieval";
 
 const TEXT_EXT = /\.(md|markdown|txt)$/i;
 const MAX_BYTES = 1_000_000;
@@ -54,6 +54,14 @@ export function createWorkspaceIndex() {
         building = null;
       }
       return retrieve(index, q, k, excludePath);
+    },
+    async queryScored(folder: string, q: string, k: number, excludePath?: string): Promise<{ chunk: Chunk; score: number }[]> {
+      if (builtFolder !== folder) {
+        if (!building) building = build(folder);
+        await building;
+        building = null;
+      }
+      return retrieveScored(index, q, k, excludePath);
     },
     onFileChanged(path: string, text: string): void {
       if (!builtFolder || !TEXT_EXT.test(path)) return;

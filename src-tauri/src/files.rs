@@ -418,6 +418,41 @@ pub fn save_file(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
+    use std::io::Write;
+
+    let target = Path::new(&path);
+    let parent = target.parent().ok_or_else(|| "Invalid file path".to_string())?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let name = target.file_name().ok_or_else(|| "Invalid file path".to_string())?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let temporary = parent.join(format!(
+        ".{}.bugtext-tmp-{}-{nonce}",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+
+    let result = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| error.to_string())?;
+        file.write_all(contents.as_bytes())
+            .map_err(|error| error.to_string())?;
+        file.sync_all().map_err(|error| error.to_string())?;
+        fs::rename(&temporary, target).map_err(|error| error.to_string())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+#[tauri::command]
 pub fn save_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
     fs::write(&path, bytes).map_err(|error| error.to_string())
 }
@@ -543,6 +578,28 @@ mod tests {
         assert_eq!(count_words("  one   two\tthree\n"), 3);
         assert_eq!(count_words(""), 0);
         assert_eq!(count_words("   "), 0);
+    }
+}
+
+#[cfg(test)]
+mod atomic_write_tests {
+    use super::write_file_atomic;
+    use std::fs;
+
+    #[test]
+    fn atomic_write_replaces_and_leaves_no_temp() {
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-atomic-write-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.md");
+        fs::write(&path, "old").unwrap();
+        write_file_atomic(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(dir).unwrap();
     }
 }
 
