@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 const NOT_RUNNING: &str = "BugText isn't running. Open it and try again.";
+const TURNED_OFF: &str = "MCP is turned off in BugText Settings ▸ AI ▸ MCP server.";
 const INVALID_REPLY: &str = "BugText sent an invalid reply.";
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -47,6 +48,16 @@ impl CallError {
 }
 
 fn read_error(error: io::Error) -> CallError { CallError::Io(error) }
+
+fn connect_failure(config_dir: &Path) -> CallError {
+    let settings = fs::read_to_string(config_dir.join("settings.json"))
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok());
+    match settings {
+        Some(settings) if settings.get("mcp").and_then(|mcp| mcp.get("enabled")).and_then(Value::as_bool) != Some(true) => CallError::App(TURNED_OFF.to_string()),
+        _ => CallError::NotRunning,
+    }
+}
 
 pub fn socket_path(config_dir: &Path) -> Result<PathBuf, String> {
     let path = config_dir.join("mcp.sock");
@@ -92,7 +103,8 @@ impl SocketForward {
 
     fn call_once(&mut self, client: &str, tool: &str, args: Value) -> Result<Value, CallError> {
         if self.stream.is_none() {
-            let stream = UnixStream::connect(&self.path).map_err(|_| CallError::NotRunning)?;
+            let config_dir = self.path.parent().unwrap_or_else(|| Path::new("."));
+            let stream = UnixStream::connect(&self.path).map_err(|_| connect_failure(config_dir))?;
             stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
             stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
             self.stream = Some(stream);
@@ -178,6 +190,31 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let result = SocketForward::new(path).call("Agent", "read_note", json!({}));
         assert_eq!(result.unwrap_err(), "BugText isn't running. Open it and try again.");
+    }
+
+    #[test]
+    fn connect_failure_reports_turned_off_when_setting_is_false() {
+        let config = temp_socket("settings-off");
+        std::fs::create_dir_all(&config).unwrap();
+        std::fs::write(config.join("settings.json"), r#"{"mcp":{"enabled":false}}"#).unwrap();
+        let result = SocketForward::new(config.join("mcp.sock")).call("Agent", "read_note", json!({}));
+        let _ = std::fs::remove_dir_all(config);
+        assert_eq!(result.unwrap_err(), "MCP is turned off in BugText Settings ▸ AI ▸ MCP server.");
+    }
+
+    #[test]
+    fn connect_failure_reports_not_running_when_enabled_or_settings_missing() {
+        for (label, settings) in [
+            ("settings-on", Some(r#"{"mcp":{"enabled":true}}"#)),
+            ("settings-missing", None),
+        ] {
+            let config = temp_socket(label);
+            std::fs::create_dir_all(&config).unwrap();
+            if let Some(settings) = settings { std::fs::write(config.join("settings.json"), settings).unwrap(); }
+            let result = SocketForward::new(config.join("mcp.sock")).call("Agent", "read_note", json!({}));
+            let _ = std::fs::remove_dir_all(config);
+            assert_eq!(result.unwrap_err(), "BugText isn't running. Open it and try again.");
+        }
     }
 
     #[test]
