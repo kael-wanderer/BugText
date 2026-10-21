@@ -994,3 +994,61 @@
   display: block;
   margin: 14px 0 0 auto;
 }
+
+.st-api-row {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.st-api-host {
+  font-family: var(--font-mono);
+  font-size: var(--st-t-xs);
+  color: var(--muted);
+  margin: 5px 0;
+}
+.st-api-page [data-setting="api-add"] {
+  margin: 20px 0;
+}
+.st-connection-editor {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--st-surface);
+}
+.st-connection-presets,
+.st-quick-fill {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.st-connection-presets [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.st-connection-field {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.st-connection-field input,
+.st-connection-field select {
+  width: 100%;
+  min-width: 0;
+}
+.st-connection-field[hidden],
+.st-quick-fill[hidden] {
+  display: none;
+}
+.st-connection-field .st-note,
+.st-connection-field .st-btn {
+  grid-column: 2;
+  justify-self: start;
+}
+.st-field-error {
+  color: var(--st-danger);
+  font-size: var(--st-t-sm);
+}

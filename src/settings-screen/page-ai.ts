@@ -1,6 +1,7 @@
 import type { CliInfo } from "../ai/engines";
 import { pageHeader } from "./controls";
 import { renderLocalCli } from "./page-ai-local-cli";
+import { renderApi } from "./page-ai-api";
 import { renderUseFor } from "./page-ai-use-for";
 import type { SettingsPage } from "./screen";
 export type AiPageDeps = {
@@ -14,11 +15,6 @@ export const aiPage: SettingsPage = {
     pageHeader(host, "ai");
     if (sub === "use-for") renderUseFor(host, deps);
     else if (sub === "local-cli") renderLocalCli(host, deps);
-    else {
-      // Temporary route placeholders; Task 9 supplies the API providers page.
-      const heading = document.createElement("h3");
-      heading.textContent = "API providers";
-      host.append(heading);
-    }
+    else renderApi(host, deps);
   },
 };

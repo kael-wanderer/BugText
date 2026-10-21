@@ -1,22 +1,42 @@
-import { describe, expect, it } from "vitest";
-import { connectionDetail } from "../ai/client";
-
-describe("connectionDetail", () => {
-  it("accepts successful responses", () => {
-    expect(connectionDetail(200, "")).toEqual({ ok: true, detail: "OK" });
+import { beforeEach, expect, it, vi } from "vitest";
+import { listModels } from "../ai/connections";
+import type { Connection } from "../ai/aisettings";
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue("secret"),
+}));
+const c: Connection = {
+  id: "x",
+  name: "X",
+  provider: "openai",
+  baseUrl: "https://api.openai.com/v1",
+  auth: "bearer",
+  textModel: "m",
+};
+beforeEach(() => vi.restoreAllMocks());
+it("explains rejected keys", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("secret", { status: 401 }),
+  );
+  expect(await listModels(c)).toEqual({
+    ok: false,
+    message: "The key was rejected.",
   });
-
-  it("explains rejected credentials and missing endpoints", () => {
-    expect(connectionDetail(401, "nope").detail).toContain(
-      "The key was rejected.",
-    );
-    expect(connectionDetail(404, "nope").detail).toContain("No such endpoint");
+});
+it("explains missing endpoints", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("secret", { status: 404 }),
+  );
+  expect(await listModels(c)).toEqual({
+    ok: false,
+    message: "No such endpoint — check the server address.",
   });
-
-  it("includes the status without leaking response text", () => {
-    const result = connectionDetail(500, "boom");
-    expect(result.ok).toBe(false);
-    expect(result.detail).toContain("500");
-    expect(result.detail).not.toContain("boom");
+});
+it("reports server status without leaking response bodies", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("secret", { status: 500 }),
+  );
+  expect(await listModels(c)).toEqual({
+    ok: false,
+    message: "Server answered 500.",
   });
 });

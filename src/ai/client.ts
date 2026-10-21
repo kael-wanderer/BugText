@@ -7,7 +7,7 @@ import {
   type Provider,
   type UseRow,
 } from "./aisettings";
-import { streamConnection, testTextModel } from "./connections";
+import { streamConnection } from "./connections";
 import { runCli } from "./cli-runner";
 import { chatContentText, type ChatMessage } from "./providers";
 type Options = {
@@ -136,30 +136,6 @@ function legacyConnection(p: Extract<Provider, { type: "http" }>): Connection {
     textModel: p.model,
   };
 }
-export async function testConnection(
-  p: Extract<Provider, { type: "http" }>,
-): Promise<{ ok: boolean; detail: string }> {
-  const result = await testTextModel(legacyConnection(p), p.model);
-  return { ok: result.ok, detail: result.message };
-}
 export function cancelCommandRun(requestId: string): Promise<void> {
   return invoke("ai_cancel", { requestId });
-}
-
-// Temporary legacy test/settings adapter; remove with Tasks 9/10.
-export function connectionDetail(
-  status: number,
-  _bodyText: string,
-): { ok: boolean; detail: string } {
-  return {
-    ok: status >= 200 && status < 300,
-    detail:
-      status >= 200 && status < 300
-        ? "OK"
-        : status === 401
-          ? "The key was rejected."
-          : status === 404
-            ? "No such endpoint — check the server address."
-            : `Server answered ${status}.`,
-  };
 }

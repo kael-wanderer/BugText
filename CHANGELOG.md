@@ -39,6 +39,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- API connection key badges now read the OS keychain. Changing a server address
+  clears its saved key and model cache before the updated connection is saved.
+
 - Coding CLI runs use a folder sandbox with private temporary files, restricted
   environment variables, and the system reads required for CLI sign-in and startup.
 
