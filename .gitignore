@@ -34,7 +34,5 @@ docs/
 images/*
 # ...except the icons bundled into the app at build time
 !images/agent.png
-!images/excalidraw.png
-!images/mindmap.png
 !images/screenshots/
 !images/screenshots/bugtext-main.png

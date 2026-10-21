@@ -18,6 +18,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Removed
 
+- Excalidraw boards and jsMind mindmaps. `.excalidraw` and `.mind` files now open as plain text.
 - Dead code: the unused `saveFile` helper in `src/files.ts` (the save path goes
   through `pickSavePath` + `writeFile`) and the unused `toCanvas` export in
   `src/capture.ts`.

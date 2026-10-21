@@ -16,19 +16,11 @@ describe("exportOptionsFor", () => {
     ]);
   });
 
-  it("offers PNG and SVG for HTML and Excalidraw", () => {
+  it("offers PNG and SVG for HTML", () => {
     expect(formats(exportOptionsFor("page.html"))).toEqual([
       "img-png",
       "img-svg",
     ]);
-    expect(formats(exportOptionsFor("board.excalidraw"))).toEqual([
-      "img-png",
-      "img-svg",
-    ]);
-  });
-
-  it("offers PNG only for mindmaps", () => {
-    expect(formats(exportOptionsFor("map.mind"))).toEqual(["img-png"]);
   });
 
   it("offers nothing for PDF documents", () => {

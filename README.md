@@ -3,7 +3,7 @@
 A fast, lightweight markdown editor built with Tauri 2 + Rust and a plain-TypeScript
 frontend. BugText is an IDE-style workspace for markdown: a file explorer, split
   windows, a command palette, rich preview (mermaid, math, raw HTML), a built-in AI
-panel, a PDF reader, editable Excalidraw and mindmap boards, and document export.
+panel, a PDF reader, and document export.
 
 **License:** MIT · **Identifier:** `com.kael.bugtext`
 
@@ -27,7 +27,7 @@ panel, a PDF reader, editable Excalidraw and mindmap boards, and document export
   (split, move between windows, close variants, copy paths).
 - **Command palette** — `⌘K` to fuzzy-find files or run commands.
 - **Search** — in-editor find (`⌘F`) and **Find in Folder** (`⌘⇧F`): content search
-  across text files plus the text inside `.mind` / `.excalidraw` drawings, with
+  across text files, with
   results grouped by file (click to open at the line).
 - **Customizable keyboard shortcuts** — the **Keys** settings tab (or **View →
   Keyboard Shortcuts**) lists every command; rebind, reset, or restore defaults.
@@ -52,13 +52,6 @@ panel, a PDF reader, editable Excalidraw and mindmap boards, and document export
   (tesseract.js, configurable language such as `eng` or `eng+vie`) for scanned pages.
   Edits draft locally until saved; the original is backed up to a hidden
   `.bugtext-pdf-backups/` folder before Save / Save As.
-- **Excalidraw boards** — open and edit `.excalidraw` files in a focused full-pane
-  canvas. Boards use the normal tab, save, dirty-close, and session workflows.
-- **Mindmap boards** — open and edit `.mind` files (jsMind) with an on-board toolbar:
-  add / rename / delete nodes, and format a selected node's shape (rect / rounded /
-  pill / circle), fill & text color, font size, and bold. Styling is saved in the
-  `.mind` file. Select several nodes at once with shift/⌘-click or a marquee drag and
-  delete them in one step (Delete/Backspace or the toolbar); Escape clears selection.
 - **AI panel** — a right-side assistant with a **Chat** tab (provider + permission-mode
   selectors, document/selection context, file attachments via 📎 / drag-drop /
   `@`-mention, streamed replies, copy / insert-at-cursor / apply-as-diff) and a
@@ -167,12 +160,6 @@ src/
   pdf-selection-edit.ts  selection-to-edit geometry helpers
   pdf-direct-rewrite.ts  in-document text rewrite path
   pdf-ocr.ts       per-page OCR via tesseract.js
-  excalidraw-document.ts Excalidraw JSON validation and serialization
-  excalidrawview.ts lazy board-only runtime loader
-  mindmap-document.ts jsMind node_tree validation and serialization
-  mindmap-style.ts pure per-node style helpers (shape/color/size)
-  mindmap-selection.ts pure multi-select math (toggle, marquee, subtree filter)
-  mindmapview.ts   lazy jsMind board (node + format toolbars, multi-select, screenshot)
   recovery-policy.ts pure recovery decisions (ids, conflict, retention)
   recovery.ts      draft autosave, crash restore, external-change detection, snapshots
   historyview.ts   version-history panel (list / compare / restore)
@@ -191,10 +178,6 @@ src-tauri/src/
   native_windows.rs independent Tauri window creation and focused-window routing
   macos_dock.rs     macOS Dock context-menu New Window integration
 ```
-
-Excalidraw 0.18.0 and its React boundary are shipped as a pinned, self-contained
-module under `public/vendor/excalidraw`. It is requested only when a board opens, so
-the plain-TypeScript startup bundle does not load React.
 
 ## Configuring signed updates
 

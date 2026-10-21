@@ -13,8 +13,6 @@ const BY_EXTENSION: Record<string, string> = {
   yml: "yaml",
   sql: "sql",
   pdf: "pdf",
-  excalidraw: "excalidraw",
-  mind: "mind",
 };
 
 export function fileIcon(name: string, isDir: boolean): string {
@@ -33,7 +31,5 @@ export const FILE_ICON_TEXT: Readonly<Record<string, string>> = {
   yaml: "YML",
   sql: "SQL",
   pdf: "PDF",
-  excalidraw: "EX",
-  mind: "M",
   file: "·",
 };

@@ -25,22 +25,6 @@ Vite
   License: MIT
   https://github.com/vitejs/vite
 ================================================================================
-Excalidraw 0.18.0
-  License: MIT
-  https://github.com/excalidraw/excalidraw
-================================================================================
-React and ReactDOM 19
-  License: MIT
-  https://github.com/facebook/react
-================================================================================
-jsMind 0.9.1
-  License: BSD-3-Clause
-  https://github.com/hizzgdev/jsmind
-================================================================================
-dom-to-image
-  License: MIT
-  https://github.com/tsayen/dom-to-image
-================================================================================
 
 Full license texts are available in each package's distribution under
 node_modules/<package>/ and in the respective Cargo crate sources.

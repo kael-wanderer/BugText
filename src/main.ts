@@ -50,9 +50,7 @@ import { markdownOutline } from "./outline";
 import { addRecent, loadRecent, saveRecent } from "./recent";
 import { breadcrumbsPath, joinPath, relativePath } from "./paths";
 import {
-  isExcalidrawFile,
   isHtmlFile,
-  isMindmapFile,
   isPdfFile,
   fileLanguageInfo,
   normalizeDocumentViewMode,
@@ -384,7 +382,6 @@ const handlers = {
     setState({ activeWindowId: wid });
     void doOpen();
   },
-  onResetMindmap: (wid: string) => void resetMindmap(wid),
   onThemeChange: (theme: ThemeName) => setMenuTheme(theme),
   getTheme: () => currentSettings.theme,
   onEditorContextMenu: (wid: string, x: number, y: number) => {
@@ -708,7 +705,6 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
     });
   }
   if (windowId === getState().activeWindowId && tabId === w.activeTabId) {
-    if (isExcalidrawFile(t?.path ?? t?.name) || isMindmapFile(t?.path ?? t?.name)) return;
     schedulePreview(windowId, tabId, text);
   }
 }
@@ -953,12 +949,6 @@ function newDoc(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "Untitled", text: "" });
 }
 
-function newBoard(kind: "excalidraw" | "mind"): void {
-  const name =
-    kind === "excalidraw" ? "Untitled.excalidraw" : "Untitled.mind";
-  openInWindow(getState().activeWindowId, { path: null, name, text: "" });
-}
-
 async function doSave(saveAs = false): Promise<void> {
   const t = activeMeta();
   if (!t) return;
@@ -1154,9 +1144,7 @@ async function checkActiveForExternalChange(windowId: string): Promise<void> {
 
 // Clean tabs are compared against the file's actual text rather than a cached
 // mtime/size: a stale or failed stat used to leave a tab permanently stale, and
-// re-reading the handful of open files is cheap. Board documents are skipped —
-// their serialized text differs harmlessly from disk and reloading would reset
-// the canvas mid-edit.
+// re-reading the handful of open files is cheap.
 async function refreshCleanOpenFilesFromDisk(): Promise<void> {
   for (const windowState of getState().windows) {
     const view = views.get(windowState.id);
@@ -1164,13 +1152,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
 
     for (const tab of windowState.tabs) {
       if (!tab.path || tab.dirty) continue;
-      if (
-        isPdfFile(tab.path) ||
-        isExcalidrawFile(tab.path) ||
-        isMindmapFile(tab.path)
-      ) {
-        continue;
-      }
+      if (isPdfFile(tab.path)) continue;
       let text: string;
       try {
         text = await invoke<string>("read_file", { path: tab.path });
@@ -1245,22 +1227,6 @@ function openDraft(draft: DraftRecord): void {
   }
 }
 
-async function resetMindmap(windowId: string): Promise<void> {
-  const windowState = getWindow(windowId);
-  const tab = windowState?.tabs.find((item) => item.id === windowState.activeTabId);
-  if (!tab || !isMindmapFile(tab.path ?? tab.name)) return;
-  const approved = await confirm("Reset this mindmap to a new central idea?", {
-    title: "Reset mindmap",
-    kind: "warning",
-  });
-  if (!approved) return;
-  setState({ activeWindowId: windowId });
-  const view = views.get(windowId);
-  if (!view) return;
-  view.editor.setText("");
-  view.renderPreview("", tab.path ?? tab.name);
-}
-
 function exportError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -1306,11 +1272,6 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
 
 async function captureActive(): Promise<HTMLCanvasElement> {
   const tab = activeMeta()!;
-  if (isMindmapFile(tab.path ?? tab.name) || isExcalidrawFile(tab.path ?? tab.name)) {
-    const board = activeView().captureBoard();
-    if (board) return board.png();
-    throw new Error("The board is still loading.");
-  }
   const text = activeView().editor.getText(tab.id);
   const capture = await import("./capture");
   if (isHtmlFile(tab.path ?? tab.name)) {
@@ -1326,14 +1287,6 @@ async function activeSvg(): Promise<string> {
   const tab = activeMeta();
   if (!tab) throw new Error("No document is active.");
   const name = tab.path ?? tab.name;
-  const board = activeView().captureBoard();
-  if (isExcalidrawFile(name)) {
-    if (board?.svg) return board.svg();
-    throw new Error("The Excalidraw board is still loading.");
-  }
-  if (isMindmapFile(name)) {
-    throw new Error("SVG export is not available for mindmaps.");
-  }
   const text = activeView().editor.getText(tab.id);
   const capture = await import("./capture");
   if (isHtmlFile(name)) return capture.htmlToSvg(text);
@@ -2012,12 +1965,7 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
         activeView().openPdfPage(page);
         return;
       }
-      if (
-        tab &&
-        !isPdfFile(name) &&
-        !isExcalidrawFile(name) &&
-        !isMindmapFile(name)
-      ) {
+      if (tab && !isPdfFile(name)) {
         activeView().editor.gotoLine(line);
       }
     });
@@ -2053,7 +2001,6 @@ initActivityBar(
   (x, y) => settingsPanel.open(x, y),
   toggleAI,
   openExportMenu,
-  newBoard,
 );
 
 // Clicking Explorer while search is open should just return to the tree.

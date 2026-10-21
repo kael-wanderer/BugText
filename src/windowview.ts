@@ -7,10 +7,8 @@ import {
   htmlPreviewLayout,
   htmlWithBaseHref,
   htmlWithPreviewZoom,
-  isExcalidrawFile,
   isHtmlFile,
   isMarkdownFile,
-  isMindmapFile,
   isPdfFile,
   isSqlFile,
   normalizeDocumentViewMode,
@@ -53,7 +51,6 @@ export type WindowHandlers = {
   onPdfEditDirtyChange: (windowId: string, tabId: string, dirty: boolean) => void;
   onSave: (windowId: string) => void;
   onOpen: (windowId: string) => void;
-  onResetMindmap: (windowId: string) => void;
   onThemeChange: (theme: ThemeName) => void;
   getTheme: () => ThemeName;
   onEditorContextMenu: (windowId: string, x: number, y: number) => void;
@@ -67,10 +64,6 @@ export type WindowView = {
   adjustFocusedZoom: (delta: number) => void;
   resetFocusedZoom: () => void;
   requestMeasure: () => void;
-  captureBoard: () => {
-    png: () => Promise<HTMLCanvasElement>;
-    svg?: () => Promise<string>;
-  } | null;
   focus: () => void;
   destroy: () => void;
   setLineNumbersFlag: (on: boolean) => void;
@@ -192,16 +185,7 @@ export function createWindowView(
   let previewCanvas: HTMLElement | null = null;
   let htmlPreviewContentSize: { width: number; height: number } | null = null;
   let lastMode: ViewMode | null = null;
-  let boardDestroy: (() => void) | null = null;
-  let boardCapture: {
-    png: () => Promise<HTMLCanvasElement>;
-    svg?: () => Promise<string>;
-  } | null = null;
-  let boardZoom: {
-    zoomBy: (delta: number) => void;
-    reset: () => void;
-  } | null = null;
-  let boardRenderToken = 0;
+  let previewRenderToken = 0;
   const findBar = root.querySelector<HTMLElement>(".preview-find")!;
   const findInput = findBar.querySelector<HTMLInputElement>("input")!;
   const findStatus =
@@ -334,7 +318,6 @@ export function createWindowView(
     if (!w) return;
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     const activeName = active?.path ?? active?.name;
-    const isBoard = isExcalidrawFile(activeName) || isMindmapFile(activeName);
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
     const language = fileLanguageInfo(activeName);
@@ -345,7 +328,6 @@ export function createWindowView(
       "window-mode-split",
     );
     root.classList.add(`window-mode-${effectiveMode}`);
-    root.classList.toggle("window-document-board", isBoard);
     // Drop any seam-resize inline flex outside split mode so the single visible
     // pane fills the row instead of keeping its split width.
     if (effectiveMode !== "split") {
@@ -449,17 +431,13 @@ export function createWindowView(
     previewPathOrName = pathOrName;
     if (isPdfFile(pathOrName)) {
       const pdfTabId = getWindow(windowId)?.activeTabId;
-      const token = ++boardRenderToken;
-      boardDestroy?.();
-      boardDestroy = null;
-      boardCapture = null;
-      boardZoom = null;
+      const token = ++previewRenderToken;
       previewFrame = null;
       previewCanvas = null;
       htmlPreviewContentSize = null;
       pdfFind?.destroy();
       pdfFind = null;
-      previewPane.innerHTML = '<div class="board-loading">Loading PDF…</div>';
+      previewPane.innerHTML = '<div class="preview-loading">Loading PDF…</div>';
       wsWords.textContent = "PDF";
       void renderPdf(previewPane, pathOrName!, {
         initialPage: pdfTargetPage,
@@ -471,7 +449,7 @@ export function createWindowView(
         },
       })
         .then((handle) => {
-          if (token !== boardRenderToken) {
+          if (token !== previewRenderToken) {
             handle.destroy();
             return;
           }
@@ -480,106 +458,13 @@ export function createWindowView(
           if (!findBar.classList.contains("hidden") && findInput.value) runFind();
         })
         .catch((error) => {
-          if (token !== boardRenderToken) return;
+          if (token !== previewRenderToken) return;
           previewPane.textContent =
             error instanceof Error ? error.message : String(error);
         });
       return;
     }
-    if (isExcalidrawFile(pathOrName)) {
-      previewFrame = null;
-      previewCanvas = null;
-      htmlPreviewContentSize = null;
-      const token = ++boardRenderToken;
-      boardDestroy?.();
-      boardDestroy = null;
-      boardCapture = null;
-      boardZoom = null;
-      previewPane.innerHTML =
-        '<div class="board-loading">Loading Excalidraw…</div>';
-      wsWords.textContent = "Excalidraw board";
-      // Board changes are debounced, so a flush can land after the user switched
-      // tabs — write to the board's own tab, never whichever tab is now active.
-      const boardTabId = getWindow(windowId)?.activeTabId;
-      void import("./excalidrawview")
-        .then(({ mountExcalidrawBoard }) =>
-          mountExcalidrawBoard(previewPane, text, (serialized) => {
-            if (boardTabId) editor.setTextFor(boardTabId, serialized);
-          }),
-        )
-        .then((handle) => {
-          if (token !== boardRenderToken) {
-            handle.destroy();
-            return;
-          }
-          boardDestroy = handle.destroy;
-          boardCapture = {
-            png: handle.exportPng,
-            svg: handle.exportSvg,
-          };
-          boardZoom = null;
-        })
-        .catch((error) => {
-          if (token !== boardRenderToken) return;
-          previewPane.innerHTML = "";
-          const message = document.createElement("div");
-          message.className = "board-error";
-          message.textContent =
-            error instanceof Error ? error.message : String(error);
-          previewPane.appendChild(message);
-        });
-      return;
-    }
-    if (isMindmapFile(pathOrName)) {
-      previewFrame = null;
-      previewCanvas = null;
-      htmlPreviewContentSize = null;
-      const token = ++boardRenderToken;
-      boardDestroy?.();
-      boardDestroy = null;
-      boardCapture = null;
-      boardZoom = null;
-      previewPane.innerHTML = '<div class="board-loading">Loading mindmap…</div>';
-      wsWords.textContent = "Mindmap";
-      void import("./mindmapview")
-        .then(({ mountMindmapBoard }) =>
-          mountMindmapBoard(
-            previewPane,
-            text,
-            (serialized) => editor.setText(serialized),
-            () => h.onOpen(windowId),
-            () => h.onSave(windowId),
-            () => h.onResetMindmap(windowId),
-          ),
-        )
-        .then((handle) => {
-          if (token !== boardRenderToken) {
-            handle.destroy();
-            return;
-          }
-          boardDestroy = handle.destroy;
-          boardCapture = { png: handle.capture };
-          boardZoom = {
-            zoomBy: handle.zoomBy,
-            reset: handle.resetZoom,
-          };
-        })
-        .catch((error) => {
-          if (token !== boardRenderToken) return;
-          previewPane.innerHTML = "";
-          const message = document.createElement("div");
-          message.className = "board-error";
-          message.textContent =
-            error instanceof Error ? error.message : String(error);
-          previewPane.appendChild(message);
-        });
-      return;
-    }
-    boardRenderToken += 1;
-    boardDestroy?.();
-    boardDestroy = null;
-    boardCapture = null;
-    boardZoom = null;
+    previewRenderToken += 1;
     previewFrame = null;
     previewCanvas = null;
     htmlPreviewContentSize = null;
@@ -794,11 +679,6 @@ export function createWindowView(
     render,
     renderPreview,
     adjustFocusedZoom: (delta) => {
-      if (isMindmapFile(previewPathOrName)) {
-        boardZoom?.zoomBy(delta);
-        return;
-      }
-      if (isExcalidrawFile(previewPathOrName)) return;
       if (zoomTarget() === "editor") {
         setEditorZoom(editorZoom + delta);
       } else {
@@ -806,11 +686,6 @@ export function createWindowView(
       }
     },
     resetFocusedZoom: () => {
-      if (isMindmapFile(previewPathOrName)) {
-        boardZoom?.reset();
-        return;
-      }
-      if (isExcalidrawFile(previewPathOrName)) return;
       if (zoomTarget() === "editor") {
         setEditorZoom(1);
       } else {
@@ -818,19 +693,12 @@ export function createWindowView(
       }
     },
     requestMeasure: () => editor.requestMeasure(),
-    captureBoard: () => boardCapture,
     focus: () => {
-      if (isExcalidrawFile(previewPathOrName) || isMindmapFile(previewPathOrName)) {
-        focusedPane = "preview";
-        previewPane.focus();
-        return;
-      }
       focusedPane = "editor";
       editor.focus();
     },
     destroy: () => {
-      boardRenderToken += 1;
-      boardDestroy?.();
+      previewRenderToken += 1;
       previewResizeObserver.disconnect();
       root.remove();
     },

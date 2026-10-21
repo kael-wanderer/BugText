@@ -1,10 +1,5 @@
 import { getState, setState } from "./store";
 import { glyphs } from "./glyphs";
-import excalidrawIconUrl from "../images/excalidraw.png";
-import mindmapIconUrl from "../images/mindmap.png";
-
-const maskIcon = (url: string): string =>
-  `<span class="ab-img-icon" style="-webkit-mask-image:url(${url});mask-image:url(${url})" aria-hidden="true"></span>`;
 
 export function initActivityBar(
   onLayoutChange: () => void = () => {},
@@ -12,7 +7,6 @@ export function initActivityBar(
   onSettings: (x: number, y: number) => void = () => {},
   onAI: () => void = () => {},
   onExport: (x: number, y: number) => void = () => {},
-  onNewBoard: (kind: "excalidraw" | "mind") => void = () => {},
 ): void {
   const explorerButton = document.getElementById("ab-explorer")!;
   explorerButton.innerHTML = glyphs.explorer;
@@ -24,14 +18,6 @@ export function initActivityBar(
   const aiButton = document.getElementById("ab-ai")!;
   aiButton.innerHTML = glyphs.ai;
   aiButton.addEventListener("click", onAI);
-
-  const excalidrawButton = document.getElementById("ab-excalidraw")!;
-  excalidrawButton.innerHTML = maskIcon(excalidrawIconUrl);
-  excalidrawButton.addEventListener("click", () => onNewBoard("excalidraw"));
-
-  const mindmapButton = document.getElementById("ab-mindmap")!;
-  mindmapButton.innerHTML = maskIcon(mindmapIconUrl);
-  mindmapButton.addEventListener("click", () => onNewBoard("mind"));
 
   const exportButton = document.getElementById("ab-export")!;
   exportButton.innerHTML = glyphs.export;

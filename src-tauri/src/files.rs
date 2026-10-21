@@ -113,44 +113,8 @@ pub struct SearchOptions {
 const SEARCH_HIT_CAP: usize = 500;
 const SEARCH_FILE_BYTES: u64 = 2_000_000;
 
-fn collect_json_text(value: &serde_json::Value, out: &mut Vec<String>) {
-    match value {
-        serde_json::Value::Object(map) => {
-            for (key, child) in map {
-                if (key == "topic" || key == "text") && child.is_string() {
-                    if let Some(text) = child.as_str() {
-                        if !text.trim().is_empty() {
-                            out.push(text.to_string());
-                        }
-                    }
-                }
-                collect_json_text(child, out);
-            }
-        }
-        serde_json::Value::Array(items) => {
-            for child in items {
-                collect_json_text(child, out);
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Searchable text for a file. Drawings (.mind/.excalidraw) yield only their
-/// node/element text; other files are read as UTF-8 (binaries fail and are skipped).
+/// Searchable text for a file: read as UTF-8 (binaries fail and are skipped).
 fn searchable_text(path: &Path) -> Option<String> {
-    let ext = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    if ext == "mind" || ext == "excalidraw" {
-        let raw = fs::read_to_string(path).ok()?;
-        let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        let mut texts = Vec::new();
-        collect_json_text(&value, &mut texts);
-        return Some(texts.join("\n"));
-    }
     fs::read_to_string(path).ok()
 }
 

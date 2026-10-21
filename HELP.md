@@ -1,7 +1,7 @@
 # BugText Help
 
 BugText is a lightweight document workspace for Markdown, HTML, code/config files,
-PDFs, Excalidraw boards, and visual mindmaps.
+and PDFs.
 
 ## Windows and panes
 
@@ -17,7 +17,6 @@ pane. Main and Sub have independent tabs and view modes.
 - **Markdown and HTML:** Editor, Read, or Editor + Preview.
 - **PDF:** read-only, with zoom (see Preview zoom below).
 - **TypeScript, JavaScript, JSON, YAML/YML, and other text/config files:** Editor-only.
-- **Excalidraw and Mindmap:** focused full-pane visual editors.
 
 ## Preview zoom
 
@@ -58,29 +57,13 @@ Use `⌘K` and choose **Snapshot Now** or **Show Version History** for saved fil
 History can compare an older snapshot with the current buffer or restore it as
 unsaved edits.
 
-## Mindmaps
-
-Open or create a `.mind` file to use the visual mindmap editor.
-
-- Add a child or sibling, rename, delete, and drag nodes to reorder or reparent.
-- New nodes are text-only by default.
-- Optional node shapes include rectangle, rounded, pill, and circle.
-- Adjust fill/text color, font size, and bold.
-- Use the board’s Open, Save, Reset, and zoom controls.
-
-## Excalidraw
-
-Open a `.excalidraw` file to edit it as a full-pane board. Normal Save, Save As,
-dirty-close confirmation, tabs, and session workflows still apply.
-
 ## Search
 
 - **Find in the current document:** `⌘F` opens the editor find bar, or a Reading-view
   find bar when viewing rendered Markdown or a text-based PDF. Enter/Shift+Enter
   moves forward/backward through highlighted matches.
 - **Find in Folder:** `⌘⇧F` (or the activity-bar Search button) searches the contents
-  of every text file in the open folder, plus the text inside `.mind` and
-  `.excalidraw` drawings and PDFs. Use the Aa, whole-word, and `.*` controls for
+  of every text file in the open folder, plus PDFs. Use the Aa, whole-word, and `.*` controls for
   case-sensitive, whole-word, or regular-expression matching. Results show highlighted
   snippets and counts per file; PDF hits open at the matching page.
 

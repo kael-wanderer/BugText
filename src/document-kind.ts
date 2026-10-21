@@ -6,18 +6,6 @@ export function isPdfFile(pathOrName: string | null | undefined): boolean {
   return /\.pdf$/i.test(pathOrName ?? "");
 }
 
-export function isExcalidrawFile(
-  pathOrName: string | null | undefined,
-): boolean {
-  return /\.excalidraw$/i.test(pathOrName ?? "");
-}
-
-export function isMindmapFile(
-  pathOrName: string | null | undefined,
-): boolean {
-  return /\.mind$/i.test(pathOrName ?? "");
-}
-
 export function isSqlFile(pathOrName: string | null | undefined): boolean {
   return /\.sql$/i.test(pathOrName ?? "");
 }
@@ -71,12 +59,6 @@ export function fileLanguageInfo(
     return { editor: "markdown", icon: "md", label: "Markdown" };
   }
   if (isPdfFile(pathOrName)) return { editor: "plain", icon: "pdf", label: "PDF" };
-  if (isExcalidrawFile(pathOrName)) {
-    return { editor: "plain", icon: "excalidraw", label: "Excalidraw" };
-  }
-  if (isMindmapFile(pathOrName)) {
-    return { editor: "plain", icon: "mind", label: "Mindmap" };
-  }
   return { editor: "plain", icon: "txt", label: "Plain text" };
 }
 
@@ -86,9 +68,6 @@ export function documentViewModes(
   pathOrName: string | null | undefined,
 ): readonly DocumentViewMode[] {
   if (isPdfFile(pathOrName)) return ["preview"];
-  if (isExcalidrawFile(pathOrName) || isMindmapFile(pathOrName)) {
-    return ["preview"];
-  }
   if (isMarkdownFile(pathOrName) || isHtmlFile(pathOrName)) {
     return ["editor", "preview", "split"];
   }

@@ -4,9 +4,7 @@ import {
   htmlPreviewLayout,
   htmlWithBaseHref,
   htmlWithPreviewZoom,
-  isExcalidrawFile,
   isHtmlFile,
-  isMindmapFile,
   isMarkdownFile,
   isPdfFile,
   documentViewModes,
@@ -96,19 +94,14 @@ describe("htmlPreviewLayout", () => {
   });
 });
 
-describe("isExcalidrawFile", () => {
-  it("recognizes Excalidraw paths case-insensitively", () => {
-    expect(isExcalidrawFile("/boards/system.excalidraw")).toBe(true);
-    expect(isExcalidrawFile("SYSTEM.EXCALIDRAW")).toBe(true);
-    expect(isExcalidrawFile("system.json")).toBe(false);
-  });
-});
-
-describe("isMindmapFile", () => {
-  it("matches .mind only", () => {
-    expect(isMindmapFile("a/b/notes.mind")).toBe(true);
-    expect(isMindmapFile("notes.md")).toBe(false);
-    expect(isMindmapFile(null)).toBe(false);
+describe("retired board file types", () => {
+  it("treats .excalidraw and .mind as plain text", () => {
+    expect(fileLanguageInfo("a.excalidraw").editor).toBe(fileLanguageInfo("a.unknownext").editor);
+    expect(fileLanguageInfo("b.mind").editor).toBe(fileLanguageInfo("b.unknownext").editor);
+    expect(fileLanguageInfo("a.excalidraw")).toEqual(fileLanguageInfo("a.unknownext"));
+    expect(fileLanguageInfo("b.mind")).toEqual(fileLanguageInfo("b.unknownext"));
+    expect(documentViewModes("a.excalidraw")).toEqual(["editor"]);
+    expect(documentViewModes("b.mind")).toEqual(["editor"]);
   });
 });
 

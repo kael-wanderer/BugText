@@ -70,17 +70,6 @@ arrive through Tauri's opened event, are queued until the frontend listener is r
 then use the same document-opening workflow as File ▸ Open. The application menu can
 register BugText as the Markdown/text editor or PDF viewer through LaunchServices.
 
-Special-pane document types: `.excalidraw` files open as an editable Excalidraw board
-(single pane, React-isolated); `.mind` files open as an editable jsMind mindmap board
-(single pane, drag-drop node editing, similar layout shape). Mindmap nodes support
-per-node shape (rect/rounded/pill/circle), fill/text color, font size, and bold, stored
-in node `data` and persisted in the `.mind` file (no format change). Dedicated activity-bar
-buttons create untitled boards of either type. jsMind nodes and connector lines derive
-their colors from the active BugText theme and update when the theme changes. Mindmaps
-support transient multi-selection via shift/⌘-click or marquee drag; Delete/Backspace
-and the toolbar Delete action remove the selected subtrees without changing the
-`.mind` format.
-
 Editor settings live at `<app config dir>/settings.json`; AI providers and terminals
 live at `<app config dir>/agent.json` (legacy `ai.json` is auto-migrated on first
 run), while API keys live in the OS keychain and never in that file. The Gear button opens either file as a normal tab, and saving applies
@@ -123,16 +112,15 @@ brew install pandoc typst
 ```
 
 Export is document-aware: Markdown/plain documents offer rendered PDF/DOCX plus
-PNG/SVG; HTML and Excalidraw offer PNG/SVG; mindmaps offer PNG; PDF is read-only.
+PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
 
 Heavy render/terminal engines are loaded on demand so the startup bundle remains
 below the release chunk-warning threshold.
 
-PDF OCR runs fully offline and Excalidraw is pinned as a vendored board-only module;
-both live under `public/vendor/` and React stays isolated from the plain-TypeScript
-shell. Rebuild steps: see the `vendored-assets` skill.
+PDF OCR runs fully offline; its tesseract runtime lives under `public/vendor/`.
+Rebuild steps: see the `vendored-assets` skill.
 
 Updater runtime and UI are active. Gear ▸ General offers Manual (no background
 checks) and Automatic (at most once per 24 hours); both modes always prompt before

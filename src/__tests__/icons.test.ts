@@ -14,7 +14,11 @@ describe("fileIcon", () => {
     expect(fileIcon("widget.jsx", false)).toBe("js");
     expect(fileIcon("config.yml", false)).toBe("yaml");
     expect(fileIcon("doc.pdf", false)).toBe("pdf");
-    expect(fileIcon("board.excalidraw", false)).toBe("excalidraw");
+  });
+
+  it("gives retired board extensions the generic file icon", () => {
+    expect(fileIcon("board.excalidraw", false)).toBe("file");
+    expect(fileIcon("map.mind", false)).toBe("file");
   });
 
   it("falls back to file", () => expect(fileIcon("Makefile", false)).toBe("file"));

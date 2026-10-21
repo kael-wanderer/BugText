@@ -7,7 +7,7 @@ const FILTERS = [
   {
     name: "Documents",
     extensions: [
-      "md", "markdown", "txt", "html", "htm", "pdf", "excalidraw", "mind",
+      "md", "markdown", "txt", "html", "htm", "pdf",
       "json", "yaml", "yml", "toml", "xml", "csv", "tsv", "css", "js", "ts",
     ],
   },
