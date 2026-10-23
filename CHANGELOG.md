@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-23
+
 ### Changed
 
 - AI settings now has Use for, Local CLI and API providers pages, with an engine,
