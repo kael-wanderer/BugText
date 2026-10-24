@@ -22,6 +22,7 @@ import {
   type PdfTextStyle,
 } from "./pdf-edit-document";
 import { tryDirectTextRewrite, type PdfRewritePageScope } from "./pdf-direct-rewrite";
+import { tryFontAwareRewrite } from "./pdf-font-rewrite";
 import { pdfStandardFontMatch } from "./pdf-font-inspection";
 import {
   createPdfPageFrame,
@@ -363,6 +364,11 @@ export async function writeEditedPdf(
     : new Map<number, PdfRewritePageScope>();
   const directRewrite = tryDirectTextRewrite(originalBytes, edits, scopes);
   const pdf = await PDFDocument.load(directRewrite.bytes);
+  if (directRewrite.skippedIds.size) {
+    for (const id of tryFontAwareRewrite(pdf, edits, directRewrite.skippedIds)) {
+      directRewrite.appliedIds.add(id);
+    }
+  }
   const context: WriterContext = {
     pdf,
     standardFonts: {},

@@ -40,6 +40,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - An open PDF notices when another app changes it. A view without edits reloads on
   its own; with unsaved edits, a bar offers Reload (which asks whether to keep the
   edits) or Keep Editing.
+- Direct text edits now rewrite text stored in hex strings and two-byte (CID) fonts,
+  such as fonts embedded by most PDF tools, using the font's own character map.
+  When the font lacks a letter of the new text, the edit is drawn over the page as
+  before.
 
 ### Changed
 
