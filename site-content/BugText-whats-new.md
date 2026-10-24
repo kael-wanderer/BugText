@@ -4,7 +4,7 @@
 - Safer agents: coding agents run in a macOS sandbox limited to the open folder, and BugText lists every file they changed.
 - MCP server: Claude Code and Codex can search, read and edit your open notes. Off by default; each edit is snapshotted first.
 - Also new since 0.2.7: SQL highlighting, drag files between folders, interactive HTML previews and offline PDF OCR.
-- Fixed: files reload when changed elsewhere, settings sync across windows, and a restored pane no longer shows a PDF over its tab.
+- Fixed: PDFs look sharp on Retina and save Vietnamese text and rotated-page edits; files reload when changed elsewhere; settings sync.
 - Removed: Excalidraw boards. .excalidraw files now open as plain JSON text; open them in BugMind to keep drawing.
 - Removed: jsMind mind maps. .mind files stay on disk and open as plain JSON text; no BugText or BugMind importer reads them.
 - Removed: the Agent Console and built-in terminal. Run Claude Code, Codex or Pi in your own terminal app.
