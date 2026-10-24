@@ -6,6 +6,63 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-24
+
+### Fixed
+
+- Saving PDF edits checks the file on disk first. If it changed after BugText
+  opened it, BugText asks before replacing it, and the history snapshot now holds
+  the newer file rather than the copy BugText opened.
+- Unsaved PDF edits remember which version of the file they were made on. When the
+  file has changed since, BugText asks whether to apply or discard them instead of
+  drawing them over different content.
+- History ▸ Restore on a PDF now redraws the pages straight away instead of showing
+  the old pages until the tab is reopened.
+- Dragging the PDF color or opacity control, or typing in a Proofread or OCR text
+  box, now makes one undo step instead of one per change. Proofread text boxes keep
+  focus while you type.
+- Esc while editing PDF text in place now cancels the change instead of keeping it.
+- OCR Page reads the page that fills most of the view, not whichever page's top edge
+  is nearest the toolbar.
+- Text and covers have separate color and opacity controls, so restyling a
+  replacement's text no longer repaints its cover.
+- Limits ▸ Cover places its patch correctly on rotated and cropped pages.
+- Direct text edits only rewrite text on the page you edited, and fall back to an
+  overlay when the page's subset font may not contain the new letters.
+- PDF edit drafts with inserted images take about a third of the space, and BugText
+  says so when a draft can't be kept instead of dropping it silently.
+- OCR Page falls back to the nearest page when no page is in view.
+- The app compiles for Windows again: the MCP server, which needs Unix sockets, is
+  reported as unavailable there instead of breaking the build.
+- With nothing selected, the PDF style controls show the color and opacity the next
+  new edit will use, instead of the last selected edit's.
+
+### Added
+
+- An open PDF notices when another app changes it. A view without edits reloads on
+  its own; with unsaved edits, a bar offers Reload (which asks whether to keep the
+  edits) or Keep Editing.
+- Direct text edits now rewrite text stored in hex strings and two-byte (CID) fonts,
+  such as fonts embedded by most PDF tools, using the font's own character map.
+  When the font lacks a letter of the new text, the edit is drawn over the page as
+  before.
+
+### Changed
+
+- Update checks read the feed at kael.io.vn/projects/bugtext/latest.json. When a
+  newer version is listed, BugText offers to open its download page in the
+  browser instead of installing in place, so releases no longer need an updater
+  signing key.
+- The PDF toolbar wraps instead of scrolling sideways, and its style controls moved
+  to a second row that appears only while they apply: text style for text edits and
+  the Text/Replace tools, cover color and opacity for covers.
+- Long PDFs open faster and use far less memory: pages are drawn only near the
+  view and freed when you scroll away, so Retina sharpness no longer drops on long
+  documents. Thumbnails and the Review panel render their own small previews.
+- Unsaved PDF edits are kept in files under the app's config folder
+  (`pdf-drafts/`) instead of browser storage, so large drafts (images) no longer hit
+  a storage limit. Drafts from earlier versions move over the first time they open.
+
 ## [0.3.0] - 2026-10-24
 
 ### Changed

@@ -175,7 +175,7 @@ describe("pdf edit document", () => {
 
   it("serializes stable JSON", () => {
     const raw = serializePdfEditDocument(createPdfEditDocument("abc123"));
-    expect(raw).toContain('"version": 1');
+    expect(raw).toContain('"version":1');
     expect(parsePdfEditDocument(raw).sourceFingerprint).toBe("abc123");
   });
 

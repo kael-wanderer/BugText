@@ -79,8 +79,8 @@ panel, a PDF reader, and document export.
   Editing, Theme, Shortcuts and AI pages and a search box, plus raw `settings.json` /
   `agent.json` for advanced edits. Changes apply live and sync across windows. General
   includes an app-icon picker that sets the Dock icon.
-- **Updates** — manual checks from Help and optional once-daily automatic checks;
-  installation always requires confirmation.
+- **Updates** — manual checks from Help and optional once-daily automatic checks
+  against the hosted feed; a newer version opens its download page.
 - **Themes** — System, Light, Dark, Catppuccin Mocha, Everforest Dark, Nord — recoloring
   the whole UI including editor syntax.
 - **Export** — Markdown and plain-text documents export to PDF and DOCX via pandoc
@@ -162,7 +162,7 @@ src/
   settings-screen/ full-window settings screen (pages, search registry, app icons)
   settings-sync.ts cross-window settings change event
   settings.ts      settings.json model (themes, fonts, sizes, session, keymap)
-  updater.ts       manual and once-daily signed update checks
+  updater.ts       manual and once-daily checks of the hosted update feed
   compareview.ts   side-by-side diff surface
   pdfview.ts       pdf.js viewer + edit toolbar
   pdf-edit-document.ts   PDF edit operation model (parse/serialize/draft)
@@ -196,14 +196,15 @@ src-tauri/src/
   dock_icon.rs      runtime Dock icon from the Settings icon picker
 ```
 
-## Signed updates
+## Updates
 
-`src-tauri/tauri.conf.json` points the updater at the GitHub release feed
-(`latest.json`) and holds the public key. Release builds in CI sign the updater
-artifacts with the matching private key, which lives only in CI secrets; local
-builds without it should pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
-Settings ▸ General offers Manual or Automatic (at most once a day) checks, and
-installing always asks first.
+BugText reads `https://kael.io.vn/projects/bugtext/latest.json`, shaped
+`{"version": "0.3.1", "release_url": "https://..."}`. When `version` is newer than
+the running app (semantic-version order), BugText offers to open `release_url` in
+the browser; only `https` links are opened. Nothing is downloaded or installed by
+the app, so builds need no updater signing key. Publish a release by uploading the
+DMG and updating that JSON. Settings ▸ General offers Manual or Automatic (at most
+once a day) checks.
 
 ## License
 

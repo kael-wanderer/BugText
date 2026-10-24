@@ -22,7 +22,7 @@ export const generalPage: SettingsPage = {
       row(
         "update-mode",
         "Update checks",
-        "Automatic checks at most once a day. BugText always asks before installing.",
+        "Automatic checks at most once a day. A new version opens its download page.",
         segmented(
           "Update checks",
           [

@@ -6,6 +6,8 @@ import {
   type PdfDirectTextEditOperation,
 } from "../pdf-edit-document";
 import { pdfLiteralRanges, tryDirectTextRewrite } from "../pdf-direct-rewrite";
+import { PDFDocument, PDFName, StandardFonts } from "pdf-lib";
+import { pdfRewriteScopes } from "../pdf-edit-writer";
 
 function textBytes(text: string): Uint8Array {
   return new TextEncoder().encode(text);
@@ -188,5 +190,50 @@ describe("pdf direct text rewrite", () => {
         compressedLongEdits,
       ).skippedIds.has("direct-1"),
     ).toBe(true);
+  });
+
+  it("only rewrites text on the edited page", async () => {
+    // Page 2 shows the text as a literal; page 1 shows it some other way (hex here),
+    // which the byte search cannot match.
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    for (const show of ["<48656c6c6f> Tj", "(Hello) Tj"]) {
+      const page = pdf.addPage([300, 200]);
+      page.drawText("x", { font, size: 1 });
+      const stream = pdf.context.flateStream(`BT /F1 12 Tf 30 150 Td ${show} ET`);
+      page.node.set(PDFName.of("Contents"), pdf.context.register(stream));
+      page.node.setFontDictionary(PDFName.of("F1"), font.ref);
+    }
+    const bytes = await pdf.save({ useObjectStreams: false });
+    const edits = addPdfEditOperation(
+      createPdfEditDocument("sample"),
+      { page: 1, width: 300, height: 200 },
+      edit("Hello", "Howdy"),
+    );
+    const scopes = pdfRewriteScopes(await PDFDocument.load(bytes));
+
+    const result = tryDirectTextRewrite(bytes, edits, scopes);
+    expect(result.skippedIds.has("direct-1")).toBe(true);
+    expect(result.bytes).toEqual(bytes);
+
+    // Without the page scope the same edit would have rewritten page 2.
+    expect(tryDirectTextRewrite(bytes, edits).appliedIds.has("direct-1")).toBe(true);
+  });
+
+  it("falls back when a subset font may lack the replacement glyphs", () => {
+    const pdf = minimalPdfWithStream("BT /F1 12 Tf 30 150 Td (Cab) Tj ET");
+    const edits = (replacement: string) =>
+      addPdfEditOperation(
+        createPdfEditDocument("sample"),
+        { page: 1, width: 300, height: 200 },
+        edit("Cab", replacement),
+      );
+    const scopes = new Map([[1, { contentObjects: new Set([5]), subsetFonts: new Set(["F1"]) }]]);
+
+    expect(tryDirectTextRewrite(pdf, edits("Zed"), scopes).skippedIds.has("direct-1")).toBe(true);
+    // Letters the page already draws in that font are safe to reuse.
+    expect(tryDirectTextRewrite(pdf, edits("baC"), scopes).appliedIds.has("direct-1")).toBe(true);
+    const fullFont = new Map([[1, { contentObjects: new Set([5]), subsetFonts: new Set<string>() }]]);
+    expect(tryDirectTextRewrite(pdf, edits("Zed"), fullFont).appliedIds.has("direct-1")).toBe(true);
   });
 });

@@ -85,41 +85,37 @@ function numericMatrix(value: unknown): [number, number, number, number, number,
   return parts as [number, number, number, number, number, number];
 }
 
-function imageRectFromMatrix(
-  pageHeight: number,
-  matrix: [number, number, number, number, number, number],
-): PdfObjectRect | null {
-  const points = [
-    [0, 0],
-    [1, 0],
-    [0, 1],
-    [1, 1],
-  ].map(([x, y]) => ({
-    x: matrix[0] * x + matrix[2] * y + matrix[4],
-    y: matrix[1] * x + matrix[3] * y + matrix[5],
-  }));
-  const minX = Math.min(...points.map((point) => point.x));
-  const maxX = Math.max(...points.map((point) => point.x));
-  const minY = Math.min(...points.map((point) => point.y));
-  const maxY = Math.max(...points.map((point) => point.y));
-  const width = maxX - minX;
-  const height = maxY - minY;
-  if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
-    return null;
-  }
-  return {
-    x: minX,
-    y: pageHeight - maxY,
-    width,
-    height,
-  };
+/** Maps a PDF user-space point to page space (top-left origin, as the page is shown). */
+export type PdfPointToPage = (x: number, y: number) => { x: number; y: number };
+
+/** Page space for an unrotated page whose visible box starts at the origin. */
+export function flipPdfPoint(pageHeight: number): PdfPointToPage {
+  return (x, y) => ({ x, y: pageHeight - y });
 }
 
-function rectFromPdfPoints(
-  pageHeight: number,
-  points: Array<{ x: number; y: number }>,
+function imageRectFromMatrix(
+  toPage: PdfPointToPage,
+  matrix: [number, number, number, number, number, number],
 ): PdfObjectRect | null {
-  if (!points.length) return null;
+  return rectFromPdfPoints(
+    toPage,
+    [
+      [0, 0],
+      [1, 0],
+      [0, 1],
+      [1, 1],
+    ].map(([x, y]) => transformPoint(matrix, x, y)),
+  );
+}
+
+// Bounds of user-space points once mapped to page space, so rotated and cropped
+// pages get the box the viewer shows.
+function rectFromPdfPoints(
+  toPage: PdfPointToPage,
+  userPoints: Array<{ x: number; y: number }>,
+): PdfObjectRect | null {
+  if (!userPoints.length) return null;
+  const points = userPoints.map((point) => toPage(point.x, point.y));
   const minX = Math.min(...points.map((point) => point.x));
   const maxX = Math.max(...points.map((point) => point.x));
   const minY = Math.min(...points.map((point) => point.y));
@@ -129,12 +125,7 @@ function rectFromPdfPoints(
   if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
     return null;
   }
-  return {
-    x: minX,
-    y: pageHeight - maxY,
-    width,
-    height,
-  };
+  return { x: minX, y: minY, width, height };
 }
 
 function transformPoint(
@@ -155,14 +146,14 @@ function numericArray(value: unknown): number[] | null {
 }
 
 function vectorRectFromConstructPath(
-  pageHeight: number,
+  toPage: PdfPointToPage,
   matrix: [number, number, number, number, number, number],
   args: unknown,
 ): PdfObjectRect | null {
   if (!Array.isArray(args)) return null;
   const minMax = numericArray(args[2]);
   if (minMax && minMax.length >= 4) {
-    return rectFromPdfPoints(pageHeight, [
+    return rectFromPdfPoints(toPage, [
       transformPoint(matrix, minMax[0], minMax[1]),
       transformPoint(matrix, minMax[2], minMax[1]),
       transformPoint(matrix, minMax[0], minMax[3]),
@@ -175,7 +166,7 @@ function vectorRectFromConstructPath(
   for (let index = 0; index + 1 < pathArgs.length; index += 2) {
     points.push(transformPoint(matrix, pathArgs[index], pathArgs[index + 1]));
   }
-  return rectFromPdfPoints(pageHeight, points);
+  return rectFromPdfPoints(toPage, points);
 }
 
 export function inspectPdfPageOperators(
@@ -184,6 +175,7 @@ export function inspectPdfPageOperators(
   ops: PdfOperatorMap,
   argsArray: unknown[] = [],
   pageHeight = 0,
+  toPage: PdfPointToPage = flipPdfPoint(pageHeight),
 ): PdfPageObjectSignal {
   const images = valuesFor(IMAGE_OPERATORS, ops);
   const vectors = valuesFor(VECTOR_OPERATORS, ops);
@@ -206,7 +198,7 @@ export function inspectPdfPageOperators(
         if (next) matrix = multiplyMatrix(matrix, next);
       } else if (ops.constructPath === fn && pageHeight > 0) {
         pendingVectorRect = vectorRectFromConstructPath(
-          pageHeight,
+          toPage,
           matrix,
           argsArray[index],
         );
@@ -214,7 +206,7 @@ export function inspectPdfPageOperators(
 
       const isImage = images.has(fn);
       const object =
-        isImage && pageHeight > 0 ? imageRectFromMatrix(pageHeight, matrix) : null;
+        isImage && pageHeight > 0 ? imageRectFromMatrix(toPage, matrix) : null;
       const vectorObject = vectorPainters.has(fn) ? pendingVectorRect : null;
       if (vectorPainters.has(fn)) pendingVectorRect = null;
       const detectedObject: PdfDetectedPageObject | null = object
@@ -260,35 +252,25 @@ export type PdfAnnotationLike = {
 };
 
 function annotationRectFromPdfRect(
-  pageHeight: number,
+  toPage: PdfPointToPage,
   rawRect: unknown,
 ): PdfObjectRect | null {
   const values = numericArray(rawRect);
-  if (!values || values.length < 4 || pageHeight <= 0) return null;
-  const minX = Math.min(values[0], values[2]);
-  const maxX = Math.max(values[0], values[2]);
-  const minY = Math.min(values[1], values[3]);
-  const maxY = Math.max(values[1], values[3]);
-  const width = maxX - minX;
-  const height = maxY - minY;
-  if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
-    return null;
-  }
-  return {
-    x: minX,
-    y: pageHeight - maxY,
-    width,
-    height,
-  };
+  if (!values || values.length < 4) return null;
+  return rectFromPdfPoints(toPage, [
+    { x: values[0], y: values[1] },
+    { x: values[2], y: values[3] },
+  ]);
 }
 
 export function inspectPdfPageAnnotations(
   page: number,
   pageHeight: number,
   annotations: PdfAnnotationLike[],
+  toPage: PdfPointToPage = flipPdfPoint(pageHeight),
 ): PdfPageObjectSignal {
   const objects = annotations.flatMap((annotation, index) => {
-    const rect = annotationRectFromPdfRect(pageHeight, annotation.rect);
+    const rect = pageHeight > 0 ? annotationRectFromPdfRect(toPage, annotation.rect) : null;
     if (!rect) return [];
     const label =
       typeof annotation.subtype === "string"

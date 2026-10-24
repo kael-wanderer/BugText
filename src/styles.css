@@ -1002,6 +1002,8 @@ body.search-active #search-panel {
   position: relative;
   margin: 0 auto 12px;
   scroll-margin-top: 16px;
+  /* Pages far from view have no canvas yet; keep a blank sheet in their place. */
+  background: #fff;
 }
 
 .pdf-edit-toolbar {
@@ -1009,6 +1011,7 @@ body.search-active #search-panel {
   top: 0;
   z-index: 4;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 34px;
@@ -1058,7 +1061,30 @@ body.search-active #search-panel {
   width: 72px;
 }
 
+.pdf-edit-stylebar,
+.pdf-edit-style-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-edit-stylebar {
+  flex-basis: 100%;
+  gap: 14px;
+}
+
+.pdf-edit-stylebar[hidden],
+.pdf-edit-style-group[hidden] {
+  display: none;
+}
+
+.pdf-edit-style-label {
+  color: var(--muted);
+  font: 12px var(--font-ui);
+}
+
 .pdf-edit-status {
+  flex: 1 1 160px;
   min-width: 0;
   margin-left: 4px;
   overflow: hidden;
@@ -1068,9 +1094,30 @@ body.search-active #search-panel {
   text-overflow: ellipsis;
 }
 
+.pdf-disk-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: var(--text);
+  font: 12px var(--font-ui);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev));
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.pdf-disk-notice button {
+  height: 22px;
+  padding: 0 8px;
+  color: var(--text);
+  font: 12px var(--font-ui);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
 .pdf-ocr-review-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 5;
   display: flex;
@@ -1173,7 +1220,7 @@ body.search-active #search-panel {
 
 .pdf-capability-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 5;
   display: flex;
@@ -1285,7 +1332,7 @@ body.search-active #search-panel {
 
 .pdf-thumbnail-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   left: 18px;
   z-index: 5;
   display: flex;
@@ -1376,7 +1423,7 @@ body.search-active #search-panel {
 
 .pdf-review-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 6;
   display: flex;
@@ -1503,7 +1550,7 @@ body.search-active #search-panel {
 
 .pdf-proof-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 6;
   display: flex;

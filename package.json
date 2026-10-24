@@ -1,7 +1,7 @@
 {
   "name": "bugtext",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -31,7 +31,6 @@
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
-    "@tauri-apps/plugin-updater": "^2.10.1",
     "codemirror": "^6.0.2",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",

@@ -13,6 +13,8 @@ mod mcp_protocol;
 mod mcp_server;
 mod menu;
 mod native_windows;
+mod pdf_drafts;
+mod update_feed;
 mod preview;
 mod recovery;
 mod sandbox;
@@ -159,9 +161,6 @@ pub fn run() {
             preview::respond(ctx.app_handle(), request)
         })
         .setup(|app| {
-            #[cfg(desktop)]
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
             let m = menu::build(app.handle())?;
             app.set_menu(m)?;
             macos_dock::install(app.handle());
@@ -189,6 +188,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            update_feed::update_feed_fetch,
             mcp_server::mcp_set_enabled,
             mcp_server::mcp_report_window,
             mcp_server::mcp_reply,
@@ -198,6 +198,8 @@ pub fn run() {
             mcp_clients::mcp_unregister,
             files::ai_models_cache_read,
             files::ai_models_cache_write,
+            pdf_drafts::pdf_draft_read,
+            pdf_drafts::pdf_draft_write,
             ai::ai_run,
             cli_scan::cli_scan,
             dock_icon::set_dock_icon,

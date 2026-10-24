@@ -169,8 +169,9 @@ below the release chunk-warning threshold.
 PDF OCR runs fully offline; its tesseract runtime lives under `public/vendor/`.
 Rebuild steps: see the `vendored-assets` skill.
 
-Updater runtime and UI are active. Settings ▸ General offers Manual (no background
-checks) and Automatic (at most once per 24 hours); both modes always prompt before
-installing, and manual checks remain available. Production release checks still
-require the signed release feed (`latest.json`) and public key in `tauri.conf.json`;
-keep the matching private signing key only in CI secrets.
+Update checks read `https://kael.io.vn/projects/bugtext/latest.json`
+(`{version, release_url}`), fetched in Rust (`update_feed.rs`, the host sends no
+CORS headers). A newer semantic version offers to open the `https` release page in
+the browser; the app never downloads or installs itself, so there is no updater
+plugin or signing key. Settings ▸ General offers Manual (no background checks) and
+Automatic (at most once per 24 hours).

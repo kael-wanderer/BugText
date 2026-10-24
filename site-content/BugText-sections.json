@@ -160,7 +160,7 @@
     },
     {
       "question": "How do I install and update it?",
-      "answer": "Download the .dmg from the GitHub releases page and drag BugText to Applications. The app is not signed with an Apple Developer ID yet, so the first launch shows a Gatekeeper warning. Open System Settings ▸ Privacy & Security and click Open Anyway, then launch it again. Updates are signed and BugText always asks before installing one. Checks are manual by default; you can turn on a daily automatic check."
+      "answer": "Download the .dmg from this page and drag BugText to Applications. The app is not signed with an Apple Developer ID yet, so the first launch shows a Gatekeeper warning. Open System Settings ▸ Privacy & Security and click Open Anyway, then launch it again. When a new version is out, BugText offers to open its download page here; it never installs anything on its own. Checks are manual by default; you can turn on a daily automatic check."
     },
     {
       "question": "Can I import and export documents?",
