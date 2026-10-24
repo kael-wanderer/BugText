@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { installTestDom } from "./setup";
 
 const destroyDocument = vi.fn();
+// Page count the fake document reports; zero lets a render finish without drawing.
+const pdfPages = vi.hoisted(() => ({ count: 1 }));
 // Drafts the app would keep in its config folder, by PDF path.
 const drafts = vi.hoisted(() => new Map<string, string>());
 vi.mock("@tauri-apps/api/core", () => ({
@@ -20,7 +22,7 @@ vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", () => ({ default: "worker.js"
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: {},
   getDocument: () => ({
-    promise: Promise.resolve({ numPages: 1 }),
+    promise: Promise.resolve({ numPages: pdfPages.count }),
     destroy: destroyDocument,
   }),
 }));
@@ -166,4 +168,23 @@ it("picks the page that fills most of the view for OCR", async () => {
   // Scrolled into a gap past the last page: OCR the nearest one rather than nothing.
   expect(mostVisiblePageIndex([{ top: -2000, bottom: -1000 }, { top: 1000, bottom: 2000 }], 0, 800)).toBe(1);
   expect(mostVisiblePageIndex([], 0, 800)).toBe(-1);
+});
+
+it("reloads a clean PDF that changed on disk", async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  Object.assign(window, { document });
+  const onReloadRequest = vi.fn();
+  pdfPages.count = 0;
+  const handle = await renderPdf(document.createElement("div"), "/notes/clean.pdf", { onReloadRequest });
+  await handle.checkDisk();
+  expect(onReloadRequest).not.toHaveBeenCalled();
+
+  // The stat moves and the bytes differ from what the view opened.
+  vi.mocked(invoke).mockImplementation(async (command: string) =>
+    command === "file_stat" ? { mtimeMs: 2, size: 4 } : [9, 9, 9, 9],
+  );
+  await handle.checkDisk();
+  expect(onReloadRequest).toHaveBeenCalledOnce();
+  handle.destroy();
+  pdfPages.count = 1;
 });

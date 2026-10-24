@@ -67,6 +67,8 @@ export type PdfFindHandle = {
   setQuery: (query: string) => number;
   move: (delta: number) => { count: number; active: number };
   clear: () => void;
+  /** Reloads when the file changed on disk, or asks first when there are unsaved edits. */
+  checkDisk: () => Promise<void>;
   destroy: () => void;
 };
 
@@ -2230,6 +2232,52 @@ export async function renderPdf(
       updateToolbarState();
     }
   };
+  // Another app changed the file: reload a clean view; with unsaved edits, offer a
+  // reload (which asks whether to keep them) instead of drawing over new content.
+  let diskNotice: HTMLElement | null = null;
+  // Checks run every few seconds, so bytes are only re-read when the stat moves.
+  const fileStamp = async (): Promise<string | null> => {
+    try {
+      const stat = await invoke<{ mtimeMs: number; size: number }>("file_stat", { path });
+      return `${stat.mtimeMs}:${stat.size}`;
+    } catch {
+      return null;
+    }
+  };
+  let checkedStamp = await fileStamp();
+  const checkDisk = async (): Promise<void> => {
+    if (saving || diskNotice) return;
+    const stamp = await fileStamp();
+    if (!stamp || stamp === checkedStamp) return;
+    checkedStamp = stamp;
+    let onDisk: Uint8Array;
+    try {
+      onDisk = new Uint8Array(await invoke<number[]>("read_file_bytes", { path }));
+    } catch {
+      return;
+    }
+    if (saving || diskNotice || (await pdfSourceDigest(onDisk)) === sourceDigest) return;
+    if (!hasPdfEdits(editDocument)) {
+      options?.onReloadRequest?.();
+      return;
+    }
+    diskNotice = window.document.createElement("div");
+    diskNotice.className = "pdf-disk-notice";
+    diskNotice.setAttribute("role", "status");
+    const message = window.document.createElement("span");
+    message.textContent = "This PDF changed on disk.";
+    const reload = window.document.createElement("button");
+    reload.type = "button";
+    reload.textContent = "Reload";
+    reload.addEventListener("click", () => options?.onReloadRequest?.());
+    const keep = window.document.createElement("button");
+    keep.type = "button";
+    keep.textContent = "Keep Editing";
+    keep.title = "Keep editing the version you opened; Save will ask before replacing the newer file";
+    keep.addEventListener("click", () => diskNotice?.remove());
+    diskNotice.append(message, reload, keep);
+    toolbar.after(diskNotice);
+  };
   const onMenuSave = (): void => {
     void saveEditedPdf();
   };
@@ -2443,6 +2491,7 @@ export async function renderPdf(
     },
     move,
     clear,
+    checkDisk,
     destroy: () => {
       clear();
       closeOcrReviewPanel();

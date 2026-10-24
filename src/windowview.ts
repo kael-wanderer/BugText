@@ -70,6 +70,8 @@ export type WindowView = {
   openPdfPage: (page: number) => void;
   savePdf: () => boolean;
   savePdfAs: () => boolean;
+  /** Re-checks the shown PDF against the file on disk. */
+  checkPdfDisk: () => Promise<void>;
   openFind: () => boolean;
 };
 
@@ -726,6 +728,9 @@ export function createWindowView(
       if (!isPdfFile(previewPathOrName)) return false;
       previewPane.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
       return true;
+    },
+    checkPdfDisk: async () => {
+      if (isPdfFile(previewPathOrName)) await pdfFind?.checkDisk();
     },
     openFind: () => {
       const state = getWindow(windowId);

@@ -1432,6 +1432,8 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
   for (const windowState of getState().windows) {
     const view = views.get(windowState.id);
     if (!view) continue;
+    // A shown PDF compares its own bytes; background PDF tabs reload when shown.
+    await view.checkPdfDisk();
 
     for (const tab of windowState.tabs) {
       if (!tab.path || tab.dirty) continue;

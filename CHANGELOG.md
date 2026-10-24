@@ -33,6 +33,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - With nothing selected, the PDF style controls show the color and opacity the next
   new edit will use, instead of the last selected edit's.
 
+### Added
+
+- An open PDF notices when another app changes it. A view without edits reloads on
+  its own; with unsaved edits, a bar offers Reload (which asks whether to keep the
+  edits) or Keep Editing.
+
 ### Changed
 
 - Unsaved PDF edits are kept in files under the app's config folder
