@@ -1002,6 +1002,8 @@ body.search-active #search-panel {
   position: relative;
   margin: 0 auto 12px;
   scroll-margin-top: 16px;
+  /* Pages far from view have no canvas yet; keep a blank sheet in their place. */
+  background: #fff;
 }
 
 .pdf-edit-toolbar {

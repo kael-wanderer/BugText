@@ -46,6 +46,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - The PDF toolbar wraps instead of scrolling sideways, and its style controls moved
   to a second row that appears only while they apply: text style for text edits and
   the Text/Replace tools, cover color and opacity for covers.
+- Long PDFs open faster and use far less memory: pages are drawn only near the
+  view and freed when you scroll away, so Retina sharpness no longer drops on long
+  documents. Thumbnails and the Review panel render their own small previews.
 - Unsaved PDF edits are kept in files under the app's config folder
   (`pdf-drafts/`) instead of browser storage, so large drafts (images) no longer hit
   a storage limit. Drafts from earlier versions move over the first time they open.

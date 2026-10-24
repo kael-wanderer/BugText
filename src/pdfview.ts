@@ -92,9 +92,12 @@ export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
 
 const RENDER_SCALE = 1.4;
-// Upper bound on canvas pixels for one document (about 1 GB of RGBA). Every page
-// is drawn up front, so a long PDF on a Retina display drops back toward 1x.
+// Upper bound on canvas pixels for one document (about 1 GB of RGBA). Pages are
+// drawn only near the view, so the budget covers about this many pages at once.
 const PDF_CANVAS_PIXEL_BUDGET = 256 * 1024 * 1024;
+const PDF_LIVE_PAGE_ESTIMATE = 12;
+// How far (CSS px) outside the view a page is drawn ahead of scrolling to it.
+const PDF_DRAW_MARGIN = 1200;
 
 /** Canvas pixels per CSS pixel: the display's ratio (max 2x), reduced to stay inside the budget. */
 export function pdfOutputScale(
@@ -143,6 +146,12 @@ type PdfPageView = {
   overlay: HTMLElement;
   text: string;
   box: PdfPageBox;
+  /** Draws the page if needed; null when the draw was cancelled. */
+  draw: () => Promise<HTMLCanvasElement | null>;
+  /** Frees the page's canvas; it is drawn again when it comes back into view. */
+  release: () => void;
+  /** A small standalone rendering of the page, `width` pixels wide. */
+  snapshot: (width: number) => Promise<HTMLCanvasElement | null>;
 };
 
 // Saving reads system fonts for text the standard PDF fonts cannot encode.
@@ -1327,24 +1336,24 @@ export async function renderPdf(
 
     const list = window.document.createElement("div");
     list.className = "pdf-thumbnail-list";
+    const panel = thumbnailPanel;
     for (const pageView of pages) {
-      const source = pageView.element.querySelector<HTMLCanvasElement>("canvas.pdf-page");
-      if (!source) continue;
       const button = window.document.createElement("button");
       button.type = "button";
       button.className = "pdf-thumbnail";
       button.title = `Go to page ${pageView.box.page}`;
       button.addEventListener("click", () => focusPage(pageView.box.page));
+      // A blank page-shaped canvas holds the place until the snapshot is ready.
       const canvas = window.document.createElement("canvas");
-      const ratio = source.height > 0 ? source.width / source.height : 0.75;
       canvas.width = 96;
-      canvas.height = Math.max(80, Math.round(canvas.width / Math.max(0.2, ratio)));
-      const context = canvas.getContext("2d");
-      context?.drawImage(source, 0, 0, canvas.width, canvas.height);
+      canvas.height = Math.max(1, Math.round((96 * pageView.box.height) / pageView.box.width));
       const label = window.document.createElement("span");
       label.textContent = String(pageView.box.page);
       button.append(canvas, label);
       list.appendChild(button);
+      void pageView.snapshot(96).then((source) => {
+        if (source && thumbnailPanel === panel) canvas.replaceWith(source);
+      });
     }
     thumbnailPanel.appendChild(list);
   };
@@ -1395,7 +1404,6 @@ export async function renderPdf(
     }
     for (const page of editedPages) {
       const pageView = pages.find((item) => item.box.page === page.page);
-      const source = pageView?.element.querySelector<HTMLCanvasElement>("canvas.pdf-page");
       const row = window.document.createElement("section");
       row.className = "pdf-review-row";
       const rowHeader = window.document.createElement("div");
@@ -1408,20 +1416,23 @@ export async function renderPdf(
       rowHeader.append(focus, count);
       row.appendChild(rowHeader);
 
-      if (source && pageView) {
+      if (pageView) {
         const preview = window.document.createElement("div");
         preview.className = "pdf-review-preview";
-        const pair = createReviewCanvasPair(source, pageView.box, page.operations);
-        const beforeFigure = window.document.createElement("figure");
-        const beforeLabel = window.document.createElement("figcaption");
-        beforeLabel.textContent = "Before";
-        beforeFigure.append(pair.before, beforeLabel);
-        const afterFigure = window.document.createElement("figure");
-        const afterLabel = window.document.createElement("figcaption");
-        afterLabel.textContent = "After";
-        afterFigure.append(pair.after, afterLabel);
-        preview.append(beforeFigure, afterFigure);
         row.appendChild(preview);
+        void pageView.snapshot(180).then((source) => {
+          if (!source) return;
+          const pair = createReviewCanvasPair(source, pageView.box, page.operations);
+          const beforeFigure = window.document.createElement("figure");
+          const beforeLabel = window.document.createElement("figcaption");
+          beforeLabel.textContent = "Before";
+          beforeFigure.append(pair.before, beforeLabel);
+          const afterFigure = window.document.createElement("figure");
+          const afterLabel = window.document.createElement("figcaption");
+          afterLabel.textContent = "After";
+          afterFigure.append(pair.after, afterLabel);
+          preview.append(beforeFigure, afterFigure);
+        });
       }
 
       const summary = window.document.createElement("ul");
@@ -2134,7 +2145,7 @@ export async function renderPdf(
   ocrButton.addEventListener("click", () => {
     void (async () => {
       const page = visiblePage();
-      const canvas = page?.element.querySelector<HTMLCanvasElement>("canvas.pdf-page");
+      const canvas = await page?.draw();
       if (!page || !canvas) return;
       ocrButton.disabled = true;
       setStatus(`Running OCR on page ${page.box.page}...`);
@@ -2343,6 +2354,30 @@ export async function renderPdf(
   setTool("select");
 
   let outputScale = 1;
+  // Only pages near the view keep a canvas. Measured on scroll rather than with
+  // IntersectionObserver, which WebKit misjudges under the zoom applied to pages.
+  const lazyDraw = typeof requestAnimationFrame !== "undefined" && typeof ResizeObserver !== "undefined";
+  let drawFrame = 0;
+  const updateDrawnPages = (): void => {
+    drawFrame = 0;
+    const top = -PDF_DRAW_MARGIN;
+    const bottom = window.innerHeight + PDF_DRAW_MARGIN;
+    for (const view of pages) {
+      const bounds = view.element.getBoundingClientRect();
+      if (bounds.bottom >= top && bounds.top <= bottom) void view.draw();
+      else view.release();
+    }
+  };
+  const scheduleDrawnPages = (): void => {
+    if (!drawFrame) drawFrame = requestAnimationFrame(updateDrawnPages);
+  };
+  const documentSize = lazyDraw ? new ResizeObserver(scheduleDrawnPages) : null;
+  if (lazyDraw) {
+    // Capture catches scrolling in whichever ancestor pane scrolls.
+    window.addEventListener("scroll", scheduleDrawnPages, { capture: true, passive: true });
+    window.addEventListener("resize", scheduleDrawnPages);
+    documentSize?.observe(container);
+  }
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     // Stop drawing once another document owns the pane; nothing else frees this one.
     if (options?.isCurrent && !options.isCurrent()) {
@@ -2355,7 +2390,7 @@ export async function renderPdf(
       outputScale = pdfOutputScale(
         window.devicePixelRatio,
         viewport.width * viewport.height,
-        document.numPages,
+        Math.min(document.numPages, PDF_LIVE_PAGE_ESTIMATE),
       );
     }
     const pageElement = window.document.createElement("div");
@@ -2363,22 +2398,64 @@ export async function renderPdf(
     pageElement.dataset.page = String(pageNumber);
     pageElement.style.width = `${viewport.width}px`;
     pageElement.style.height = `${viewport.height}px`;
-    const canvas = window.document.createElement("canvas");
-    canvas.className = "pdf-page";
-    // Back the canvas with device pixels so text stays sharp on Retina displays.
-    canvas.width = Math.floor(viewport.width * outputScale);
-    canvas.height = Math.floor(viewport.height * outputScale);
-    canvas.style.width = `${viewport.width}px`;
-    pageElement.appendChild(canvas);
     container.appendChild(pageElement);
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Canvas rendering is unavailable");
-    await page.render({
-      canvas,
-      canvasContext: context,
-      viewport,
-      transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
-    }).promise;
+    let canvas: HTMLCanvasElement | null = null;
+    let drawing: Promise<HTMLCanvasElement | null> | null = null;
+    let renderTask: ReturnType<typeof page.render> | null = null;
+    const pageScale = outputScale;
+    const draw = (): Promise<HTMLCanvasElement | null> => {
+      if (drawing) return drawing;
+      const target = window.document.createElement("canvas");
+      target.className = "pdf-page";
+      // Back the canvas with device pixels so text stays sharp on Retina displays.
+      target.width = Math.floor(viewport.width * pageScale);
+      target.height = Math.floor(viewport.height * pageScale);
+      target.style.width = `${viewport.width}px`;
+      const context = target.getContext("2d");
+      if (!context) return Promise.resolve(null);
+      pageElement.prepend(target);
+      canvas = target;
+      const task = page.render({
+        canvas: target,
+        canvasContext: context,
+        viewport,
+        transform: pageScale === 1 ? undefined : [pageScale, 0, 0, pageScale, 0, 0],
+      });
+      renderTask = task;
+      drawing = task.promise.then(
+        () => target,
+        () => null,
+      );
+      return drawing;
+    };
+    const release = (): void => {
+      if (!drawing) return;
+      renderTask?.cancel();
+      renderTask = null;
+      drawing = null;
+      if (canvas) {
+        // Zero-sized first so WebKit frees the backing store right away.
+        canvas.width = 0;
+        canvas.height = 0;
+        canvas.remove();
+        canvas = null;
+      }
+    };
+    const snapshot = async (width: number): Promise<HTMLCanvasElement | null> => {
+      const small = page.getViewport({ scale: width / page.getViewport({ scale: 1 }).width });
+      const target = window.document.createElement("canvas");
+      target.width = Math.max(1, Math.round(small.width));
+      target.height = Math.max(1, Math.round(small.height));
+      const context = target.getContext("2d");
+      if (!context) return null;
+      try {
+        await page.render({ canvas: target, canvasContext: context, viewport: small }).promise;
+        return target;
+      } catch {
+        return null;
+      }
+    };
+    if (!lazyDraw) await draw();
     // Text extraction powers the find feature; never let it block the visible
     // page render (it can fail per-file on some PDFs).
     let pageText = "";
@@ -2452,7 +2529,7 @@ export async function renderPdf(
     objectSignals.push(objectSignal);
     const overlay = window.document.createElement("div");
     overlay.className = "pdf-edit-layer";
-    const pageView = {
+    const pageView: PdfPageView = {
       element: pageElement,
       overlay,
       text: pageText,
@@ -2461,7 +2538,11 @@ export async function renderPdf(
         width: viewport.width / RENDER_SCALE,
         height: viewport.height / RENDER_SCALE,
       },
+      draw,
+      release,
+      snapshot,
     };
+    if (lazyDraw) scheduleDrawnPages();
     overlay.addEventListener("click", (event) => addOperationAt(pageView, event));
     pageElement.appendChild(overlay);
     pages.push(pageView);
@@ -2539,6 +2620,11 @@ export async function renderPdf(
     destroy: () => {
       clear();
       toolbarSize?.disconnect();
+      if (drawFrame) cancelAnimationFrame(drawFrame);
+      documentSize?.disconnect();
+      window.removeEventListener("scroll", scheduleDrawnPages, { capture: true });
+      window.removeEventListener("resize", scheduleDrawnPages);
+      pages.forEach((page) => page.release());
       closeOcrReviewPanel();
       closeCapabilityPanel();
       closeThumbnailPanel();
