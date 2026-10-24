@@ -1009,6 +1009,7 @@ body.search-active #search-panel {
   top: 0;
   z-index: 4;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 34px;
@@ -1058,7 +1059,30 @@ body.search-active #search-panel {
   width: 72px;
 }
 
+.pdf-edit-stylebar,
+.pdf-edit-style-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-edit-stylebar {
+  flex-basis: 100%;
+  gap: 14px;
+}
+
+.pdf-edit-stylebar[hidden],
+.pdf-edit-style-group[hidden] {
+  display: none;
+}
+
+.pdf-edit-style-label {
+  color: var(--muted);
+  font: 12px var(--font-ui);
+}
+
 .pdf-edit-status {
+  flex: 1 1 160px;
   min-width: 0;
   margin-left: 4px;
   overflow: hidden;
@@ -1069,9 +1093,6 @@ body.search-active #search-panel {
 }
 
 .pdf-disk-notice {
-  position: sticky;
-  top: 34px;
-  z-index: 4;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1094,7 +1115,7 @@ body.search-active #search-panel {
 
 .pdf-ocr-review-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 5;
   display: flex;
@@ -1197,7 +1218,7 @@ body.search-active #search-panel {
 
 .pdf-capability-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 5;
   display: flex;
@@ -1309,7 +1330,7 @@ body.search-active #search-panel {
 
 .pdf-thumbnail-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   left: 18px;
   z-index: 5;
   display: flex;
@@ -1400,7 +1421,7 @@ body.search-active #search-panel {
 
 .pdf-review-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 6;
   display: flex;
@@ -1527,7 +1548,7 @@ body.search-active #search-panel {
 
 .pdf-proof-panel {
   position: absolute;
-  top: 48px;
+  top: calc(var(--pdf-toolbar-height, 34px) + 14px);
   right: 18px;
   z-index: 6;
   display: flex;

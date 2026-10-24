@@ -636,6 +636,7 @@ export async function renderPdf(
   const setTool = (tool: PdfEditTool): void => {
     activeTool = tool;
     container.dataset.pdfTool = tool;
+    updateStyleBar();
     toolButtons.forEach((button, key) => {
       button.classList.toggle("active", key === tool);
     });
@@ -819,15 +820,6 @@ export async function renderPdf(
     editSelectedButton,
     directSelectedButton,
     reflowButton,
-    fontFamilySelect,
-    fontSizeInput,
-    boldButton,
-    italicButton,
-    alignSelect,
-    colorInput,
-    opacityInput,
-    coverColorInput,
-    coverOpacityInput,
     ocrLanguageInput,
     ocrButton,
     ocrReviewButton,
@@ -839,10 +831,61 @@ export async function renderPdf(
     saveAsButton,
     status,
   );
+  // Style controls sit on their own row and only appear while they apply: text
+  // controls for text edits or tools, cover controls for covers.
+  const styleBar = window.document.createElement("div");
+  styleBar.className = "pdf-edit-stylebar";
+  const textStyleGroup = window.document.createElement("div");
+  textStyleGroup.className = "pdf-edit-style-group";
+  textStyleGroup.setAttribute("aria-label", "Text style");
+  textStyleGroup.append(
+    fontFamilySelect,
+    fontSizeInput,
+    boldButton,
+    italicButton,
+    alignSelect,
+    colorInput,
+    opacityInput,
+  );
+  const coverStyleGroup = window.document.createElement("div");
+  coverStyleGroup.className = "pdf-edit-style-group";
+  coverStyleGroup.setAttribute("aria-label", "Cover style");
+  const coverLabel = window.document.createElement("span");
+  coverLabel.className = "pdf-edit-style-label";
+  coverLabel.textContent = "Cover";
+  coverStyleGroup.append(coverLabel, coverColorInput, coverOpacityInput);
+  styleBar.append(textStyleGroup, coverStyleGroup);
+  toolbar.append(styleBar);
+  const updateStyleBar = (): void => {
+    const operation = selectedOperation();
+    const type = operation?.type;
+    const showText =
+      activeTool === "text" ||
+      activeTool === "replace" ||
+      type === "textBox" ||
+      type === "replacementText" ||
+      type === "directTextEdit";
+    const showCover =
+      activeTool === "cover" ||
+      activeTool === "replace" ||
+      type === "coverPatch" ||
+      type === "replacementText";
+    textStyleGroup.hidden = !showText;
+    coverStyleGroup.hidden = !showCover;
+    styleBar.hidden = !showText && !showCover;
+  };
   const container = window.document.createElement("div");
   container.className = "pdf-document";
   container.dataset.path = path;
   host.append(toolbar, container);
+  // Side panels sit just below the toolbar, which wraps onto more rows when narrow.
+  const toolbarSize =
+    typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => {
+          host.style.setProperty("--pdf-toolbar-height", `${toolbar.offsetHeight}px`);
+        });
+  toolbarSize?.observe(toolbar);
   const pages: PdfPageView[] = [];
   const textSignals: PdfPageTextSignal[] = [];
   const objectSignals: PdfPageObjectSignal[] = [];
@@ -975,6 +1018,7 @@ export async function renderPdf(
     applyStyleControls(textStyle);
     coverColorInput.value = cover.color;
     coverOpacityInput.value = String(cover.opacity);
+    updateStyleBar();
     deleteButton.disabled = !id;
     reflowButton.disabled =
       !operation ||
@@ -2494,6 +2538,7 @@ export async function renderPdf(
     checkDisk,
     destroy: () => {
       clear();
+      toolbarSize?.disconnect();
       closeOcrReviewPanel();
       closeCapabilityPanel();
       closeThumbnailPanel();
