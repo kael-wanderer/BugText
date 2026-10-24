@@ -28,7 +28,16 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Direct text edits only rewrite text on the page you edited, and fall back to an
   overlay when the page's subset font may not contain the new letters.
 - PDF edit drafts with inserted images take about a third of the space, and BugText
-  says so when a draft is too large to keep instead of dropping it silently.
+  says so when a draft can't be kept instead of dropping it silently.
+- OCR Page falls back to the nearest page when no page is in view.
+- With nothing selected, the PDF style controls show the color and opacity the next
+  new edit will use, instead of the last selected edit's.
+
+### Changed
+
+- Unsaved PDF edits are kept in files under the app's config folder
+  (`pdf-drafts/`) instead of browser storage, so large drafts (images) no longer hit
+  a storage limit. Drafts from earlier versions move over the first time they open.
 
 ## [0.3.0] - 2026-10-24
 

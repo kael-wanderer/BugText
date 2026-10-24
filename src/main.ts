@@ -678,7 +678,7 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
     const tab = w.tabs.find((item) => item.id === id);
     if (tab) {
       clearDraft(tab.path, tab.id);
-      if (tab.path && isPdfFile(tab.path)) clearPdfEditDraft(tab.path);
+      if (tab.path && isPdfFile(tab.path)) void clearPdfEditDraft(tab.path);
       const recoveredId = recoveredDraftIds.get(tab.id);
       if (recoveredId) clearDraftById(recoveredId);
       recoveredDraftIds.delete(tab.id);
@@ -914,7 +914,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   }
 
   clearDraft(t.path, t.id);
-  if (t.path && isPdfFile(t.path)) clearPdfEditDraft(t.path);
+  if (t.path && isPdfFile(t.path)) void clearPdfEditDraft(t.path);
   const recoveredId = recoveredDraftIds.get(t.id);
   if (recoveredId) clearDraftById(recoveredId);
   recoveredDraftIds.delete(t.id);
@@ -1203,7 +1203,10 @@ function openPdf(windowId: string, path: string): void {
   // The PDF view reports its draft only once it renders, which a tab restored in
   // the background never does; without this, closing it would drop the edits unasked.
   const found = findTabByPath(getState().windows, path);
-  if (found && hasPdfEditDraft(path)) onPdfEditDirtyChange(found.windowId, found.tab.id, true);
+  if (!found) return;
+  void hasPdfEditDraft(path).then((hasDraft) => {
+    if (hasDraft) onPdfEditDirtyChange(found.windowId, found.tab.id, true);
+  });
 }
 
 function newDoc(): void {
@@ -1332,7 +1335,7 @@ function showActiveHistory(): void {
           path: tab.path!,
           bytes: Array.from(bytes),
         }).then(() => {
-          clearPdfEditDraft(tab.path!);
+          void clearPdfEditDraft(tab.path!);
           void recordStat(tab.path!);
           const latestWindow = getWindow(windowState.id);
           if (latestWindow) {

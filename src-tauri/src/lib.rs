@@ -13,6 +13,7 @@ mod mcp_protocol;
 mod mcp_server;
 mod menu;
 mod native_windows;
+mod pdf_drafts;
 mod preview;
 mod recovery;
 mod sandbox;
@@ -198,6 +199,8 @@ pub fn run() {
             mcp_clients::mcp_unregister,
             files::ai_models_cache_read,
             files::ai_models_cache_write,
+            pdf_drafts::pdf_draft_read,
+            pdf_drafts::pdf_draft_write,
             ai::ai_run,
             cli_scan::cli_scan,
             dock_icon::set_dock_icon,
