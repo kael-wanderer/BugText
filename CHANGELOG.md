@@ -68,6 +68,14 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   still drawing stops when another document takes its pane. Every PDF visited used
   to stay in memory until the window closed.
 
+- Saving PDF edits with Vietnamese or other non-Western text no longer fails with
+  "WinAnsi cannot encode". Such text is drawn with the matching macOS system font
+  (Arial, Times New Roman or Courier New, falling back to Arial Unicode), and a
+  character no installed font has is named in the error.
+
+- PDF edits on rotated or cropped pages are saved where they were placed and read
+  upright; they used to land offset or turned with the page.
+
 - The MCP bridge now reports when the server switch is off after a refused socket connection.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.
 - MCP now matches open tabs through the path reported by their owning window, including symlinked roots.

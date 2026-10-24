@@ -58,6 +58,7 @@ import {
 } from "./pdf-proofing";
 import { installReadableStreamAsyncIterator } from "./readable-stream-iter";
 import { manualBinarySnapshot } from "./recovery";
+import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
   setQuery: (query: string) => number;
@@ -116,6 +117,15 @@ type PdfPageView = {
   overlay: HTMLElement;
   text: string;
   box: PdfPageBox;
+};
+
+// Saving reads system fonts for text the standard PDF fonts cannot encode.
+const loadSystemFontBytes: PdfFontBytesLoader = async (fontPath) => {
+  try {
+    return new Uint8Array(await invoke<number[]>("read_file_bytes", { path: fontPath }));
+  } catch {
+    return null;
+  }
 };
 
 function operationRect(operation: PdfEditOperation): PdfRect {
@@ -2067,7 +2077,11 @@ export async function renderPdf(
       const backupPath = await invoke<string>("backup_file", { path });
       setStatus("Saving edited PDF...");
       const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(new Uint8Array(bytes), editDocument);
+      const output = await writeEditedPdf(
+        new Uint8Array(bytes),
+        editDocument,
+        loadSystemFontBytes,
+      );
       await invoke("save_bytes", { path, bytes: Array.from(output) });
       editDocument = createPdfEditDocument(path);
       undoStack = [];
@@ -2098,7 +2112,11 @@ export async function renderPdf(
     try {
       setStatus("Saving edited PDF...");
       const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(new Uint8Array(bytes), editDocument);
+      const output = await writeEditedPdf(
+        new Uint8Array(bytes),
+        editDocument,
+        loadSystemFontBytes,
+      );
       await invoke("save_bytes", { path: out, bytes: Array.from(output) });
       setStatus("Edited PDF saved", { sticky: true });
     } catch (error) {
