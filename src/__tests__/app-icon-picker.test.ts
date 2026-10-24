@@ -5,8 +5,8 @@ import { stepIcon } from "../settings-screen/app-icon-picker";
 
 describe("app icon picker", () => {
   it("stepIcon wraps both ways", () => {
-    expect(stepIcon("pixel-bug", 1)).toBe("page-bug");
-    expect(stepIcon("page-bug", -1)).toBe("pixel-bug");
+    expect(stepIcon("pixel-bug", 1)).toBe("bt-lettermark");
+    expect(stepIcon("bt-lettermark", -1)).toBe("pixel-bug");
   });
   it("stepIcon moves one step inside the list", () => {
     expect(stepIcon("page-bug", 1)).toBe("cursor-ladybug");

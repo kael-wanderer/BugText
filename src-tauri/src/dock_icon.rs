@@ -4,10 +4,10 @@
 /// Embedded 512x512 PNG for an icon id. `Ok(None)` means "use the bundle icon".
 fn dock_icon_bytes(id: &str) -> Result<Option<&'static [u8]>, String> {
     let bytes: &'static [u8] = match id {
-        "page-bug" => return Ok(None),
+        "bt-lettermark" => return Ok(None),
+        "page-bug" => include_bytes!("../icons/dock/page-bug.png"),
         "cursor-ladybug" => include_bytes!("../icons/dock/cursor-ladybug.png"),
         "hash-beetle" => include_bytes!("../icons/dock/hash-beetle.png"),
-        "bt-lettermark" => include_bytes!("../icons/dock/bt-lettermark.png"),
         "line-bug" => include_bytes!("../icons/dock/line-bug.png"),
         "markdown-bug" => include_bytes!("../icons/dock/markdown-bug.png"),
         "b-wings" => include_bytes!("../icons/dock/b-wings.png"),
@@ -46,7 +46,7 @@ fn apply(_bytes: Option<&'static [u8]>) -> Result<(), String> {
     Ok(())
 }
 
-/// Sets the Dock icon for the whole app (`page-bug` restores the bundle icon).
+/// Sets the Dock icon for the whole app (`bt-lettermark` restores the bundle icon).
 /// Async so it runs off the main thread; the AppKit call is hopped onto it.
 #[tauri::command]
 pub async fn set_dock_icon(app: tauri::AppHandle, id: String) -> Result<(), String> {
@@ -72,16 +72,16 @@ mod tests {
     }
 
     #[test]
-    fn page_bug_resets_to_bundle_icon() {
-        assert!(dock_icon_bytes("page-bug").unwrap().is_none());
+    fn lettermark_resets_to_bundle_icon() {
+        assert!(dock_icon_bytes("bt-lettermark").unwrap().is_none());
     }
 
     #[test]
     fn embedded_pngs_are_png() {
         for id in [
+            "page-bug",
             "cursor-ladybug",
             "hash-beetle",
-            "bt-lettermark",
             "line-bug",
             "markdown-bug",
             "b-wings",

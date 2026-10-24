@@ -12,10 +12,10 @@ export type ZoneSettings = {
 };
 
 export const APP_ICON_IDS = [
+  "bt-lettermark",
   "page-bug",
   "cursor-ladybug",
   "hash-beetle",
-  "bt-lettermark",
   "line-bug",
   "markdown-bug",
   "b-wings",
@@ -24,7 +24,7 @@ export const APP_ICON_IDS = [
   "pixel-bug",
 ] as const;
 export type AppIconId = (typeof APP_ICON_IDS)[number];
-export const DEFAULT_APP_ICON: AppIconId = "page-bug";
+export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 
 export type Settings = {
   mcp: { enabled: boolean };
