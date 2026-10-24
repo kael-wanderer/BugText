@@ -180,6 +180,8 @@ export function createWindowView(
   let previewText = "";
   let previewPathOrName: string | null = null;
   let pdfTargetPage: number | undefined;
+  // Scroll position to return to when the open PDF reloads from disk.
+  let pdfReloadScroll: { top: number; left: number } | null = null;
   let pdfFind: PdfFindHandle | null = null;
   let textFindMatches: HTMLElement[] = [];
   let textFindIndex = -1;
@@ -434,6 +436,8 @@ export function createWindowView(
     if (isPdfFile(pathOrName)) {
       const pdfTabId = getWindow(windowId)?.activeTabId;
       const token = ++previewRenderToken;
+      const restoreScroll = pdfReloadScroll;
+      pdfReloadScroll = null;
       previewFrame = null;
       previewCanvas = null;
       htmlPreviewContentSize = null;
@@ -447,6 +451,7 @@ export function createWindowView(
           if (pdfTabId) h.onPdfEditDirtyChange(windowId, pdfTabId, dirty);
         },
         onReloadRequest: () => {
+          pdfReloadScroll = { top: previewPane.scrollTop, left: previewPane.scrollLeft };
           renderPreview(previewText, pathOrName);
         },
         isCurrent: () => token === previewRenderToken,
@@ -458,6 +463,10 @@ export function createWindowView(
           }
           pdfFind = handle;
           setPreviewZoom(previewZoom);
+          if (restoreScroll) {
+            previewPane.scrollTop = restoreScroll.top;
+            previewPane.scrollLeft = restoreScroll.left;
+          }
           if (!findBar.classList.contains("hidden") && findInput.value) runFind();
         })
         .catch((error) => {

@@ -175,3 +175,8 @@ CORS headers). A newer semantic version offers to open the `https` release page 
 the browser; the app never downloads or installs itself, so there is no updater
 plugin or signing key. Settings ▸ General offers Manual (no background checks) and
 Automatic (at most once per 24 hours).
+
+The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
+(started at 249). Raise it by one for every build handed out, even when the version
+is unchanged, and never reuse a number. `build.rs` bakes it in as `BUGTEXT_BUILD`
+(the runtime config omits bundle settings) for Settings ▸ General and About.

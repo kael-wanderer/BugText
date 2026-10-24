@@ -49,6 +49,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .about(Some(AboutMetadata {
             name: Some("BugText".into()),
             version: Some(env!("CARGO_PKG_VERSION").into()),
+            // Shown in parentheses after the version.
+            short_version: option_env!("BUGTEXT_BUILD").map(Into::into),
             comments: Some("A fast, lightweight markdown editor".into()),
             ..Default::default()
         }))

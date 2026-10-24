@@ -141,9 +141,10 @@ fn window_tile(window: tauri::Window, side: String) {
     let _ = window.set_size(tauri::PhysicalSize::new(half_w, size.height));
 }
 
+/// The build number (`bundle.macOS.bundleVersion`) shown beside the version.
 #[tauri::command]
-fn restart_app(app: tauri::AppHandle) {
-    app.restart();
+fn app_build() -> Option<&'static str> {
+    option_env!("BUGTEXT_BUILD")
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -189,6 +190,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             update_feed::update_feed_fetch,
+            app_build,
             mcp_server::mcp_set_enabled,
             mcp_server::mcp_report_window,
             mcp_server::mcp_reply,
@@ -253,7 +255,6 @@ pub fn run() {
             window_fullscreen_toggle,
             window_tile,
             native_windows::new_window,
-            restart_app,
         ])
         .build(tauri::generate_context!())
         .expect("error while building BugText")
