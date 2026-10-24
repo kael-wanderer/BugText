@@ -308,6 +308,11 @@ export function clearPdfEditDraft(path: string): void {
   }
 }
 
+/** True when unsaved edits for `path` are stored, so a tab can show them before it renders. */
+export function hasPdfEditDraft(path: string): boolean {
+  return hasPdfEdits(loadDraft(path));
+}
+
 function loadDraft(path: string): PdfEditDocument {
   try {
     const raw =

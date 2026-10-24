@@ -57,7 +57,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 - A pane no longer shows a PDF over its active tab after relaunch. A PDF tab restored
   in the background, or one switched away from while still loading, used to finish
-  loading and draw over the document that had taken its place.
+  loading and draw over the document that had taken its place. A PDF tab with
+  unsaved edits now shows its unsaved dot as soon as it is restored, so closing it
+  asks first even if it was never opened.
 
 - The MCP bridge now reports when the server switch is off after a refused socket connection.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.

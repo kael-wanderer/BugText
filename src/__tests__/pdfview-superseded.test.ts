@@ -42,3 +42,28 @@ it("frees the loaded document when the render is superseded after parsing", asyn
   expect(destroyDocument).toHaveBeenCalledOnce();
   expect(host.querySelector(".pdf-edit-toolbar")).toBeNull();
 });
+
+it("reports a stored edit draft before the PDF renders", async () => {
+  const { hasPdfEditDraft } = await import("../pdfview");
+  const { createPdfEditDocument, addPdfEditOperation, serializePdfEditDocument } =
+    await import("../pdf-edit-document");
+  const path = "/notes/draft.pdf";
+  // The test DOM has no window.localStorage; expose the setup's in-memory one.
+  Object.assign(window, { localStorage: globalThis.localStorage });
+  expect(hasPdfEditDraft(path)).toBe(false);
+  const page = { page: 1, width: 612, height: 792 };
+  const draft = addPdfEditOperation(createPdfEditDocument(path), page, {
+    id: "cover-1",
+    type: "coverPatch",
+    page: 1,
+    rect: { x: 10, y: 10, width: 50, height: 20 },
+    color: "#ffffff",
+    opacity: 1,
+  });
+  window.localStorage.setItem(
+    `bugtext.pdf.edits.${encodeURIComponent(path)}`,
+    serializePdfEditDocument(draft),
+  );
+  expect(hasPdfEditDraft(path)).toBe(true);
+  window.localStorage.removeItem(`bugtext.pdf.edits.${encodeURIComponent(path)}`);
+});
