@@ -53,7 +53,6 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   newer version is listed, BugText offers to open its download page in the
   browser instead of installing in place, so releases no longer need an updater
   signing key.
-
 - The PDF toolbar wraps instead of scrolling sideways, and its style controls moved
   to a second row that appears only while they apply: text style for text edits and
   the Text/Replace tools, cover color and opacity for covers.

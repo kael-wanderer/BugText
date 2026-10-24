@@ -241,12 +241,13 @@ faq = [
     {
         "question": "How do I install and update it?",
         "answer": (
-            "Download the .dmg from the GitHub releases page and drag BugText to "
+            "Download the .dmg from this page and drag BugText to "
             "Applications. The app is not signed with an Apple Developer ID yet, so the "
             "first launch shows a Gatekeeper warning. Open System Settings ▸ Privacy & "
-            "Security and click Open Anyway, then launch it again. Updates are "
-            "signed and BugText always asks before installing one. Checks are manual "
-            "by default; you can turn on a daily automatic check."
+            "Security and click Open Anyway, then launch it again. When a new version "
+            "is out, BugText offers to open its download page here; it never installs "
+            "anything on its own. Checks are manual by default; you can turn on a "
+            "daily automatic check."
         ),
     },
     {
@@ -298,18 +299,17 @@ faq = [
 ]
 
 release = {
-    "version": "0.3.0",
+    "version": "0.3.1",
     "whats_new": [
-        "New name: mdFlow is now BugText, with a new icon. Settings, recent files and saved API keys from mdFlow do not carry over.",
-        "Settings: a full-window Settings screen (⌘,) with search and General, Editing, Theme, Shortcuts and AI pages.",
-        "AI engines: pick Claude Code, Codex CLI, Pi or an API connection, with its model and effort, for Chat and each quick action.",
-        "Safer agents: coding agents run in a macOS sandbox limited to the open folder, and BugText lists every file they changed.",
-        "MCP server: Claude Code and Codex can search, read and edit your open notes. Off by default; each edit is snapshotted first.",
-        "Also new since 0.2.7: SQL highlighting, drag files between folders, interactive HTML previews and offline PDF OCR.",
-        "Fixed: PDFs look sharp on Retina and save Vietnamese text and rotated-page edits; files reload when changed elsewhere; settings sync.",
-        "Removed: Excalidraw boards. .excalidraw files now open as plain JSON text; open them in BugMind to keep drawing.",
-        "Removed: jsMind mind maps. .mind files stay on disk and open as plain JSON text; no BugText or BugMind importer reads them.",
-        "Removed: the Agent Console and built-in terminal. Run Claude Code, Codex or Pi in your own terminal app.",
+        "Updates: BugText checks kael.io.vn for new versions and opens the download page. Nothing installs on its own.",
+        "Coming from 0.3.0? Download 0.3.1 once from this page; later versions are offered inside the app.",
+        "Safer PDF saves: BugText asks before replacing a PDF that changed on disk, and notices changes while it is open.",
+        "PDF drafts: unsaved edits survive a restart and ask before they are applied to a PDF that has changed since.",
+        "Direct text edits now work on text in fonts embedded by most PDF tools, using the font's own letters.",
+        "Long PDFs open faster and stay sharp: only the pages near the view are drawn.",
+        "PDF toolbar wraps to a second row; text and covers get their own color and opacity controls.",
+        "Fixed: Esc cancels an in-place edit, one undo step per drag, OCR reads the page in view, covers fit rotated pages.",
+        "Fixed: History ▸ Restore redraws a PDF straight away.",
     ],
 }
 
@@ -324,8 +324,6 @@ questions = [
     "minimum is set or tested. What should the requirements line state?",
     "Signing: the build is ad hoc signed and not notarized, so the FAQ mentions the "
     "Gatekeeper prompt. Confirm, or tell me if Developer ID signing is planned.",
-    "Download link: should the page point to GitHub releases, or will kael.io.vn host "
-    "the .dmg?",
     "Category: I used Productivity. The admin's category list was not available to me.",
     "Accent colour: #2F5BD3 is the icon's blue background. The in-app accent is "
     "amber #B9762A. Pick one.",
