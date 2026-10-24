@@ -34,6 +34,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-026 | 2026-10-24 | PDF editor / Direct | Major | — | Direct rewrite matches text across the whole file, not the selected page, and subset fonts may lack replacement glyphs | fixed (0.3.1) |
 | BUG-027 | 2026-10-24 | PDF editor / drafts | Minor | — | Inserted images are stored in the localStorage draft as JSON number arrays; past ~5 MB the draft silently stops saving | fixed (0.3.1) |
 | BUG-028 | 2026-10-24 | PDF editor / Proofread | Minor | — | Typing in a Proofread suggestion box lost focus after each character: every keystroke rebuilt the proof panel | fixed (0.3.1) |
+| BUG-029 | 2026-10-24 | PDF / reload | Minor | — | A clean PDF that reloads after another app changes it jumps back to page 1 | fixed (0.3.2) |
 
 > Delete the example row once real bugs are logged.
 

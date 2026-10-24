@@ -6,6 +6,11 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- A PDF that reloads after another app changes it stays at the same scroll
+  position instead of jumping back to page 1.
+
 ## [0.3.1] - 2026-10-24
 
 ### Fixed
