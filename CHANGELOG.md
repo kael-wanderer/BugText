@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-24
+
 ### Changed
 
 - New app icon: the bT Lettermark (a lime "b" with antennae and a white "T" on
