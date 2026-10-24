@@ -58,6 +58,7 @@ import {
 } from "./pdf-proofing";
 import { installReadableStreamAsyncIterator } from "./readable-stream-iter";
 import { manualBinarySnapshot } from "./recovery";
+import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
   setQuery: (query: string) => number;
@@ -70,12 +71,37 @@ export type PdfRenderOptions = {
   initialPage?: number;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
+  /** Return false once another document owns `host`; loading then stops before touching it. */
+  isCurrent?: () => boolean;
 };
+
+/** Rejection from `renderPdf` when the load was superseded before it drew anything. */
+export class PdfRenderSuperseded extends Error {
+  constructor() {
+    super("PDF render superseded");
+    this.name = "PdfRenderSuperseded";
+  }
+}
 
 export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
 
 const RENDER_SCALE = 1.4;
+// Upper bound on canvas pixels for one document (about 1 GB of RGBA). Every page
+// is drawn up front, so a long PDF on a Retina display drops back toward 1x.
+const PDF_CANVAS_PIXEL_BUDGET = 256 * 1024 * 1024;
+
+/** Canvas pixels per CSS pixel: the display's ratio (max 2x), reduced to stay inside the budget. */
+export function pdfOutputScale(
+  devicePixelRatio: number,
+  cssPixelsPerPage: number,
+  pageCount: number,
+): number {
+  const ratio = Math.max(1, Math.min(devicePixelRatio || 1, 2));
+  const cssPixels = Math.max(1, cssPixelsPerPage * pageCount);
+  if (cssPixels * ratio * ratio <= PDF_CANVAS_PIXEL_BUDGET) return ratio;
+  return Math.max(1, Math.sqrt(PDF_CANVAS_PIXEL_BUDGET / cssPixels));
+}
 const PDF_EDIT_HISTORY_LIMIT = 80;
 type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 type PendingPdfImage = {
@@ -91,6 +117,15 @@ type PdfPageView = {
   overlay: HTMLElement;
   text: string;
   box: PdfPageBox;
+};
+
+// Saving reads system fonts for text the standard PDF fonts cannot encode.
+const loadSystemFontBytes: PdfFontBytesLoader = async (fontPath) => {
+  try {
+    return new Uint8Array(await invoke<number[]>("read_file_bytes", { path: fontPath }));
+  } catch {
+    return null;
+  }
 };
 
 function operationRect(operation: PdfEditOperation): PdfRect {
@@ -298,6 +333,11 @@ export function clearPdfEditDraft(path: string): void {
   }
 }
 
+/** True when unsaved edits for `path` are stored, so a tab can show them before it renders. */
+export function hasPdfEditDraft(path: string): boolean {
+  return hasPdfEdits(loadDraft(path));
+}
+
 function loadDraft(path: string): PdfEditDocument {
   try {
     const raw =
@@ -502,14 +542,24 @@ export async function renderPdf(
   path: string,
   options?: PdfRenderOptions,
 ): Promise<PdfFindHandle> {
+  const ensureCurrent = (): void => {
+    if (options?.isCurrent && !options.isCurrent()) throw new PdfRenderSuperseded();
+  };
   host.innerHTML = '<div class="pdf-loading">Loading PDF…</div>';
   installReadableStreamAsyncIterator();
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  ensureCurrent();
   const bytes = await invoke<number[]>("read_file_bytes", { path });
-  const document = await pdfjs.getDocument({
+  ensureCurrent();
+  const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(bytes),
-  }).promise;
+  });
+  const document = await loadingTask.promise;
+  if (options?.isCurrent && !options.isCurrent()) {
+    void loadingTask.destroy();
+    throw new PdfRenderSuperseded();
+  }
   host.innerHTML = "";
   let editDocument: PdfEditDocument = loadDraft(path);
   let activeTool: PdfEditTool = "select";
@@ -2027,7 +2077,11 @@ export async function renderPdf(
       const backupPath = await invoke<string>("backup_file", { path });
       setStatus("Saving edited PDF...");
       const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(new Uint8Array(bytes), editDocument);
+      const output = await writeEditedPdf(
+        new Uint8Array(bytes),
+        editDocument,
+        loadSystemFontBytes,
+      );
       await invoke("save_bytes", { path, bytes: Array.from(output) });
       editDocument = createPdfEditDocument(path);
       undoStack = [];
@@ -2058,7 +2112,11 @@ export async function renderPdf(
     try {
       setStatus("Saving edited PDF...");
       const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(new Uint8Array(bytes), editDocument);
+      const output = await writeEditedPdf(
+        new Uint8Array(bytes),
+        editDocument,
+        loadSystemFontBytes,
+      );
       await invoke("save_bytes", { path: out, bytes: Array.from(output) });
       setStatus("Edited PDF saved", { sticky: true });
     } catch (error) {
@@ -2088,9 +2146,22 @@ export async function renderPdf(
   });
   setTool("select");
 
+  let outputScale = 1;
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    // Stop drawing once another document owns the pane; nothing else frees this one.
+    if (options?.isCurrent && !options.isCurrent()) {
+      void loadingTask.destroy();
+      throw new PdfRenderSuperseded();
+    }
     const page = await document.getPage(pageNumber);
     const viewport = page.getViewport({ scale: RENDER_SCALE });
+    if (pageNumber === 1) {
+      outputScale = pdfOutputScale(
+        window.devicePixelRatio,
+        viewport.width * viewport.height,
+        document.numPages,
+      );
+    }
     const pageElement = window.document.createElement("div");
     pageElement.className = "pdf-page-wrap";
     pageElement.dataset.page = String(pageNumber);
@@ -2098,13 +2169,20 @@ export async function renderPdf(
     pageElement.style.height = `${viewport.height}px`;
     const canvas = window.document.createElement("canvas");
     canvas.className = "pdf-page";
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
+    // Back the canvas with device pixels so text stays sharp on Retina displays.
+    canvas.width = Math.floor(viewport.width * outputScale);
+    canvas.height = Math.floor(viewport.height * outputScale);
+    canvas.style.width = `${viewport.width}px`;
     pageElement.appendChild(canvas);
     container.appendChild(pageElement);
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas rendering is unavailable");
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
+    await page.render({
+      canvas,
+      canvasContext: context,
+      viewport,
+      transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+    }).promise;
     // Text extraction powers the find feature; never let it block the visible
     // page render (it can fail per-file on some PDFs).
     let pageText = "";
@@ -2264,6 +2342,9 @@ export async function renderPdf(
       host.removeEventListener(PDF_SAVE_EVENT, onMenuSave);
       host.removeEventListener(PDF_SAVE_AS_EVENT, onMenuSaveAs);
       host.removeEventListener("keydown", keyHandler);
+      // Frees the parsed document and its worker-side data; a PDF tab switch would
+      // otherwise keep every visited document alive.
+      void loadingTask.destroy();
     },
   };
 }

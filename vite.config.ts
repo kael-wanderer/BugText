@@ -14,9 +14,10 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    // Mermaid's optional diagram engines are lazy chunks; keep the startup
-    // bundle small while allowing those on-demand engines to exceed 500 kB.
-    chunkSizeWarningLimit: 700,
+    // Mermaid's optional diagram engines and fontkit (PDF saves with non-Latin
+    // text) are lazy chunks; keep the startup bundle small while allowing those
+    // on-demand engines to exceed 500 kB.
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
         manualChunks(id) {

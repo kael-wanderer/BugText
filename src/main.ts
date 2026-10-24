@@ -68,7 +68,7 @@ import {
   type ExportItem,
 } from "./export-options";
 import { initResize } from "./resize";
-import { clearPdfEditDraft } from "./pdfview";
+import { clearPdfEditDraft, hasPdfEditDraft } from "./pdfview";
 import {
   applySettings,
   DEFAULT_APP_ICON,
@@ -1200,6 +1200,10 @@ async function doOpen(): Promise<void> {
 function openPdf(windowId: string, path: string): void {
   openInWindow(windowId, { path, name: basename(path), text: "" });
   setMode(windowId, "preview");
+  // The PDF view reports its draft only once it renders, which a tab restored in
+  // the background never does; without this, closing it would drop the edits unasked.
+  const found = findTabByPath(getState().windows, path);
+  if (found && hasPdfEditDraft(path)) onPdfEditDirtyChange(found.windowId, found.tab.id, true);
 }
 
 function newDoc(): void {

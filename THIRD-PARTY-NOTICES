@@ -2,14 +2,16 @@ BugText bundles the following third-party libraries. Each is distributed under
 its own permissive license, reproduced or referenced below.
 
 ================================================================================
-Tauri (tauri, tauri-plugin-dialog, tauri-plugin-updater, tauri-plugin-opener)
+Tauri (tauri, tauri-plugin-dialog, tauri-plugin-updater, tauri-plugin-opener,
+       tauri-plugin-clipboard-manager)
   License: MIT OR Apache-2.0
   https://github.com/tauri-apps/tauri
 ================================================================================
 CodeMirror 6
   (codemirror, @codemirror/state, @codemirror/view, @codemirror/commands,
-   @codemirror/lang-markdown, @codemirror/lang-html,
-   @codemirror/language-data)
+   @codemirror/search, @codemirror/language, @codemirror/language-data,
+   @codemirror/lang-markdown, @codemirror/lang-html, @codemirror/lang-javascript,
+   @codemirror/lang-json, @codemirror/lang-sql, @codemirror/lang-yaml)
   License: MIT
   https://github.com/codemirror/dev
 ================================================================================
@@ -24,6 +26,34 @@ highlight.js
 Vite
   License: MIT
   https://github.com/vitejs/vite
+================================================================================
+KaTeX
+  License: MIT
+  https://github.com/KaTeX/KaTeX
+================================================================================
+Mermaid
+  License: MIT
+  https://github.com/mermaid-js/mermaid
+================================================================================
+PDF.js (pdfjs-dist)
+  License: Apache-2.0
+  https://github.com/mozilla/pdf.js
+================================================================================
+pdf-lib
+  License: MIT
+  https://github.com/Hopding/pdf-lib
+================================================================================
+@pdf-lib/fontkit
+  License: MIT
+  https://github.com/Hopding/fontkit
+================================================================================
+pako
+  License: MIT AND Zlib
+  https://github.com/nodeca/pako
+================================================================================
+tesseract.js (with tesseract.js-core and the eng / vie trained data)
+  License: Apache-2.0
+  https://github.com/naptha/tesseract.js
 ================================================================================
 
 Full license texts are available in each package's distribution under

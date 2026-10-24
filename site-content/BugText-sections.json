@@ -1,0 +1,186 @@
+{
+  "requirements": "macOS · Apple Silicon & Intel · Pandoc + Typst for PDF/DOCX export",
+  "features": [
+    {
+      "background": "plain",
+      "kicker": "What it is",
+      "title": "A Markdown editor that shows the finished page as you type",
+      "description": "Open a folder and BugText lists every note in an Explorer beside the editor. Type on the left and the rendered page updates on the right, with tables, task lists, KaTeX math and Mermaid diagrams drawn in place.",
+      "layout": "split",
+      "bullets": [
+        "Editor, Read or Editor + Preview mode for each tab",
+        "Formatting toolbar for headings, links, lists, tables and task lists",
+        "Syntax highlighting for Markdown, HTML, JSON, YAML, SQL and JavaScript",
+        "Tabs with unsaved markers, pinning and session restore",
+        "Six themes: System, Light, Dark, Catppuccin Mocha, Everforest Dark, Nord"
+      ],
+      "side": "right",
+      "media": {
+        "pictures": [
+          "01-hero.png",
+          "02-reading-view.png"
+        ]
+      }
+    },
+    {
+      "background": "tint",
+      "kicker": "Find and read",
+      "title": "Notes, search and PDFs in the same window",
+      "description": "Search a whole folder, open any file from the keyboard, read PDFs next to your notes and keep two documents open side by side.",
+      "layout": "showcase",
+      "tiles": [
+        {
+          "title": "Find in Folder",
+          "caption": "Search every text file and PDF at once, with case, whole-word and regex options.",
+          "picture": "03-find-in-folder.png"
+        },
+        {
+          "title": "Command palette",
+          "caption": "⌘K finds files, headings in the open note, and every command.",
+          "picture": "04-command-palette.png"
+        },
+        {
+          "title": "PDF reader and editor",
+          "caption": "Add text and cover boxes, rewrite selected text, or OCR a scanned page offline.",
+          "picture": "05-pdf-editing.png"
+        },
+        {
+          "title": "Main and Sub panes",
+          "caption": "Split any window into two panes with their own tabs and view modes.",
+          "picture": "08-split-nord-theme.png"
+        }
+      ]
+    },
+    {
+      "background": "dark",
+      "kicker": "Optional AI",
+      "title": "Ask about your notes with the AI tools you already use",
+      "description": "The AI panel reads the open note and the most relevant passages from your folder, then shows which files it used. It runs Claude Code, Codex CLI or Pi from your Mac, or any API connection you add.",
+      "layout": "split",
+      "bullets": [
+        "Choose an engine and model separately for Chat and each quick action",
+        "Proofread, Rewrite, Summarize and Generate outline from ⌘K or right-click",
+        "Every AI edit is shown as a diff before it touches your text",
+        "Attach files with 📎, drag and drop, or an @-mention",
+        "Works with Ollama, LM Studio, Anthropic, OpenAI and OpenRouter"
+      ],
+      "side": "left",
+      "media": {
+        "pictures": [
+          "06-ai-chat.png",
+          "07-ai-settings.png"
+        ]
+      }
+    },
+    {
+      "background": "plain",
+      "kicker": "How it works",
+      "title": "From folder to finished document in four steps",
+      "description": "BugText works on the files you already have. Nothing to import.",
+      "layout": "cards",
+      "numbered": true,
+      "cards": [
+        {
+          "title": "Open a folder",
+          "text": "Pick any folder of notes. The Explorer shows its files, and you can create, rename, move and delete them there."
+        },
+        {
+          "title": "Write and preview",
+          "text": "Edit Markdown with the preview beside you. Diagrams, math and tables render as you type."
+        },
+        {
+          "title": "Find and ask",
+          "text": "Search the folder, jump with ⌘K, or ask the AI panel a question about your notes."
+        },
+        {
+          "title": "Save or export",
+          "text": "Save with ⌘S. Export to PDF, Word (DOCX), PNG or SVG with math and diagrams included."
+        }
+      ]
+    },
+    {
+      "background": "tint",
+      "kicker": "Local first",
+      "title": "Your files stay on your Mac",
+      "description": "BugText has no account and no cloud storage. It edits plain files in folders you choose, and keeps its own safety copies beside them.",
+      "layout": "cards",
+      "numbered": false,
+      "cards": [
+        {
+          "title": "Plain files",
+          "text": "Notes are ordinary .md and .txt files. Open them in any other editor, or put the folder in your own sync service."
+        },
+        {
+          "title": "Recovery and history",
+          "text": "Unsaved edits are drafted in the background and offered back after a crash. Each save keeps a local snapshot you can compare and restore."
+        },
+        {
+          "title": "Keys in the Keychain",
+          "text": "API keys are stored in the macOS Keychain, never in settings files."
+        },
+        {
+          "title": "Sandboxed AI runs",
+          "text": "Coding agents run in a macOS sandbox limited to the open folder, and BugText lists every file they changed."
+        },
+        {
+          "title": "Offline OCR",
+          "text": "PDF text recognition runs inside the app with no network connection. English and Vietnamese are included."
+        },
+        {
+          "title": "Open source",
+          "text": "BugText is MIT licensed and its source code is public on GitHub."
+        }
+      ]
+    }
+  ],
+  "faq": [
+    {
+      "question": "What is BugText?",
+      "answer": "BugText is a desktop Markdown editor and document workspace. It opens a folder of Markdown, text, HTML and PDF files in one window, with a live preview, folder search, a command palette, a PDF reader with editing tools, and an optional AI panel."
+    },
+    {
+      "question": "Who is it for?",
+      "answer": "People who keep notes, documentation or project files as Markdown in folders: developers, technical writers, students and researchers who want an IDE-style layout without a heavy IDE."
+    },
+    {
+      "question": "Which platforms does it run on?",
+      "answer": "BugText is built for macOS and runs natively on Apple Silicon and Intel Macs. PDF and DOCX export need Pandoc and Typst, which you can install with `brew install pandoc typst`. The AI panel needs either a supported command-line agent or an API connection."
+    },
+    {
+      "question": "How much does it cost?",
+      "answer": "BugText is free. It is open source under the MIT license. AI providers you connect may charge for their own service."
+    },
+    {
+      "question": "Where are my files and settings stored?",
+      "answer": "Your notes stay where you put them, as plain files. Settings live in the app's configuration folder on your Mac, and API keys are kept in the macOS Keychain. BugText has no account and does not upload your files. When you use AI, the note text and passages you send go to the engine you chose."
+    },
+    {
+      "question": "Does it work offline? Does it sync?",
+      "answer": "Everything except cloud AI and update checks works offline, including PDF OCR. BugText has no sync service of its own. Because notes are normal files, you can keep the folder in iCloud Drive, Dropbox or a Git repo, and BugText reloads files that change on disk."
+    },
+    {
+      "question": "How do I install and update it?",
+      "answer": "Download the .dmg from the GitHub releases page and drag BugText to Applications. The app is not signed with an Apple Developer ID yet, so the first launch shows a Gatekeeper warning. Open System Settings ▸ Privacy & Security and click Open Anyway, then launch it again. Updates are signed and BugText always asks before installing one. Checks are manual by default; you can turn on a daily automatic check."
+    },
+    {
+      "question": "Can I import and export documents?",
+      "answer": "There is nothing to import: open any folder of .md, .txt, .html or .pdf files. Markdown documents export to PDF and Word (DOCX) with math and diagrams rendered, or to PNG and SVG images. HTML documents export to PNG and SVG."
+    },
+    {
+      "question": "How is it different from Obsidian or VS Code?",
+      "answer": "BugText has no vault format or plugin system to learn: it opens plain folders. Unlike VS Code it is built around reading and writing documents, with a rendered preview, a PDF reader and editor, and document export in the box. It does not have VS Code's extension ecosystem or Obsidian's linked-note graph."
+    },
+    {
+      "question": "Which AI tools does it work with?",
+      "answer": "BugText detects Claude Code, Codex CLI and Pi installed on your Mac. It can also connect to Anthropic, OpenAI, OpenRouter, or any OpenAI- or Anthropic-compatible server, including local models in Ollama, LM Studio and MLX. Each AI feature can use a different engine, and each can be turned off."
+    },
+    {
+      "question": "Can terminal agents read my notes?",
+      "answer": "Yes, if you turn it on. BugText includes an MCP server that lets Claude Code and Codex list, search, read, update and create notes in the folders open in the app. It is off by default, is limited to open folders, and takes a snapshot before every edit so you can undo it."
+    },
+    {
+      "question": "How do I report a bug or ask for a feature?",
+      "answer": "Open an issue at github.com/kael-wanderer/BugText/issues. Include your macOS version, the BugText version from Settings ▸ General, and the steps that cause the problem."
+    }
+  ]
+}
