@@ -70,7 +70,17 @@ export type PdfRenderOptions = {
   initialPage?: number;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
+  /** Return false once another document owns `host`; loading then stops before touching it. */
+  isCurrent?: () => boolean;
 };
+
+/** Rejection from `renderPdf` when the load was superseded before it drew anything. */
+export class PdfRenderSuperseded extends Error {
+  constructor() {
+    super("PDF render superseded");
+    this.name = "PdfRenderSuperseded";
+  }
+}
 
 export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
@@ -502,14 +512,24 @@ export async function renderPdf(
   path: string,
   options?: PdfRenderOptions,
 ): Promise<PdfFindHandle> {
+  const ensureCurrent = (): void => {
+    if (options?.isCurrent && !options.isCurrent()) throw new PdfRenderSuperseded();
+  };
   host.innerHTML = '<div class="pdf-loading">Loading PDF…</div>';
   installReadableStreamAsyncIterator();
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  ensureCurrent();
   const bytes = await invoke<number[]>("read_file_bytes", { path });
-  const document = await pdfjs.getDocument({
+  ensureCurrent();
+  const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(bytes),
-  }).promise;
+  });
+  const document = await loadingTask.promise;
+  if (options?.isCurrent && !options.isCurrent()) {
+    void loadingTask.destroy();
+    throw new PdfRenderSuperseded();
+  }
   host.innerHTML = "";
   let editDocument: PdfEditDocument = loadDraft(path);
   let activeTool: PdfEditTool = "select";

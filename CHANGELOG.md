@@ -6,6 +6,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- A pane no longer shows a PDF over its active tab after relaunch. A PDF tab restored
+  in the background, or one switched away from while still loading, used to finish
+  loading and draw over the document that had taken its place.
+
 ## [0.3.0] - 2026-10-23
 
 ### Changed

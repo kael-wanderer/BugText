@@ -447,6 +447,7 @@ export function createWindowView(
         onReloadRequest: () => {
           renderPreview(previewText, pathOrName);
         },
+        isCurrent: () => token === previewRenderToken,
       })
         .then((handle) => {
           if (token !== previewRenderToken) {
