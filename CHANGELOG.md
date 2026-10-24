@@ -6,7 +6,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-10-23
+## [0.3.0] - 2026-10-24
 
 ### Changed
 
