@@ -4,8 +4,9 @@
 // one <symbol id="ic" viewBox="0 0 1024 1024">. NOTE: docs/ is gitignored, so
 // these sources are local-only; the OUTPUTS below are committed:
 //   - src/settings-screen/app-icons.ts   (preview SVG markup, carousel order)
-//   - src-tauri/icons/dock/<id>.png      (512x512 Dock PNGs, not for page-bug)
-// page-bug is the bundle icon, so the Dock is reset to it (no PNG needed).
+//   - src-tauri/icons/dock/<id>.png      (512x512 Dock PNGs, not for bt-lettermark)
+// bt-lettermark is the bundle icon, so the Dock is reset to it (no PNG needed).
+// Regenerate the bundle icons from its artboard with `npx tauri icon <svg>`.
 //
 // Add a concept: add its id to APP_ICON_IDS in src/settings.ts, add a row to
 // CONCEPTS below, add the id to the allowlist in src-tauri/src/dock_icon.rs,
@@ -22,10 +23,10 @@ const dockDir = join(root, "src-tauri/icons/dock");
 const outTs = join(root, "src/settings-screen/app-icons.ts");
 
 const CONCEPTS = [
+  { id: "bt-lettermark", file: "Lettermark", name: "bT Lettermark" },
   { id: "page-bug", file: "PageBug", name: "Page Bug" },
   { id: "cursor-ladybug", file: "Main", name: "Cursor Ladybug" },
   { id: "hash-beetle", file: "HashBeetle", name: "Hash Beetle" },
-  { id: "bt-lettermark", file: "Lettermark", name: "bT Lettermark" },
   { id: "line-bug", file: "LineBug", name: "Line Bug" },
   { id: "markdown-bug", file: "MarkdownBug", name: "Markdown Bug" },
   { id: "b-wings", file: "BWings", name: "B Wings" },
@@ -63,7 +64,7 @@ mkdirSync(dockDir, { recursive: true });
 const tmp = mkdtempSync(join(tmpdir(), "bugtext-app-icons-"));
 try {
   for (const icon of icons) {
-    if (icon.id === "page-bug") continue;
+    if (icon.id === "bt-lettermark") continue;
     const svgPath = join(tmp, `${icon.id}.svg`);
     const outDir = join(tmp, icon.id);
     writeFileSync(svgPath, icon.svg);
