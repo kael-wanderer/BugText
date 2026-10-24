@@ -16,6 +16,24 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-008 | 2026-07-09 | PDF editor | Major | PDFE-02-02 | Replace tool used `window.prompt`, which Tauri's WKWebView doesn't implement — the tool silently created nothing | fixed |
 | BUG-009 | 2026-07-09 | PDF editor | Minor | PDFE-03-06 | Save/Save As error status was immediately overwritten by "Unsaved PDF edits" in `updateToolbarState`, so failed saves looked like the button did nothing | fixed |
 | BUG-010 | 2026-07-09 | Excalidraw (since removed) | Major | — | Excalidraw fires `onChange` every pointer frame during pan/zoom; the board serialized the whole scene (pretty-printed JSON incl. base64 files) per frame to dedupe, stalling space+drag panning on large boards | fixed |
+| BUG-011 | 2026-07-20 | Workspace sync | Major | — | An open file kept showing stale content after another process edited it (renumbered from the duplicate BUG-007) | fixed |
+| BUG-012 | 2026-10-23 | PDF / session restore | Major | — | After relaunch a pane showed a background PDF over its active tab: `renderPdf` drew into the shared preview pane after its async load without checking the render token (5a91ca5) | fixed |
+| BUG-013 | 2026-10-24 | PDF / tabs | Major | — | A restored background PDF tab with an edit draft showed no unsaved dot, so closing it dropped the draft unasked; regression from the BUG-012 fix before release (dd1ea15) | fixed |
+| BUG-014 | 2026-10-24 | PDF editor / save | Major | — | Saving text outside WinAnsi (Vietnamese, arrows, CJK) failed the whole save with `WinAnsi cannot encode`; now uses macOS system fonts (616895b) | fixed |
+| BUG-015 | 2026-10-24 | PDF editor / save | Major | — | Edits on rotated or cropped pages were written offset or turned: the writer ignored `/Rotate` and the crop box (616895b) | fixed |
+| BUG-016 | 2026-10-24 | PDF reader | Minor | — | Pages were blurry on Retina: canvases ignored `devicePixelRatio` (11aaf92) | fixed |
+| BUG-017 | 2026-10-24 | PDF reader | Major | — | Parsed pdf.js documents were never destroyed, so every visited PDF stayed in memory; superseded renders kept drawing (11aaf92) | fixed |
+| BUG-018 | 2026-10-24 | PDF editor / save | Major | — | Save applies edits to the bytes read at first render, overwriting changes another app made since (backup keeps them) | fixed (0.3.1) |
+| BUG-019 | 2026-10-24 | PDF editor / drafts | Major | — | Edit drafts are keyed by path only, so a PDF replaced on disk gets the old file's edits | fixed (0.3.1) |
+| BUG-020 | 2026-10-24 | PDF / history | Major | — | Restoring a PDF snapshot may leave the old version on screen; a later Save would overwrite the restore (from code reading, reproduce first) | fixed (0.3.1) |
+| BUG-021 | 2026-10-24 | PDF editor / undo | Minor | — | Color/opacity inputs and Proof/OCR review textareas push one undo step per change, evicting real edits (limit 80) | fixed (0.3.1) |
+| BUG-022 | 2026-10-24 | PDF editor | Minor | — | Esc during inline text editing keeps the change instead of cancelling | open |
+| BUG-023 | 2026-10-24 | PDF / OCR | Minor | — | OCR Page picks the page whose top is nearest the toolbar, so it can OCR the wrong page | open |
+| BUG-024 | 2026-10-24 | PDF editor | Minor | — | Text color and cover color share one control (opacity too) | open |
+| BUG-025 | 2026-10-24 | PDF editor / Limits | Minor | — | Limits panel Cover is misplaced on rotated pages (object inspection ignores rotation) | open |
+| BUG-026 | 2026-10-24 | PDF editor / Direct | Major | — | Direct rewrite matches text across the whole file, not the selected page, and subset fonts may lack replacement glyphs | open |
+| BUG-027 | 2026-10-24 | PDF editor / drafts | Minor | — | Inserted images are stored in the localStorage draft as JSON number arrays; past ~5 MB the draft silently stops saving | open |
+| BUG-028 | 2026-10-24 | PDF editor / Proofread | Minor | — | Typing in a Proofread suggestion box lost focus after each character: every keystroke rebuilt the proof panel | fixed (0.3.1) |
 
 > Delete the example row once real bugs are logged.
 
@@ -157,7 +175,7 @@ table and a detail block below. Reference the failing test-case ID.
   enumerate and signal children) so cancel reaps the tree on Unix too.
 - **Status:** fixed (AI trustworthy plumbing, v0.2.3).
 
-### BUG-007 — Open file keeps showing stale content after another process edits it
+### BUG-011 — Open file keeps showing stale content after another process edits it
 
 - **Feature / test case:** Recovery / external-change sync
 - **Severity:** Major

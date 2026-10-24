@@ -15,6 +15,8 @@ import {
   addPdfEditOperation,
   createPdfEditDocument,
   hasPdfEdits,
+  pdfDraftIsStale,
+  pdfSourceDigest,
   normalizePdfRect,
   parsePdfEditDocument,
   removePdfEditOperation,
@@ -551,17 +553,35 @@ export async function renderPdf(
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   ensureCurrent();
   const bytes = await invoke<number[]>("read_file_bytes", { path });
+  const sourceDigest = await pdfSourceDigest(new Uint8Array(bytes));
   ensureCurrent();
   const loadingTask = pdfjs.getDocument({
     data: new Uint8Array(bytes),
   });
   const document = await loadingTask.promise;
+  // Drafts are keyed by path; one made on different bytes may no longer line up.
+  let editDocument: PdfEditDocument = loadDraft(path);
+  if (pdfDraftIsStale(editDocument, sourceDigest)) {
+    const count = editDocument.pages.reduce((sum, page) => sum + page.operations.length, 0);
+    const apply = await confirm(
+      `This PDF changed after you made ${count} unsaved edit${count === 1 ? "" : "s"} to it. ` +
+        "Apply them to the current file anyway? They may no longer line up with its content.",
+      {
+        title: "Unsaved PDF edits",
+        kind: "warning",
+        okLabel: "Apply Edits",
+        cancelLabel: "Discard Edits",
+      },
+    );
+    if (!apply) editDocument = createPdfEditDocument(path);
+  }
+  editDocument = { ...editDocument, sourceDigest };
+  storeDraft(path, editDocument);
   if (options?.isCurrent && !options.isCurrent()) {
     void loadingTask.destroy();
     throw new PdfRenderSuperseded();
   }
   host.innerHTML = "";
-  let editDocument: PdfEditDocument = loadDraft(path);
   let activeTool: PdfEditTool = "select";
   let selectedOperationId: string | null = null;
   let saving = false;
@@ -1419,7 +1439,13 @@ export async function renderPdf(
       textarea.spellcheck = true;
       textarea.value = issue.replacement;
       textarea.rows = Math.min(5, Math.max(2, issue.replacement.split(/\r?\n/).length));
-      textarea.addEventListener("focus", () => focusOperation(issue.operationId));
+      // Typing previews live; leaving the box records one undo step. The panel is
+      // not rebuilt while typing, so the box keeps focus.
+      let beforeTyping: PdfEditDocument | null = null;
+      textarea.addEventListener("focus", () => {
+        beforeTyping = clonePdfEditDocument(editDocument);
+        focusOperation(issue.operationId);
+      });
       textarea.addEventListener("input", () => {
         suggestionText = textarea.value;
         const page = pages.find((item) => item.box.page === issue.page)?.box;
@@ -1431,8 +1457,13 @@ export async function renderPdf(
             issue.operationId,
             textarea.value,
           ),
+          { history: false },
         );
-        renderEditOverlays();
+        renderEditOverlays({ refreshProof: false });
+      });
+      textarea.addEventListener("blur", () => {
+        if (beforeTyping) commitTransientEdit(beforeTyping);
+        beforeTyping = null;
       });
       const reflow = window.document.createElement("button");
       reflow.type = "button";
@@ -1525,10 +1556,20 @@ export async function renderPdf(
       const textarea = window.document.createElement("textarea");
       textarea.value = item.text;
       textarea.rows = Math.min(5, Math.max(2, item.text.split(/\r?\n/).length));
-      textarea.addEventListener("focus", () => focusOperation(item.id));
+      let beforeTyping: PdfEditDocument | null = null;
+      textarea.addEventListener("focus", () => {
+        beforeTyping = clonePdfEditDocument(editDocument);
+        focusOperation(item.id);
+      });
       textarea.addEventListener("input", () => {
-        applyEditDocument(updateOcrReviewText(editDocument, item.id, textarea.value));
+        applyEditDocument(updateOcrReviewText(editDocument, item.id, textarea.value), {
+          history: false,
+        });
         renderEditOverlays();
+      });
+      textarea.addEventListener("blur", () => {
+        if (beforeTyping) commitTransientEdit(beforeTyping);
+        beforeTyping = null;
       });
       row.append(rowHeader, textarea);
       list.appendChild(row);
@@ -1553,7 +1594,7 @@ export async function renderPdf(
   thumbnailButton.addEventListener("click", openThumbnailPanel);
   reviewButton.addEventListener("click", openReviewPanel);
   proofButton.addEventListener("click", openProofPanel);
-  const updateSelectedStyle = (): void => {
+  const updateSelectedStyle = (options: { history?: boolean } = {}): void => {
     const nextStyle = (base: typeof DEFAULT_PDF_TEXT_STYLE): typeof DEFAULT_PDF_TEXT_STYLE => ({
       ...base,
       fontFamily: fontFamilySelect.value,
@@ -1579,7 +1620,7 @@ export async function renderPdf(
       replaceOperation(page, {
         ...selected,
         style: nextStyle(selected.style),
-      });
+      }, options);
     } else if (selected.type === "replacementText") {
       replaceOperation(page, {
         ...selected,
@@ -1592,25 +1633,25 @@ export async function renderPdf(
           ...selected.text,
           style: nextStyle(selected.text.style),
         },
-      });
+      }, options);
     } else if (selected.type === "coverPatch") {
       replaceOperation(page, {
         ...selected,
         color: colorInput.value,
         opacity: Number(opacityInput.value) || selected.opacity,
-      });
+      }, options);
       currentCoverColor = colorInput.value;
     } else if (selected.type === "directTextEdit") {
       const style = selected.fallbackStyle ?? DEFAULT_PDF_TEXT_STYLE;
       replaceOperation(page, {
         ...selected,
         fallbackStyle: nextStyle(style),
-      });
+      }, options);
     }
     renderEditOverlays();
   };
-  fontFamilySelect.addEventListener("change", updateSelectedStyle);
-  fontSizeInput.addEventListener("change", updateSelectedStyle);
+  fontFamilySelect.addEventListener("change", () => updateSelectedStyle());
+  fontSizeInput.addEventListener("change", () => updateSelectedStyle());
   boldButton.addEventListener("click", () => {
     boldButton.classList.toggle("active");
     updateSelectedStyle();
@@ -1619,10 +1660,24 @@ export async function renderPdf(
     italicButton.classList.toggle("active");
     updateSelectedStyle();
   });
-  alignSelect.addEventListener("change", updateSelectedStyle);
-  colorInput.addEventListener("input", updateSelectedStyle);
-  opacityInput.addEventListener("input", updateSelectedStyle);
-  const renderEditOverlays = (): void => {
+  alignSelect.addEventListener("change", () => updateSelectedStyle());
+  // Dragging the color or opacity control previews live and records one undo step.
+  let styleEditBefore: PdfEditDocument | null = null;
+  const previewSelectedStyle = (): void => {
+    styleEditBefore = styleEditBefore ?? clonePdfEditDocument(editDocument);
+    updateSelectedStyle({ history: false });
+  };
+  const commitSelectedStyle = (): void => {
+    if (!styleEditBefore) return;
+    const before = styleEditBefore;
+    styleEditBefore = null;
+    commitTransientEdit(before);
+  };
+  colorInput.addEventListener("input", previewSelectedStyle);
+  colorInput.addEventListener("change", commitSelectedStyle);
+  opacityInput.addEventListener("input", previewSelectedStyle);
+  opacityInput.addEventListener("change", commitSelectedStyle);
+  const renderEditOverlays = (options: { refreshProof?: boolean } = {}): void => {
     pages.forEach((pageView) => {
       pageView.overlay.innerHTML = "";
       editDocument.pages
@@ -1761,7 +1816,7 @@ export async function renderPdf(
     });
     updateToolbarState();
     refreshReviewPanel();
-    refreshProofPanel();
+    if (options.refreshProof !== false) refreshProofPanel();
   };
   const addOperationAt = (pageView: PdfPageView, event: MouseEvent): void => {
     if (activeTool === "select") {
@@ -2054,25 +2109,40 @@ export async function renderPdf(
   host.addEventListener("keydown", keyHandler);
   const saveEditedPdf = async (): Promise<void> => {
     if (!hasPdfEdits(editDocument) || saving) return;
+    let onDisk: Uint8Array;
+    try {
+      onDisk = new Uint8Array(await invoke<number[]>("read_file_bytes", { path }));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
+      return;
+    }
+    // Edits are written onto the bytes this view opened; say so if the file moved on.
+    const changedOnDisk = (await pdfSourceDigest(onDisk)) !== sourceDigest;
     const overwrite = await confirm(
-      "Save these edits into the original PDF? BugText will create a backup copy first.",
+      changedOnDisk
+        ? "This PDF changed on disk after BugText opened it. Saving puts your edits on the " +
+            "version you opened and replaces the newer file (BugText backs it up first). Save anyway?"
+        : "Save these edits into the original PDF? BugText will create a backup copy first.",
       {
         title: "Save edited PDF",
         kind: "warning",
-        okLabel: "Save",
+        okLabel: changedOnDisk ? "Save Anyway" : "Save",
         cancelLabel: "Cancel",
       },
     );
-    if (!overwrite) return;
+    if (!overwrite) {
+      if (changedOnDisk) {
+        setStatus("Not saved: the PDF changed on disk. Save As keeps both versions.", {
+          sticky: true,
+        });
+      }
+      return;
+    }
     saving = true;
     updateToolbarState();
     try {
       setStatus("Saving PDF history snapshot...");
-      await manualBinarySnapshot(
-        path,
-        new Uint8Array(bytes),
-        "Before PDF edit overwrite",
-      );
+      await manualBinarySnapshot(path, onDisk, "Before PDF edit overwrite");
       setStatus("Backing up original PDF...");
       const backupPath = await invoke<string>("backup_file", { path });
       setStatus("Saving edited PDF...");

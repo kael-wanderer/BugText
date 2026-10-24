@@ -1343,6 +1343,10 @@ function showActiveHistory(): void {
             });
           }
           renderAll();
+          // The PDF view keeps its own copy of the pages; redraw it from the restored file.
+          if (getWindow(windowState.id)?.activeTabId === tab.id) {
+            views.get(windowState.id)?.renderPreview("", tab.path!);
+          }
         }).catch((error) => {
           const text = error instanceof Error ? error.message : String(error);
           void message(text, { title: "Restore PDF snapshot", kind: "error" });

@@ -6,6 +6,20 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- Saving PDF edits checks the file on disk first. If it changed after BugText
+  opened it, BugText asks before replacing it, and the history snapshot now holds
+  the newer file rather than the copy BugText opened.
+- Unsaved PDF edits remember which version of the file they were made on. When the
+  file has changed since, BugText asks whether to apply or discard them instead of
+  drawing them over different content.
+- History ▸ Restore on a PDF now redraws the pages straight away instead of showing
+  the old pages until the tab is reopened.
+- Dragging the PDF color or opacity control, or typing in a Proofread or OCR text
+  box, now makes one undo step instead of one per change. Proofread text boxes keep
+  focus while you type.
+
 ## [0.3.0] - 2026-10-24
 
 ### Changed

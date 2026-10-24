@@ -106,6 +106,8 @@ export type PdfEditPage = {
 export type PdfEditDocument = {
   version: 1;
   sourceFingerprint: string;
+  /** SHA-256 of the PDF bytes the edits were made on; absent in older drafts. */
+  sourceDigest?: string;
   pages: PdfEditPage[];
 };
 
@@ -350,11 +352,23 @@ export function parsePdfEditDocument(raw: string): PdfEditDocument {
   return {
     version: 1,
     sourceFingerprint: obj.sourceFingerprint,
+    ...(typeof obj.sourceDigest === "string" ? { sourceDigest: obj.sourceDigest } : {}),
     pages: Array.isArray(obj.pages) ? obj.pages.flatMap((page) => {
       const parsedPage = parsePage(page);
       return parsedPage ? [parsedPage] : [];
     }) : [],
   };
+}
+
+/** Hex SHA-256 of PDF bytes, used to tell whether a draft belongs to the file on disk. */
+export async function pdfSourceDigest(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/** True when a draft with edits was made on different bytes than `digest`. */
+export function pdfDraftIsStale(document: PdfEditDocument, digest: string): boolean {
+  return hasPdfEdits(document) && !!document.sourceDigest && document.sourceDigest !== digest;
 }
 
 export function serializePdfEditDocument(document: PdfEditDocument): string {

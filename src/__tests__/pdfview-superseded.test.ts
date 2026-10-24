@@ -91,3 +91,60 @@ it("renders at the display ratio until the canvas budget is spent", () => {
   expect(reduced).toBeLessThan(2);
   expect(pdfOutputScale(2, letterPage, 1000)).toBe(1);
 });
+
+it("asks before applying a draft made on a different version of the file", async () => {
+  const { confirm } = await import("@tauri-apps/plugin-dialog");
+  const { createPdfEditDocument, addPdfEditOperation, serializePdfEditDocument } =
+    await import("../pdf-edit-document");
+  Object.assign(window, { localStorage: globalThis.localStorage });
+  const path = "/notes/changed.pdf";
+  const key = `bugtext.pdf.edits.${encodeURIComponent(path)}`;
+  const draft = addPdfEditOperation(createPdfEditDocument(path), { page: 1, width: 612, height: 792 }, {
+    id: "cover-1",
+    type: "coverPatch",
+    page: 1,
+    rect: { x: 10, y: 10, width: 50, height: 20 },
+    color: "#ffffff",
+    opacity: 1,
+  });
+  window.localStorage.setItem(key, serializePdfEditDocument({ ...draft, sourceDigest: "older-bytes" }));
+  vi.mocked(confirm).mockResolvedValueOnce(false);
+
+  let checks = 0;
+  const pending = renderPdf(document.createElement("div"), path, { isCurrent: () => ++checks < 3 });
+  await expect(pending).rejects.toBeInstanceOf(PdfRenderSuperseded);
+
+  expect(confirm).toHaveBeenCalledOnce();
+  // Discarding leaves no draft behind.
+  expect(window.localStorage.getItem(key)).toBeNull();
+});
+
+it("stamps a kept draft with the file it was opened on", async () => {
+  const { confirm } = await import("@tauri-apps/plugin-dialog");
+  const { createPdfEditDocument, addPdfEditOperation, parsePdfEditDocument, pdfSourceDigest, serializePdfEditDocument } =
+    await import("../pdf-edit-document");
+  Object.assign(window, { localStorage: globalThis.localStorage });
+  const path = "/notes/kept.pdf";
+  const key = `bugtext.pdf.edits.${encodeURIComponent(path)}`;
+  const draft = addPdfEditOperation(createPdfEditDocument(path), { page: 1, width: 612, height: 792 }, {
+    id: "cover-1",
+    type: "coverPatch",
+    page: 1,
+    rect: { x: 10, y: 10, width: 50, height: 20 },
+    color: "#ffffff",
+    opacity: 1,
+  });
+  // A draft from before digests were recorded is trusted without asking.
+  window.localStorage.setItem(key, serializePdfEditDocument(draft));
+  vi.mocked(confirm).mockClear();
+
+  let checks = 0;
+  const pending = renderPdf(document.createElement("div"), path, { isCurrent: () => ++checks < 3 });
+  await expect(pending).rejects.toBeInstanceOf(PdfRenderSuperseded);
+
+  expect(confirm).not.toHaveBeenCalled();
+  const stored = parsePdfEditDocument(window.localStorage.getItem(key)!);
+  expect(stored.pages.flatMap((page) => page.operations)).toHaveLength(1);
+  expect(stored.sourceDigest).toBe(await pdfSourceDigest(new Uint8Array([1, 2, 3])));
+  window.localStorage.removeItem(key);
+});
