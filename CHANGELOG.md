@@ -61,6 +61,13 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   unsaved edits now shows its unsaved dot as soon as it is restored, so closing it
   asks first even if it was never opened.
 
+- PDF pages are sharp on Retina displays; they used to be drawn at 1x and scaled up.
+  Very long PDFs step back toward 1x to cap canvas memory at about 1 GB.
+
+- Switching away from a PDF tab now frees the loaded document, and a PDF that is
+  still drawing stops when another document takes its pane. Every PDF visited used
+  to stay in memory until the window closed.
+
 - The MCP bridge now reports when the server switch is off after a refused socket connection.
 - MCP now resolves live editor reads and edits through the pane that owns the tab.
 - MCP now matches open tabs through the path reported by their owning window, including symlinked roots.

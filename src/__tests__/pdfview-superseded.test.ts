@@ -13,7 +13,7 @@ vi.mock("pdfjs-dist", () => ({
   }),
 }));
 
-import { PdfRenderSuperseded, renderPdf } from "../pdfview";
+import { PdfRenderSuperseded, pdfOutputScale, renderPdf } from "../pdfview";
 
 beforeEach(() => {
   installTestDom();
@@ -66,4 +66,28 @@ it("reports a stored edit draft before the PDF renders", async () => {
   );
   expect(hasPdfEditDraft(path)).toBe(true);
   window.localStorage.removeItem(`bugtext.pdf.edits.${encodeURIComponent(path)}`);
+});
+
+it("stops drawing pages and frees the document when superseded mid-render", async () => {
+  // renderPdf builds its toolbar through window.document, which the test DOM leaves unset.
+  Object.assign(window, { document });
+  const host = document.createElement("div");
+  let checks = 0;
+  // Current through loading and parsing, stale before the first page draws.
+  const pending = renderPdf(host, "/notes/report.pdf", { isCurrent: () => ++checks < 4 });
+
+  await expect(pending).rejects.toBeInstanceOf(PdfRenderSuperseded);
+  expect(destroyDocument).toHaveBeenCalledOnce();
+  expect(host.querySelector(".pdf-page-wrap")).toBeNull();
+});
+
+it("renders at the display ratio until the canvas budget is spent", () => {
+  const letterPage = 857 * 1109; // US Letter at the 1.4 render scale
+  expect(pdfOutputScale(2, letterPage, 20)).toBe(2);
+  expect(pdfOutputScale(1, letterPage, 20)).toBe(1);
+  expect(pdfOutputScale(3, letterPage, 20)).toBe(2);
+  const reduced = pdfOutputScale(2, letterPage, 150);
+  expect(reduced).toBeGreaterThan(1);
+  expect(reduced).toBeLessThan(2);
+  expect(pdfOutputScale(2, letterPage, 1000)).toBe(1);
 });
