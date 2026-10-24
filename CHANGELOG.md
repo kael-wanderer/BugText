@@ -11,6 +11,11 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - A PDF that reloads after another app changes it stays at the same scroll
   position instead of jumping back to page 1.
 
+### Added
+
+- A build number, starting at 249, appears beside the version in Settings ▸
+  General and in About BugText.
+
 ## [0.3.1] - 2026-10-24
 
 ### Fixed

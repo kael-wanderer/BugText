@@ -2211,7 +2211,13 @@ const settingsScreen = createSettingsScreen(
     onOpenAISettingsFile: openAISettings,
     onCheckForUpdates: () => void checkForUpdates(),
     getActiveTabName: () => activeMeta()?.name ?? null,
-    getAppVersion: () => getVersion(),
+    getAppVersion: async () => {
+      const [version, build] = await Promise.all([
+        getVersion(),
+        invoke<string | null>("app_build").catch(() => null),
+      ]);
+      return build ? `${version} (${build})` : version;
+    },
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
