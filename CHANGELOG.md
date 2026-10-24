@@ -30,6 +30,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - PDF edit drafts with inserted images take about a third of the space, and BugText
   says so when a draft can't be kept instead of dropping it silently.
 - OCR Page falls back to the nearest page when no page is in view.
+- The app compiles for Windows again: the MCP server, which needs Unix sockets, is
+  reported as unavailable there instead of breaking the build.
 - With nothing selected, the PDF style controls show the color and opacity the next
   new edit will use, instead of the last selected edit's.
 
@@ -41,6 +43,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- The PDF toolbar wraps instead of scrolling sideways, and its style controls moved
+  to a second row that appears only while they apply: text style for text edits and
+  the Text/Replace tools, cover color and opacity for covers.
 - Unsaved PDF edits are kept in files under the app's config folder
   (`pdf-drafts/`) instead of browser storage, so large drafts (images) no longer hit
   a storage limit. Drafts from earlier versions move over the first time they open.

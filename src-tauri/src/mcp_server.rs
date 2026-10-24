@@ -5,8 +5,12 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
+// The server listens on a Unix socket; on other platforms MCP stays unavailable.
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
+#[cfg(unix)]
 use std::os::unix::net::{SocketAddr, UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -96,6 +100,7 @@ pub struct McpStatus {
 
 pub fn accept_peer(peer_uid: u32, my_uid: u32) -> bool { peer_uid == my_uid }
 
+#[cfg(unix)]
 fn accept_blocking(listener: &UnixListener) -> std::io::Result<(UnixStream, SocketAddr)> {
     let (stream, address) = listener.accept()?;
     stream.set_nonblocking(false)?;
@@ -107,6 +112,7 @@ extern "C" {
     fn getpeereid(socket: i32, effective_uid: *mut u32, effective_gid: *mut u32) -> i32;
 }
 
+#[cfg(unix)]
 fn peer_uid(stream: &UnixStream) -> Option<u32> {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -277,6 +283,16 @@ pub fn mcp_set_enabled(app: tauri::AppHandle, state: State<'_, McpState>, enable
         emit_status(&app, &state);
         return Ok(());
     }
+    start_listener(app, &state)
+}
+
+#[cfg(not(unix))]
+fn start_listener(_app: tauri::AppHandle, _state: &McpState) -> Result<(), String> {
+    Err("The MCP server is only available on macOS and Linux.".to_string())
+}
+
+#[cfg(unix)]
+fn start_listener(app: tauri::AppHandle, state: &McpState) -> Result<(), String> {
     let path = socket_path(&config_dir())?;
     if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|error| error.to_string())?; }
     let _ = fs::remove_file(&path);
@@ -289,7 +305,7 @@ pub fn mcp_set_enabled(app: tauri::AppHandle, state: State<'_, McpState>, enable
     listener.set_nonblocking(true).map_err(|error| error.to_string())?;
     let stop = Arc::new(AtomicBool::new(false));
     state.core.lock().expect("MCP state poisoned").enabled = true;
-    emit_status(&app, &state);
+    emit_status(&app, state);
     let listener_stop = stop.clone();
     let handle = thread::spawn(move || loop {
         if listener_stop.load(Ordering::SeqCst) { break; }
@@ -308,6 +324,7 @@ pub fn mcp_set_enabled(app: tauri::AppHandle, state: State<'_, McpState>, enable
     Ok(())
 }
 
+#[cfg(unix)]
 fn serve_connection(app: tauri::AppHandle, stream: UnixStream) {
     let state = app.state::<McpState>();
     {
@@ -425,7 +442,7 @@ fn emit_activity(app: &tauri::AppHandle, client: &str, tool: &str, args: &Value,
     let _ = app.emit("bugtext://mcp-activity", json!({"time":time,"client":client,"text":text}));
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::{accept_blocking, accept_peer, activity_text, checked_note_path, empty_selection, list_files_from_registry, owner, reported_tab_path, Access, McpCore, Roots, TabReport, WindowReport};
     use serde_json::json;

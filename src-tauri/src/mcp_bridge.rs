@@ -3,7 +3,11 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
+// Without Unix sockets the bridge never connects; the type only keeps it compiling.
+#[cfg(not(unix))]
+type UnixStream = std::net::TcpStream;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -93,6 +97,16 @@ pub fn config_dir() -> PathBuf {
         .join(identifier)
 }
 
+#[cfg(unix)]
+fn connect(path: &Path) -> io::Result<UnixStream> {
+    UnixStream::connect(path)
+}
+
+#[cfg(not(unix))]
+fn connect(_path: &Path) -> io::Result<UnixStream> {
+    Err(io::Error::new(io::ErrorKind::Unsupported, "MCP needs Unix sockets"))
+}
+
 pub struct SocketForward {
     path: PathBuf,
     stream: Option<UnixStream>,
@@ -104,7 +118,7 @@ impl SocketForward {
     fn call_once(&mut self, client: &str, tool: &str, args: Value) -> Result<Value, CallError> {
         if self.stream.is_none() {
             let config_dir = self.path.parent().unwrap_or_else(|| Path::new("."));
-            let stream = UnixStream::connect(&self.path).map_err(|_| connect_failure(config_dir))?;
+            let stream = connect(&self.path).map_err(|_| connect_failure(config_dir))?;
             stream.set_read_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
             stream.set_write_timeout(Some(Duration::from_secs(30))).map_err(CallError::Io)?;
             self.stream = Some(stream);
@@ -167,7 +181,7 @@ pub fn mcp_bridge_main() -> i32 {
     0
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::{identifier_from, socket_path, Forward, SocketForward};
     use serde_json::{json, Value};
