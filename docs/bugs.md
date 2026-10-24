@@ -27,12 +27,12 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-019 | 2026-10-24 | PDF editor / drafts | Major | — | Edit drafts are keyed by path only, so a PDF replaced on disk gets the old file's edits | fixed (0.3.1) |
 | BUG-020 | 2026-10-24 | PDF / history | Major | — | Restoring a PDF snapshot may leave the old version on screen; a later Save would overwrite the restore (from code reading, reproduce first) | fixed (0.3.1) |
 | BUG-021 | 2026-10-24 | PDF editor / undo | Minor | — | Color/opacity inputs and Proof/OCR review textareas push one undo step per change, evicting real edits (limit 80) | fixed (0.3.1) |
-| BUG-022 | 2026-10-24 | PDF editor | Minor | — | Esc during inline text editing keeps the change instead of cancelling | open |
-| BUG-023 | 2026-10-24 | PDF / OCR | Minor | — | OCR Page picks the page whose top is nearest the toolbar, so it can OCR the wrong page | open |
-| BUG-024 | 2026-10-24 | PDF editor | Minor | — | Text color and cover color share one control (opacity too) | open |
-| BUG-025 | 2026-10-24 | PDF editor / Limits | Minor | — | Limits panel Cover is misplaced on rotated pages (object inspection ignores rotation) | open |
-| BUG-026 | 2026-10-24 | PDF editor / Direct | Major | — | Direct rewrite matches text across the whole file, not the selected page, and subset fonts may lack replacement glyphs | open |
-| BUG-027 | 2026-10-24 | PDF editor / drafts | Minor | — | Inserted images are stored in the localStorage draft as JSON number arrays; past ~5 MB the draft silently stops saving | open |
+| BUG-022 | 2026-10-24 | PDF editor | Minor | — | Esc during inline text editing keeps the change instead of cancelling | fixed (0.3.1) |
+| BUG-023 | 2026-10-24 | PDF / OCR | Minor | — | OCR Page picks the page whose top is nearest the toolbar, so it can OCR the wrong page | fixed (0.3.1) |
+| BUG-024 | 2026-10-24 | PDF editor | Minor | — | Text color and cover color share one control (opacity too) | fixed (0.3.1) |
+| BUG-025 | 2026-10-24 | PDF editor / Limits | Minor | — | Limits panel Cover is misplaced on rotated pages (object inspection ignores rotation) | fixed (0.3.1) |
+| BUG-026 | 2026-10-24 | PDF editor / Direct | Major | — | Direct rewrite matches text across the whole file, not the selected page, and subset fonts may lack replacement glyphs | fixed (0.3.1) |
+| BUG-027 | 2026-10-24 | PDF editor / drafts | Minor | — | Inserted images are stored in the localStorage draft as JSON number arrays; past ~5 MB the draft silently stops saving | fixed (0.3.1) |
 | BUG-028 | 2026-10-24 | PDF editor / Proofread | Minor | — | Typing in a Proofread suggestion box lost focus after each character: every keystroke rebuilt the proof panel | fixed (0.3.1) |
 
 > Delete the example row once real bugs are logged.

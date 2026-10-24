@@ -19,6 +19,16 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Dragging the PDF color or opacity control, or typing in a Proofread or OCR text
   box, now makes one undo step instead of one per change. Proofread text boxes keep
   focus while you type.
+- Esc while editing PDF text in place now cancels the change instead of keeping it.
+- OCR Page reads the page that fills most of the view, not whichever page's top edge
+  is nearest the toolbar.
+- Text and covers have separate color and opacity controls, so restyling a
+  replacement's text no longer repaints its cover.
+- Limits ▸ Cover places its patch correctly on rotated and cropped pages.
+- Direct text edits only rewrite text on the page you edited, and fall back to an
+  overlay when the page's subset font may not contain the new letters.
+- PDF edit drafts with inserted images take about a third of the space, and BugText
+  says so when a draft is too large to keep instead of dropping it silently.
 
 ## [0.3.0] - 2026-10-24
 

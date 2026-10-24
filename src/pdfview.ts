@@ -104,6 +104,23 @@ export function pdfOutputScale(
   if (cssPixels * ratio * ratio <= PDF_CANVAS_PIXEL_BUDGET) return ratio;
   return Math.max(1, Math.sqrt(PDF_CANVAS_PIXEL_BUDGET / cssPixels));
 }
+/** The page showing the most height between `top` and `bottom`; ties go to the earlier page. */
+export function mostVisiblePageIndex(
+  pages: ReadonlyArray<{ top: number; bottom: number }>,
+  top: number,
+  bottom: number,
+): number {
+  let best = -1;
+  let bestShown = 0;
+  pages.forEach((page, index) => {
+    const shown = Math.min(page.bottom, bottom) - Math.max(page.top, top);
+    if (shown > bestShown) {
+      best = index;
+      bestShown = shown;
+    }
+  });
+  return best;
+}
 const PDF_EDIT_HISTORY_LIMIT = 80;
 type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 type PendingPdfImage = {
@@ -353,7 +370,8 @@ function loadDraft(path: string): PdfEditDocument {
   }
 }
 
-function storeDraft(path: string, edits: PdfEditDocument): void {
+/** False when the draft could not be kept, for example past the storage quota. */
+function storeDraft(path: string, edits: PdfEditDocument): boolean {
   try {
     const key = draftKey(path);
     if (hasPdfEdits(edits)) {
@@ -361,8 +379,10 @@ function storeDraft(path: string, edits: PdfEditDocument): void {
     } else {
       window.localStorage.removeItem(key);
     }
+    return true;
   } catch {
-    // Draft persistence is best-effort; editing should continue if storage is blocked.
+    // Editing continues either way; the caller tells the user the draft is not kept.
+    return false;
   }
 }
 
@@ -619,6 +639,8 @@ export async function renderPdf(
   const alignSelect = window.document.createElement("select");
   const colorInput = window.document.createElement("input");
   const opacityInput = window.document.createElement("input");
+  const coverColorInput = window.document.createElement("input");
+  const coverOpacityInput = window.document.createElement("input");
   const status = window.document.createElement("span");
   status.className = "pdf-edit-status";
   // Sticky statuses (save results/errors) survive the routine toolbar refresh,
@@ -786,15 +808,26 @@ export async function renderPdf(
     alignSelect.appendChild(option);
   });
   alignSelect.value = currentStyle.align;
+  // Text and covers each get their own color and opacity, so restyling the text of
+  // a replacement never repaints the cover behind it.
   colorInput.type = "color";
   colorInput.value = currentStyle.color;
-  colorInput.title = "Text or cover color";
+  colorInput.title = "Text color";
   opacityInput.type = "range";
   opacityInput.min = "0.05";
   opacityInput.max = "1";
   opacityInput.step = "0.05";
   opacityInput.value = String(currentStyle.opacity);
-  opacityInput.title = "Opacity";
+  opacityInput.title = "Text opacity";
+  coverColorInput.type = "color";
+  coverColorInput.value = currentCoverColor;
+  coverColorInput.title = "Cover color";
+  coverOpacityInput.type = "range";
+  coverOpacityInput.min = "0.05";
+  coverOpacityInput.max = "1";
+  coverOpacityInput.step = "0.05";
+  coverOpacityInput.value = "1";
+  coverOpacityInput.title = "Cover opacity";
   toolbar.append(
     undoButton,
     redoButton,
@@ -810,6 +843,8 @@ export async function renderPdf(
     alignSelect,
     colorInput,
     opacityInput,
+    coverColorInput,
+    coverOpacityInput,
     ocrLanguageInput,
     ocrButton,
     ocrReviewButton,
@@ -942,13 +977,14 @@ export async function renderPdf(
       applyStyleControls(operation.style);
     } else if (operation?.type === "replacementText") {
       applyStyleControls(operation.text.style);
-      currentCoverColor = operation.cover.color;
+      coverColorInput.value = operation.cover.color;
+      coverOpacityInput.value = String(operation.cover.opacity);
     } else if (operation?.type === "directTextEdit") {
       const style = operation.fallbackStyle ?? DEFAULT_PDF_TEXT_STYLE;
       applyStyleControls(style);
     } else if (operation?.type === "coverPatch") {
-      colorInput.value = operation.color;
-      opacityInput.value = String(operation.opacity);
+      coverColorInput.value = operation.color;
+      coverOpacityInput.value = String(operation.opacity);
     }
     deleteButton.disabled = !id;
     reflowButton.disabled =
@@ -984,6 +1020,12 @@ export async function renderPdf(
       setStatus("Unsaved PDF edits");
     }
   };
+  const warnDraftNotKept = (): void => {
+    setStatus(
+      "These edits are too large to keep if BugText closes. Save the PDF to keep them.",
+      { sticky: true },
+    );
+  };
   const applyEditDocument = (
     nextDocument: PdfEditDocument,
     options: { history?: boolean } = {},
@@ -998,12 +1040,12 @@ export async function renderPdf(
       redoStack = [];
     }
     editDocument = nextDocument;
-    storeDraft(path, editDocument);
+    if (!storeDraft(path, editDocument)) warnDraftNotKept();
   };
   const restoreEditDocument = (nextDocument: PdfEditDocument): void => {
     editDocument = clonePdfEditDocument(nextDocument);
     selectedOperationId = null;
-    storeDraft(path, editDocument);
+    if (!storeDraft(path, editDocument)) warnDraftNotKept();
     renderEditOverlays();
     refreshOcrReviewPanel();
     refreshProofPanel();
@@ -1069,6 +1111,7 @@ export async function renderPdf(
       );
       updateToolbarState();
     };
+    let cancelled = false;
     const finish = (): void => {
       item.removeEventListener("input", onInput);
       item.removeEventListener("blur", finish);
@@ -1076,7 +1119,9 @@ export async function renderPdf(
       item.contentEditable = "false";
       item.spellcheck = false;
       item.classList.remove("editing");
-      commitTransientEdit(beforeEdit);
+      // Esc puts the text back as it was before editing began; leaving any other way keeps it.
+      if (cancelled) applyEditDocument(beforeEdit, { history: false });
+      else commitTransientEdit(beforeEdit);
       renderEditOverlays();
       refreshOcrReviewPanel();
       refreshProofPanel();
@@ -1084,6 +1129,8 @@ export async function renderPdf(
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
+        cancelled = true;
         item.blur();
       }
     };
@@ -1196,7 +1243,7 @@ export async function renderPdf(
                   page: object.page,
                   rect: normalizePdfRect(object.rect, pageView.box),
                   color: currentCoverColor,
-                  opacity: Number(opacityInput.value) || 1,
+                  opacity: Number(coverOpacityInput.value) || 1,
                 }),
               );
               renderEditOverlays();
@@ -1608,10 +1655,10 @@ export async function renderPdf(
           ? alignSelect.value
           : "left",
     });
+    currentCoverColor = coverColorInput.value;
     const selected = selectedOperation();
     if (!selected) {
       currentStyle = nextStyle(currentStyle);
-      currentCoverColor = colorInput.value;
       return;
     }
     const page = pages.find((item) => item.box.page === selected.page)?.box;
@@ -1626,8 +1673,8 @@ export async function renderPdf(
         ...selected,
         cover: {
           ...selected.cover,
-          color: currentCoverColor,
-          opacity: Number(opacityInput.value) || selected.cover.opacity,
+          color: coverColorInput.value,
+          opacity: Number(coverOpacityInput.value) || selected.cover.opacity,
         },
         text: {
           ...selected.text,
@@ -1637,10 +1684,9 @@ export async function renderPdf(
     } else if (selected.type === "coverPatch") {
       replaceOperation(page, {
         ...selected,
-        color: colorInput.value,
-        opacity: Number(opacityInput.value) || selected.opacity,
+        color: coverColorInput.value,
+        opacity: Number(coverOpacityInput.value) || selected.opacity,
       }, options);
-      currentCoverColor = colorInput.value;
     } else if (selected.type === "directTextEdit") {
       const style = selected.fallbackStyle ?? DEFAULT_PDF_TEXT_STYLE;
       replaceOperation(page, {
@@ -1677,6 +1723,10 @@ export async function renderPdf(
   colorInput.addEventListener("change", commitSelectedStyle);
   opacityInput.addEventListener("input", previewSelectedStyle);
   opacityInput.addEventListener("change", commitSelectedStyle);
+  coverColorInput.addEventListener("input", previewSelectedStyle);
+  coverColorInput.addEventListener("change", commitSelectedStyle);
+  coverOpacityInput.addEventListener("input", previewSelectedStyle);
+  coverOpacityInput.addEventListener("change", commitSelectedStyle);
   const renderEditOverlays = (options: { refreshProof?: boolean } = {}): void => {
     pages.forEach((pageView) => {
       pageView.overlay.innerHTML = "";
@@ -1852,7 +1902,7 @@ export async function renderPdf(
             page: pageView.box.page,
             rect: rectFromPointer(event, pageView.element, pageView.box, 170, 28),
             color: currentCoverColor,
-            opacity: Number(opacityInput.value) || 1,
+            opacity: Number(coverOpacityInput.value) || 1,
           }),
         ),
       );
@@ -1868,7 +1918,7 @@ export async function renderPdf(
         cover: {
           rect,
           color: currentCoverColor,
-          opacity: Number(opacityInput.value) || 1,
+          opacity: Number(coverOpacityInput.value) || 1,
         },
         text: {
           rect,
@@ -1970,7 +2020,7 @@ export async function renderPdf(
         rect: replacement.rect,
         rects: replacement.coverRects.length ? replacement.coverRects : undefined,
         color: currentCoverColor,
-        opacity: Number(opacityInput.value) || 1,
+        opacity: Number(coverOpacityInput.value) || 1,
       },
       text: {
         rect: replacement.rect,
@@ -2038,18 +2088,12 @@ export async function renderPdf(
     setStatus("Reflowed selected PDF edit text");
   });
   const visiblePage = (): PdfPageView | null => {
-    const toolbarBottom = toolbar.getBoundingClientRect().bottom;
-    let bestPage: PdfPageView | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const page of pages) {
-      const bounds = page.element.getBoundingClientRect();
-      const distance = Math.abs(bounds.top - toolbarBottom);
-      if (distance < bestDistance) {
-        bestPage = page;
-        bestDistance = distance;
-      }
-    }
-    return bestPage;
+    const index = mostVisiblePageIndex(
+      pages.map((page) => page.element.getBoundingClientRect()),
+      toolbar.getBoundingClientRect().bottom,
+      window.innerHeight,
+    );
+    return index < 0 ? null : pages[index];
   };
   ocrButton.addEventListener("click", () => {
     void (async () => {
@@ -2291,6 +2335,11 @@ export async function renderPdf(
       annotationPaints: 0,
       objects: [],
     };
+    // Detected objects are placed through the viewport so rotation and the crop box apply.
+    const toPage = (x: number, y: number): { x: number; y: number } => {
+      const [viewX, viewY] = viewport.convertToViewportPoint(x, y);
+      return { x: viewX / RENDER_SCALE, y: viewY / RENDER_SCALE };
+    };
     try {
       const operatorList = await page.getOperatorList();
       objectSignal = inspectPdfPageOperators(
@@ -2299,6 +2348,7 @@ export async function renderPdf(
           pdfjs.OPS as Record<string, number>,
           Array.from(operatorList.argsArray),
           viewport.height / RENDER_SCALE,
+          toPage,
       );
     } catch {
       // Keep the page editable even if operator inspection fails.
@@ -2311,6 +2361,7 @@ export async function renderPdf(
           pageNumber,
           viewport.height / RENDER_SCALE,
           annotations,
+          toPage,
         ),
       );
     } catch {

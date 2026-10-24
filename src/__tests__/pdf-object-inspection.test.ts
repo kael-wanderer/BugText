@@ -173,4 +173,16 @@ describe("pdf object inspection", () => {
       ).annotationPaints,
     ).toBe(2);
   });
+
+  it("places detected objects on a rotated page as the viewer shows it", () => {
+    // A page turned 90° clockwise shows user-space y running left to right.
+    const turned = (x: number, y: number) => ({ x: y, y: x });
+    const signal = inspectPdfPageAnnotations(
+      1,
+      612,
+      [{ rect: [100, 200, 150, 260], subtype: "Link" }],
+      turned,
+    );
+    expect(signal.objects[0].rect).toEqual({ x: 200, y: 100, width: 60, height: 50 });
+  });
 });

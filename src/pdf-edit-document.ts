@@ -142,7 +142,29 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
+function bytesToBase64(bytes: number[]): string {
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.slice(index, index + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): number[] | null {
+  try {
+    const binary = atob(value);
+    return Array.from(binary, (character) => character.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+
+// Image bytes are stored as base64 (older drafts used a JSON number array).
 function parseByteArray(value: unknown): number[] | null {
+  if (typeof value === "string") {
+    const bytes = base64ToBytes(value);
+    return bytes?.length ? bytes : null;
+  }
   if (!Array.isArray(value)) return null;
   const bytes = value.flatMap((item) => {
     if (typeof item !== "number" || !Number.isInteger(item) || item < 0 || item > 255) {
@@ -371,8 +393,12 @@ export function pdfDraftIsStale(document: PdfEditDocument, digest: string): bool
   return hasPdfEdits(document) && !!document.sourceDigest && document.sourceDigest !== digest;
 }
 
+// Compact, with image bytes as base64: a number array takes about three times the
+// space, and drafts live in browser storage with a small quota.
 export function serializePdfEditDocument(document: PdfEditDocument): string {
-  return JSON.stringify(document, null, 2);
+  return JSON.stringify(document, (key, value: unknown) =>
+    key === "bytes" && Array.isArray(value) ? bytesToBase64(value as number[]) : value,
+  );
 }
 
 export function pageBox(page: PdfEditPage | PdfPageBox): PdfPageBox {

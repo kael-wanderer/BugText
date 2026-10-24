@@ -1,5 +1,9 @@
 import {
+  PDFArray,
+  PDFDict,
   PDFDocument,
+  PDFName,
+  PDFRef,
   StandardFonts,
   degrees,
   rgb,
@@ -17,7 +21,7 @@ import {
   type PdfRect,
   type PdfTextStyle,
 } from "./pdf-edit-document";
-import { tryDirectTextRewrite } from "./pdf-direct-rewrite";
+import { tryDirectTextRewrite, type PdfRewritePageScope } from "./pdf-direct-rewrite";
 import { pdfStandardFontMatch } from "./pdf-font-inspection";
 import {
   createPdfPageFrame,
@@ -304,12 +308,60 @@ async function applyOperation(
   }
 }
 
+function contentObjectNumbers(pdf: PDFDocument, contents: unknown): number[] {
+  if (contents instanceof PDFRef) {
+    const target = pdf.context.lookup(contents);
+    return target instanceof PDFArray
+      ? contentObjectNumbers(pdf, target)
+      : [contents.objectNumber];
+  }
+  if (contents instanceof PDFArray) {
+    return contents.asArray().flatMap((item) => contentObjectNumbers(pdf, item));
+  }
+  return [];
+}
+
+function subsetFontNames(pdf: PDFDocument, page: PDFPage): Set<string> {
+  const names = new Set<string>();
+  const fonts = page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict);
+  for (const [name, value] of fonts?.entries() ?? []) {
+    const font = pdf.context.lookup(value);
+    const base = font instanceof PDFDict ? font.get(PDFName.of("BaseFont")) : undefined;
+    // Subset fonts carry a six-letter tag, e.g. /ABCDEF+Arial.
+    if (base instanceof PDFName && /^[A-Z]{6}\+/.test(base.decodeText())) {
+      names.add(name.decodeText());
+    }
+  }
+  return names;
+}
+
+/** Each page's content streams and subset fonts, so direct rewrites stay on their page. */
+export function pdfRewriteScopes(pdf: PDFDocument): Map<number, PdfRewritePageScope> {
+  return new Map(
+    pdf.getPages().map((page, index) => [
+      index + 1,
+      {
+        contentObjects: new Set(
+          contentObjectNumbers(pdf, page.node.get(PDFName.of("Contents"))),
+        ),
+        subsetFonts: subsetFontNames(pdf, page),
+      },
+    ]),
+  );
+}
+
 export async function writeEditedPdf(
   originalBytes: Uint8Array,
   edits: PdfEditDocument,
   loadFontBytes?: PdfFontBytesLoader,
 ): Promise<Uint8Array> {
-  const directRewrite = tryDirectTextRewrite(originalBytes, edits);
+  const hasDirectEdits = edits.pages.some((page) =>
+    page.operations.some((operation) => operation.type === "directTextEdit"),
+  );
+  const scopes = hasDirectEdits
+    ? pdfRewriteScopes(await PDFDocument.load(originalBytes))
+    : new Map<number, PdfRewritePageScope>();
+  const directRewrite = tryDirectTextRewrite(originalBytes, edits, scopes);
   const pdf = await PDFDocument.load(directRewrite.bytes);
   const context: WriterContext = {
     pdf,

@@ -148,3 +148,15 @@ it("stamps a kept draft with the file it was opened on", async () => {
   expect(stored.sourceDigest).toBe(await pdfSourceDigest(new Uint8Array([1, 2, 3])));
   window.localStorage.removeItem(key);
 });
+
+it("picks the page that fills most of the view for OCR", async () => {
+  const { mostVisiblePageIndex } = await import("../pdfview");
+  // Page 1 has scrolled mostly away; page 2 fills the view below the toolbar.
+  const pages = [
+    { top: -900, bottom: 140 },
+    { top: 160, bottom: 1200 },
+  ];
+  expect(mostVisiblePageIndex(pages, 100, 900)).toBe(1);
+  expect(mostVisiblePageIndex([{ top: 0, bottom: 500 }, { top: 520, bottom: 1000 }], 0, 800)).toBe(0);
+  expect(mostVisiblePageIndex([{ top: 1000, bottom: 2000 }], 0, 800)).toBe(-1);
+});

@@ -44,3 +44,39 @@ describe("pdf draft digest", () => {
     expect(parsed.sourceDigest).toBe("d1");
   });
 });
+
+describe("pdf draft image storage", () => {
+  const image = (bytes: unknown) =>
+    JSON.stringify({
+      version: 1,
+      sourceFingerprint: "a.pdf",
+      pages: [{
+        page: 1,
+        width: 612,
+        height: 792,
+        operations: [{
+          id: "i1",
+          type: "imageBox",
+          page: 1,
+          rect: { x: 0, y: 0, width: 10, height: 10 },
+          name: "logo.png",
+          mimeType: "image/png",
+          bytes,
+        }],
+      }],
+    });
+
+  it("stores image bytes as base64 and reads them back", () => {
+    const bytes = Array.from({ length: 70000 }, (_, index) => index % 256);
+    const raw = serializePdfEditDocument(parsePdfEditDocument(image(bytes)));
+    expect(raw).not.toContain("[0,1,2");
+    expect(raw.length).toBeLessThan(bytes.length * 1.5);
+    const operation = parsePdfEditDocument(raw).pages[0].operations[0];
+    expect(operation.type === "imageBox" && operation.bytes).toEqual(bytes);
+  });
+
+  it("still reads drafts that stored bytes as a number array", () => {
+    const operation = parsePdfEditDocument(image([137, 80, 78, 71])).pages[0].operations[0];
+    expect(operation.type === "imageBox" && operation.bytes).toEqual([137, 80, 78, 71]);
+  });
+});

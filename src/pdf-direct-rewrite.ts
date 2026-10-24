@@ -7,6 +7,14 @@ export type PdfDirectRewriteResult = {
   skippedIds: Set<string>;
 };
 
+/** Where one page's text lives, from the parsed document. */
+export type PdfRewritePageScope = {
+  /** Object numbers of the page's content streams. */
+  contentObjects: ReadonlySet<number>;
+  /** Font resource names (without the slash) whose embedded font is a subset. */
+  subsetFonts: ReadonlySet<string>;
+};
+
 type LiteralRange = {
   contentStart: number;
   contentEnd: number;
@@ -23,7 +31,7 @@ type TextShowingMatch = {
   spans: Array<Pick<LiteralRange, "contentStart" | "contentEnd">>;
 };
 
-type RewriteCandidate =
+type RewriteCandidate = (
   | {
       kind: "raw";
       match: TextShowingMatch;
@@ -33,9 +41,22 @@ type RewriteCandidate =
       stream: FlateStreamRange;
       decodedBytes: Uint8Array;
       match: TextShowingMatch;
-    };
+    }
+) & {
+  /** Font resource selected where the text is shown; known only for page-scoped search. */
+  font?: string;
+};
+
+type PageStream = {
+  /** Decoded content bytes; offsets in matches are relative to these. */
+  content: Uint8Array;
+  /** Where `content` starts in the file for an unfiltered stream; null when compressed. */
+  fileOffset: number | null;
+  flate: FlateStreamRange | null;
+};
 
 type FlateStreamRange = {
+  objectNumber: number | null;
   dictionaryStart: number;
   dictionaryEnd: number;
   lengthStart: number;
@@ -252,8 +273,17 @@ function hasOnlyFlateDecodeFilter(dictionary: string): boolean {
   return /\/Filter\s*(?:\/FlateDecode|\[\s*\/FlateDecode\s*\])/.test(dictionary);
 }
 
-function findFlateStreams(bytes: Uint8Array): FlateStreamRange[] {
-  const streams: FlateStreamRange[] = [];
+function objectNumberBefore(bytes: Uint8Array, dictionaryStart: number): number | null {
+  const header = /(\d+)\s+\d+\s+obj\s*$/.exec(
+    ascii(bytes, Math.max(0, dictionaryStart - 32), dictionaryStart),
+  );
+  return header ? Number(header[1]) : null;
+}
+
+type StreamRange = FlateStreamRange & { filter: "flate" | "none" | "other" };
+
+function findStreams(bytes: Uint8Array): StreamRange[] {
+  const streams: StreamRange[] = [];
   let cursor = 0;
   while (cursor < bytes.length) {
     const streamKeyword = findAscii(bytes, "stream", cursor);
@@ -265,8 +295,14 @@ function findFlateStreams(bytes: Uint8Array): FlateStreamRange[] {
     if (dictionaryStart >= 0) {
       const dictionary = ascii(bytes, dictionaryStart, streamKeyword);
       const lengthRange = directLengthRange(dictionary);
-      if (lengthRange && hasOnlyFlateDecodeFilter(dictionary)) {
+      if (lengthRange) {
         streams.push({
+          filter: hasOnlyFlateDecodeFilter(dictionary)
+            ? "flate"
+            : /\/Filter/.test(dictionary)
+              ? "other"
+              : "none",
+          objectNumber: objectNumberBefore(bytes, dictionaryStart),
           dictionaryStart,
           dictionaryEnd: streamKeyword,
           lengthStart: dictionaryStart + lengthRange.start,
@@ -279,6 +315,92 @@ function findFlateStreams(bytes: Uint8Array): FlateStreamRange[] {
     cursor = endStream + "endstream".length;
   }
   return streams;
+}
+
+function findFlateStreams(bytes: Uint8Array): FlateStreamRange[] {
+  return findStreams(bytes).filter((stream) => stream.filter === "flate");
+}
+
+function pageStreams(bytes: Uint8Array, scope: PdfRewritePageScope): PageStream[] {
+  return findStreams(bytes).flatMap<PageStream>((stream) => {
+    if (stream.objectNumber === null || !scope.contentObjects.has(stream.objectNumber)) return [];
+    if (stream.filter === "none") {
+      return [{
+        content: bytes.subarray(stream.streamStart, stream.streamEnd),
+        fileOffset: stream.streamStart,
+        flate: null,
+      }];
+    }
+    if (stream.filter !== "flate") return [];
+    try {
+      const content = inflate(bytes.slice(stream.streamStart, stream.streamEnd));
+      return [{ content, fileOffset: null, flate: stream }];
+    } catch {
+      // Unsupported or corrupt compressed stream; direct rewrite will fall back.
+      return [];
+    }
+  });
+}
+
+/** Font resource set by the last `Tf` before `offset` in a content stream. */
+function fontAt(content: Uint8Array, offset: number): string | undefined {
+  const text = ascii(content, 0, offset);
+  let font: string | undefined;
+  for (const match of text.matchAll(/\/([^\s/[\]()<>{}%]+)\s+[-+\d.]+\s+Tf\b/g)) {
+    font = match[1];
+  }
+  return font;
+}
+
+function shiftMatch(match: TextShowingMatch, offset: number): TextShowingMatch {
+  return {
+    decoded: match.decoded,
+    spans: match.spans.map((span) => ({
+      contentStart: span.contentStart + offset,
+      contentEnd: span.contentEnd + offset,
+    })),
+  };
+}
+
+// Only text drawn on the edited page is a candidate, so equal text elsewhere in
+// the file is never touched.
+function pageRewriteCandidates(
+  streams: PageStream[],
+  originalText: string,
+): RewriteCandidate[] {
+  return streams.flatMap((stream) =>
+    directTextShowingMatches(stream.content)
+      .filter((match) => match.decoded === originalText)
+      .map<RewriteCandidate>((match) => {
+        const font = fontAt(stream.content, match.spans[0].contentStart);
+        return stream.flate
+          ? { kind: "flate", stream: stream.flate, decodedBytes: stream.content, match, font }
+          : { kind: "raw", match: shiftMatch(match, stream.fileOffset ?? 0), font };
+      }),
+  );
+}
+
+/** Characters the page already shows in `font`; a subset font is sure to hold these glyphs. */
+function charactersShownInFont(streams: PageStream[], font: string): Set<string> {
+  const shown = new Set<string>();
+  for (const stream of streams) {
+    for (const match of directTextShowingMatches(stream.content)) {
+      if (fontAt(stream.content, match.spans[0].contentStart) !== font) continue;
+      for (const character of match.decoded) shown.add(character);
+    }
+  }
+  return shown;
+}
+
+function glyphsAvailable(
+  streams: PageStream[],
+  scope: PdfRewritePageScope,
+  candidate: RewriteCandidate,
+  replacementText: string,
+): boolean {
+  if (!candidate.font || !scope.subsetFonts.has(candidate.font)) return true;
+  const shown = charactersShownInFont(streams, candidate.font);
+  return [...replacementText].every((character) => shown.has(character));
 }
 
 function rewriteSpans(
@@ -366,6 +488,7 @@ function directOperations(edits: PdfEditDocument): PdfDirectTextEditOperation[] 
 export function tryDirectTextRewrite(
   originalBytes: Uint8Array,
   edits: PdfEditDocument,
+  scopes?: ReadonlyMap<number, PdfRewritePageScope>,
 ): PdfDirectRewriteResult {
   const bytes = new Uint8Array(originalBytes);
   const appliedIds = new Set<string>();
@@ -381,13 +504,24 @@ export function tryDirectTextRewrite(
       skippedIds.add(operation.id);
       continue;
     }
-    const candidates = directRewriteCandidates(bytes, operation.originalText);
+    const scope = scopes?.get(operation.page);
+    if (scopes && !scope) {
+      skippedIds.add(operation.id);
+      continue;
+    }
+    const streams = scope ? pageStreams(bytes, scope) : [];
+    const candidates = scope
+      ? pageRewriteCandidates(streams, operation.originalText)
+      : directRewriteCandidates(bytes, operation.originalText);
     if (candidates.length !== 1) {
       skippedIds.add(operation.id);
       continue;
     }
     const [candidate] = candidates;
-    if (!replacementFits(candidate.match, replacement)) {
+    if (
+      !replacementFits(candidate.match, replacement) ||
+      (scope && !glyphsAvailable(streams, scope, candidate, operation.replacementText))
+    ) {
       skippedIds.add(operation.id);
       continue;
     }
