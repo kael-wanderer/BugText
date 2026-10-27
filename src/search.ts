@@ -43,6 +43,7 @@ export function createSearchPanel(
   };
 
   async function run(): Promise<void> {
+    const current = ++token;
     const folder = deps.getFolder();
     const query = input.value.trim();
     results.replaceChildren();
@@ -55,7 +56,6 @@ export function createSearchPanel(
       return;
     }
     status.textContent = "Searching…";
-    const current = ++token;
     let hits: SearchHit[];
     try {
       const textHits = await searchInFolder(folder, query, options);

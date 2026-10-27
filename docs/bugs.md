@@ -199,6 +199,42 @@ table and a detail block below. Reference the failing test-case ID.
   refresh also runs on native window focus, and the Refresh button runs the full
   workspace refresh.
 
+### BUG-033 — Markdown preview allows active content
+
+- **Feature / test case:** Markdown preview and export / —
+- **Severity:** Major
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Open a Markdown file containing an image with an `onerror` handler or a script tag.
+- **Expected:** Document content is rendered without executing scripts or event handlers.
+- **Actual:** Raw HTML was inserted into the app without sanitization.
+- **Notes:** Raw HTML support remains available for safe elements; Mermaid uses strict mode.
+- **Status:** Fixed in 0.3.5.
+
+### BUG-034 — Interrupted saves can damage files
+
+- **Feature / test case:** Save file / —
+- **Severity:** Major
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Save a document while the target is a symlink or the write is interrupted.
+- **Expected:** The save swaps in a complete file, preserves the link and keeps existing permissions.
+- **Actual:** Direct writes truncated the target, while the prior atomic path replaced symlinks and dropped permissions.
+- **Notes:** Save commands now share a temporary sibling and rename path.
+- **Status:** Fixed in 0.3.5.
+
+### BUG-035 — Clearing search can show stale results
+
+- **Feature / test case:** Folder search / —
+- **Severity:** Minor
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Search a folder, then clear or shorten the query before the search completes.
+- **Expected:** Results from the old query are discarded.
+- **Actual:** The old search could still publish results after an early return.
+- **Notes:** Each run now invalidates prior searches before checking the query.
+- **Status:** Fixed in 0.3.5.
+
 ### BUG-000 (example — delete me)
 
 - **Feature / test case:** Export / EXP-02

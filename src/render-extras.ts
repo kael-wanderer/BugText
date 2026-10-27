@@ -7,7 +7,7 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
       mermaid.initialize({
         startOnLoad: false,
         theme: "dark",
-        securityLevel: "loose",
+        securityLevel: "strict",
       });
       return mermaid;
     });
