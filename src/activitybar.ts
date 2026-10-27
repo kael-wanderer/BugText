@@ -10,6 +10,7 @@ export function initActivityBar(
 ): void {
   const explorerButton = document.getElementById("ab-explorer")!;
   explorerButton.innerHTML = glyphs.explorer;
+  document.getElementById("ab-outline")!.innerHTML = glyphs.outline;
 
   const searchButton = document.getElementById("ab-search")!;
   searchButton.innerHTML = glyphs.search;

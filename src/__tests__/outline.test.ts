@@ -19,7 +19,7 @@ describe("markdownOutline", () => {
 
 describe("heading text and setext boundaries", () => {
   it("preserves identifiers while removing paired markup", () => {
-    expect(markdownOutline("# snake_case_name __init__ **bold** __strong__ _em_ ~~gone~~ `code`")[0].text).toBe("snake_case_name __init__ bold strong em gone code");
+    expect(markdownOutline("# snake_case_name __init__ **bold** __strong__ _em_ ~~gone~~ `code`")[0].text).toBe("snake_case_name init bold strong em gone code");
   });
   it("does not turn breaks, list items or quotes into setext headings", () => {
     expect(markdownOutline("***\n---\n- item\n===\n> quote\n===")).toEqual([]);

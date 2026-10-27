@@ -8,7 +8,7 @@ export function plainHeadingText(text: string): string {
   return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/(`+)(.*?)\1/g, "$2")
     .replace(/(\*\*|~~)(?=\S)(.+?\S)\1/g, "$2")
-    .replace(/(^|[^\w])__(?=\S)(.+?\S)__(?=$|[^\w])/g, (match, prefix: string, content: string) => /^init$/.test(content) ? match : prefix + content)
+    .replace(/(^|[^\w])__(?=\S)(.+?\S)__(?=$|[^\w])/g, "$1$2")
     .replace(/(^|[^\w])([*_])(?!\2)(?=\S)(.+?\S)\2(?!\2)(?=$|[^\w])/g, "$1$3")
     .trim();
 }

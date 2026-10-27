@@ -23,3 +23,17 @@ it("renders safe text, filters with parents, folds and supports keyboard jumps",
   row.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   expect(jump).toHaveBeenCalledWith(2);
 });
+
+it("gives only headings with sub-headings a toggle and keeps the header in place", () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const view = createOutlineView(host, vi.fn(), vi.fn());
+  view.update("doc", [{ level: 1, text: "A", line: 1 }, { level: 2, text: "B", line: 3 }], true);
+  expect(host.querySelectorAll(".outline-caret")[0].tagName).toBe("BUTTON");
+  expect(host.querySelectorAll(".outline-caret")[1].tagName).toBe("SPAN");
+  expect(host.querySelectorAll('[aria-label="Toggle section"]')).toHaveLength(1);
+  const scrolled = vi.fn();
+  Element.prototype.scrollIntoView = scrolled;
+  view.setActive(3);
+  expect(scrolled).not.toHaveBeenCalled();
+});

@@ -3274,11 +3274,11 @@ body.search-active #outline-panel { display: none; }
   font-size: var(--explorer-size, 13px);
 }
 body.settings-active #outline-panel { visibility: hidden; pointer-events: none; }
-.outline-header { display: flex; align-items: center; gap: 4px; padding: 12px 10px; color: var(--muted); }
-.outline-header span { flex: 1; font-size: 11px; font-weight: 600; }
-.outline-header button, .outline-caret { border: 0; background: transparent; color: inherit; cursor: pointer; }
+.outline-header, #outline-panel input { flex-shrink: 0; }
+.outline-actions { display: flex; gap: 1px; }
+.outline-caret { border: 0; background: transparent; color: inherit; cursor: pointer; }
 #outline-panel input { margin: 0 10px 8px; min-width: 0; padding: 6px 8px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
-.outline-tree { overflow: auto; min-height: 0; }
+.outline-tree { flex: 1 1 auto; overflow: auto; min-height: 0; }
 .outline-row { display: flex; align-items: center; min-height: 27px; cursor: pointer; color: var(--text); }
 .outline-row:hover, .outline-row.active { background: var(--bg-hover, rgba(128,128,128,.15)); }
 .outline-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -174,7 +174,9 @@ function updateOutline(force = false): void {
   const key = `${getState().activeWindowId}:${tab?.id ?? ""}`;
   if (force || key !== outlineKey) {
     outlineKey = key;
-    outlineView.update(tab?.path ?? key, tab && isMarkdownFile(tab.path ?? tab.name) ? markdownOutline(activeView().editor.getText(tab.id)) : [], !!tab && isMarkdownFile(tab.path ?? tab.name));
+    // A window without tabs edits a new Markdown note once you type.
+    const markdown = !tab || isMarkdownFile(tab.path ?? tab.name);
+    outlineView.update(tab?.path ?? key, tab && markdown ? markdownOutline(activeView().editor.getText(tab.id)) : [], markdown);
   }
   const view = views.get(getState().activeWindowId);
   if (view) outlineView.setActive(view.navigationLine());
@@ -2532,6 +2534,7 @@ function applySidebarView(): void {
   document.getElementById("ab-outline")!.classList.toggle("active", outline && getState().explorerVisible);
   document.getElementById("ab-outline")!.setAttribute("aria-pressed", String(outline && getState().explorerVisible));
   document.getElementById("ab-explorer")!.classList.toggle("active", !outline && getState().explorerVisible);
+  document.getElementById("ab-explorer")!.setAttribute("aria-pressed", String(!outline && getState().explorerVisible));
 }
 document.getElementById("ab-outline")!.addEventListener("click", () => {
   if (settingsScreen.isOpen()) settingsScreen.close();

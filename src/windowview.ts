@@ -1,5 +1,5 @@
 import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from "./scroll-sync";
-import { capturePreviewPlace, restorePreviewPlace } from "./preview-place";
+import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
 import { invoke } from "@tauri-apps/api/core";
@@ -192,6 +192,7 @@ export function createWindowView(
   let focusedPane: "editor" | "preview" = "editor";
   let cursorLine = 1;
   let previewDocumentId: string | null = null;
+  let previewLineCount = 0;
   let placeObserver: ResizeObserver | null = null;
   let editorZoom = 1;
   let previewZoom = 1;
@@ -331,7 +332,13 @@ export function createWindowView(
     (tabId, files) => h.onPasteImages(windowId, tabId, files),
   );
   const guard = createScrollGuard();
+  // Anchor offsets are measured once per layout: scrolling only moves the pane, and
+  // a re-render, image load, zoom or resize changes the scroll height or width.
+  let anchorCache: { article: Element | null; height: number; width: number; anchors: ScrollAnchor[] } | null = null;
   function anchors(): ScrollAnchor[] {
+    const article = previewPane.firstElementChild;
+    if (anchorCache && anchorCache.article === article && anchorCache.height === previewPane.scrollHeight
+      && anchorCache.width === previewPane.clientWidth) return anchorCache.anchors;
     const top = previewPane.getBoundingClientRect().top;
     const result: ScrollAnchor[] = [];
     for (const element of previewPane.querySelectorAll<HTMLElement>("[data-line]")) {
@@ -339,6 +346,7 @@ export function createWindowView(
       const offset = element.getBoundingClientRect().top - top + previewPane.scrollTop;
       if (line > 0 && (!result.length || (line > result[result.length - 1].line && offset >= result[result.length - 1].offset))) result.push({ line, offset });
     }
+    anchorCache = { article, height: previewPane.scrollHeight, width: previewPane.clientWidth, anchors: result };
     return result;
   }
   function navigationLine(): number {
@@ -505,11 +513,14 @@ export function createWindowView(
     const documentId = getWindow(windowId)?.activeTabId ?? null;
     const place = documentId && documentId === previewDocumentId && getWindow(windowId)?.mode !== "editor"
       ? capturePreviewPlace(previewPane) : null;
+    const lineCount = text.split("\n").length;
+    const placeLine = place ? shiftedLine(place.line, lineCount - previewLineCount, cursorLine) : 0;
     previewDocumentId = documentId;
+    previewLineCount = lineCount;
     placeObserver?.disconnect();
     placeObserver = null;
     const restorePlace = (): void => {
-      if (place && documentId === previewDocumentId) restorePreviewPlace(previewPane, place);
+      if (place && documentId === previewDocumentId) restorePreviewPlace(previewPane, place, placeLine);
     };
     // Reset zoom to 100% on a document switch (new file), but not on the frequent
     // edit-debounce re-renders of the same document — otherwise a manual zoom would
