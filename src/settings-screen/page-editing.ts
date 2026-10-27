@@ -1,7 +1,7 @@
 import { caption, clampStep, group, pageHeader, row, segmented, select, stepper, textInput, button } from "./controls";
 import { FONT_OPTIONS } from "./fonts";
 import type { SettingsPage } from "./screen";
-import type { Settings } from "../settings";
+import { DEFAULT_SETTINGS, type Settings } from "../settings";
 
 export type Zone = "explorer" | "main" | "sub";
 
@@ -9,10 +9,10 @@ export const SIZE_MIN = 10;
 export const SIZE_MAX = 28;
 export const WRAP_MIN = 20;
 export const WRAP_MAX = 200;
-export const WRAP_DEFAULT = 80;
+export const WRAP_DEFAULT = DEFAULT_SETTINGS.wrapColumn;
 
 export function defaultZoneSize(zone: Zone): number {
-  return zone === "explorer" ? 13 : 15;
+  return DEFAULT_SETTINGS[zone].size;
 }
 
 export function stepZoneSize(size: number, delta: number): number {

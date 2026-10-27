@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-27
+
 ### Changed
 
 - General now has explicit Editor and Sub Editor Font Size controls, separate from
@@ -21,6 +23,27 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Theme follows the shared settings pattern: System/Dark/Light appearance,
   remembered dark palette, searchable theme lists, and Default/Match Panel/Tinted
   sidebar appearance. Existing theme and explorer preferences are preserved.
+
+- PDF Save As is now Save a Copy and works on unchanged PDFs too (it copies the
+  opened bytes). The open file keeps its pending edits, and a copy onto the open
+  PDF itself is refused; Save writes the original with a backup.
+- The PDF thumbnail button is named Pages.
+
+### Fixed
+
+- PDFs and plain-text files no longer show the Editor / Editor + Preview mode
+  buttons or Line numbers: explicit button display styles overrode `hidden`.
+- App Font Size now scales the per-window status bar; its rule targeted a class
+  the status bar does not use.
+- General's File Explorer Font Size Reset gave 15 px while the default (and
+  Editing's Reset) is 13 px. Every font-size Reset now reads the settings defaults.
+- Choosing a theme no longer jumps its list back to the top or drops keyboard
+  focus, and the theme search survives settings refreshes.
+- Every settings change rebuilt the open Settings page and dropped keyboard focus;
+  the focused control is now restored after each refresh.
+- The status bar's quick theme picker clipped its text at larger App Font Sizes.
+- Escape closes the open PDF panel (Review, Proof, OCR review, editing support,
+  then Pages) and returns focus to its button.
 
 
 ## [0.3.3] - 2026-10-24

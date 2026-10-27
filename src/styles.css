@@ -691,8 +691,8 @@ body[data-wrap="guide"] .doc {
 .tab-file-icon.type-pdf { color: #e0544e; }
 
 .ws-theme {
-  max-width: 126px;
-  height: 19px;
+  max-width: 10.5em;
+  height: 1.6em; /* 19px at the default status size; grows with App Font Size */
   padding: 0 20px 0 6px;
   color: var(--muted);
   background: transparent;
@@ -2735,6 +2735,8 @@ body.resizing-ai {
 .wt-btn:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,0.05); }
 .wt-btn.active { color: var(--text-strong); background: rgba(255,255,255,0.10); }
 .wt-icon { border: 1px solid var(--border); border-radius: 7px; }
+/* Explicit display values above must not reveal controls hidden per document. */
+.window-toolbar [hidden] { display: none; }
 
 /* ---------- Command palette ---------- */
 
@@ -2914,5 +2916,10 @@ body.resizing-ai {
 :root[data-sidebar-look="match"] #settings-rail { background: var(--bg-editor); }
 :root[data-sidebar-look="tinted"] #explorer,
 :root[data-sidebar-look="tinted"] #settings-rail { background: color-mix(in srgb, var(--bg-elev) 92%, var(--accent)); }
-.tab, .statusbar, .search-input { font-size: var(--ui-size, 14px); }
+.tab, .search-input { font-size: var(--ui-size, 14px); }
+.window-status {
+  font-size: calc(var(--ui-size, 14px) - 2px);
+  height: auto;
+  min-height: max(24px, calc(var(--ui-size, 14px) * 1.7));
+}
 .explorer-header, .explorer-root { font-size: var(--explorer-size, 13px); }

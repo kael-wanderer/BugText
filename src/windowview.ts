@@ -92,7 +92,7 @@ export function createWindowView(
     <div class="editor-header">
       <div class="tabbar"></div>
       <div class="window-toolbar">
-        <div class="wt-group">
+        <div class="wt-group wt-modes">
           <button class="wt-btn" data-mode="editor" type="button" title="Editor (⌘E)">${glyphs.editor}</button>
           <button class="wt-btn" data-mode="preview" type="button" title="Read">${glyphs.read}</button>
           <button class="wt-btn" data-mode="split" type="button" title="Editor + Preview">${glyphs.split}</button>
@@ -353,6 +353,8 @@ export function createWindowView(
       btn.hidden = !modes.includes(mode);
       btn.classList.toggle("active", mode === effectiveMode);
     });
+    // A single available mode (PDF) needs no switcher.
+    root.querySelector<HTMLElement>(".wt-modes")!.hidden = modes.length < 2;
     root.querySelector<HTMLElement>(".preview-zoom-group")!.hidden =
       !modes.includes("preview") && !modes.includes("split");
     root.querySelector<HTMLElement>(".wt-lines")!.hidden =

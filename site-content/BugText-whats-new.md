@@ -1,5 +1,5 @@
 - Updates: BugText checks kael.io.vn for new versions and opens the download page. Nothing installs on its own.
-- Coming from 0.3.0? Download 0.3.3 once from this page; later versions are offered inside the app.
+- Coming from 0.3.0? Download 0.3.4 once from this page; later versions are offered inside the app.
 - Safer PDF saves: BugText asks before replacing a PDF that changed on disk, and notices changes while it is open.
 - PDF drafts: unsaved edits survive a restart and ask before they are applied to a PDF that has changed since.
 - Direct text edits now work on text in fonts embedded by most PDF tools, using the font's own letters.
@@ -7,4 +7,7 @@
 - PDF toolbar wraps to a second row; text and covers get their own color and opacity controls.
 - Fixed: Esc cancels an in-place edit, one undo step per drag, OCR reads the page in view, covers fit rotated pages.
 - Fixed: History ▸ Restore redraws a PDF at once, and a PDF reloaded from disk keeps its scroll position.
-- New app icon, the bT Lettermark. Settings and About show a build number: 0.3.3 is build 250.
+- Themes: 10 dark and 10 light palettes, picked separately. General sets app, Explorer and editor font sizes.
+- PDF Save a Copy works on unchanged PDFs too, Esc closes PDF panels, and thumbnails are now called Pages.
+- Fixed: stray Markdown buttons on PDFs, status bar text size, font-size Reset values, and keyboard focus in Settings.
+- The bT Lettermark is the app icon. Settings and About show a build number: 0.3.4 is build 251.

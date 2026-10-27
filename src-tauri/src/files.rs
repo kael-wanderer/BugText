@@ -457,6 +457,16 @@ pub fn save_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
     fs::write(&path, bytes).map_err(|error| error.to_string())
 }
 
+/// True when both paths name the same existing file, through symlinks and
+/// aliases. A missing path is never the same file.
+#[tauri::command]
+pub fn same_file(a: String, b: String) -> bool {
+    match (Path::new(&a).canonicalize(), Path::new(&b).canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
 pub fn backup_path_for(path: &Path, timestamp_ms: u128) -> Result<PathBuf, String> {
     let parent = path
         .parent()
@@ -970,4 +980,32 @@ pub fn ai_models_cache_write(app: tauri::AppHandle, contents: String) -> Result<
         .map_err(|error| error.to_string())?;
     fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
     fs::write(dir.join("ai-models-cache.json"), contents).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod same_file_tests {
+    use super::same_file;
+    use std::fs;
+
+    #[test]
+    fn matches_same_path_and_symlink_but_not_other_or_missing() {
+        let dir = std::env::temp_dir().join(format!("bugtext_same_file_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.pdf");
+        let other = dir.join("b.pdf");
+        fs::write(&file, b"a").unwrap();
+        fs::write(&other, b"b").unwrap();
+        let text = |p: &std::path::Path| p.to_string_lossy().into_owned();
+        assert!(same_file(text(&file), text(&dir.join(".").join("a.pdf"))));
+        assert!(!same_file(text(&file), text(&other)));
+        assert!(!same_file(text(&file), text(&dir.join("missing.pdf"))));
+        #[cfg(unix)]
+        {
+            let link = dir.join("link.pdf");
+            std::os::unix::fs::symlink(&file, &link).unwrap();
+            assert!(same_file(text(&file), text(&link)));
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

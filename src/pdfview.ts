@@ -741,8 +741,8 @@ export async function renderPdf(
   capabilityButton.title = "Show PDF editing capabilities by page";
   capabilityButton.disabled = true;
   thumbnailButton.type = "button";
-  thumbnailButton.textContent = "Thumbs";
-  thumbnailButton.title = "Show PDF page thumbnails";
+  thumbnailButton.textContent = "Pages";
+  thumbnailButton.title = "Show page thumbnails";
   thumbnailButton.disabled = true;
   ocrLanguageInput.type = "text";
   ocrLanguageInput.value = "eng";
@@ -752,7 +752,8 @@ export async function renderPdf(
   saveButton.textContent = "Save";
   saveButton.disabled = true;
   saveAsButton.type = "button";
-  saveAsButton.textContent = "Save As";
+  saveAsButton.textContent = "Save a Copy";
+  saveAsButton.title = "Save a copy of this PDF, with any pending edits";
   saveAsButton.disabled = true;
   reviewButton.type = "button";
   reviewButton.textContent = "Review";
@@ -1041,7 +1042,7 @@ export async function renderPdf(
   };
   const updateToolbarState = (): void => {
     saveButton.disabled = saving || !hasPdfEdits(editDocument);
-    saveAsButton.disabled = saving || !hasPdfEdits(editDocument);
+    saveAsButton.disabled = saving;
     reviewButton.disabled = saving || !hasPdfEdits(editDocument);
     const proofIssues = listPdfProofIssues(editDocument);
     proofButton.disabled = saving || !hasPdfEdits(editDocument);
@@ -2176,8 +2177,29 @@ export async function renderPdf(
       }
     })();
   });
+  // Escape closes one panel at a time, right-hand panels before Pages, and
+  // returns focus to the button that opened it.
+  const closeTopPanel = (): boolean => {
+    const panels: [HTMLElement | null, () => void, HTMLButtonElement][] = [
+      [proofPanel, closeProofPanel, proofButton],
+      [reviewPanel, closeReviewPanel, reviewButton],
+      [ocrReviewPanel, closeOcrReviewPanel, ocrReviewButton],
+      [capabilityPanel, closeCapabilityPanel, capabilityButton],
+      [thumbnailPanel, closeThumbnailPanel, thumbnailButton],
+    ];
+    const open = panels.find(([panel]) => panel);
+    if (!open) return false;
+    open[1]();
+    open[2].focus({ preventScroll: true });
+    return true;
+  };
   const keyHandler = (event: KeyboardEvent): void => {
     if (isTextEntryTarget(event.target)) return;
+    if (event.key === "Escape" && closeTopPanel()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
       if (event.shiftKey) {
@@ -2223,7 +2245,7 @@ export async function renderPdf(
     );
     if (!overwrite) {
       if (changedOnDisk) {
-        setStatus("Not saved: the PDF changed on disk. Save As keeps both versions.", {
+        setStatus("Not saved: the PDF changed on disk. Save a Copy keeps both versions.", {
           sticky: true,
         });
       }
@@ -2264,22 +2286,29 @@ export async function renderPdf(
       updateToolbarState();
     }
   };
+  // Writes a separate copy; the open file, its pending edits and history stay put.
   const saveEditedPdfAs = async (): Promise<void> => {
-    if (!hasPdfEdits(editDocument) || saving) return;
+    if (saving) return;
     const out = await pickExportPath("pdf");
     if (!out) return;
+    if (await invoke<boolean>("same_file", { a: path, b: out }).catch(() => out === path)) {
+      setStatus("Choose another file for the copy. Save writes the original with a backup.", {
+        sticky: true,
+      });
+      return;
+    }
     saving = true;
     updateToolbarState();
     try {
-      setStatus("Saving edited PDF...");
-      const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(
-        new Uint8Array(bytes),
-        editDocument,
-        loadSystemFontBytes,
-      );
+      const edited = hasPdfEdits(editDocument);
+      let output: Uint8Array = new Uint8Array(bytes);
+      if (edited) {
+        setStatus("Saving edited PDF copy...");
+        const { writeEditedPdf } = await import("./pdf-edit-writer");
+        output = await writeEditedPdf(output, editDocument, loadSystemFontBytes);
+      }
       await invoke("save_bytes", { path: out, bytes: Array.from(output) });
-      setStatus("Edited PDF saved", { sticky: true });
+      setStatus(edited ? "Edited copy saved" : "Copy saved", { sticky: true });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
     } finally {

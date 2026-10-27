@@ -18,6 +18,44 @@ import {
 } from "./registry";
 import "./settings-screen.css";
 
+// Controls in document order under a node; used to find "the same control" again
+// after a page is rebuilt.
+function focusableControls(root: Element): HTMLElement[] {
+  const found: HTMLElement[] = [];
+  for (const child of Array.from(root.children)) {
+    if (/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(child.tagName)) found.push(child as HTMLElement);
+    found.push(...focusableControls(child));
+  }
+  return found;
+}
+
+function settingRowOf(node: Element, pane: Element): HTMLElement | null {
+  for (let at: Element | null = node; at && at !== pane; at = at.parentElement) {
+    if ((at as HTMLElement).dataset?.setting) return at as HTMLElement;
+  }
+  return null;
+}
+
+export type FocusKey = { setting: string; index: number };
+
+/** Names the focused control as its settings row plus its position in that row. */
+export function settingFocusKey(pane: Element, active: Element | null): FocusKey | null {
+  if (!active || active === pane || !pane.contains(active)) return null;
+  const row = settingRowOf(active, pane);
+  if (!row) return null;
+  const index = focusableControls(row).indexOf(active as HTMLElement);
+  return index < 0 ? null : { setting: row.dataset.setting!, index };
+}
+
+/** Focuses the control a key names in a rebuilt page; false when it is gone. */
+export function restoreSettingFocus(pane: Element, key: FocusKey | null): boolean {
+  if (!key) return false;
+  const row = pane.querySelector<HTMLElement>(`[data-setting="${CSS.escape(key.setting)}"]`);
+  const control = row ? focusableControls(row)[key.index] : undefined;
+  control?.focus({ preventScroll: true });
+  return Boolean(control);
+}
+
 export type ScreenDeps = AiPageDeps & {
   openAiPage?: (sub: AiSubPage) => void;
   getSettings: () => Settings;
@@ -301,11 +339,15 @@ export function createSettingsScreen(
     if (target?.isConnected) target.focus({ preventScroll: true });
   }
 
+  // Refreshes arrive after every save (and from other windows); keep the
+  // keyboard user on the control they were using.
   function refresh(): void {
     if (!open) return;
     const scroll = pane.scrollTop;
+    const focus = settingFocusKey(pane, document.activeElement);
     render();
     pane.scrollTop = scroll;
+    restoreSettingFocus(pane, focus);
   }
 
   window.addEventListener("keydown", (event) => {
