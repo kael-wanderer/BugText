@@ -22,6 +22,23 @@ const md = new MarkdownIt({
   },
 });
 
+// Source maps attach navigation anchors to rendered block elements.
+md.core.ruler.push("source_lines", (state) => {
+  for (const token of state.tokens) {
+    if (token.map && token.block && token.nesting === 1) {
+      token.attrSet("data-line", String(token.map[0] + 1));
+    }
+  }
+});
+for (const name of ["fence", "code_block"] as const) {
+  const render = md.renderer.rules[name]!;
+  md.renderer.rules[name] = (tokens, index, options, env, renderer) => {
+    const html = render(tokens, index, options, env, renderer);
+    const line = tokens[index].map?.[0];
+    return line === undefined ? html : html.replace("<pre", `<pre data-line="${line + 1}"`);
+  };
+}
+
 md.inline.ruler.after("escape", "math", (state, silent) => {
   const source = state.src.slice(state.pos);
   const display = source.startsWith("$$");

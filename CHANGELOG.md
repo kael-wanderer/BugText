@@ -21,6 +21,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Heading search ignores fenced code, front matter, comments and indented code, and recognizes setext headings.
+
 - An edit made just as BugText regained focus could be replaced by the file on disk
   (BUG-037).
 - PNG and SVG export of a Markdown note works again: notes with images failed with

@@ -8,4 +8,11 @@ describe("markdownOutline", () => {
       { level: 3, text: "Three", line: 3 },
     ]);
   });
+  it("skips front matter, comments, indented and fenced code and finds setext", () => {
+    const source = ["---", "# metadata", "---", "Title", "===", "<!--", "# hidden", "-->", "    # code", "~~~~", "# fenced", "~~~", "# still fenced", "~~~~", "## **Bold** [link](url) ###", "```", "# unclosed"].join("\n");
+    expect(markdownOutline(source)).toEqual([
+      { level: 1, text: "Title", line: 4 },
+      { level: 2, text: "Bold link", line: 15 },
+    ]);
+  });
 });

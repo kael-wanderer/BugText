@@ -443,6 +443,20 @@ export function createWindowView(
     text: string,
     pathOrName: string | null = null,
   ): void {
+    const sameDocument = pathOrName === previewPathOrName;
+    const paneTop = previewPane.getBoundingClientRect().top;
+    const visible = sameDocument
+      ? Array.from(previewPane.querySelectorAll<HTMLElement>("[data-line]"))
+          .find((element) => element.getBoundingClientRect().bottom > paneTop)
+      : undefined;
+    const anchorLine = visible?.dataset.line;
+    const anchorOffset = visible ? visible.getBoundingClientRect().top - paneTop : 0;
+    const restorePlace = (): void => {
+      if (!anchorLine || pathOrName !== previewPathOrName) return;
+      const anchor = Array.from(previewPane.querySelectorAll<HTMLElement>("[data-line]"))
+        .find((element) => element.dataset.line === anchorLine);
+      if (anchor) previewPane.scrollTop += anchor.getBoundingClientRect().top - previewPane.getBoundingClientRect().top - anchorOffset;
+    };
     // Reset zoom to 100% on a document switch (new file), but not on the frequent
     // edit-debounce re-renders of the same document — otherwise a manual zoom would
     // snap back while typing.
@@ -576,7 +590,12 @@ export function createWindowView(
       article.innerHTML = renderMarkdown(text);
       resolvePreviewImages(article, pathOrName?.startsWith("/") ? pathOrName : null);
       previewPane.appendChild(article);
-      void enhancePreview(previewPane);
+      restorePlace();
+      const token = previewRenderToken;
+      const restoredScroll = previewPane.scrollTop;
+      void enhancePreview(previewPane).then(() => {
+        if (token === previewRenderToken && previewPane.scrollTop === restoredScroll) restorePlace();
+      });
     }
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;

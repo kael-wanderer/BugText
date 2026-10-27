@@ -4,12 +4,20 @@ import { renderMarkdown } from "../preview";
 
 describe("renderMarkdown", () => {
   it("renders headings", () => {
-    expect(renderMarkdown("# Hi")).toContain("<h1>Hi</h1>");
+    expect(renderMarkdown("# Hi")).toContain('<h1 data-line="1">Hi</h1>');
+  });
+
+  it("anchors blocks and removes other data attributes", () => {
+    const html = renderMarkdown('# Head\n\nParagraph\n\n<div data-other="x" onclick="evil()">Hi</div>');
+    expect(html).toContain('<h1 data-line="1">');
+    expect(html).toContain('<p data-line="3">');
+    expect(html).not.toContain('data-other');
+    expect(html).not.toContain('onclick');
   });
 
   it("renders GFM tables", () => {
     const html = renderMarkdown("| a | b |\n|---|---|\n| 1 | 2 |");
-    expect(html).toContain("<table>");
+    expect(html).toContain('<table data-line="1">');
   });
 
   it("autolinks bare urls", () => {
