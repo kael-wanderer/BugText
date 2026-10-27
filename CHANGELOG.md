@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-10-27
+
 ### Changed
 
 - General now has explicit Editor and Sub Editor Font Size controls, separate from
