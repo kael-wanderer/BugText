@@ -102,4 +102,62 @@ describe("buildExportHtml", () => {
     expect(replacement).toHaveBeenCalledWith(imageElement);
     expect(imageElement.src).toBe("data:image/png;base64,diagram");
   });
+
+  it("embeds rendered SVG as serialized XML images for PDF", async () => {
+    const replacement = vi.fn();
+    const svg = { replaceWith: replacement };
+    const host = {
+      className: "",
+      innerHTML: "",
+      style: {},
+      querySelectorAll: () => [svg],
+      remove: vi.fn(),
+    };
+    Object.defineProperty(host, "outerHTML", {
+      get: () => `<article class="${host.className}">${host.innerHTML}</article>`,
+    });
+    const imageElement = { src: "", alt: "" };
+    vi.stubGlobal("document", {
+      createElement: vi.fn((tag: string) => (tag === "img" ? imageElement : host)),
+      body: { appendChild: vi.fn() },
+    });
+    vi.stubGlobal(
+      "XMLSerializer",
+      class {
+        serializeToString() {
+          return '<svg xmlns="http://www.w3.org/2000/svg"><rect style=""/></svg>';
+        }
+      },
+    );
+    vi.mocked(enhancePreview).mockResolvedValueOnce();
+
+    await buildExportHtml("diagram", { rasterizeSvg: false, svgAsImage: true });
+
+    expect(replacement).toHaveBeenCalledWith(imageElement);
+    expect(imageElement.src.startsWith("data:image/svg+xml;charset=utf-8,")).toBe(true);
+    expect(decodeURIComponent(imageElement.src.split(",")[1])).toContain('style=""');
+  });
+
+  it("leaves inline SVG alone for image capture", async () => {
+    const replacement = vi.fn();
+    const host = {
+      className: "",
+      innerHTML: "",
+      style: {},
+      querySelectorAll: () => [{ replaceWith: replacement }],
+      remove: vi.fn(),
+    };
+    Object.defineProperty(host, "outerHTML", {
+      get: () => `<article class="${host.className}">${host.innerHTML}</article>`,
+    });
+    vi.stubGlobal("document", {
+      createElement: vi.fn(() => host),
+      body: { appendChild: vi.fn() },
+    });
+    vi.mocked(enhancePreview).mockResolvedValueOnce();
+
+    await buildExportHtml("diagram", { rasterizeSvg: false });
+
+    expect(replacement).not.toHaveBeenCalled();
+  });
 });

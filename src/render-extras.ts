@@ -8,6 +8,10 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
         startOnLoad: false,
         theme: "dark",
         securityLevel: "strict",
+        // Plain SVG text labels: PDF export (Typst) cannot draw HTML labels
+        // inside <foreignObject>.
+        htmlLabels: false,
+        flowchart: { htmlLabels: false },
       });
       return mermaid;
     });

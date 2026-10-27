@@ -118,6 +118,11 @@ pub fn export_pdf_html(html: String, out: String) -> Result<(), String> {
         media.to_string_lossy().into_owned(),
         "--pdf-engine".into(),
         typst.to_string_lossy().into_owned(),
+        // Pandoc hands Typst absolute paths to extracted images; Typst reads
+        // absolute paths from its project root, so the root must be "/". Safe
+        // here: Pandoc's HTML reader cannot emit raw Typst, so the document
+        // itself never gets file access through Typst.
+        "--pdf-engine-opt=--root=/".into(),
         "-o".into(),
         out,
     ];

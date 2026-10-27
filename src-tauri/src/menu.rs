@@ -179,7 +179,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     for (label, value) in FONT_OPTIONS {
         font_items.push(
             CheckMenuItemBuilder::with_id(format!("view.font.{value}"), *label)
-                .checked(*value == "")
+                .checked(value.is_empty())
                 .build(app)?,
         );
     }

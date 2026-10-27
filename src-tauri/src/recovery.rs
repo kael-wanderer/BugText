@@ -91,7 +91,7 @@ pub fn list_drafts_at(dir: &Path) -> Vec<DraftRecord> {
             drafts.push(draft);
         }
     }
-    drafts.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    drafts.sort_by_key(|draft| std::cmp::Reverse(draft.updated_at));
     drafts
 }
 
@@ -146,7 +146,7 @@ pub fn save_snapshot_at(
         label,
         kind: None,
     });
-    entries.sort_by(|left, right| right.ts.cmp(&left.ts));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.ts));
     let json = serde_json::to_vec(&entries).map_err(|error| error.to_string())?;
     atomic_write(&snapshot_dir.join("index.json"), &json)
 }
@@ -168,7 +168,7 @@ pub fn save_snapshot_bytes_at(
         label,
         kind: Some("binary".into()),
     });
-    entries.sort_by(|left, right| right.ts.cmp(&left.ts));
+    entries.sort_by_key(|entry| std::cmp::Reverse(entry.ts));
     let json = serde_json::to_vec(&entries).map_err(|error| error.to_string())?;
     atomic_write(&snapshot_dir.join("index.json"), &json)
 }

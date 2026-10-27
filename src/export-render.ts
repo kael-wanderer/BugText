@@ -10,13 +10,17 @@ th,td{border:1px solid #bbb;padding:6px 10px;text-align:left}
 pre{white-space:pre-wrap}
 `;
 
-async function svgToPngDataUri(svg: SVGElement): Promise<string> {
+function svgToDataUri(svg: SVGElement): string {
   const xml = new XMLSerializer().serializeToString(svg);
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+}
+
+async function svgToPngDataUri(svg: SVGElement): Promise<string> {
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve();
     image.onerror = () => reject(new Error("Could not rasterize diagram"));
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+    image.src = svgToDataUri(svg);
   });
   const viewBox = (svg as SVGSVGElement).viewBox?.baseVal;
   const width = Math.max(
@@ -40,7 +44,7 @@ async function svgToPngDataUri(svg: SVGElement): Promise<string> {
 
 export async function buildExportHtml(
   markdown: string,
-  options: { rasterizeSvg: boolean },
+  options: { rasterizeSvg: boolean; svgAsImage?: boolean },
 ): Promise<string> {
   const host = document.createElement("article");
   host.className = "doc";
@@ -54,6 +58,16 @@ export async function buildExportHtml(
   document.body.appendChild(host);
   try {
     await enhancePreview(host);
+    if (options.svgAsImage) {
+      // Pandoc re-serializes inline SVG as HTML (e.g. a bare `style`
+      // attribute), which Typst rejects; an image of serialized XML survives.
+      for (const svg of Array.from(host.querySelectorAll("svg"))) {
+        const image = document.createElement("img");
+        image.src = svgToDataUri(svg);
+        image.alt = "Rendered diagram";
+        svg.replaceWith(image);
+      }
+    }
     if (options.rasterizeSvg) {
       for (const svg of Array.from(host.querySelectorAll("svg"))) {
         try {

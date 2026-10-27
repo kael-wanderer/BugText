@@ -409,10 +409,7 @@ fn dispatch_search(app: &tauri::AppHandle, state: &McpState, windows: &[(String,
         if requested_folder.as_ref().is_some_and(|folder| !folder.starts_with(&root)) { continue; }
         let mut args = request.args.clone();
         if let Some(folder) = requested_folder.as_ref() { args["folder"] = Value::String(folder.to_string_lossy().into_owned()); }
-        match forward(app, state, label, &request.client, "search", args)? {
-            Value::Array(mut values) => hits.append(&mut values),
-            _ => {}
-        }
+        if let Value::Array(mut values) = forward(app, state, label, &request.client, "search", args)? { hits.append(&mut values) }
     }
     hits.sort_by(|a, b| b.get("score").and_then(Value::as_f64).unwrap_or(0.0).total_cmp(&a.get("score").and_then(Value::as_f64).unwrap_or(0.0)));
     let limit = request.args.get("limit").and_then(Value::as_u64).unwrap_or(8).clamp(1, 20) as usize;
