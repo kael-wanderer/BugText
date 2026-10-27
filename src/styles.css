@@ -1280,28 +1280,6 @@ body.search-active #search-panel {
   background: var(--border-soft);
 }
 
-.pdf-tb-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: var(--pdf-tb-h);
-  padding: 0 10px;
-  color: var(--muted);
-}
-
-.pdf-tb-ocr-language {
-  width: 90px;
-  height: calc(var(--pdf-tb-h) - 6px);
-  box-sizing: border-box;
-  padding: 0 6px;
-  color: var(--text);
-  font: inherit;
-  background: var(--bg-editor);
-  border: 1px solid var(--border);
-  border-radius: 5px;
-}
-
 /* Reading leaves edits visible but out of the way of text selection. */
 .pdf-document[data-pdf-mode="read"] .pdf-edit-item {
   pointer-events: none;
@@ -1861,13 +1839,13 @@ body.search-active #search-panel {
 }
 
 .pdf-inspector .pdf-ins-btn.primary {
-  color: var(--bg-elev);
+  color: var(--bg-editor);
   background: var(--accent);
   border-color: var(--accent);
 }
 
 .pdf-inspector .pdf-ins-btn.primary:hover {
-  color: var(--bg-elev);
+  color: var(--bg-editor);
   background: color-mix(in srgb, var(--accent) 86%, #000);
 }
 
@@ -1894,6 +1872,11 @@ body.search-active #search-panel {
   height: auto;
   min-height: max(28px, calc(var(--ui-size, 14px) * 2));
   font: inherit;
+}
+
+.pdf-inspector .pdf-edit-font-family {
+  width: auto;
+  min-width: 8.5em;
 }
 
 .pdf-inspector .pdf-review-preview canvas {
@@ -3193,3 +3176,19 @@ body.resizing-ai {
   min-height: max(24px, calc(var(--ui-size, 14px) * 1.7));
 }
 .explorer-header, .explorer-root { font-size: var(--explorer-size, 13px); }
+
+.pdf-ins-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pdf-inspector .pdf-ins-chip {
+  border-radius: 999px;
+}
+
+.pdf-inspector .pdf-ins-chip[aria-pressed="true"] {
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-elev));
+  border-color: var(--accent);
+}

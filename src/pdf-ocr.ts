@@ -40,6 +40,18 @@ export function ocrBlocksToOperations(
   });
 }
 
+/** Languages whose data is bundled under public/vendor/tesseract/lang (see the vendored-assets skill). */
+export const OCR_LANGUAGES = [
+  { code: "eng", label: "English" },
+  { code: "vie", label: "Vietnamese" },
+] as const;
+
+/** Tesseract's language string for the chosen bundled languages, or null when none is chosen. */
+export function bundledOcrLanguage(codes: readonly string[]): string | null {
+  const chosen = OCR_LANGUAGES.filter((language) => codes.includes(language.code));
+  return chosen.length ? chosen.map((language) => language.code).join("+") : null;
+}
+
 export function normalizeOcrLanguage(value: string): string {
   const language = value
     .split("+")

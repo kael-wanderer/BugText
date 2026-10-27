@@ -23,6 +23,7 @@ import { THEME_OPTIONS, type ThemeName } from "./settings";
 import {
   PDF_FIND_EVENT,
   PDF_ZOOM_EVENT,
+  PDF_EDIT_EVENT,
   PDF_SAVE_AS_EVENT,
   PDF_SAVE_EVENT,
   renderPdf,
@@ -73,6 +74,8 @@ export type WindowView = {
   openPdfPage: (page: number) => void;
   savePdf: () => boolean;
   savePdfAs: () => boolean;
+  /** Toggles Edit PDF when a PDF is open; false otherwise. */
+  togglePdfEdit: () => boolean;
   /** Re-checks the shown PDF against the file on disk. */
   checkPdfDisk: () => Promise<void>;
   openFind: () => boolean;
@@ -820,6 +823,11 @@ export function createWindowView(
     savePdfAs: () => {
       if (!isPdfFile(previewPathOrName)) return false;
       previewPane.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
+      return true;
+    },
+    togglePdfEdit: () => {
+      if (!isPdfFile(previewPathOrName)) return false;
+      previewPane.dispatchEvent(new Event(PDF_EDIT_EVENT));
       return true;
     },
     checkPdfDisk: async () => {

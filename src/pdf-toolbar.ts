@@ -6,7 +6,7 @@ import type { PdfFitMode } from "./pdf-navigation";
 export type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 
 /** Right-hand inspector pages a toolbar control opens. */
-export type PdfPanel = "replace" | "review" | "proof" | "ocr-review" | "support";
+export type PdfPanel = "replace" | "review" | "proof" | "ocr" | "ocr-review" | "support";
 
 export type PdfToolbarCommand =
   | "pages"
@@ -66,7 +66,6 @@ export type PdfToolbar = {
   element: HTMLElement;
   /** Flexible slot on the Read row for status messages. */
   status: HTMLElement;
-  ocrLanguage: HTMLInputElement;
   update(state: PdfToolbarState): void;
   /** Closes an open menu; true when one was open. */
   closeMenu(): boolean;
@@ -326,7 +325,7 @@ export function createPdfToolbar(
   const editButton = el("button", "pdf-tb-btn pdf-tb-edit");
   editButton.type = "button";
   editButton.dataset.command = "edit";
-  editButton.title = "Edit PDF";
+  editButton.title = "Edit PDF (⌘E)";
   editButton.setAttribute("aria-label", "Edit PDF");
   editButton.setAttribute("aria-pressed", "false");
   const editLabel = el("span", "pdf-tb-label");
@@ -354,16 +353,8 @@ export function createPdfToolbar(
   moreTrigger.append(icon("more"));
   const findItem = menuItem("find", "Find in PDF", "⌘F");
   findItem.element.classList.add("pdf-tb-narrow-only");
-  const ocrItem = menuItem("ocr", "Recognize Text on This Page");
+  const ocrItem = menuItem("ocr", "Recognize Text…");
   const ocrReviewItem = menuItem("ocr-review", "Review OCR Text");
-  const ocrLanguage = el("input", "pdf-tb-ocr-language");
-  ocrLanguage.type = "text";
-  ocrLanguage.value = "eng";
-  ocrLanguage.title = "OCR language, for example eng or eng+vie";
-  const ocrLanguageRow = el("label", "pdf-tb-field");
-  const ocrLanguageText = el("span");
-  ocrLanguageText.textContent = "OCR language";
-  ocrLanguageRow.append(ocrLanguageText, ocrLanguage);
   const proofItem = menuItem("proof", "Check Text Edits");
   const supportItem = menuItem("support", "Editing Support");
   const separator = (): HTMLElement => {
@@ -388,7 +379,6 @@ export function createPdfToolbar(
     narrowSeparator,
     ocrItem,
     ocrReviewItem,
-    ocrLanguageRow,
     separator(),
     proofItem,
     supportItem,
@@ -572,7 +562,6 @@ export function createPdfToolbar(
     setDisabled(saveItem.element, state.saving || state.pending === 0);
     setDisabled(saveCopyItem.element, state.saving);
 
-    setDisabled(ocrItem.element, state.ocrBusy);
     const { total, lowConfidence } = state.ocrReview;
     ocrReviewItem.element.querySelector(".pdf-tb-item-label")!.textContent =
       total === 0
@@ -626,7 +615,6 @@ export function createPdfToolbar(
   return {
     element,
     status,
-    ocrLanguage,
     update,
     closeMenu: () => closeMenu(true),
     focusCommand,

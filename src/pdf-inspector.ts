@@ -9,6 +9,7 @@ export type PdfInspectorPage =
   | "replace"
   | "review"
   | "proof"
+  | "ocr"
   | "ocr-review"
   | "support";
 

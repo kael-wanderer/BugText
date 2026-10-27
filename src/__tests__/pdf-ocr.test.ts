@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeOcrLanguage, ocrBlocksToOperations } from "../pdf-ocr";
+import { bundledOcrLanguage, normalizeOcrLanguage, ocrBlocksToOperations } from "../pdf-ocr";
 
 describe("pdf OCR helpers", () => {
   it("converts OCR pixel bboxes to PDF page coordinates", () => {
@@ -64,5 +64,12 @@ describe("pdf OCR helpers", () => {
     expect(normalizeOcrLanguage(" eng + VIE ")).toBe("eng+vie");
     expect(normalizeOcrLanguage("")).toBe("eng");
     expect(normalizeOcrLanguage("../eng")).toBe("eng");
+  });
+
+  it("builds the language string from bundled languages only", () => {
+    expect(bundledOcrLanguage(["eng"])).toBe("eng");
+    expect(bundledOcrLanguage(["vie", "eng"])).toBe("eng+vie");
+    expect(bundledOcrLanguage([])).toBeNull();
+    expect(bundledOcrLanguage(["jpn", "../eng", "eng+vie"])).toBeNull();
   });
 });

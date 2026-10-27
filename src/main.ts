@@ -2561,6 +2561,8 @@ listenScoped<string>("menu", (event) => {
     case "view.toggle_preview":
       return setMode(wid, activeWindow().mode === "split" ? "editor" : "split");
     case "view.reading":
+      // A PDF has no source to hide, so the shortcut toggles Edit PDF instead.
+      if (activeView().togglePdfEdit()) return;
       return setMode(wid, activeWindow().mode === "preview" ? "split" : "preview");
     case "view.toggle_lines":
       return toggleLineNumbers();
