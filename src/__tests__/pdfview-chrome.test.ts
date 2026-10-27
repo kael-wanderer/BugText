@@ -23,7 +23,7 @@ vi.mock("pdfjs-dist", () => ({
   getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }), destroy: vi.fn() }),
 }));
 
-import { PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, renderPdf } from "../pdfview";
+import { PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, PDF_ZOOM_EVENT, renderPdf } from "../pdfview";
 
 beforeEach(() => {
   installTestDom();
@@ -115,5 +115,19 @@ it("asks the workbench to open find from the toolbar", async () => {
   host.addEventListener(PDF_FIND_EVENT, () => seen.push("find"));
   toolbarButton(host, "Find").dispatchEvent(new Event("click"));
   expect(seen).toEqual(["find"]);
+  handle.destroy();
+});
+
+it("hands zoom commands to the workbench, which owns zoom", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const seen: string[] = [];
+  host.addEventListener(PDF_ZOOM_EVENT, (event) => seen.push((event as CustomEvent<string>).detail));
+  Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+    .filter((b) => b.dataset.command === "zoom-in" || b.dataset.command === "fit-page")
+    .forEach((b) => b.dispatchEvent(new Event("click")));
+  expect(seen).toEqual(expect.arrayContaining(["zoom-in", "fit-page"]));
+  // No pages: there is nothing to fit yet.
+  expect(handle.fitZoom("width")).toBeNull();
   handle.destroy();
 });

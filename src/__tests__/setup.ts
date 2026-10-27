@@ -162,6 +162,7 @@ export function installTestDom(): void {
       doc.activeElement = this;
     }
     scrollIntoView() {}
+    select() {}
     click() {
       if (!this.disabled) this.dispatchEvent(new Event("click"));
     }

@@ -10,6 +10,7 @@ import {
   type PdfPanel,
   type PdfToolbarCommand,
 } from "./pdf-toolbar";
+import { parsePageInput, pdfFitZoom, pdfZoomLabel, type PdfFitMode } from "./pdf-navigation";
 import {
   pdfCapabilityDetails,
   pdfCapabilityMessage,
@@ -76,6 +77,12 @@ export type PdfFindHandle = {
   clear: () => void;
   /** Reloads when the file changed on disk, or asks first when there are unsaved edits. */
   checkDisk: () => Promise<void>;
+  /** Display zoom that fits the page in view, or null while the pane has no size. */
+  fitZoom: (mode: PdfFitMode) => number | null;
+  /** Shows the workbench's zoom state in the toolbar. */
+  setZoomState: (zoom: number, fit: PdfFitMode | null) => void;
+  /** Runs a zoom change while keeping the same spot of the page in view. */
+  keepAnchor: (change: () => void) => void;
   destroy: () => void;
 };
 
@@ -83,6 +90,8 @@ export type PdfRenderOptions = {
   initialPage?: number;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
+  /** The page in view changed (one-based). */
+  onPageChange?: (page: number, pageCount: number) => void;
   /** Return false once another document owns `host`; loading then stops before touching it. */
   isCurrent?: () => boolean;
 };
@@ -99,6 +108,8 @@ export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
 /** Raised by the PDF toolbar's Find; the workbench opens its find bar. */
 export const PDF_FIND_EVENT = "bugtext:pdf-find";
+/** Raised by the PDF toolbar's zoom controls; `detail` is the command (zoom-in, fit-width, …). */
+export const PDF_ZOOM_EVENT = "bugtext:pdf-zoom";
 
 const RENDER_SCALE = 1.4;
 // Upper bound on canvas pixels for one document (about 1 GB of RGBA). Pages are
@@ -614,6 +625,8 @@ export async function renderPdf(
   let redoStack: PdfEditDocument[] = [];
   let editing = false;
   let ocrBusy = false;
+  let currentPage = 0;
+  let zoomState: { zoom: number; fit: PdfFitMode | null } = { zoom: 1, fit: "auto" };
   const fontFamilySelect = window.document.createElement("select");
   const fontSizeInput = window.document.createElement("input");
   const boldButton = window.document.createElement("button");
@@ -778,6 +791,18 @@ export async function renderPdf(
   container.dataset.pdfMode = "read";
   const toolbar = createPdfToolbar(window.document, {
     onCommand: (command) => runToolbarCommand(command),
+    onPageInput: (text) => {
+      const result = parsePageInput(text, pages.length);
+      if (!result.ok) {
+        setStatus(result.message);
+        return result.message;
+      }
+      setStatus("");
+      goToPage(result.page);
+      host.focus({ preventScroll: true });
+      return null;
+    },
+    onPageReset: () => setStatus(""),
     onPress: (command) => {
       // The Actions menu takes two presses (open, then choose); keep the first capture.
       if (command === "actions-menu") cachedSelectionReplacement = selectionReplacement();
@@ -950,6 +975,11 @@ export async function renderPdf(
     const operation = selectedOperation();
     const pending = editDocument.pages.reduce((sum, page) => sum + page.operations.length, 0);
     toolbar.update({
+      page: currentPage,
+      pageCount: pages.length,
+      zoom: zoomState.zoom,
+      fit: zoomState.fit,
+      zoomLabel: pdfZoomLabel(zoomState.zoom, zoomState.fit),
       editing,
       tool: activeTool,
       saving,
@@ -2088,6 +2118,33 @@ export async function renderPdf(
       }
     })();
   };
+  const setCurrentPage = (page: number): void => {
+    if (page === currentPage) return;
+    currentPage = page;
+    syncToolbar();
+    options?.onPageChange?.(page, pages.length);
+  };
+  const goToPage = (page: number): void => {
+    const view = pages[page - 1];
+    if (!view) return;
+    // Land the page top just below the sticky toolbar, whatever the zoom.
+    const gap = 12;
+    host.scrollTop +=
+      view.element.getBoundingClientRect().top - toolbar.element.getBoundingClientRect().bottom - gap;
+    setCurrentPage(page);
+  };
+  // The page field follows scrolling, measured once per frame.
+  let pageFrame = 0;
+  const trackPage = (): void => {
+    pageFrame = 0;
+    const view = visiblePage();
+    if (view) setCurrentPage(view.box.page);
+  };
+  const schedulePageTrack = (): void => {
+    if (typeof requestAnimationFrame === "undefined") return;
+    if (!pageFrame) pageFrame = requestAnimationFrame(trackPage);
+  };
+  host.addEventListener("scroll", schedulePageTrack, { passive: true });
   const setEditing = (next: boolean): void => {
     if (editing === next) return;
     editing = next;
@@ -2108,8 +2165,14 @@ export async function renderPdf(
       else setTool(tool);
       return;
     }
+    if (command.startsWith("zoom-") || command.startsWith("fit-")) {
+      host.dispatchEvent(new CustomEvent(PDF_ZOOM_EVENT, { detail: command, bubbles: true }));
+      return;
+    }
     const actions: Record<string, () => void> = {
       pages: openThumbnailPanel,
+      "page-prev": () => goToPage(currentPage - 1),
+      "page-next": () => goToPage(currentPage + 1),
       find: () => host.dispatchEvent(new Event(PDF_FIND_EVENT, { bubbles: true })),
       edit: () => setEditing(!editing),
       save: () => void saveEditedPdf(),
@@ -2533,6 +2596,7 @@ export async function renderPdf(
   }
   renderThumbnailPanel();
   capabilitySummary = summarizePdfCapabilities(textSignals);
+  setCurrentPage(pages.length ? Math.min(Math.max(options?.initialPage ?? 1, 1), pages.length) : 0);
   syncToolbar();
   renderCapabilityPanel();
   if (!hasPdfEdits(editDocument)) {
@@ -2560,7 +2624,38 @@ export async function renderPdf(
     page.element.scrollIntoView({ block: "center", behavior: "smooth" });
     return { count: matches.length, active: active + 1 };
   };
+  // Width fits use the widest page so mixed sizes never scroll sideways or
+  // change zoom while scrolling; Fit Page uses the page in view.
+  const fitZoom = (mode: PdfFitMode): number | null => {
+    const view = pages[Math.max(currentPage, 1) - 1];
+    const width = host.clientWidth;
+    const height = host.clientHeight - toolbar.element.offsetHeight;
+    if (!view || width <= 0 || height <= 0) return null;
+    const widest = Math.max(...pages.map((page) => page.box.width));
+    const box = mode === "page" ? view.box : { width: widest, height: view.box.height };
+    return pdfFitZoom(
+      mode,
+      { width: box.width * RENDER_SCALE, height: box.height * RENDER_SCALE },
+      { width, height },
+    );
+  };
+  const keepAnchor = (change: () => void): void => {
+    const view = visiblePage();
+    const top = toolbar.element.getBoundingClientRect().bottom;
+    const before = view?.element.getBoundingClientRect();
+    const fraction = before && before.height > 0 ? (top - before.top) / before.height : 0;
+    change();
+    if (!view) return;
+    const after = view.element.getBoundingClientRect();
+    host.scrollTop += after.top + fraction * after.height - top;
+  };
   return {
+    fitZoom,
+    keepAnchor,
+    setZoomState: (zoom, fit) => {
+      zoomState = { zoom, fit };
+      syncToolbar();
+    },
     setQuery: (query) => {
       clear();
       const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2594,6 +2689,8 @@ export async function renderPdf(
       clear();
       toolbarSize?.disconnect();
       toolbar.destroy();
+      host.removeEventListener("scroll", schedulePageTrack);
+      if (pageFrame) cancelAnimationFrame(pageFrame);
       if (drawFrame) cancelAnimationFrame(drawFrame);
       documentSize?.disconnect();
       window.removeEventListener("scroll", scheduleDrawnPages, { capture: true });

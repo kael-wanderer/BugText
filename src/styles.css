@@ -1047,6 +1047,55 @@ body.search-active #search-panel {
   border-radius: 8px;
 }
 
+.pdf-tb-pager {
+  gap: 0;
+}
+
+.pdf-tb-page-input {
+  width: 3.2em;
+  height: calc(var(--pdf-tb-h) - 4px);
+  box-sizing: border-box;
+  padding: 0 4px;
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.pdf-tb-page-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.pdf-tb-page-input[aria-invalid="true"] {
+  border-color: #d9534f;
+}
+
+.pdf-tb-page-count {
+  padding: 0 6px 0 5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pdf-tb-zoom {
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+}
+
+.pdf-toolbar .pdf-tb-zoom-label {
+  min-width: 6.5em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-tb-zoom .pdf-tb-menu {
+  right: auto;
+  left: 0;
+}
+
 .pdf-tb-grow,
 .pdf-tb-status {
   flex: 1 1 0;
@@ -1221,7 +1270,8 @@ body.search-active #search-panel {
 
 .pdf-tb-item.checked::after {
   color: var(--accent);
-  content: "✓";
+  /* Decorative: aria-checked carries the state. */
+  content: "✓" / "";
 }
 
 .pdf-tb-sep {

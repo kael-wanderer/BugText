@@ -3,6 +3,11 @@ import { installTestDom } from "./setup";
 import { createPdfToolbar, toolForKey, type PdfToolbarCommand, type PdfToolbarState } from "../pdf-toolbar";
 
 const state = (overrides: Partial<PdfToolbarState> = {}): PdfToolbarState => ({
+  page: 1,
+  pageCount: 3,
+  zoom: 1,
+  fit: "auto",
+  zoomLabel: "Auto",
   editing: false,
   tool: "select",
   saving: false,
@@ -141,4 +146,83 @@ it("keeps the text selection when a toolbar button is pressed", () => {
   toolbar.element.dispatchEvent(press);
   expect(press.defaultPrevented).toBe(true);
   expect(presses).toEqual(["actions-menu"]);
+});
+
+const pageSetup = (answer: (text: string) => string | null) => {
+  const inputs: string[] = [];
+  const commands: PdfToolbarCommand[] = [];
+  const toolbar = createPdfToolbar(document, {
+    onCommand: (command) => commands.push(command),
+    onPageInput: (text) => {
+      inputs.push(text);
+      return answer(text);
+    },
+  });
+  document.body.append(toolbar.element);
+  const field = toolbar.element.querySelector<HTMLInputElement>(".pdf-tb-page-input")!;
+  const key = (name: string) => {
+    const event = Object.assign(new Event("keydown", { cancelable: true }), { key: name });
+    field.dispatchEvent(event);
+    return event;
+  };
+  const byCommand = (command: string) =>
+    Array.from(toolbar.element.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.dataset.command === command)!;
+  return { toolbar, field, key, inputs, commands, byCommand };
+};
+
+it("jumps to a typed page and marks invalid input without moving", () => {
+  const { toolbar, field, key, inputs } = pageSetup((text) => (text === "2" ? null : "Enter a page from 1 to 3"));
+  toolbar.update(state({ page: 1, pageCount: 3 }));
+  expect(field.value).toBe("1");
+  field.value = "9";
+  key("Enter");
+  expect(inputs).toEqual(["9"]);
+  expect(field.getAttribute("aria-invalid")).toBe("true");
+  expect(field.title).toBe("Enter a page from 1 to 3");
+  field.value = "2";
+  key("Enter");
+  expect(field.getAttribute("aria-invalid")).toBeNull();
+});
+
+it("restores the current page on Escape and keeps typing over scroll updates", () => {
+  const { toolbar, field, key } = pageSetup(() => null);
+  toolbar.update(state({ page: 2, pageCount: 3 }));
+  field.focus();
+  field.value = "3";
+  // A scroll update while typing leaves the typed value alone.
+  toolbar.update(state({ page: 1, pageCount: 3 }));
+  expect(field.value).toBe("3");
+  const escape = key("Escape");
+  expect(escape.defaultPrevented).toBe(true);
+  expect(field.value).toBe("1");
+});
+
+it("disables previous and next at the document ends", () => {
+  const { toolbar, byCommand } = pageSetup(() => null);
+  toolbar.update(state({ page: 1, pageCount: 3 }));
+  expect(byCommand("page-prev").disabled).toBe(true);
+  expect(byCommand("page-next").disabled).toBe(false);
+  toolbar.update(state({ page: 3, pageCount: 3 }));
+  expect(byCommand("page-prev").disabled).toBe(false);
+  expect(byCommand("page-next").disabled).toBe(true);
+  toolbar.update(state({ page: 0, pageCount: 0 }));
+  expect(byCommand("page-next").disabled).toBe(true);
+  expect(toolbar.element.querySelector<HTMLInputElement>(".pdf-tb-page-input")!.disabled).toBe(true);
+});
+
+it("shows the zoom state and checks the matching zoom item", () => {
+  const { toolbar, byCommand } = pageSetup(() => null);
+  toolbar.update(state({ fit: "width", zoom: 1.6, zoomLabel: "Fit Width" }));
+  const label = Array.from(toolbar.element.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.getAttribute("aria-label") === "Zoom")!;
+  expect(label.textContent).toBe("Fit Width");
+  const radios = (command: string) =>
+    Array.from(toolbar.element.querySelectorAll<HTMLButtonElement>("button")).filter(
+      (b) => b.dataset.command === command && b.getAttribute("role") === "menuitemradio",
+    )[0];
+  expect(radios("fit-width").getAttribute("aria-checked")).toBe("true");
+  expect(radios("fit-auto").getAttribute("aria-checked")).toBe("false");
+  expect(radios("zoom-actual").getAttribute("aria-checked")).toBe("false");
+  toolbar.update(state({ fit: null, zoom: 1, zoomLabel: "100%" }));
+  expect(radios("zoom-actual").getAttribute("aria-checked")).toBe("true");
+  byCommand("zoom-in").dispatchEvent(new Event("click"));
 });

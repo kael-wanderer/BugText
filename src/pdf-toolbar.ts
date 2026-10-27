@@ -1,12 +1,20 @@
 // PDF toolbar: a Read row that is always shown and an Edit row shown while editing.
 // It renders state and reports commands; the PDF view owns every action.
 
+import type { PdfFitMode } from "./pdf-navigation";
+
 export type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 
 export type PdfPanel = "pages" | "review" | "proof" | "ocr-review" | "support";
 
 export type PdfToolbarCommand =
   | "pages"
+  | "page-prev"
+  | "page-next"
+  | "zoom-in"
+  | "zoom-out"
+  | "zoom-actual"
+  | `fit-${PdfFitMode}`
   | "find"
   | "edit"
   | "save"
@@ -26,6 +34,13 @@ export type PdfToolbarCommand =
   | `tool:${PdfEditTool}`;
 
 export type PdfToolbarState = {
+  /** One-based page in view; 0 before pages exist. */
+  page: number;
+  pageCount: number;
+  zoomLabel: string;
+  fit: PdfFitMode | null;
+  /** Display zoom; the Actual Size item is checked at 1 without a fit mode. */
+  zoom: number;
   editing: boolean;
   tool: PdfEditTool;
   saving: boolean;
@@ -79,6 +94,10 @@ const ICONS: Record<string, Shape[]> = {
     ["path", { d: "M5.5 3v3h4V3M5 13V9.5h6V13" }],
   ],
   more: [["path", { d: "M3.5 8h.01M8 8h.01M12.5 8h.01", "stroke-width": "2.2" }]],
+  prev: [["path", { d: "M10 3.5L5.5 8l4.5 4.5" }]],
+  next: [["path", { d: "M6 3.5L10.5 8 6 12.5" }]],
+  minus: [["path", { d: "M3.5 8h9" }]],
+  plus: [["path", { d: "M3.5 8h9M8 3.5v9" }]],
   caret: [["path", { d: "M5 6.5l3 3 3-3" }]],
   select: [["path", { d: "M4 2.5l8.5 5.8-3.8.7 2.1 3.8-1.6.9-2.1-3.8L4 12.6z" }]],
   text: [["path", { d: "M2.5 4V3h7v1M6 3v9.5M4.5 12.5h3M12 8.5v5M9.5 11h5" }]],
@@ -131,6 +150,10 @@ export function createPdfToolbar(
     onCommand: (command: PdfToolbarCommand) => void;
     /** Runs on press, before focus or text selection can change. */
     onPress?: (command: PdfToolbarCommand | "actions-menu") => void;
+    /** Jumps to a typed page; returns an error message when the input is not a page. */
+    onPageInput?: (text: string) => string | null;
+    /** The page field went back to the current page (Escape or leaving it). */
+    onPageReset?: () => void;
   },
 ): PdfToolbar {
   const el = <K extends keyof HTMLElementTagNameMap>(
@@ -193,12 +216,12 @@ export function createPdfToolbar(
     command: PdfToolbarCommand,
     label: string,
     shortcut?: string,
-    checkable = false,
+    checkable: false | "checkbox" | "radio" = false,
   ): MenuItem => {
     const node = el("button", "pdf-tb-item");
     node.type = "button";
     node.dataset.command = command;
-    node.setAttribute("role", checkable ? "menuitemcheckbox" : "menuitem");
+    node.setAttribute("role", checkable === "checkbox" ? "menuitemcheckbox" : checkable === "radio" ? "menuitemradio" : "menuitem");
     node.tabIndex = -1;
     const text = el("span", "pdf-tb-item-label");
     text.textContent = label;
@@ -346,8 +369,21 @@ export function createPdfToolbar(
     node.setAttribute("role", "separator");
     return node;
   };
+  // Zoom moves here when the row is too narrow for its own controls.
+  const narrowZoom = [
+    menuItem("zoom-in", "Zoom In", "⌘+"),
+    menuItem("zoom-out", "Zoom Out", "⌘−"),
+    menuItem("fit-auto", "Automatic Zoom", "⌘0"),
+    menuItem("fit-width", "Fit Width"),
+    menuItem("fit-page", "Fit Page"),
+  ];
+  narrowZoom.forEach((item) => item.element.classList.add("pdf-tb-narrow-only"));
+  const narrowSeparator = separator();
+  narrowSeparator.classList.add("pdf-tb-narrow-only");
   const moreMenu = menu(moreTrigger, "More PDF actions", [
     findItem,
+    ...narrowZoom,
+    narrowSeparator,
     ocrItem,
     ocrReviewItem,
     ocrLanguageRow,
@@ -356,11 +392,72 @@ export function createPdfToolbar(
     supportItem,
   ]);
 
+  // Page position: previous, editable one-based page, count, next.
+  const prevButton = button("page-prev", "Previous Page", "prev", { iconOnly: true });
+  const nextButton = button("page-next", "Next Page", "next", { iconOnly: true });
+  const pageInput = el("input", "pdf-tb-page-input");
+  pageInput.type = "text";
+  pageInput.inputMode = "numeric";
+  pageInput.setAttribute("aria-label", "Page number");
+  pageInput.value = "0";
+  const pageCount = el("span", "pdf-tb-page-count");
+  let lastPage = 0;
+  const clearPageError = (): void => {
+    if (pageInput.getAttribute("aria-invalid")) options.onPageReset?.();
+    pageInput.removeAttribute("aria-invalid");
+    pageInput.title = "Page number";
+  };
+  pageInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const error = options.onPageInput?.(pageInput.value) ?? null;
+      if (error) {
+        pageInput.setAttribute("aria-invalid", "true");
+        pageInput.title = error;
+        pageInput.select();
+      } else {
+        clearPageError();
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      pageInput.value = String(lastPage);
+      clearPageError();
+      pageInput.select();
+    }
+  });
+  pageInput.addEventListener("focus", () => pageInput.select());
+  pageInput.addEventListener("blur", () => {
+    pageInput.value = String(lastPage);
+    clearPageError();
+  });
+  const pageGroup = group(prevButton, pageInput, pageCount, nextButton);
+  pageGroup.classList.add("pdf-tb-pager");
+
+  // Zoom: out, a fit/zoom menu showing the current state, in.
+  const zoomOutButton = button("zoom-out", "Zoom Out", "minus", { title: "Zoom Out (⌘−)", iconOnly: true });
+  const zoomInButton = button("zoom-in", "Zoom In", "plus", { title: "Zoom In (⌘+)", iconOnly: true });
+  const zoomTrigger = el("button", "pdf-tb-btn pdf-tb-zoom-label");
+  zoomTrigger.type = "button";
+  zoomTrigger.title = "Zoom";
+  zoomTrigger.setAttribute("aria-label", "Zoom");
+  const zoomText = el("span");
+  zoomTrigger.append(zoomText, icon("caret"));
+  const fitItems: Record<string, MenuItem> = {
+    auto: menuItem("fit-auto", "Automatic", "⌘0", "radio"),
+    width: menuItem("fit-width", "Fit Width", undefined, "radio"),
+    page: menuItem("fit-page", "Fit Page", undefined, "radio"),
+  };
+  const actualItem = menuItem("zoom-actual", "Actual Size", undefined, "radio");
+  const zoomMenu = menu(zoomTrigger, "Zoom", [fitItems.auto, fitItems.width, fitItems.page, actualItem]);
+  const zoomGroup = group(zoomOutButton, zoomMenu, zoomInButton);
+  zoomGroup.classList.add("pdf-tb-zoom", "pdf-tb-wide-only");
+
   const readRow = el("div", "pdf-tb-row pdf-tb-read");
   readRow.dataset.fit = "full";
   readRow.setAttribute("role", "toolbar");
   readRow.setAttribute("aria-label", "PDF");
-  readRow.append(pagesButton, findButton, status, editButton, saveMenu, moreMenu);
+  readRow.append(pagesButton, pageGroup, zoomGroup, findButton, status, editButton, saveMenu, moreMenu);
 
   // Edit row.
   const toolButtons = new Map<PdfEditTool, HTMLButtonElement>();
@@ -386,7 +483,7 @@ export function createPdfToolbar(
   const replaceSelectionItem = menuItem("replace-selection", "Replace Selected Text");
   const directSelectionItem = menuItem("direct-selection", "Try Direct Rewrite");
   const reflowItem = menuItem("reflow", "Reflow Text Box");
-  const snapItem = menuItem("snap", "Snap to 5-Point Grid", undefined, true);
+  const snapItem = menuItem("snap", "Snap to 5-Point Grid", undefined, "checkbox");
   const deleteItem = menuItem("delete", "Delete Selected Edit", "⌫");
   deleteItem.element.classList.add("pdf-tb-narrow-only");
   const actionsMenu = menu(actionsTrigger, "Text actions", [
@@ -411,7 +508,7 @@ export function createPdfToolbar(
   editRow.hidden = true;
   editRow.append(toolGroup, group(undoButton, redoButton), actionsMenu, deleteButton, grow(), reviewButton);
 
-  const rowButtons = [pagesButton, findButton, editButton, ...toolButtons.values(), undoButton, redoButton, deleteButton, reviewButton];
+  const rowButtons = [pagesButton, prevButton, nextButton, zoomOutButton, zoomInButton, findButton, editButton, ...toolButtons.values(), undoButton, redoButton, deleteButton, reviewButton];
   const element = el("div", "pdf-edit-toolbar pdf-toolbar");
   element.append(readRow, editRow);
 
@@ -447,6 +544,21 @@ export function createPdfToolbar(
   };
   const update = (state: PdfToolbarState): void => {
     const wasEditing = !editRow.hidden;
+    lastPage = state.page;
+    // Scrolling must not overwrite a page number being typed.
+    if (doc.activeElement !== pageInput) pageInput.value = String(state.page);
+    pageInput.disabled = state.pageCount === 0;
+    pageCount.textContent = `/ ${state.pageCount}`;
+    setDisabled(prevButton, state.page <= 1);
+    setDisabled(nextButton, state.page >= state.pageCount);
+    zoomText.textContent = state.zoomLabel;
+    for (const [mode, item] of Object.entries(fitItems)) {
+      item.element.setAttribute("aria-checked", String(state.fit === mode));
+      item.element.classList.toggle("checked", state.fit === mode);
+    }
+    const actual = state.fit === null && Math.abs(state.zoom - 1) < 0.005;
+    actualItem.element.setAttribute("aria-checked", String(actual));
+    actualItem.element.classList.toggle("checked", actual);
     editRow.hidden = !state.editing;
     element.dataset.mode = state.editing ? "edit" : "read";
     editButton.classList.toggle("active", state.editing);
