@@ -28,6 +28,15 @@ function serializeElement(node: HTMLElement): string {
   return clone.outerHTML;
 }
 
+/**
+ * An SVG image must be well-formed XML, so `<foreignObject>` content is
+ * serialized as XHTML (`<img/>`, `<br/>`), never with innerHTML.
+ */
+export function xhtmlMarkup(nodes: Node[]): string {
+  const serializer = new XMLSerializer();
+  return nodes.map((node) => serializer.serializeToString(node)).join("");
+}
+
 export function nodeToSvg(node: HTMLElement): string {
   const rect = node.getBoundingClientRect();
   const width = Math.max(
@@ -71,8 +80,13 @@ function detectArtboard(
 
 // Capture a full HTML document: render it in an off-screen iframe so its own
 // stylesheet and layout apply, measure the real content size, then rasterize.
+// `detectArtboard` is for HTML slide documents; a rendered Markdown note is a
+// normal flowing page whose diagrams must not be mistaken for the stage.
+type CaptureOptions = { artboard?: boolean };
+
 async function htmlToSvgAndSize(
   html: string,
+  options: CaptureOptions = {},
 ): Promise<{ svg: string; width: number; height: number }> {
   const frame = document.createElement("iframe");
   frame.setAttribute("sandbox", "allow-same-origin");
@@ -95,7 +109,7 @@ async function htmlToSvgAndSize(
     const doc = frame.contentDocument;
     if (!doc) throw new Error("Could not render HTML for capture");
 
-    const artboard = detectArtboard(doc);
+    const artboard = options.artboard === false ? null : detectArtboard(doc);
     const width =
       artboard?.width ??
       Math.max(doc.documentElement.scrollWidth, doc.body?.scrollWidth ?? 0, 1);
@@ -103,14 +117,12 @@ async function htmlToSvgAndSize(
       artboard?.height ??
       Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0, 1);
 
-    const styles = Array.from(doc.querySelectorAll("style"))
-      .map((style) => style.outerHTML)
-      .join("");
+    const styles = xhtmlMarkup(Array.from(doc.querySelectorAll("style")));
     // Neutralize fixed/centered stage layout so the artboard flows at full size.
     const artboardCss = artboard
       ? `<style>#stage{position:relative!important;inset:auto!important;display:block!important;width:${artboard.width}px!important;height:${artboard.height}px!important;place-items:initial!important}#frame{position:relative!important;transform:none!important;transform-origin:top left!important}svg{max-width:none!important}</style>`
       : "";
-    const body = doc.body ? doc.body.innerHTML : "";
+    const body = doc.body ? xhtmlMarkup(Array.from(doc.body.childNodes)) : "";
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
       '<foreignObject width="100%" height="100%">' +
@@ -122,11 +134,11 @@ async function htmlToSvgAndSize(
   }
 }
 
-export async function htmlToSvg(html: string): Promise<string> {
-  return (await htmlToSvgAndSize(html)).svg;
+export async function htmlToSvg(html: string, options?: CaptureOptions): Promise<string> {
+  return (await htmlToSvgAndSize(html, options)).svg;
 }
 
-export async function htmlToCanvas(html: string): Promise<HTMLCanvasElement> {
-  const { svg, width, height } = await htmlToSvgAndSize(html);
+export async function htmlToCanvas(html: string, options?: CaptureOptions): Promise<HTMLCanvasElement> {
+  const { svg, width, height } = await htmlToSvgAndSize(html, options);
   return rasterize(svg, width, height);
 }

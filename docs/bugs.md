@@ -43,6 +43,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-035 | 2026-10-27 | Folder search | Minor | — | Clearing search during a slow search could still show the old results | fixed (0.3.5) |
 | BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | fixed (0.3.5) |
 | BUG-037 | 2026-10-27 | Editor / external changes | Major | — | An edit made just as BugText regains focus could be replaced by the file on disk | fixed (unreleased) |
+| BUG-038 | 2026-10-27 | Export / PNG, SVG | Major | — | Image export of a Markdown note failed with images, or came out blank | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -267,6 +268,20 @@ table and a detail block below. Reference the failing test-case ID.
 - **Notes:** On focus, BugText re-reads clean open files. The loop captured each tab's `dirty` flag before the asynchronous read and reloaded afterwards without checking again, so anything typed or inserted during the read was replaced. The focus-check reload path had the same gap. Present before M4; M4's save-then-insert flow made it reliable to hit.
 - **Fix:** Both reload paths re-check the tab's current dirty state (and, for the focus check, the buffer text) after the read and keep the edit.
 - **Status:** fixed (unreleased).
+
+### BUG-038 — PNG/SVG export of Markdown notes fails or is blank
+
+- **Feature / test case:** Export / Image (PNG, SVG)
+- **Severity:** Major
+- **Environment:** macOS, release build of main (7e25d07)
+- **Steps to reproduce:**
+  1. Open a Markdown note with an image (or a Mermaid diagram).
+  2. Export ▸ Image ▸ PNG Image…
+- **Expected:** A PNG of the rendered note.
+- **Actual:** "Could not rasterize preview"; after that was fixed, a blank image (85×163, or 1280×1024 white).
+- **Notes:** Three causes, all older than M4: the capture SVG embedded `body.innerHTML`, which is HTML (`<img …>`), not XML, so the SVG image failed to load; the slide "artboard" detection took a Mermaid diagram as the page size; and the exported page kept the renderer's off-screen `position: fixed; left: -10000px`, which Pandoc ignores but the capture draws.
+- **Fix:** Serialize foreignObject content with `XMLSerializer`; skip artboard detection for Markdown captures; drop the render-only style before serializing.
+- **Status:** fixed (unreleased). Remote https images still show alt text in captures (an SVG image cannot fetch remote files).
 
 ### BUG-000 (example — delete me)
 

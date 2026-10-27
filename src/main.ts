@@ -1707,6 +1707,7 @@ async function captureActive(): Promise<HTMLCanvasElement> {
   const { buildExportHtml } = await import("./export-render");
   return capture.htmlToCanvas(
     await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    { artboard: false },
   );
 }
 
@@ -1720,6 +1721,7 @@ async function activeSvg(): Promise<string> {
   const { buildExportHtml } = await import("./export-render");
   return capture.htmlToSvg(
     await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    { artboard: false },
   );
 }
 
