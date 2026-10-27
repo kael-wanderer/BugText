@@ -21,12 +21,15 @@ import type { ViewMode } from "./state";
 import type { MarkdownFormat } from "./markdown-format";
 import { THEME_OPTIONS, type ThemeName } from "./settings";
 import {
+  PDF_FIND_EVENT,
+  PDF_ZOOM_EVENT,
   PDF_SAVE_AS_EVENT,
   PDF_SAVE_EVENT,
   renderPdf,
   scrollPdfToPage,
   type PdfFindHandle,
 } from "./pdfview";
+import type { PdfFitMode } from "./pdf-navigation";
 import { FILE_ICON_TEXT, fileIcon } from "./icons";
 import {
   activateTextMatch,
@@ -177,6 +180,8 @@ export function createWindowView(
   let focusedPane: "editor" | "preview" = "editor";
   let editorZoom = 1;
   let previewZoom = 1;
+  // PDF zoom follows a fit mode until the user picks an explicit zoom.
+  let pdfFit: PdfFitMode | null = "auto";
   let previewText = "";
   let previewPathOrName: string | null = null;
   let pdfTargetPage: number | undefined;
@@ -355,8 +360,10 @@ export function createWindowView(
     });
     // A single available mode (PDF) needs no switcher.
     root.querySelector<HTMLElement>(".wt-modes")!.hidden = modes.length < 2;
+    // PDFs carry their own zoom controls in the PDF toolbar.
     root.querySelector<HTMLElement>(".preview-zoom-group")!.hidden =
-      !modes.includes("preview") && !modes.includes("split");
+      (!modes.includes("preview") && !modes.includes("split")) ||
+      isPdfFile(active?.path ?? active?.name);
     root.querySelector<HTMLElement>(".wt-lines")!.hidden =
       !modes.includes("editor") && !modes.includes("split");
     wsWords.hidden = !active;
@@ -432,6 +439,7 @@ export function createWindowView(
     // snap back while typing.
     if (pathOrName !== previewPathOrName) {
       previewZoom = 1;
+      pdfFit = "auto";
     }
     previewText = text;
     previewPathOrName = pathOrName;
@@ -452,6 +460,9 @@ export function createWindowView(
         onEditDirtyChange: (dirty) => {
           if (pdfTabId) h.onPdfEditDirtyChange(windowId, pdfTabId, dirty);
         },
+        onPageChange: (page, count) => {
+          wsWords.textContent = count ? `Page ${page} of ${count}` : "PDF";
+        },
         onReloadRequest: () => {
           pdfReloadScroll = { top: previewPane.scrollTop, left: previewPane.scrollLeft };
           renderPreview(previewText, pathOrName);
@@ -464,7 +475,8 @@ export function createWindowView(
             return;
           }
           pdfFind = handle;
-          setPreviewZoom(previewZoom);
+          if (pdfFit) applyPdfFit(pdfFit);
+          else setPreviewZoom(previewZoom);
           if (restoreScroll) {
             previewPane.scrollTop = restoreScroll.top;
             previewPane.scrollLeft = restoreScroll.left;
@@ -624,13 +636,19 @@ export function createWindowView(
     previewCanvas.style.height = scaled.canvasHeight;
   }
 
-  function setPreviewZoom(next: number): void {
+  function setPreviewZoom(next: number, fit: PdfFitMode | null = null): void {
     previewZoom = Math.max(0.25, Math.min(3, next));
     updateZoomLabel();
     if (isPdfFile(previewPathOrName)) {
       // Scale the rendered pages; the pane scrolls when they overflow.
+      pdfFit = fit;
       const container = previewPane.querySelector<HTMLElement>(".pdf-document");
-      if (container) container.style.zoom = String(previewZoom);
+      const apply = (): void => {
+        if (container) container.style.zoom = String(previewZoom);
+      };
+      if (pdfFind) pdfFind.keepAnchor(apply);
+      else apply();
+      pdfFind?.setZoomState(previewZoom, pdfFit);
       return;
     }
     // HTML preview: scale the painted iframe surface (compositor path, no reflow).
@@ -645,6 +663,21 @@ export function createWindowView(
       return;
     }
     renderPreview(previewText, previewPathOrName);
+  }
+
+  function applyPdfFit(mode: PdfFitMode): void {
+    const zoom = pdfFind?.fitZoom(mode);
+    if (zoom == null) {
+      pdfFit = mode;
+      return;
+    }
+    setPreviewZoom(zoom, mode);
+  }
+
+  // Reset means the default fit for a PDF and 100% elsewhere.
+  function resetPreviewZoom(): void {
+    if (isPdfFile(previewPathOrName)) applyPdfFit("auto");
+    else setPreviewZoom(1);
   }
 
   function setEditorZoom(next: number): void {
@@ -665,6 +698,12 @@ export function createWindowView(
   }
 
   const previewResizeObserver = new ResizeObserver(() => {
+    if (isPdfFile(previewPathOrName) && pdfFit) {
+      // Ignore sub-pixel changes so a scrollbar appearing cannot loop the fit.
+      const zoom = pdfFind?.fitZoom(pdfFit);
+      if (zoom != null && Math.abs(zoom - previewZoom) > 0.002) setPreviewZoom(zoom, pdfFit);
+      return;
+    }
     if (isHtmlFile(previewPathOrName) && previewFrame) {
       measureHtmlPreview();
       applyHtmlZoom(previewZoom);
@@ -682,10 +721,46 @@ export function createWindowView(
         } else if (action === "out") {
           setPreviewZoom(previewZoom - 0.1);
         } else {
-          setPreviewZoom(1);
+          resetPreviewZoom();
         }
       });
     });
+
+  const openFind = (): boolean => {
+    const state = getWindow(windowId);
+    const tab = state?.tabs.find((item) => item.id === state.activeTabId);
+    const effectiveMode = normalizeDocumentViewMode(
+      tab?.path ?? tab?.name,
+      state?.mode ?? "editor",
+    );
+    if (
+      !isPdfFile(previewPathOrName) &&
+      effectiveMode !== "preview" &&
+      focusedPane !== "preview"
+    ) {
+      return false;
+    }
+    if (!isPdfFile(previewPathOrName) && !isMarkdownFile(previewPathOrName)) {
+      return false;
+    }
+    findBar.classList.remove("hidden");
+    findInput.focus();
+    findInput.select();
+    if (findInput.value) runFind();
+    return true;
+  };
+  previewPane.addEventListener(PDF_FIND_EVENT, () => {
+    openFind();
+  });
+  previewPane.addEventListener(PDF_ZOOM_EVENT, (event) => {
+    const command = (event as CustomEvent<string>).detail;
+    if (command === "zoom-in") setPreviewZoom(previewZoom + 0.1);
+    else if (command === "zoom-out") setPreviewZoom(previewZoom - 0.1);
+    else if (command === "zoom-actual") setPreviewZoom(1);
+    else if (command === "fit-auto" || command === "fit-width" || command === "fit-page") {
+      applyPdfFit(command.slice(4) as PdfFitMode);
+    }
+  });
 
   return {
     id: windowId,
@@ -703,7 +778,7 @@ export function createWindowView(
       if (zoomTarget() === "editor") {
         setEditorZoom(1);
       } else {
-        setPreviewZoom(1);
+        resetPreviewZoom();
       }
     },
     requestMeasure: () => editor.requestMeasure(),
@@ -743,28 +818,6 @@ export function createWindowView(
     checkPdfDisk: async () => {
       if (isPdfFile(previewPathOrName)) await pdfFind?.checkDisk();
     },
-    openFind: () => {
-      const state = getWindow(windowId);
-      const tab = state?.tabs.find((item) => item.id === state.activeTabId);
-      const effectiveMode = normalizeDocumentViewMode(
-        tab?.path ?? tab?.name,
-        state?.mode ?? "editor",
-      );
-      if (
-        !isPdfFile(previewPathOrName) &&
-        effectiveMode !== "preview" &&
-        focusedPane !== "preview"
-      ) {
-        return false;
-      }
-      if (!isPdfFile(previewPathOrName) && !isMarkdownFile(previewPathOrName)) {
-        return false;
-      }
-      findBar.classList.remove("hidden");
-      findInput.focus();
-      findInput.select();
-      if (findInput.value) runFind();
-      return true;
-    },
+    openFind,
   };
 }

@@ -23,7 +23,7 @@ vi.mock("pdfjs-dist", () => ({
   getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }), destroy: vi.fn() }),
 }));
 
-import { PDF_SAVE_AS_EVENT, renderPdf } from "../pdfview";
+import { PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, PDF_ZOOM_EVENT, renderPdf } from "../pdfview";
 
 beforeEach(() => {
   installTestDom();
@@ -62,7 +62,8 @@ it("names the thumbnail rail Pages and closes it with Escape", async () => {
 it("saves a copy of an unchanged PDF with its loaded bytes", async () => {
   const host = document.createElement("div");
   const handle = await renderPdf(host, "/notes/a.pdf");
-  expect(toolbarButton(host, "Save a Copy").disabled).toBe(false);
+  const saveCopy = Array.from(host.querySelectorAll<HTMLButtonElement>("[data-command]")).find((b) => b.dataset.command === "save-copy")!;
+  expect(saveCopy.disabled).toBe(false);
   host.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
   await flush();
   expect(calls.saved).toEqual([{ path: "/out/copy.pdf", bytes: [1, 2, 3] }]);
@@ -76,5 +77,57 @@ it("refuses a copy onto the open PDF itself", async () => {
   host.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
   await flush();
   expect(calls.saved).toEqual([]);
+  handle.destroy();
+});
+
+it("starts in Read and toggles the edit row without touching edits", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const toolbar = host.querySelector<HTMLElement>(".pdf-toolbar")!;
+  const editRow = host.querySelector<HTMLElement>(".pdf-tb-edit-row")!;
+  const documentView = host.querySelector<HTMLElement>(".pdf-document")!;
+  expect(toolbar.dataset.mode).toBe("read");
+  expect(editRow.hidden).toBe(true);
+  expect(documentView.dataset.pdfMode).toBe("read");
+
+  // Tool letters do nothing while reading.
+  host.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "t" }));
+  expect(documentView.dataset.pdfTool).toBe("select");
+
+  toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
+  expect(toolbar.dataset.mode).toBe("edit");
+  expect(editRow.hidden).toBe(false);
+  expect(documentView.dataset.pdfMode).toBe("edit");
+  host.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "t" }));
+  expect(documentView.dataset.pdfTool).toBe("text");
+
+  // Leaving Edit resets the tool only.
+  toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
+  expect(editRow.hidden).toBe(true);
+  expect(documentView.dataset.pdfTool).toBe("select");
+  handle.destroy();
+});
+
+it("asks the workbench to open find from the toolbar", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const seen: string[] = [];
+  host.addEventListener(PDF_FIND_EVENT, () => seen.push("find"));
+  toolbarButton(host, "Find").dispatchEvent(new Event("click"));
+  expect(seen).toEqual(["find"]);
+  handle.destroy();
+});
+
+it("hands zoom commands to the workbench, which owns zoom", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const seen: string[] = [];
+  host.addEventListener(PDF_ZOOM_EVENT, (event) => seen.push((event as CustomEvent<string>).detail));
+  Array.from(host.querySelectorAll<HTMLButtonElement>("button"))
+    .filter((b) => b.dataset.command === "zoom-in" || b.dataset.command === "fit-page")
+    .forEach((b) => b.dispatchEvent(new Event("click")));
+  expect(seen).toEqual(expect.arrayContaining(["zoom-in", "fit-page"]));
+  // No pages: there is nothing to fit yet.
+  expect(handle.fitZoom("width")).toBeNull();
   handle.destroy();
 });

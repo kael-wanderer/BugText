@@ -6,6 +6,33 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Changed
+
+- PDFs open in Read mode with one toolbar row: Pages, Find, Edit PDF, a Save menu
+  (Save Changes, Save a Copy…) and More (OCR, Review OCR Text, OCR language, Check
+  Text Edits, Editing Support). Edit PDF adds a second row with icon tools (Select,
+  Add Text, Replace Text, Cover, Image), Undo/Redo, an Actions menu (Replace Selected
+  Text, Try Direct Rewrite, Reflow, Snap), Delete and Review with a pending count.
+  Leaving Edit keeps every pending edit and the undo history.
+- Each toolbar row fits the pane width on its own: labels collapse to icons first,
+  then Find and Delete move into menus. Rows no longer wrap.
+- The PDF toolbar shows the page in view with Previous/Next and an editable page
+  number: Enter jumps to that page, a number outside the document is refused
+  without moving, and Escape puts the current page back. The status bar shows
+  "Page 3 of 12".
+- PDF zoom lives in the PDF toolbar: − / + and a menu with Automatic, Fit Width,
+  Fit Page and Actual Size. PDFs open in Automatic, which fits the widest page to
+  the pane but never enlarges past 100%. Fit modes follow pane resizes, explicit
+  zoom switches to a percentage, ⌘0 returns to Automatic, and zooming keeps the
+  same spot of the page in view. The generic zoom buttons are hidden for PDFs.
+- While editing, V, T, R, C and I pick a tool. Toolbar presses keep the PDF text
+  selection, and Escape closes an open toolbar menu before any panel.
+
+### Fixed
+
+- Undo and redo hide text and cover style controls left from the cleared selection.
+- PDFs wider than the pane no longer open cut off at the right edge.
+
 ## [0.3.4] - 2026-10-27
 
 ### Changed

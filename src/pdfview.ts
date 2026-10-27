@@ -4,6 +4,14 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
 import {
+  createPdfToolbar,
+  toolForKey,
+  type PdfEditTool,
+  type PdfPanel,
+  type PdfToolbarCommand,
+} from "./pdf-toolbar";
+import { parsePageInput, pdfFitZoom, pdfZoomLabel, type PdfFitMode } from "./pdf-navigation";
+import {
   pdfCapabilityDetails,
   pdfCapabilityMessage,
   pdfPageCapabilityMessage,
@@ -69,6 +77,12 @@ export type PdfFindHandle = {
   clear: () => void;
   /** Reloads when the file changed on disk, or asks first when there are unsaved edits. */
   checkDisk: () => Promise<void>;
+  /** Display zoom that fits the page in view, or null while the pane has no size. */
+  fitZoom: (mode: PdfFitMode) => number | null;
+  /** Shows the workbench's zoom state in the toolbar. */
+  setZoomState: (zoom: number, fit: PdfFitMode | null) => void;
+  /** Runs a zoom change while keeping the same spot of the page in view. */
+  keepAnchor: (change: () => void) => void;
   destroy: () => void;
 };
 
@@ -76,6 +90,8 @@ export type PdfRenderOptions = {
   initialPage?: number;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
+  /** The page in view changed (one-based). */
+  onPageChange?: (page: number, pageCount: number) => void;
   /** Return false once another document owns `host`; loading then stops before touching it. */
   isCurrent?: () => boolean;
 };
@@ -90,6 +106,10 @@ export class PdfRenderSuperseded extends Error {
 
 export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
+/** Raised by the PDF toolbar's Find; the workbench opens its find bar. */
+export const PDF_FIND_EVENT = "bugtext:pdf-find";
+/** Raised by the PDF toolbar's zoom controls; `detail` is the command (zoom-in, fit-width, …). */
+export const PDF_ZOOM_EVENT = "bugtext:pdf-zoom";
 
 const RENDER_SCALE = 1.4;
 // Upper bound on canvas pixels for one document (about 1 GB of RGBA). Pages are
@@ -132,7 +152,6 @@ export function mostVisiblePageIndex(
   return best;
 }
 const PDF_EDIT_HISTORY_LIMIT = 80;
-type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 type PendingPdfImage = {
   name: string;
   mimeType: "image/png" | "image/jpeg";
@@ -604,26 +623,10 @@ export async function renderPdf(
   let pendingInlineEditId: string | null = null;
   let undoStack: PdfEditDocument[] = [];
   let redoStack: PdfEditDocument[] = [];
-  const toolbar = window.document.createElement("div");
-  toolbar.className = "pdf-edit-toolbar";
-  const toolButtons = new Map<PdfEditTool, HTMLButtonElement>();
-  const saveButton = window.document.createElement("button");
-  const saveAsButton = window.document.createElement("button");
-  const reviewButton = window.document.createElement("button");
-  const proofButton = window.document.createElement("button");
-  const imageButton = window.document.createElement("button");
-  const undoButton = window.document.createElement("button");
-  const redoButton = window.document.createElement("button");
-  const snapButton = window.document.createElement("button");
-  const deleteButton = window.document.createElement("button");
-  const editSelectedButton = window.document.createElement("button");
-  const directSelectedButton = window.document.createElement("button");
-  const reflowButton = window.document.createElement("button");
-  const ocrButton = window.document.createElement("button");
-  const ocrReviewButton = window.document.createElement("button");
-  const capabilityButton = window.document.createElement("button");
-  const thumbnailButton = window.document.createElement("button");
-  const ocrLanguageInput = window.document.createElement("input");
+  let editing = false;
+  let ocrBusy = false;
+  let currentPage = 0;
+  let zoomState: { zoom: number; fit: PdfFitMode | null } = { zoom: 1, fit: "auto" };
   const fontFamilySelect = window.document.createElement("select");
   const fontSizeInput = window.document.createElement("input");
   const boldButton = window.document.createElement("button");
@@ -633,8 +636,6 @@ export async function renderPdf(
   const opacityInput = window.document.createElement("input");
   const coverColorInput = window.document.createElement("input");
   const coverOpacityInput = window.document.createElement("input");
-  const status = window.document.createElement("span");
-  status.className = "pdf-edit-status";
   // Sticky statuses (save results/errors) survive the routine toolbar refresh,
   // which otherwise stomps them with "Unsaved PDF edits" immediately.
   let stickyStatus = false;
@@ -646,9 +647,7 @@ export async function renderPdf(
     activeTool = tool;
     container.dataset.pdfTool = tool;
     updateStyleBar();
-    toolButtons.forEach((button, key) => {
-      button.classList.toggle("active", key === tool);
-    });
+    syncToolbar();
     setStatus(
       tool === "select"
         ? "Select or drag an edit"
@@ -663,106 +662,28 @@ export async function renderPdf(
                 : "Choose an image to place",
     );
   };
-  const addToolButton = (tool: PdfEditTool, label: string): void => {
-    const button = window.document.createElement("button");
-    button.type = "button";
-    button.textContent = label;
-    button.title = label;
-    button.addEventListener("click", () => setTool(tool));
-    toolButtons.set(tool, button);
-    toolbar.appendChild(button);
+  const chooseImage = async (): Promise<void> => {
+    const imagePath = await pickImagePath();
+    if (!imagePath) return;
+    const mimeType = imageMimeFromPath(imagePath);
+    if (!mimeType) {
+      setStatus("Choose a PNG or JPEG image");
+      return;
+    }
+    const imageBytes = await invoke<number[]>("read_file_bytes", { path: imagePath });
+    if (!imageBytes.length) {
+      setStatus("The selected image is empty");
+      return;
+    }
+    const dimensions = await readImageDimensions(imageBytes, mimeType);
+    pendingImage = {
+      name: basename(imagePath),
+      mimeType,
+      bytes: imageBytes,
+      ...dimensions,
+    };
+    setTool("image");
   };
-  addToolButton("select", "Select");
-  addToolButton("text", "Text");
-  addToolButton("cover", "Cover");
-  addToolButton("replace", "Replace");
-  imageButton.type = "button";
-  imageButton.textContent = "Image";
-  imageButton.title = "Add a PNG or JPEG image object";
-  imageButton.addEventListener("click", () => {
-    void (async () => {
-      const imagePath = await pickImagePath();
-      if (!imagePath) return;
-      const mimeType = imageMimeFromPath(imagePath);
-      if (!mimeType) {
-        setStatus("Choose a PNG or JPEG image");
-        return;
-      }
-      const imageBytes = await invoke<number[]>("read_file_bytes", { path: imagePath });
-      if (!imageBytes.length) {
-        setStatus("The selected image is empty");
-        return;
-      }
-      const dimensions = await readImageDimensions(imageBytes, mimeType);
-      pendingImage = {
-        name: basename(imagePath),
-        mimeType,
-        bytes: imageBytes,
-        ...dimensions,
-      };
-      setTool("image");
-    })();
-  });
-  toolButtons.set("image", imageButton);
-  toolbar.appendChild(imageButton);
-  undoButton.type = "button";
-  undoButton.textContent = "Undo";
-  undoButton.title = "Undo PDF edit";
-  undoButton.disabled = true;
-  redoButton.type = "button";
-  redoButton.textContent = "Redo";
-  redoButton.title = "Redo PDF edit";
-  redoButton.disabled = true;
-  snapButton.type = "button";
-  snapButton.textContent = "Snap";
-  snapButton.title = "Snap PDF edit placement to a 5-point grid";
-  deleteButton.type = "button";
-  deleteButton.textContent = "Delete";
-  deleteButton.disabled = true;
-  editSelectedButton.type = "button";
-  editSelectedButton.textContent = "Edit Text";
-  editSelectedButton.title = "Replace the currently selected PDF text visually";
-  directSelectedButton.type = "button";
-  directSelectedButton.textContent = "Direct";
-  directSelectedButton.title = "Try a real PDF text rewrite for the selected text";
-  reflowButton.type = "button";
-  reflowButton.textContent = "Reflow";
-  reflowButton.title = "Reflow the selected PDF text edit";
-  reflowButton.disabled = true;
-  ocrButton.type = "button";
-  ocrButton.textContent = "OCR Page";
-  ocrButton.title = "Recognize text on the visible page";
-  ocrReviewButton.type = "button";
-  ocrReviewButton.textContent = "Review OCR";
-  ocrReviewButton.title = "Review and correct OCR text blocks";
-  ocrReviewButton.disabled = true;
-  capabilityButton.type = "button";
-  capabilityButton.textContent = "Limits";
-  capabilityButton.title = "Show PDF editing capabilities by page";
-  capabilityButton.disabled = true;
-  thumbnailButton.type = "button";
-  thumbnailButton.textContent = "Pages";
-  thumbnailButton.title = "Show page thumbnails";
-  thumbnailButton.disabled = true;
-  ocrLanguageInput.type = "text";
-  ocrLanguageInput.value = "eng";
-  ocrLanguageInput.title = "OCR language, for example eng or eng+vie";
-  ocrLanguageInput.className = "pdf-edit-ocr-language";
-  saveButton.type = "button";
-  saveButton.textContent = "Save";
-  saveButton.disabled = true;
-  saveAsButton.type = "button";
-  saveAsButton.textContent = "Save a Copy";
-  saveAsButton.title = "Save a copy of this PDF, with any pending edits";
-  saveAsButton.disabled = true;
-  reviewButton.type = "button";
-  reviewButton.textContent = "Review";
-  reviewButton.title = "Review pending PDF edits before saving";
-  reviewButton.disabled = true;
-  proofButton.type = "button";
-  proofButton.textContent = "Proof";
-  proofButton.title = "Proofread pending PDF text edits";
-  proofButton.disabled = true;
   fontFamilySelect.title = "Font family";
   fontFamilySelect.className = "pdf-edit-select pdf-edit-font-family";
   [
@@ -822,25 +743,6 @@ export async function renderPdf(
   coverOpacityInput.step = "0.05";
   coverOpacityInput.value = "1";
   coverOpacityInput.title = "Cover opacity";
-  toolbar.append(
-    undoButton,
-    redoButton,
-    snapButton,
-    deleteButton,
-    editSelectedButton,
-    directSelectedButton,
-    reflowButton,
-    ocrLanguageInput,
-    ocrButton,
-    ocrReviewButton,
-    capabilityButton,
-    thumbnailButton,
-    reviewButton,
-    proofButton,
-    saveButton,
-    saveAsButton,
-    status,
-  );
   // Style controls sit on their own row and only appear while they apply: text
   // controls for text edits or tools, cover controls for covers.
   const styleBar = window.document.createElement("div");
@@ -865,7 +767,6 @@ export async function renderPdf(
   coverLabel.textContent = "Cover";
   coverStyleGroup.append(coverLabel, coverColorInput, coverOpacityInput);
   styleBar.append(textStyleGroup, coverStyleGroup);
-  toolbar.append(styleBar);
   const updateStyleBar = (): void => {
     const operation = selectedOperation();
     const type = operation?.type;
@@ -882,20 +783,44 @@ export async function renderPdf(
       type === "replacementText";
     textStyleGroup.hidden = !showText;
     coverStyleGroup.hidden = !showCover;
-    styleBar.hidden = !showText && !showCover;
+    styleBar.hidden = !editing || (!showText && !showCover);
   };
   const container = window.document.createElement("div");
   container.className = "pdf-document";
   container.dataset.path = path;
-  host.append(toolbar, container);
-  // Side panels sit just below the toolbar, which wraps onto more rows when narrow.
+  container.dataset.pdfMode = "read";
+  const toolbar = createPdfToolbar(window.document, {
+    onCommand: (command) => runToolbarCommand(command),
+    onPageInput: (text) => {
+      const result = parsePageInput(text, pages.length);
+      if (!result.ok) {
+        setStatus(result.message);
+        return result.message;
+      }
+      setStatus("");
+      goToPage(result.page);
+      host.focus({ preventScroll: true });
+      return null;
+    },
+    onPageReset: () => setStatus(""),
+    onPress: (command) => {
+      // The Actions menu takes two presses (open, then choose); keep the first capture.
+      if (command === "actions-menu") cachedSelectionReplacement = selectionReplacement();
+      else if (command === "replace-selection" || command === "direct-selection")
+        cachedSelectionReplacement = selectionReplacement() ?? cachedSelectionReplacement;
+    },
+  });
+  toolbar.element.append(styleBar);
+  const status = toolbar.status;
+  host.append(toolbar.element, container);
+  // Side panels sit just below the toolbar, whose height changes with Edit and the style row.
   const toolbarSize =
     typeof ResizeObserver === "undefined"
       ? null
       : new ResizeObserver(() => {
-          host.style.setProperty("--pdf-toolbar-height", `${toolbar.offsetHeight}px`);
+          host.style.setProperty("--pdf-toolbar-height", `${toolbar.element.offsetHeight}px`);
         });
-  toolbarSize?.observe(toolbar);
+  toolbarSize?.observe(toolbar.element);
   const pages: PdfPageView[] = [];
   const textSignals: PdfPageTextSignal[] = [];
   const objectSignals: PdfPageObjectSignal[] = [];
@@ -1029,35 +954,62 @@ export async function renderPdf(
     coverColorInput.value = cover.color;
     coverOpacityInput.value = String(cover.opacity);
     updateStyleBar();
-    deleteButton.disabled = !id;
-    reflowButton.disabled =
-      !operation ||
-      (operation.type !== "textBox" &&
-        operation.type !== "replacementText" &&
-        operation.type !== "directTextEdit" &&
-        operation.type !== "ocrTextBlock");
+    syncToolbar();
     container
       .querySelectorAll<HTMLElement>(".pdf-edit-item")
       .forEach((item) => item.classList.toggle("selected", item.dataset.editId === id));
   };
+  const openPanel = (): PdfPanel | null =>
+    proofPanel
+      ? "proof"
+      : reviewPanel
+        ? "review"
+        : ocrReviewPanel
+          ? "ocr-review"
+          : capabilityPanel
+            ? "support"
+            : thumbnailPanel
+              ? "pages"
+              : null;
+  const syncToolbar = (): void => {
+    const operation = selectedOperation();
+    const pending = editDocument.pages.reduce((sum, page) => sum + page.operations.length, 0);
+    toolbar.update({
+      page: currentPage,
+      pageCount: pages.length,
+      zoom: zoomState.zoom,
+      fit: zoomState.fit,
+      zoomLabel: pdfZoomLabel(zoomState.zoom, zoomState.fit),
+      editing,
+      tool: activeTool,
+      saving,
+      pending,
+      canUndo: undoStack.length > 0,
+      canRedo: redoStack.length > 0,
+      hasSelectedEdit: Boolean(selectedOperationId),
+      canReflow:
+        operation?.type === "textBox" ||
+        operation?.type === "replacementText" ||
+        operation?.type === "directTextEdit" ||
+        operation?.type === "ocrTextBlock",
+      snap: snapEnabled,
+      ocrBusy,
+      ocrReview: summarizeOcrReview(listOcrReviewItems(editDocument)),
+      proofIssues: pending ? listPdfProofIssues(editDocument).length : 0,
+      pagesReady: pages.length > 0,
+      support: capabilitySummary
+        ? {
+            limited:
+              capabilitySummary.hasScannedPages ||
+              capabilitySummary.directSimplePages < capabilitySummary.pages.length,
+            note: pdfCapabilityMessage(capabilitySummary),
+          }
+        : null,
+      openPanel: openPanel(),
+    });
+  };
   const updateToolbarState = (): void => {
-    saveButton.disabled = saving || !hasPdfEdits(editDocument);
-    saveAsButton.disabled = saving;
-    reviewButton.disabled = saving || !hasPdfEdits(editDocument);
-    const proofIssues = listPdfProofIssues(editDocument);
-    proofButton.disabled = saving || !hasPdfEdits(editDocument);
-    proofButton.textContent = proofIssues.length ? `Proof ${proofIssues.length}` : "Proof";
-    undoButton.disabled = saving || undoStack.length === 0;
-    redoButton.disabled = saving || redoStack.length === 0;
-    deleteButton.disabled = !selectedOperationId;
-    const ocrSummary = summarizeOcrReview(listOcrReviewItems(editDocument));
-    ocrReviewButton.disabled = ocrSummary.total === 0;
-    ocrReviewButton.textContent =
-      ocrSummary.total === 0
-        ? "Review OCR"
-        : ocrSummary.lowConfidence > 0
-          ? `Review OCR ${ocrSummary.lowConfidence}/${ocrSummary.total}`
-          : `Review OCR ${ocrSummary.total}`;
+    syncToolbar();
     options?.onEditDirtyChange?.(hasPdfEdits(editDocument));
     if (hasPdfEdits(editDocument) && activeTool === "select" && !saving && !stickyStatus) {
       setStatus("Unsaved PDF edits");
@@ -1090,6 +1042,7 @@ export async function renderPdf(
   const restoreEditDocument = (nextDocument: PdfEditDocument): void => {
     editDocument = clonePdfEditDocument(nextDocument);
     selectedOperationId = null;
+    updateStyleBar();
     keepDraft();
     renderEditOverlays();
     refreshOcrReviewPanel();
@@ -1318,6 +1271,7 @@ export async function renderPdf(
   const closeThumbnailPanel = (): void => {
     thumbnailPanel?.remove();
     thumbnailPanel = null;
+    syncToolbar();
   };
   const renderThumbnailPanel = (): void => {
     if (!thumbnailPanel) return;
@@ -1371,6 +1325,7 @@ export async function renderPdf(
   const closeReviewPanel = (): void => {
     reviewPanel?.remove();
     reviewPanel = null;
+    syncToolbar();
   };
   const closeProofPanel = (): void => {
     proofPanel?.remove();
@@ -1683,11 +1638,6 @@ export async function renderPdf(
     host.appendChild(ocrReviewPanel);
     renderOcrReviewPanel();
   };
-  ocrReviewButton.addEventListener("click", openOcrReviewPanel);
-  capabilityButton.addEventListener("click", openCapabilityPanel);
-  thumbnailButton.addEventListener("click", openThumbnailPanel);
-  reviewButton.addEventListener("click", openReviewPanel);
-  proofButton.addEventListener("click", openProofPanel);
   const updateSelectedStyle = (options: { history?: boolean } = {}): void => {
     const nextStyle = (base: typeof DEFAULT_PDF_TEXT_STYLE): typeof DEFAULT_PDF_TEXT_STYLE => ({
       ...base,
@@ -2038,25 +1988,16 @@ export async function renderPdf(
     restoreEditDocument(next);
     setStatus("Redid PDF edit");
   };
-  deleteButton.addEventListener("click", deleteSelected);
-  undoButton.addEventListener("click", undoPdfEdit);
-  redoButton.addEventListener("click", redoPdfEdit);
-  snapButton.addEventListener("click", () => {
+  const toggleSnap = (): void => {
     snapEnabled = !snapEnabled;
-    snapButton.classList.toggle("active", snapEnabled);
+    syncToolbar();
     setStatus(snapEnabled ? "Snap enabled" : "Snap disabled");
-  });
-  const cachePdfSelection = (event: Event): void => {
-    event.preventDefault();
-    cachedSelectionReplacement = selectionReplacement();
   };
-  editSelectedButton.addEventListener("pointerdown", cachePdfSelection);
-  editSelectedButton.addEventListener("mousedown", cachePdfSelection);
-  editSelectedButton.addEventListener("click", () => {
+  const replaceSelectedText = (): void => {
     const replacement = cachedSelectionReplacement ?? selectionReplacement();
     cachedSelectionReplacement = null;
     if (!replacement) {
-      setStatus("Select PDF text first, then choose Edit Text");
+      setStatus("Select PDF text first, then choose Replace Selected Text");
       return;
     }
     const operation: PdfEditOperation = {
@@ -2089,14 +2030,12 @@ export async function renderPdf(
     setTool("select");
     renderEditOverlays();
     setStatus(`Queued replacement on page ${replacement.pageView.box.page}`);
-  });
-  directSelectedButton.addEventListener("pointerdown", cachePdfSelection);
-  directSelectedButton.addEventListener("mousedown", cachePdfSelection);
-  directSelectedButton.addEventListener("click", () => {
+  };
+  const directRewriteSelectedText = (): void => {
     const replacement = cachedSelectionReplacement ?? selectionReplacement();
     cachedSelectionReplacement = null;
     if (!replacement) {
-      setStatus("Select PDF text first, then choose Direct");
+      setStatus("Select PDF text first, then choose Try Direct Rewrite");
       return;
     }
     const operation: PdfEditOperation = {
@@ -2125,8 +2064,8 @@ export async function renderPdf(
     setTool("select");
     renderEditOverlays();
     setStatus("Queued direct edit; Save falls back visually if unsafe");
-  });
-  reflowButton.addEventListener("click", () => {
+  };
+  const reflowSelected = (): void => {
     const selected = selectedOperation();
     if (!selected) return;
     const page = pages.find((item) => item.box.page === selected.page)?.box;
@@ -2134,28 +2073,30 @@ export async function renderPdf(
     applyEditDocument(reflowPdfEditOperationText(editDocument, page, selected.id));
     renderEditOverlays();
     setStatus("Reflowed selected PDF edit text");
-  });
+  };
   const visiblePage = (): PdfPageView | null => {
     const index = mostVisiblePageIndex(
       pages.map((page) => page.element.getBoundingClientRect()),
-      toolbar.getBoundingClientRect().bottom,
+      toolbar.element.getBoundingClientRect().bottom,
       window.innerHeight,
     );
     return index < 0 ? null : pages[index];
   };
-  ocrButton.addEventListener("click", () => {
+  const runOcr = (): void => {
+    if (ocrBusy) return;
     void (async () => {
       const page = visiblePage();
       const canvas = await page?.draw();
       if (!page || !canvas) return;
-      ocrButton.disabled = true;
+      ocrBusy = true;
+      syncToolbar();
       setStatus(`Running OCR on page ${page.box.page}...`);
       try {
         const { recognizePdfPageCanvas } = await import("./pdf-ocr");
         const operations = await recognizePdfPageCanvas(
           canvas,
           page.box,
-          ocrLanguageInput.value,
+          toolbar.ocrLanguage.value,
         );
         if (!operations.length) {
           setStatus(`No OCR text found on page ${page.box.page}`);
@@ -2172,30 +2113,106 @@ export async function renderPdf(
       } catch (error) {
         setStatus(error instanceof Error ? error.message : String(error));
       } finally {
-        ocrButton.disabled = false;
+        ocrBusy = false;
         updateToolbarState();
       }
     })();
-  });
+  };
+  const setCurrentPage = (page: number): void => {
+    if (page === currentPage) return;
+    currentPage = page;
+    syncToolbar();
+    options?.onPageChange?.(page, pages.length);
+  };
+  const goToPage = (page: number): void => {
+    const view = pages[page - 1];
+    if (!view) return;
+    // Land the page top just below the sticky toolbar, whatever the zoom.
+    const gap = 12;
+    host.scrollTop +=
+      view.element.getBoundingClientRect().top - toolbar.element.getBoundingClientRect().bottom - gap;
+    setCurrentPage(page);
+  };
+  // The page field follows scrolling, measured once per frame.
+  let pageFrame = 0;
+  const trackPage = (): void => {
+    pageFrame = 0;
+    const view = visiblePage();
+    if (view) setCurrentPage(view.box.page);
+  };
+  const schedulePageTrack = (): void => {
+    if (typeof requestAnimationFrame === "undefined") return;
+    if (!pageFrame) pageFrame = requestAnimationFrame(trackPage);
+  };
+  host.addEventListener("scroll", schedulePageTrack, { passive: true });
+  const setEditing = (next: boolean): void => {
+    if (editing === next) return;
+    editing = next;
+    container.dataset.pdfMode = next ? "edit" : "read";
+    if (!next) {
+      // Leaving Edit keeps every pending edit and the undo history; only tools reset.
+      setSelectedOperation(null);
+      setTool("select");
+    }
+    updateStyleBar();
+    syncToolbar();
+    setStatus(next ? "Select or drag an edit" : hasPdfEdits(editDocument) ? "Unsaved PDF edits" : "");
+  };
+  const runToolbarCommand = (command: PdfToolbarCommand): void => {
+    if (command.startsWith("tool:")) {
+      const tool = command.slice(5) as PdfEditTool;
+      if (tool === "image") void chooseImage();
+      else setTool(tool);
+      return;
+    }
+    if (command.startsWith("zoom-") || command.startsWith("fit-")) {
+      host.dispatchEvent(new CustomEvent(PDF_ZOOM_EVENT, { detail: command, bubbles: true }));
+      return;
+    }
+    const actions: Record<string, () => void> = {
+      pages: openThumbnailPanel,
+      "page-prev": () => goToPage(currentPage - 1),
+      "page-next": () => goToPage(currentPage + 1),
+      find: () => host.dispatchEvent(new Event(PDF_FIND_EVENT, { bubbles: true })),
+      edit: () => setEditing(!editing),
+      save: () => void saveEditedPdf(),
+      "save-copy": () => void saveEditedPdfAs(),
+      ocr: runOcr,
+      "ocr-review": openOcrReviewPanel,
+      proof: openProofPanel,
+      support: openCapabilityPanel,
+      "replace-selection": replaceSelectedText,
+      "direct-selection": directRewriteSelectedText,
+      reflow: reflowSelected,
+      snap: toggleSnap,
+      delete: deleteSelected,
+      undo: undoPdfEdit,
+      redo: redoPdfEdit,
+      review: openReviewPanel,
+    };
+    actions[command]?.();
+    syncToolbar();
+  };
   // Escape closes one panel at a time, right-hand panels before Pages, and
   // returns focus to the button that opened it.
   const closeTopPanel = (): boolean => {
-    const panels: [HTMLElement | null, () => void, HTMLButtonElement][] = [
-      [proofPanel, closeProofPanel, proofButton],
-      [reviewPanel, closeReviewPanel, reviewButton],
-      [ocrReviewPanel, closeOcrReviewPanel, ocrReviewButton],
-      [capabilityPanel, closeCapabilityPanel, capabilityButton],
-      [thumbnailPanel, closeThumbnailPanel, thumbnailButton],
+    const panels: [HTMLElement | null, () => void, PdfToolbarCommand][] = [
+      [proofPanel, closeProofPanel, "proof"],
+      [reviewPanel, closeReviewPanel, "review"],
+      [ocrReviewPanel, closeOcrReviewPanel, "ocr-review"],
+      [capabilityPanel, closeCapabilityPanel, "support"],
+      [thumbnailPanel, closeThumbnailPanel, "pages"],
     ];
     const open = panels.find(([panel]) => panel);
     if (!open) return false;
     open[1]();
-    open[2].focus({ preventScroll: true });
+    syncToolbar();
+    toolbar.focusCommand(open[2]);
     return true;
   };
   const keyHandler = (event: KeyboardEvent): void => {
     if (isTextEntryTarget(event.target)) return;
-    if (event.key === "Escape" && closeTopPanel()) {
+    if (event.key === "Escape" && (toolbar.closeMenu() || closeTopPanel())) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -2217,6 +2234,13 @@ export async function renderPdf(
     if ((event.key === "Delete" || event.key === "Backspace") && selectedOperationId) {
       event.preventDefault();
       deleteSelected();
+      return;
+    }
+    // Single letters pick an edit tool while editing.
+    const tool = editing && !event.metaKey && !event.ctrlKey && !event.altKey ? toolForKey(event.key) : null;
+    if (tool) {
+      event.preventDefault();
+      runToolbarCommand(`tool:${tool}`);
     }
   };
   host.addEventListener("keydown", keyHandler);
@@ -2360,7 +2384,7 @@ export async function renderPdf(
     keep.title = "Keep editing the version you opened; Save will ask before replacing the newer file";
     keep.addEventListener("click", () => diskNotice?.remove());
     diskNotice.append(message, reload, keep);
-    toolbar.after(diskNotice);
+    toolbar.element.after(diskNotice);
   };
   const onMenuSave = (): void => {
     void saveEditedPdf();
@@ -2370,16 +2394,6 @@ export async function renderPdf(
   };
   host.addEventListener(PDF_SAVE_EVENT, onMenuSave);
   host.addEventListener(PDF_SAVE_AS_EVENT, onMenuSaveAs);
-  saveButton.addEventListener("click", () => {
-    void (async () => {
-      await saveEditedPdf();
-    })();
-  });
-  saveAsButton.addEventListener("click", () => {
-    void (async () => {
-      await saveEditedPdfAs();
-    })();
-  });
   setTool("select");
 
   let outputScale = 1;
@@ -2580,16 +2594,10 @@ export async function renderPdf(
       pageElement.scrollIntoView({ block: "start" });
     }
   }
-  thumbnailButton.disabled = pages.length === 0;
   renderThumbnailPanel();
   capabilitySummary = summarizePdfCapabilities(textSignals);
-  capabilityButton.disabled = capabilitySummary.pages.length === 0;
-  capabilityButton.textContent =
-    capabilitySummary.hasScannedPages ||
-    capabilitySummary.directSimplePages < capabilitySummary.pages.length
-      ? "Limits !"
-      : "Limits";
-  capabilityButton.title = pdfCapabilityMessage(capabilitySummary);
+  setCurrentPage(pages.length ? Math.min(Math.max(options?.initialPage ?? 1, 1), pages.length) : 0);
+  syncToolbar();
   renderCapabilityPanel();
   if (!hasPdfEdits(editDocument)) {
     setStatus(pdfCapabilityMessage(capabilitySummary));
@@ -2616,7 +2624,38 @@ export async function renderPdf(
     page.element.scrollIntoView({ block: "center", behavior: "smooth" });
     return { count: matches.length, active: active + 1 };
   };
+  // Width fits use the widest page so mixed sizes never scroll sideways or
+  // change zoom while scrolling; Fit Page uses the page in view.
+  const fitZoom = (mode: PdfFitMode): number | null => {
+    const view = pages[Math.max(currentPage, 1) - 1];
+    const width = host.clientWidth;
+    const height = host.clientHeight - toolbar.element.offsetHeight;
+    if (!view || width <= 0 || height <= 0) return null;
+    const widest = Math.max(...pages.map((page) => page.box.width));
+    const box = mode === "page" ? view.box : { width: widest, height: view.box.height };
+    return pdfFitZoom(
+      mode,
+      { width: box.width * RENDER_SCALE, height: box.height * RENDER_SCALE },
+      { width, height },
+    );
+  };
+  const keepAnchor = (change: () => void): void => {
+    const view = visiblePage();
+    const top = toolbar.element.getBoundingClientRect().bottom;
+    const before = view?.element.getBoundingClientRect();
+    const fraction = before && before.height > 0 ? (top - before.top) / before.height : 0;
+    change();
+    if (!view) return;
+    const after = view.element.getBoundingClientRect();
+    host.scrollTop += after.top + fraction * after.height - top;
+  };
   return {
+    fitZoom,
+    keepAnchor,
+    setZoomState: (zoom, fit) => {
+      zoomState = { zoom, fit };
+      syncToolbar();
+    },
     setQuery: (query) => {
       clear();
       const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2649,6 +2688,9 @@ export async function renderPdf(
     destroy: () => {
       clear();
       toolbarSize?.disconnect();
+      toolbar.destroy();
+      host.removeEventListener("scroll", schedulePageTrack);
+      if (pageFrame) cancelAnimationFrame(pageFrame);
       if (drawFrame) cancelAnimationFrame(drawFrame);
       documentSize?.disconnect();
       window.removeEventListener("scroll", scheduleDrawnPages, { capture: true });
