@@ -1542,6 +1542,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const { buildExportHtml } = await import("./export-render");
     const html = await buildExportHtml(activeView().editor.getText(tab.id), {
       rasterizeSvg: kind === "docx",
+      svgAsImage: kind === "pdf",
     });
     await invoke(
       kind === "pdf" ? "export_pdf_html" : "export_docx_html",

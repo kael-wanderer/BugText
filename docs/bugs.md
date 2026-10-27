@@ -41,7 +41,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-033 | 2026-10-27 | Preview / security | Major | — | Markdown preview ran scripts and event handlers embedded in a document | fixed (0.3.5) |
 | BUG-034 | 2026-10-27 | Save | Major | — | Saves truncated the file before writing, so an interrupted save could destroy it | fixed (0.3.5) |
 | BUG-035 | 2026-10-27 | Folder search | Minor | — | Clearing search during a slow search could still show the old results | fixed (0.3.5) |
-| BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | open |
+| BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | fixed (0.3.5) |
 
 > Delete the example row once real bugs are logged.
 
@@ -249,8 +249,9 @@ table and a detail block below. Reference the failing test-case ID.
   2. File ▸ Export ▸ PDF and save.
 - **Expected:** PDF is written with the diagram.
 - **Actual:** "Error producing PDF." Typst reports `file not found (searched at <TMPDIR>/<TMPDIR>/media-<hash>/<sha>.svg)`; the generated `.typ` uses an absolute path that Typst resolves against its project root, so the temp prefix appears twice.
-- **Notes:** Present before 0.3.5 (not caused by the sanitizer). The SVG lands in Pandoc's own `media-<hash>` folder, not the `bugtext-export-media` folder passed with `--extract-media`. A standalone Pandoc run with small or large inline SVGs did not reproduce it, so the trigger is specific to BugText's export HTML. Candidate fixes: rasterize diagrams to PNG for PDF as DOCX already does, or pass a Typst root of `/`.
-- **Status:** open.
+- **Notes:** Present before 0.3.5 (not caused by the sanitizer). The SVG lands in Pandoc's own `media-<hash>` folder, not the `bugtext-export-media` folder passed with `--extract-media`. A standalone Pandoc run with small or large inline SVGs did not reproduce it, so the trigger is specific to BugText's export HTML. Two causes: Pandoc re-serialized the inline Mermaid SVG as HTML (an empty `style=""` became a bare `style` attribute, invalid XML for Typst), and Typst read Pandoc's absolute image paths relative to its project root. Mermaid's HTML labels (`<foreignObject>`) would also not render in Typst.
+- **Fix:** Mermaid uses plain SVG text labels; PDF export embeds each SVG as an `XMLSerializer` data-URI image; `export_pdf_html` passes `--pdf-engine-opt=--root=/` (HTML input cannot carry raw Typst, so this grants the document no file access).
+- **Status:** fixed in 0.3.5.
 
 ### BUG-000 (example — delete me)
 
