@@ -58,6 +58,7 @@ import { addRecent, loadRecent, saveRecent } from "./recent";
 import { breadcrumbsPath, joinPath, relativePath } from "./paths";
 import {
   isHtmlFile,
+  isMarkdownFile,
   isPdfFile,
   fileLanguageInfo,
   normalizeDocumentViewMode,
@@ -142,6 +143,9 @@ import {
 import { findNode } from "./treeops";
 import { findTabByPath } from "./windowops";
 import { createWindowView, type WindowView } from "./windowview";
+import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert";
+import { createNoteImages } from "./note-images";
+import { showToast } from "./toast";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex();
@@ -653,7 +657,50 @@ const handlers = {
       },
     ]);
   },
+  onPasteImages: (wid: string, tid: string, files: File[]) => {
+    if (!isImageNote(wid, tid)) return false;
+    void noteImages.paste(wid, tid, files);
+    return true;
+  },
 };
+
+function tabIn(windowId: string, tabId: string): TabMeta | undefined {
+  return getWindow(windowId)?.tabs.find((tab) => tab.id === tabId);
+}
+
+function isTabDirty(windowId: string, tabId: string): boolean {
+  return tabIn(windowId, tabId)?.dirty ?? false;
+}
+
+/** Markdown notes take pasted and dropped images; other documents do not. */
+function isImageNote(windowId: string, tabId: string): boolean {
+  const tab = tabIn(windowId, tabId);
+  return !!tab && isMarkdownFile(tab.path ?? tab.name);
+}
+
+async function ensureNoteSaved(windowId: string, tabId: string): Promise<string | null> {
+  const path = tabIn(windowId, tabId)?.path;
+  if (path) return path;
+  const save = await confirm("Save this note first so BugText knows where to keep images.", {
+    title: "Save this note first",
+    kind: "info",
+    okLabel: "Save…",
+    cancelLabel: "Cancel",
+  });
+  if (!save || !tabIn(windowId, tabId)) return null;
+  activateTab(windowId, tabId);
+  if (!(await doSave(false))) return null;
+  return tabIn(windowId, tabId)?.path ?? null;
+}
+
+const noteImages = createNoteImages({
+  folder: () => currentSettings.images.folder,
+  pasteName: () => currentSettings.images.pasteName,
+  ensureSaved: ensureNoteSaved,
+  insert: (windowId, tabId, text, at, cursor) => views.get(windowId)?.editor.insertText(tabId, text, at, cursor),
+  toast: showToast,
+  error: (text) => message(text, { title: "Add image", kind: "error" }).then(() => {}),
+});
 
 async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
   const w = getWindow(windowId);
@@ -1144,12 +1191,55 @@ async function copyDroppedPaths(
   }
 }
 
+// Native drags carry no modifier keys, so ⌥ is tracked from key events.
+let optionHeld = false;
+window.addEventListener("keydown", (event) => { optionHeld = event.altKey; }, true);
+window.addEventListener("keyup", (event) => { optionHeld = event.altKey; }, true);
+window.addEventListener("blur", () => { optionHeld = false; });
+
+type ImageDrop = { windowId: string; tabId: string; images: string[]; editor: HTMLElement };
+
+/** Image files dropped on a Markdown editor go into the note instead of opening. */
+function imageDropAt(point: DropPoint, paths: string[]): ImageDrop | null {
+  const images = paths.filter(isImagePath);
+  if (!images.length) return null;
+  const copy = currentSettings.images.dropMode === "copy";
+  if (copy === optionHeld) return null;
+  const hit = document.elementFromPoint(point.x, point.y) as HTMLElement | null;
+  const editor = hit?.closest<HTMLElement>(".pane-editor");
+  const windowId = editor?.closest<HTMLElement>(".window[data-window-id]")?.dataset.windowId;
+  const tabId = windowId ? getWindow(windowId)?.activeTabId : null;
+  if (!editor || !windowId || !tabId || !isImageNote(windowId, tabId)) return null;
+  return { windowId, tabId, images, editor };
+}
+
+let draggedPaths: string[] = [];
+
+function clearImageDropHint(): void {
+  document.querySelectorAll(".pane-editor.image-drop-target").forEach((node) => {
+    node.classList.remove("image-drop-target");
+  });
+}
+
+function showImageDropHint(point: DropPoint): void {
+  clearImageDropHint();
+  const drop = imageDropAt(point, draggedPaths);
+  if (!drop) return;
+  const count = drop.images.length === 1 ? "1 image" : `${drop.images.length} images`;
+  drop.editor.dataset.dropLabel = `Drop to add ${count} to ${folderLabel(currentSettings.images.folder)}`;
+  drop.editor.classList.add("image-drop-target");
+}
+
 async function initNativeFileDrop(): Promise<void> {
   await getCurrentWindow().onDragDropEvent((event) => {
     if (event.payload.type === "enter" || event.payload.type === "over") {
-      highlightDropTarget(dropPoint(event.payload.position));
+      if (event.payload.type === "enter") draggedPaths = event.payload.paths;
+      const point = dropPoint(event.payload.position);
+      highlightDropTarget(point);
+      showImageDropHint(point);
       return;
     }
+    clearImageDropHint();
     if (event.payload.type === "leave") {
       clearDropHighlight();
       cancelDropExpansion();
@@ -1175,7 +1265,13 @@ async function initNativeFileDrop(): Promise<void> {
     }
 
     const windowId = windowAt(point);
+    const imageDrop = imageDropAt(point, event.payload.paths);
+    if (imageDrop) {
+      const at = views.get(imageDrop.windowId)?.editor.posAtPoint(point.x, point.y) ?? null;
+      void noteImages.drop(imageDrop.windowId, imageDrop.tabId, imageDrop.images, at);
+    }
     for (const path of event.payload.paths) {
+      if (imageDrop?.images.includes(path)) continue;
       void doOpenPath(path, windowId);
     }
   });
@@ -1216,9 +1312,9 @@ function newDoc(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "Untitled", text: "" });
 }
 
-async function doSave(saveAs = false): Promise<void> {
+async function doSave(saveAs = false): Promise<boolean> {
   const t = activeMeta();
-  if (!t) return;
+  if (!t) return false;
   const view = activeView();
   if (isPdfFile(t.path ?? t.name)) {
     if (saveAs) {
@@ -1226,14 +1322,14 @@ async function doSave(saveAs = false): Promise<void> {
     } else {
       view.savePdf();
     }
-    return;
+    return false;
   }
 
   try {
     let target = saveAs ? null : t.path;
     if (!target) {
       target = await pickSavePath();
-      if (!target) return;
+      if (!target) return false;
 
       const found = findTabByPath(getState().windows, target);
       if (found) {
@@ -1242,7 +1338,7 @@ async function doSave(saveAs = false): Promise<void> {
           kind: "warning",
         });
         activateTab(found.windowId, found.tab.id);
-        return;
+        return false;
       }
     }
 
@@ -1257,10 +1353,13 @@ async function doSave(saveAs = false): Promise<void> {
           cancelLabel: "Cancel",
         },
       );
-      if (!overwrite) return;
+      if (!overwrite) return false;
     }
     const previousPath = t.path;
     await writeFile(target, text);
+    if (saveAs && previousPath && dirOf(previousPath) !== dirOf(target) && isMarkdownFile(target)) {
+      await offerImageCopy(previousPath, target, localImageLinks(text));
+    }
     if (previousPath && previousPath !== target) {
       aiPanel?.removeWorkspaceFile(previousPath);
     }
@@ -1302,11 +1401,38 @@ async function doSave(saveAs = false): Promise<void> {
     view.renderPreview(text, target);
     syncExplorerActivePath();
     renderAll();
+    return true;
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     await message(text, { title: "Save file", kind: "error" });
+    return false;
   }
 }
+
+/** Save As to another folder: offer to bring the note's local images along. */
+async function offerImageCopy(fromNote: string, toNote: string, links: string[]): Promise<void> {
+  if (!links.length) return;
+  const count = links.length === 1 ? "1 image" : `${links.length} images`;
+  const copy = await confirm(`Copy ${count} to the new location? Links in the note stay the same.`, {
+    title: "Save As",
+    kind: "info",
+    okLabel: "Copy Images",
+    cancelLabel: "Keep Links",
+  });
+  if (!copy) return;
+  try {
+    const result = await invoke<{ copied: number; skipped: string[] }>("copy_note_images", {
+      fromNote,
+      toNote,
+      links,
+    });
+    const copied = result.copied === 1 ? "1 image" : `${result.copied} images`;
+    showToast(result.skipped.length ? `Copied ${copied}; ${result.skipped.length} skipped` : `Copied ${copied}`);
+  } catch (error) {
+    await message(error instanceof Error ? error.message : String(error), { title: "Copy images", kind: "error" });
+  }
+}
+
 
 function snapshotActiveDocument(): void {
   const tab = activeMeta();
@@ -1390,6 +1516,8 @@ async function checkActiveForExternalChange(
   const bufferText = view.editor.getText(tab.id);
   await checkExternalChange(tab.path, tab.dirty, bufferText, {
     reload: (text) => {
+      // Edited while the disk was read: keep the edit; it is dirty now.
+      if (isTabDirty(windowId, tab.id) || view.editor.getText(tab.id) !== bufferText) return;
       cleanReloads.add(changeKey);
       try {
         view.editor.setTextFor(tab.id, text);
@@ -1448,6 +1576,8 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
         continue;
       }
       if (text === view.editor.getText(tab.id)) continue;
+      // The read is async; an edit made meanwhile must not be replaced.
+      if (isTabDirty(windowState.id, tab.id)) continue;
 
       const changeKey = `${windowState.id}:${tab.id}`;
       cleanReloads.add(changeKey);
@@ -1546,7 +1676,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     });
     await invoke(
       kind === "pdf" ? "export_pdf_html" : "export_docx_html",
-      { html, out },
+      { html, out, resourceDir: tab.path ? dirOf(tab.path) : null },
     );
   } catch (error) {
     await message(exportError(error), { title: "Export", kind: "error" });
@@ -1559,6 +1689,14 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   return Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
 }
 
+function captureImages(notePath: string | null) {
+  if (!notePath) return undefined;
+  return {
+    notePath,
+    read: async (path: string) => new Uint8Array(await invoke<number[]>("read_file_bytes", { path })),
+  };
+}
+
 async function captureActive(): Promise<HTMLCanvasElement> {
   const tab = activeMeta()!;
   const text = activeView().editor.getText(tab.id);
@@ -1568,7 +1706,7 @@ async function captureActive(): Promise<HTMLCanvasElement> {
   }
   const { buildExportHtml } = await import("./export-render");
   return capture.htmlToCanvas(
-    await buildExportHtml(text, { rasterizeSvg: false }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
   );
 }
 
@@ -1581,7 +1719,7 @@ async function activeSvg(): Promise<string> {
   if (isHtmlFile(name)) return capture.htmlToSvg(text);
   const { buildExportHtml } = await import("./export-render");
   return capture.htmlToSvg(
-    await buildExportHtml(text, { rasterizeSvg: false }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
   );
 }
 

@@ -518,6 +518,19 @@ body[data-wrap="guide"] .doc {
 }
 
 /* inline code + fenced code share the mono face */
+.doc img {
+  max-width: 100%;
+}
+
+.doc .img-missing {
+  display: inline-block;
+  padding: 0.5em 0.8em;
+  color: var(--muted);
+  font-size: 0.9em;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
 .doc code {
   font-family: var(--font-mono);
   font-size: 0.86em;
@@ -3199,3 +3212,50 @@ body.resizing-ai {
 
 /* Settings ▸ General ▸ Show Hidden Files off: dot-named rows and their contents. */
 :root[data-show-hidden="false"] .tree-row[data-dotted] { display: none; }
+
+.app-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 44px;
+  z-index: 1100;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 9px 16px;
+  transform: translateX(-50%);
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  animation: app-toast-in 160ms ease-out;
+}
+
+@keyframes app-toast-in {
+  from { opacity: 0; transform: translate(-50%, 6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-toast { animation: none; }
+}
+
+.window .pane-editor.image-drop-target {
+  position: relative;
+}
+
+.window .pane-editor.image-drop-target::after {
+  content: attr(data-drop-label);
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 2px dashed var(--accent);
+  border-radius: 10px;
+  pointer-events: none;
+}

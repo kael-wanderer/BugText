@@ -106,12 +106,23 @@ pub fn export_docx(markdown: String, out: String) -> Result<(), String> {
     run_pandoc(&pandoc, &markdown, &args)
 }
 
+/// `--resource-path` so relative images resolve against the note's folder.
+/// Pandoc otherwise looks in its working directory, a temporary folder.
+fn resource_args(resource_dir: Option<String>) -> Vec<String> {
+    resource_dir
+        .and_then(|dir| std::fs::canonicalize(dir).ok())
+        .filter(|dir| dir.is_dir())
+        .map(|dir| vec![format!("--resource-path={}", dir.to_string_lossy())])
+        .unwrap_or_default()
+}
+
 #[tauri::command]
-pub fn export_pdf_html(html: String, out: String) -> Result<(), String> {
+pub fn export_pdf_html(html: String, out: String, resource_dir: Option<String>) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let typst = find_typst().ok_or(TYPST_MISSING)?;
     let media = std::env::temp_dir().join("bugtext-export-media");
-    let args = vec![
+    let mut args = resource_args(resource_dir);
+    args.extend::<Vec<String>>(vec![
         "--from".into(),
         "html".into(),
         "--extract-media".into(),
@@ -125,22 +136,23 @@ pub fn export_pdf_html(html: String, out: String) -> Result<(), String> {
         "--pdf-engine-opt=--root=/".into(),
         "-o".into(),
         out,
-    ];
+    ]);
     run_pandoc(&pandoc, &html, &args)
 }
 
 #[tauri::command]
-pub fn export_docx_html(html: String, out: String) -> Result<(), String> {
+pub fn export_docx_html(html: String, out: String, resource_dir: Option<String>) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let media = std::env::temp_dir().join("bugtext-export-media");
-    let args = vec![
+    let mut args = resource_args(resource_dir);
+    args.extend::<Vec<String>>(vec![
         "--from".into(),
         "html".into(),
         "--extract-media".into(),
         media.to_string_lossy().into_owned(),
         "-o".into(),
         out,
-    ];
+    ]);
     run_pandoc(&pandoc, &html, &args)
 }
 

@@ -45,7 +45,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
-  editing: "How long lines wrap.",
+  editing: "How lines wrap and where pasted images go.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -126,6 +126,24 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     page: "editing",
     label: "Wrap column",
     keywords: "wrapping guide width",
+  },
+  {
+    id: "image-folder",
+    page: "editing",
+    label: "Image folder",
+    keywords: "images paste drop assets attachments screenshot",
+  },
+  {
+    id: "image-paste-name",
+    page: "editing",
+    label: "Pasted image name",
+    keywords: "images paste screenshot file name",
+  },
+  {
+    id: "image-drop-mode",
+    page: "editing",
+    label: "Drop images into editor",
+    keywords: "images drag drop copy link open",
   },
 
   {

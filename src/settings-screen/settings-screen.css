@@ -1011,7 +1011,8 @@
   display: none;
 }
 
-.st-font-custom .st-text[aria-invalid="true"] {
+.st-font-custom .st-text[aria-invalid="true"],
+.st-text[aria-invalid="true"] {
   border-color: var(--danger, #d14343);
 }
 

@@ -5,7 +5,7 @@ vi.mock("../render-extras", () => ({
   enhancePreview: vi.fn(async () => {}),
 }));
 
-import { buildExportHtml } from "../export-render";
+import { buildExportHtml, inlineLocalImages } from "../export-render";
 import { enhancePreview } from "../render-extras";
 
 describe("buildExportHtml", () => {
@@ -159,5 +159,19 @@ describe("buildExportHtml", () => {
     await buildExportHtml("diagram", { rasterizeSvg: false });
 
     expect(replacement).not.toHaveBeenCalled();
+  });
+
+  it("inlines the note's own images for image capture", async () => {
+    vi.unstubAllGlobals();
+    const host = document.createElement("article");
+    host.innerHTML = '<img src="assets/a%20b.png"><img src="../secret.png"><img src="https://x.test/r.png"><img src="notes.md">';
+    const read = vi.fn(async () => new Uint8Array([1, 2, 3]));
+    await inlineLocalImages(host, "/n/note.md", read);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledWith("/n/assets/a b.png");
+    const [local, up, remote] = Array.from(host.querySelectorAll("img"));
+    expect(local.getAttribute("src")).toBe("data:image/png;base64,AQID");
+    expect(up.getAttribute("src")).toBe("../secret.png");
+    expect(remote.getAttribute("src")).toBe("https://x.test/r.png");
   });
 });

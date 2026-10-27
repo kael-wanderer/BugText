@@ -169,6 +169,12 @@ from `preview://localhost/__bugtext_doc__/<slot>/<version>` (`preview_set_doc`),
 `srcdoc`, so their scripts run under their own policy in the sandboxed frame. CSP is
 only enforced in release builds; check policy changes with `npm run tauri build -- --no-bundle`.
 
+Pasted and dropped images (Markdown notes only) go through `src/note-images.ts` to
+Rust `assets.rs`, which writes into `<note dir>/<images.folder>` (default `assets`),
+checks content signature and 25 MB, refuses folders resolving outside the note's folder,
+and returns the relative link. The preview loads relative images via `preview_allow` +
+`preview://` (`src/preview-images.ts`); Pandoc export gets `--resource-path=<note dir>`.
+
 Heavy rendering engines are loaded on demand so the startup bundle remains
 below the release chunk-warning threshold.
 

@@ -1,4 +1,5 @@
-import { button, caption, clampStep, pageHeader, row, segmented, stepper } from "./controls";
+import { button, caption, clampStep, pageHeader, row, segmented, select, stepper, textInput } from "./controls";
+import { validImageFolder } from "../image-insert";
 import type { SettingsPage } from "./screen";
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
 
@@ -66,6 +67,63 @@ export const editingPage: SettingsPage = {
           onChange: (wrapColumn) => deps.onSettingsChange({ ...deps.getSettings(), wrapColumn }),
         }),
       ),
+      caption("Images"),
+      imageFolderRow(settings, deps),
+      row(
+        "image-paste-name",
+        "Pasted image name",
+        "How pasted images are named.",
+        select<Settings["images"]["pasteName"]>(
+          "Pasted image name",
+          [
+            { value: "note", label: "<note>-<date-time>" },
+            { value: "image", label: "image-<date-time>" },
+          ],
+          settings.images.pasteName,
+          (pasteName) => setImages(deps, { pasteName }),
+        ),
+      ),
+      row(
+        "image-drop-mode",
+        "Drop images into editor",
+        "Hold ⌥ while dropping to do the other.",
+        segmented<Settings["images"]["dropMode"]>(
+          "Drop images into editor",
+          [
+            { value: "copy", label: "Copy and link" },
+            { value: "open", label: "Open the file" },
+          ],
+          settings.images.dropMode,
+          (dropMode) => setImages(deps, { dropMode }),
+        ),
+      ),
     );
   },
 };
+
+type Deps = Parameters<SettingsPage["render"]>[1];
+
+function setImages(deps: Deps, patch: Partial<Settings["images"]>): void {
+  const current = deps.getSettings();
+  deps.onSettingsChange({ ...current, images: { ...current.images, ...patch } });
+}
+
+function imageFolderRow(settings: Settings, deps: Deps): HTMLElement {
+  const input = textInput("Image folder", settings.images.folder, "assets");
+  const node = row(
+    "image-folder",
+    "Image folder",
+    "Relative to the note. Use . for the note's own folder.",
+    input,
+  );
+  const note = node.querySelector<HTMLElement>(".st-note");
+  const hint = note?.textContent ?? "";
+  input.addEventListener("change", () => {
+    const folder = input.value.trim();
+    const ok = validImageFolder(folder);
+    input.setAttribute("aria-invalid", String(!ok));
+    if (note) note.textContent = ok ? hint : "Use a folder name inside the note's folder, like assets or img/shots.";
+    if (ok) setImages(deps, { folder });
+  });
+  return node;
+}

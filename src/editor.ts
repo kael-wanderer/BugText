@@ -52,6 +52,13 @@ export type EditorHandle = {
   applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
+  /** Document position under a viewport point, or null when outside the text. */
+  posAtPoint(x: number, y: number): number | null;
+  /**
+   * Inserts text into a document (at `at`, or over the selection) as one undo
+   * step, then puts the cursor `cursor` characters into the inserted text.
+   */
+  insertText(id: string, text: string, at?: number, cursor?: number): void;
   setText(text: string): void;
   setTextFor(id: string, text: string): void;
   setSoftWrap(on: boolean): void;
@@ -173,6 +180,8 @@ export function createEditor(
   parent: HTMLElement,
   onChange: (id: string, text: string) => void,
   onCursorChange: (position: CursorPosition) => void = () => {},
+  /** Image files pasted into a document; return true to take over the paste. */
+  onPasteFiles: (id: string, files: File[]) => boolean = () => false,
 ): EditorHandle {
   const states = new Map<string, EditorState>();
   let activeId: string | null = null;
@@ -213,6 +222,16 @@ export function createEditor(
     syntaxHighlighting(editorHighlight, { fallback: true }),
     wrap.of(wrapExtension()),
     theme,
+    EditorView.domEventHandlers({
+      paste(event) {
+        const data = event.clipboardData;
+        if (!data || data.getData("text/plain")) return false;
+        const files = Array.from(data.files).filter((file) => file.type.startsWith("image/"));
+        if (!files.length || !onPasteFiles(id, files)) return false;
+        event.preventDefault();
+        return true;
+      },
+    }),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) onChange(id, update.state.doc.toString());
       if (update.docChanged || update.selectionSet) reportCursor(update.state);
@@ -321,6 +340,30 @@ export function createEditor(
     },
     replaceRange(from, to, text) {
       view.dispatch({ changes: { from, to, insert: text } });
+    },
+    posAtPoint(x, y) {
+      return view.posAtCoords({ x, y });
+    },
+    insertText(id, text, at, cursor = text.length) {
+      const state = id === activeId ? view.state : states.get(id);
+      if (!state) return;
+      const length = state.doc.length;
+      const range = at === undefined
+        ? state.selection.main
+        : { from: Math.min(at, length), to: Math.min(at, length) };
+      const spec = {
+        changes: { from: range.from, to: range.to, insert: text },
+        selection: { anchor: range.from + cursor },
+        scrollIntoView: true,
+      };
+      if (id === activeId) {
+        view.dispatch(spec);
+        view.focus();
+        return;
+      }
+      const updated = state.update(spec).state;
+      states.set(id, updated);
+      onChange(id, updated.doc.toString());
     },
     setText(text) {
       view.dispatch({
