@@ -35,9 +35,13 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-027 | 2026-10-24 | PDF editor / drafts | Minor | — | Inserted images are stored in the localStorage draft as JSON number arrays; past ~5 MB the draft silently stops saving | fixed (0.3.1) |
 | BUG-028 | 2026-10-24 | PDF editor / Proofread | Minor | — | Typing in a Proofread suggestion box lost focus after each character: every keystroke rebuilt the proof panel | fixed (0.3.1) |
 | BUG-029 | 2026-10-24 | PDF / reload | Minor | — | A clean PDF that reloads after another app changes it jumps back to page 1 | fixed (0.3.2) |
-| BUG-030 | 2026-10-27 | PDF / panels | Cosmetic | — | PDF panel text (Review, Check Text, OCR review, Editing Support, Pages, Find count) ignored App Font Size | fixed (unreleased) |
-| BUG-031 | 2026-10-27 | PDF / toolbar | Cosmetic | — | Cramped PDF toolbar showed its status as a sliver ("S…") | fixed (unreleased) |
-| BUG-032 | 2026-10-27 | Recovery / PDF | Minor | — | Typing on a PDF tab saved a text draft; startup banner offered a Restore that did nothing | fixed (unreleased) |
+| BUG-030 | 2026-10-27 | PDF / panels | Cosmetic | — | PDF panel text (Review, Check Text, OCR review, Editing Support, Pages, Find count) ignored App Font Size | fixed (0.3.5) |
+| BUG-031 | 2026-10-27 | PDF / toolbar | Cosmetic | — | Cramped PDF toolbar showed its status as a sliver ("S…") | fixed (0.3.5) |
+| BUG-032 | 2026-10-27 | Recovery / PDF | Minor | — | Typing on a PDF tab saved a text draft; startup banner offered a Restore that did nothing | fixed (0.3.5) |
+| BUG-033 | 2026-10-27 | Preview / security | Major | — | Markdown preview ran scripts and event handlers embedded in a document | fixed (0.3.5) |
+| BUG-034 | 2026-10-27 | Save | Major | — | Saves truncated the file before writing, so an interrupted save could destroy it | fixed (0.3.5) |
+| BUG-035 | 2026-10-27 | Folder search | Minor | — | Clearing search during a slow search could still show the old results | fixed (0.3.5) |
+| BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | open |
 
 > Delete the example row once real bugs are logged.
 
@@ -195,9 +199,58 @@ table and a detail block below. Reference the failing test-case ID.
   unchanged forever (and a transient failure marked the tab dirty, which excluded
   it from every later pass). The Explorer Refresh button only re-listed the root
   folder — it never touched expanded subfolders or open documents.
-- **Status:** fixed (unreleased) — clean tabs now compare the file's actual text,
+- **Status:** fixed (0.3.5) — clean tabs now compare the file's actual text,
   refresh also runs on native window focus, and the Refresh button runs the full
   workspace refresh.
+
+### BUG-033 — Markdown preview allows active content
+
+- **Feature / test case:** Markdown preview and export / —
+- **Severity:** Major
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Open a Markdown file containing an image with an `onerror` handler or a script tag.
+- **Expected:** Document content is rendered without executing scripts or event handlers.
+- **Actual:** Raw HTML was inserted into the app without sanitization.
+- **Notes:** Raw HTML support remains available for safe elements; Mermaid uses strict mode.
+- **Status:** Fixed in 0.3.5.
+
+### BUG-034 — Interrupted saves can damage files
+
+- **Feature / test case:** Save file / —
+- **Severity:** Major
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Save a document while the target is a symlink or the write is interrupted.
+- **Expected:** The save swaps in a complete file, preserves the link and keeps existing permissions.
+- **Actual:** Direct writes truncated the target, while the prior atomic path replaced symlinks and dropped permissions.
+- **Notes:** Save commands now share a temporary sibling and rename path.
+- **Status:** Fixed in 0.3.5.
+
+### BUG-035 — Clearing search can show stale results
+
+- **Feature / test case:** Folder search / —
+- **Severity:** Minor
+- **Environment:** macOS, dev build, commit ``
+- **Steps to reproduce:**
+  1. Search a folder, then clear or shorten the query before the search completes.
+- **Expected:** Results from the old query are discarded.
+- **Actual:** The old search could still publish results after an early return.
+- **Notes:** Each run now invalidates prior searches before checking the query.
+- **Status:** Fixed in 0.3.5.
+
+### BUG-036 — PDF export fails on Mermaid diagrams
+
+- **Feature / test case:** Export / PDF
+- **Severity:** Major
+- **Environment:** macOS, BugText 0.3.4 release and 0.3.5 dev build; Pandoc 3.11, Typst 0.15.1
+- **Steps to reproduce:**
+  1. Open a Markdown note containing a ```mermaid``` diagram (e.g. `graph TD; A-->B`).
+  2. File ▸ Export ▸ PDF and save.
+- **Expected:** PDF is written with the diagram.
+- **Actual:** "Error producing PDF." Typst reports `file not found (searched at <TMPDIR>/<TMPDIR>/media-<hash>/<sha>.svg)`; the generated `.typ` uses an absolute path that Typst resolves against its project root, so the temp prefix appears twice.
+- **Notes:** Present before 0.3.5 (not caused by the sanitizer). The SVG lands in Pandoc's own `media-<hash>` folder, not the `bugtext-export-media` folder passed with `--extract-media`. A standalone Pandoc run with small or large inline SVGs did not reproduce it, so the trigger is specific to BugText's export HTML. Candidate fixes: rasterize diagrams to PNG for PDF as DOCX already does, or pass a Typst root of `/`.
+- **Status:** open.
 
 ### BUG-000 (example — delete me)
 

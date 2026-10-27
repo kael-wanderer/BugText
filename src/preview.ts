@@ -2,6 +2,7 @@ import MarkdownIt from "markdown-it";
 import hljs from "highlight.js/lib/common";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { sanitizeHtml } from "./sanitize";
 
 const md = new MarkdownIt({
   html: true,
@@ -69,5 +70,5 @@ export function findMathSpans(
 }
 
 export function renderMarkdown(src: string): string {
-  return md.render(src);
+  return sanitizeHtml(md.render(src));
 }

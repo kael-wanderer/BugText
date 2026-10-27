@@ -412,19 +412,20 @@ pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|error| error.to_string())
 }
 
-#[tauri::command]
-pub fn save_file(path: String, contents: String) -> Result<(), String> {
-    fs::write(&path, contents).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
+/// Write through a temporary sibling, then rename over the target. A symlink is
+/// followed so the link stays a link, and an existing file keeps its permissions.
+fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
 
-    let target = Path::new(&path);
+    let requested = Path::new(path);
+    let target = match requested.canonicalize() {
+        Ok(real) => real,
+        Err(_) => requested.to_path_buf(),
+    };
     let parent = target.parent().ok_or_else(|| "Invalid file path".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     let name = target.file_name().ok_or_else(|| "Invalid file path".to_string())?;
+    let permissions = fs::metadata(&target).ok().map(|meta| meta.permissions());
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -441,10 +442,12 @@ pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
             .create_new(true)
             .open(&temporary)
             .map_err(|error| error.to_string())?;
-        file.write_all(contents.as_bytes())
-            .map_err(|error| error.to_string())?;
+        file.write_all(bytes).map_err(|error| error.to_string())?;
         file.sync_all().map_err(|error| error.to_string())?;
-        fs::rename(&temporary, target).map_err(|error| error.to_string())
+        if let Some(permissions) = permissions {
+            fs::set_permissions(&temporary, permissions).map_err(|error| error.to_string())?;
+        }
+        fs::rename(&temporary, &target).map_err(|error| error.to_string())
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -453,8 +456,18 @@ pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn save_file(path: String, contents: String) -> Result<(), String> {
+    write_atomic(&path, contents.as_bytes())
+}
+
+#[tauri::command]
+pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
+    write_atomic(&path, contents.as_bytes())
+}
+
+#[tauri::command]
 pub fn save_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
-    fs::write(&path, bytes).map_err(|error| error.to_string())
+    write_atomic(&path, &bytes)
 }
 
 /// True when both paths name the same existing file, through symlinks and
@@ -593,7 +606,7 @@ mod tests {
 
 #[cfg(test)]
 mod atomic_write_tests {
-    use super::write_file_atomic;
+    use super::{save_bytes, save_file, write_file_atomic};
     use std::fs;
 
     #[test]
@@ -609,6 +622,76 @@ mod atomic_write_tests {
         write_file_atomic(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn save_bytes_replaces_and_leaves_no_temp() {
+        let dir = std::env::temp_dir().join(format!("bugtext-save-bytes-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.md");
+        fs::write(&path, "old").unwrap();
+        save_bytes(path.to_string_lossy().into_owned(), b"new".to_vec()).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_keeps_symlink() {
+        use std::os::unix::fs::symlink;
+        let dir = std::env::temp_dir().join(format!("bugtext-save-link-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        let real = dir.join("real.md");
+        let link = dir.join("link.md");
+        fs::write(&real, "old").unwrap();
+        symlink("real.md", &link).unwrap();
+        save_file(link.to_string_lossy().into_owned(), "new".to_string()).unwrap();
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(fs::read_to_string(&real).unwrap(), "new");
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 2);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_keeps_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("bugtext-save-mode-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.md");
+        fs::write(&path, "old").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        save_file(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn save_file_creates_new_file() {
+        let dir = std::env::temp_dir().join(format!("bugtext-save-new-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.md");
+        save_file(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
+        assert_eq!(fs::read_to_string(path).unwrap(), "new");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn save_file_failure_keeps_original() {
+        use std::os::unix::fs::PermissionsExt;
+        if std::env::var("USER") == Ok("root".into()) { return; }
+        let dir = std::env::temp_dir().join(format!("bugtext-save-fail-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("note.md");
+        fs::write(&path, "old").unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+        assert!(save_file(path.to_string_lossy().into_owned(), "new".to_string()).is_err());
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), "old");
+        assert!(!fs::read_dir(&dir).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().contains(".bugtext-tmp-")));
         fs::remove_dir_all(dir).unwrap();
     }
 }

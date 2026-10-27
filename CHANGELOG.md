@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-10-27
+
 ### Added
 
 - Show Hidden Files: Settings ▸ General and the Explorer's ⋯ menu hide or show names
@@ -68,6 +70,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - ⌘E (Reading View) toggles Edit PDF when a PDF is open.
 
 ### Fixed
+
+- Markdown preview and export no longer run scripts or event handlers embedded in a document; raw HTML such as <details> and <kbd> still renders. Mermaid diagrams render in strict mode. (BUG-033)
+- Saving writes to a temporary file and swaps it in, so a failed or interrupted save leaves the original intact; saving through a symlink keeps the link and the file keeps its permissions. (BUG-034)
+- Clearing or shortening a search while a slow search is running no longer shows the old results. (BUG-035)
 
 - A narrow PDF toolbar no longer shows its status squeezed to a few letters ("S…");
   the text hides until there is room for it.
