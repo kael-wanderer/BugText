@@ -1,3 +1,4 @@
+import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
 import "./styles.css";
@@ -166,6 +167,20 @@ const listenScoped: typeof listen = currentNativeWindow
 const isPrimaryNativeWindow = nativeWindowLabel === "main";
 const startupUi = isPrimaryNativeWindow ? loadState() : freshState();
 let ui = { ...startupUi, aiVisible: false };
+let outlineKey = "";
+const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus());
+function updateOutline(force = false): void {
+  const tab = activeMeta();
+  const key = `${getState().activeWindowId}:${tab?.id ?? ""}`;
+  if (force || key !== outlineKey) {
+    outlineKey = key;
+    // A window without tabs edits a new Markdown note once you type.
+    const markdown = !tab || isMarkdownFile(tab.path ?? tab.name);
+    outlineView.update(tab?.path ?? key, tab && markdown ? markdownOutline(activeView().editor.getText(tab.id)) : [], markdown);
+  }
+  const view = views.get(getState().activeWindowId);
+  if (view) outlineView.setActive(view.navigationLine());
+}
 let currentSettings = parseSettings("{}");
 let settingsPath = "";
 let aiSettingsPath = "";
@@ -590,7 +605,7 @@ function outlineItems(): PaletteItem[] {
     id: `heading:${index}:${heading.line}`,
     label: `${"· ".repeat(Math.max(0, heading.level - 1))}${heading.text}`,
     kind: "symbol",
-    run: () => editor.gotoLine(heading.line),
+    run: () => activeView().jumpToLine(heading.line),
   }));
 }
 
@@ -629,6 +644,8 @@ const handlers = {
       renderAll();
     }
   },
+  onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) updateOutline(); },
+  syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
   onPdfEditDirtyChange: (wid: string, tid: string, dirty: boolean) =>
     onPdfEditDirtyChange(wid, tid, dirty),
@@ -875,6 +892,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 
 function renderAll(): void {
   for (const v of views.values()) v.render();
+  if (views.has(getState().activeWindowId)) updateOutline();
   document.getElementById("windows")!.classList.toggle("has-sub", getState().windows.length > 1);
   const tab = activeMeta();
   const exportButton = document.getElementById("ab-export") as HTMLButtonElement | null;
@@ -1040,12 +1058,14 @@ function schedulePreview(
   timers.set(
     windowId,
     window.setTimeout(() => {
+      if (getWindow(windowId)?.activeTabId !== tabId) return;
       const tab = getWindow(windowId)?.tabs.find(
         (item) => item.id === tabId,
       );
       views
         .get(windowId)!
         .renderPreview(text, tab?.path ?? tab?.name);
+      if (windowId === getState().activeWindowId && tabId === getWindow(windowId)?.activeTabId) updateOutline(true);
     }, 300)
   );
 }
@@ -1859,6 +1879,7 @@ function syncViewMenu(): void {
     size: currentSettings.main.size,
     explorerSize: currentSettings.explorer.size,
     automaticUpdates: currentSettings.updateMode === "auto",
+    syncScroll: currentSettings.syncScroll,
   });
 }
 
@@ -2506,6 +2527,35 @@ initActivityBar(
   openExportMenu,
 );
 
+function applySidebarView(): void {
+  const outline = ui.sidebarView === "outline";
+  document.getElementById("outline-panel")!.hidden = !outline;
+  document.getElementById("explorer")!.hidden = outline;
+  document.getElementById("ab-outline")!.classList.toggle("active", outline && getState().explorerVisible);
+  document.getElementById("ab-outline")!.setAttribute("aria-pressed", String(outline && getState().explorerVisible));
+  document.getElementById("ab-explorer")!.classList.toggle("active", !outline && getState().explorerVisible);
+  document.getElementById("ab-explorer")!.setAttribute("aria-pressed", String(!outline && getState().explorerVisible));
+}
+document.getElementById("ab-outline")!.addEventListener("click", () => {
+  if (settingsScreen.isOpen()) settingsScreen.close();
+  if (document.body.classList.contains("search-active")) setSearchActive(false);
+  const hide = ui.sidebarView === "outline" && getState().explorerVisible;
+  ui = { ...ui, sidebarView: "outline" };
+  setState({ explorerVisible: !hide });
+  document.body.classList.toggle("explorer-hidden", hide);
+  applySidebarView(); persistUiState(); requestWindowMeasure();
+  if (!hide) updateOutline(true);
+});
+document.getElementById("ab-explorer")!.addEventListener("click", (event) => {
+  if (ui.sidebarView !== "outline") return;
+  event.stopImmediatePropagation();
+  ui = { ...ui, sidebarView: "explorer" };
+  setState({ explorerVisible: true });
+  document.body.classList.remove("explorer-hidden");
+  applySidebarView(); persistUiState(); requestWindowMeasure();
+}, true);
+applySidebarView();
+
 // Clicking Explorer while settings is open leaves settings and shows the tree.
 document.getElementById("ab-explorer")!.addEventListener(
   "click",
@@ -2705,6 +2755,11 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-png");
     case "export.image.svg":
       return void runNativeExport("img-svg");
+    case "view.outline":
+      return void document.getElementById("ab-outline")?.click();
+    case "view.sync_scroll":
+      currentSettings = { ...currentSettings, syncScroll: !currentSettings.syncScroll };
+      return persistCurrentSettings();
     case "view.toggle_explorer":
       return void document.getElementById("ab-explorer")?.click();
     case "view.toggle_preview":

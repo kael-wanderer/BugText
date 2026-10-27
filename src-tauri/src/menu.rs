@@ -146,6 +146,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let toggle_explorer = MenuItemBuilder::with_id("view.toggle_explorer", "Show/Hide Explorer")
         .accelerator("CmdOrCtrl+B")
         .build(app)?;
+    let outline = MenuItemBuilder::with_id("view.outline", "Outline").accelerator("CmdOrCtrl+Alt+O").build(app)?;
+    let sync_scroll = CheckMenuItemBuilder::with_id("view.sync_scroll", "Sync Scroll").build(app)?;
     let toggle_preview = MenuItemBuilder::with_id("view.toggle_preview", "Show/Hide Preview")
         .accelerator("CmdOrCtrl+P")
         .build(app)?;
@@ -214,6 +216,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&toggle_explorer)
+        .item(&outline)
+        .item(&sync_scroll)
         .item(&toggle_preview)
         .item(&reading)
         .item(&toggle_lines)

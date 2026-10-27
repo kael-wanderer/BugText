@@ -34,7 +34,7 @@ describe("buildExportHtml", () => {
       rasterizeSvg: false,
     });
     expect(html).toContain("<html");
-    expect(html).toContain("<h1>Title</h1>");
+    expect(html).toContain('<h1 data-line="1">Title</h1>');
     expect(html).toContain('class="doc"');
   });
 

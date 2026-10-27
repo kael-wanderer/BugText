@@ -27,6 +27,8 @@ export const glyphs: Record<string, string> = {
     `<path d="M2 4h4l1.5 1.5H14V13H2z"/><path d="M8 8v3M6.5 9.5h3"/>`,
   ),
   collapseAll: wrap(`<path d="M5 6l3-2.5L11 6"/><path d="M5 10l3 2.5L11 10"/>`),
+  expandAll: wrap(`<path d="M5 4.5l3 2.5 3-2.5"/><path d="M5 9l3 2.5 3-2.5"/>`),
+  outline: wrap(`<path d="M2.5 3.5h11M5 6.5h8.5M7.5 9.5h6M5 12.5h8.5"/>`),
   search: wrap(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3.5 3.5"/>`),
   ai: wrap(
     `<path d="M8 2.6c0 3 2.4 5.4 5.4 5.4-3 0-5.4 2.4-5.4 5.4 0-3-2.4-5.4-5.4-5.4 3 0 5.4-2.4 5.4-5.4z"/>`,

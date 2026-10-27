@@ -12,5 +12,6 @@ export function sanitizeHtml(html: string): string {
     FORBID_TAGS,
     FORBID_ATTR: ["srcdoc", "formaction"],
     ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ["data-line"],
   });
 }

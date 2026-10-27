@@ -119,6 +119,11 @@ runtime via the `set_accelerators` command (`item.set_accelerator`); app-scoped
 shortcuts (palette, AI send) and the JS fallback handlers match against the
 resolved keymap.
 
+The Outline sidebar follows the focused window's Markdown tab and shares its heading
+scanner with the command palette. Preview block `data-line` anchors support heading
+jumps, place preservation and optional Sync Scroll between editor and preview; the
+sidebar selection persists in view state and Sync Scroll in settings.json.
+
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 The open note is always context; when a folder is open, keyword retrieval adds the
 top `workspaceContextK` chunks on every question. Replies show timing, model and

@@ -66,6 +66,9 @@ export type EditorHandle = {
   setLineNumbers(on: boolean): void;
   requestMeasure(): void;
   gotoLine(line: number): void;
+  scrollLineToTop(line: number, cursor?: boolean): void;
+  visibleTopLine(): number;
+  onScroll(callback: () => void): void;
   focus(): void;
 };
 
@@ -410,6 +413,16 @@ export function createEditor(
       });
       view.focus();
     },
+    scrollLineToTop(line, cursor = true) {
+      const info = view.state.doc.line(Math.min(Math.max(Math.round(line), 1), view.state.doc.lines));
+      view.dispatch({ ...(cursor ? { selection: { anchor: info.from } } : {}), effects: EditorView.scrollIntoView(info.from, { y: "start" }) });
+      if (cursor) view.focus();
+    },
+    visibleTopLine() {
+      const block = view.lineBlockAtHeight(view.scrollDOM.scrollTop);
+      return view.state.doc.lineAt(block.from).number;
+    },
+    onScroll(callback) { view.scrollDOM.addEventListener("scroll", callback); },
     focus() {
       view.focus();
     },

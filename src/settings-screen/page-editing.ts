@@ -1,4 +1,4 @@
-import { button, caption, clampStep, pageHeader, row, segmented, select, stepper, textInput } from "./controls";
+import { button, caption, clampStep, pageHeader, row, segmented, select, stepper, textInput, toggle } from "./controls";
 import { validImageFolder } from "../image-insert";
 import type { SettingsPage } from "./screen";
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
@@ -67,6 +67,8 @@ export const editingPage: SettingsPage = {
           onChange: (wrapColumn) => deps.onSettingsChange({ ...deps.getSettings(), wrapColumn }),
         }),
       ),
+      caption("Navigation"),
+      row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
       caption("Images"),
       imageFolderRow(settings, deps),
       row(

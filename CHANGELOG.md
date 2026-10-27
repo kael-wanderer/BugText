@@ -8,6 +8,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Outline navigation for Markdown notes, preview place preservation, and optional Sync Scroll.
+
 - Paste and drop images into Markdown notes. ⌘V with an image on the clipboard saves it
   as a PNG in an `assets` folder beside the note and inserts `![](assets/…)` with the
   cursor ready for alt text. Dropping PNG, JPEG, GIF, WebP or SVG files on a Markdown
@@ -21,6 +23,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- A pending preview refresh no longer replaces the newly selected tab's preview.
+- Heading search ignores fenced code, front matter, comments and indented code, and recognizes setext headings.
 - An edit made just as BugText regained focus could be replaced by the file on disk
   (BUG-037).
 - PNG and SVG export of a Markdown note works again: notes with images failed with
