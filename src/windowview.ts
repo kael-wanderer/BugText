@@ -697,11 +697,17 @@ export function createWindowView(
     return focusedPane;
   }
 
+  // Keeps a fit mode fitted when the room for the pages changes.
+  function refitPdf(): void {
+    if (!pdfFit) return;
+    // Ignore sub-pixel changes so a scrollbar appearing cannot loop the fit.
+    const zoom = pdfFind?.fitZoom(pdfFit);
+    if (zoom != null && Math.abs(zoom - previewZoom) > 0.002) setPreviewZoom(zoom, pdfFit);
+  }
+
   const previewResizeObserver = new ResizeObserver(() => {
     if (isPdfFile(previewPathOrName) && pdfFit) {
-      // Ignore sub-pixel changes so a scrollbar appearing cannot loop the fit.
-      const zoom = pdfFind?.fitZoom(pdfFit);
-      if (zoom != null && Math.abs(zoom - previewZoom) > 0.002) setPreviewZoom(zoom, pdfFit);
+      refitPdf();
       return;
     }
     if (isHtmlFile(previewPathOrName) && previewFrame) {
@@ -757,6 +763,7 @@ export function createWindowView(
     if (command === "zoom-in") setPreviewZoom(previewZoom + 0.1);
     else if (command === "zoom-out") setPreviewZoom(previewZoom - 0.1);
     else if (command === "zoom-actual") setPreviewZoom(1);
+    else if (command === "refit") refitPdf();
     else if (command === "fit-auto" || command === "fit-width" || command === "fit-page") {
       applyPdfFit(command.slice(4) as PdfFitMode);
     }

@@ -10,8 +10,15 @@ import {
   type PdfPanel,
   type PdfToolbarCommand,
 } from "./pdf-toolbar";
+import {
+  PDF_INSPECTOR_WIDTH,
+  createPdfInspector,
+  type PdfInspectorContent,
+  type PdfInspectorPage,
+} from "./pdf-inspector";
 import { parsePageInput, pdfFitZoom, pdfZoomLabel, type PdfFitMode } from "./pdf-navigation";
 import {
+  pdfCapabilityDetail,
   pdfCapabilityDetails,
   pdfCapabilityMessage,
   pdfPageCapabilityMessage,
@@ -621,6 +628,8 @@ export async function renderPdf(
   let snapEnabled = false;
   let pendingImage: PendingPdfImage | null = null;
   let pendingInlineEditId: string | null = null;
+  // Text chosen for Replace Text, waiting for the replacement in the inspector.
+  let pendingReplace: NonNullable<ReturnType<typeof selectionReplacement>> | null = null;
   let undoStack: PdfEditDocument[] = [];
   let redoStack: PdfEditDocument[] = [];
   let editing = false;
@@ -646,6 +655,9 @@ export async function renderPdf(
   const setTool = (tool: PdfEditTool): void => {
     activeTool = tool;
     container.dataset.pdfTool = tool;
+    if (tool !== "replace" && inspector.page === "replace" && !pendingReplace) {
+      inspector.close({ restoreFocus: false });
+    }
     updateStyleBar();
     syncToolbar();
     setStatus(
@@ -656,7 +668,7 @@ export async function renderPdf(
           : tool === "cover"
             ? "Click a page to cover content"
             : tool === "replace"
-              ? "Click a page to replace visible text"
+              ? "Select the words you want to replace"
               : pendingImage
                 ? `Click a page to place ${pendingImage.name}`
                 : "Choose an image to place",
@@ -743,10 +755,7 @@ export async function renderPdf(
   coverOpacityInput.step = "0.05";
   coverOpacityInput.value = "1";
   coverOpacityInput.title = "Cover opacity";
-  // Style controls sit on their own row and only appear while they apply: text
-  // controls for text edits or tools, cover controls for covers.
-  const styleBar = window.document.createElement("div");
-  styleBar.className = "pdf-edit-stylebar";
+  // Style controls live in the inspector's Properties page for the selected edit.
   const textStyleGroup = window.document.createElement("div");
   textStyleGroup.className = "pdf-edit-style-group";
   textStyleGroup.setAttribute("aria-label", "Text style");
@@ -762,28 +771,16 @@ export async function renderPdf(
   const coverStyleGroup = window.document.createElement("div");
   coverStyleGroup.className = "pdf-edit-style-group";
   coverStyleGroup.setAttribute("aria-label", "Cover style");
-  const coverLabel = window.document.createElement("span");
-  coverLabel.className = "pdf-edit-style-label";
-  coverLabel.textContent = "Cover";
-  coverStyleGroup.append(coverLabel, coverColorInput, coverOpacityInput);
-  styleBar.append(textStyleGroup, coverStyleGroup);
+  coverStyleGroup.append(coverColorInput, coverOpacityInput);
+  // Selecting an edit shows its Properties unless another page is in use (a
+  // half-typed replacement or Review stays put); clearing the selection closes them.
   const updateStyleBar = (): void => {
-    const operation = selectedOperation();
-    const type = operation?.type;
-    const showText =
-      activeTool === "text" ||
-      activeTool === "replace" ||
-      type === "textBox" ||
-      type === "replacementText" ||
-      type === "directTextEdit";
-    const showCover =
-      activeTool === "cover" ||
-      activeTool === "replace" ||
-      type === "coverPatch" ||
-      type === "replacementText";
-    textStyleGroup.hidden = !showText;
-    coverStyleGroup.hidden = !showCover;
-    styleBar.hidden = !editing || (!showText && !showCover);
+    const operation = editing ? selectedOperation() : null;
+    if (operation && (inspector.page === null || inspector.page === "properties")) {
+      inspector.open("properties", { focus: false });
+    } else if (!operation && inspector.page === "properties") {
+      inspector.close({ restoreFocus: false });
+    }
   };
   const container = window.document.createElement("div");
   container.className = "pdf-document";
@@ -806,30 +803,48 @@ export async function renderPdf(
     onPress: (command) => {
       // The Actions menu takes two presses (open, then choose); keep the first capture.
       if (command === "actions-menu") cachedSelectionReplacement = selectionReplacement();
-      else if (command === "replace-selection" || command === "direct-selection")
+      else if (command === "replace-selection" || command === "tool:replace")
         cachedSelectionReplacement = selectionReplacement() ?? cachedSelectionReplacement;
     },
   });
-  toolbar.element.append(styleBar);
   const status = toolbar.status;
-  host.append(toolbar.element, container);
-  // Side panels sit just below the toolbar, whose height changes with Edit and the style row.
-  const toolbarSize =
-    typeof ResizeObserver === "undefined"
-      ? null
-      : new ResizeObserver(() => {
-          host.style.setProperty("--pdf-toolbar-height", `${toolbar.element.offsetHeight}px`);
-        });
+  let shownPage: PdfInspectorPage | null = null;
+  const inspector = createPdfInspector(window.document, {
+    render: (page) => renderInspectorPage(page),
+    onChange: () => {
+      const was = shownPage;
+      shownPage = inspector.page;
+      if (was === "replace" && shownPage !== "replace" && pendingReplace) {
+        pendingReplace = null;
+        renderEditOverlays();
+      }
+      // Closing Properties by hand also lets go of the edit it showed.
+      if (was === "properties" && shownPage === null && selectedOperationId) {
+        setSelectedOperation(null);
+      }
+      container.dataset.inspector = inspector.page ? inspector.layout : "";
+      syncToolbar();
+      // The docked panel narrows the pages; refit while keeping the page in view.
+      host.dispatchEvent(new CustomEvent(PDF_ZOOM_EVENT, { detail: "refit", bubbles: true }));
+    },
+  });
+  host.append(toolbar.element, inspector.element, container);
+  // Side panels sit just below the toolbar, whose height changes with Edit; the
+  // inspector fills the rest of the pane and docks or floats by its width.
+  const measureHost = (): void => {
+    const toolbarHeight = toolbar.element.offsetHeight;
+    host.style.setProperty("--pdf-toolbar-height", `${toolbarHeight}px`);
+    host.style.setProperty("--pdf-view-h", `${Math.max(0, host.clientHeight - toolbarHeight)}px`);
+    inspector.setHostWidth(host.clientWidth);
+  };
+  const toolbarSize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measureHost);
   toolbarSize?.observe(toolbar.element);
+  toolbarSize?.observe(host);
   const pages: PdfPageView[] = [];
   const textSignals: PdfPageTextSignal[] = [];
   const objectSignals: PdfPageObjectSignal[] = [];
   const fontSignals: PdfPageFontSignal[] = [];
-  let ocrReviewPanel: HTMLElement | null = null;
-  let capabilityPanel: HTMLElement | null = null;
   let thumbnailPanel: HTMLElement | null = null;
-  let reviewPanel: HTMLElement | null = null;
-  let proofPanel: HTMLElement | null = null;
   let capabilitySummary: PdfCapabilitySummary | null = null;
   let matches: number[] = [];
   let active = -1;
@@ -960,17 +975,7 @@ export async function renderPdf(
       .forEach((item) => item.classList.toggle("selected", item.dataset.editId === id));
   };
   const openPanel = (): PdfPanel | null =>
-    proofPanel
-      ? "proof"
-      : reviewPanel
-        ? "review"
-        : ocrReviewPanel
-          ? "ocr-review"
-          : capabilityPanel
-            ? "support"
-            : thumbnailPanel
-              ? "pages"
-              : null;
+    inspector.page === "properties" ? null : inspector.page;
   const syncToolbar = (): void => {
     const operation = selectedOperation();
     const pending = editDocument.pages.reduce((sum, page) => sum + page.operations.length, 0);
@@ -1005,6 +1010,7 @@ export async function renderPdf(
             note: pdfCapabilityMessage(capabilitySummary),
           }
         : null,
+      pagesOpen: Boolean(thumbnailPanel),
       openPanel: openPanel(),
     });
   };
@@ -1155,119 +1161,6 @@ export async function renderPdf(
       setStatus(pdfPageCapabilityMessage(capabilitySummary, pageNumber));
     }
   };
-  const closeCapabilityPanel = (): void => {
-    capabilityPanel?.remove();
-    capabilityPanel = null;
-  };
-  const renderCapabilityPanel = (): void => {
-    if (!capabilityPanel || !capabilitySummary) return;
-    capabilityPanel.innerHTML = "";
-    const header = window.document.createElement("header");
-    const title = window.document.createElement("strong");
-    title.textContent = "PDF Editing Limits";
-    const meta = window.document.createElement("span");
-    meta.textContent = pdfCapabilityMessage(capabilitySummary);
-    const close = window.document.createElement("button");
-    close.type = "button";
-    close.textContent = "×";
-    close.title = "Close editing limits";
-    close.addEventListener("click", closeCapabilityPanel);
-    header.append(title, meta, close);
-    capabilityPanel.appendChild(header);
-
-    const list = window.document.createElement("div");
-    list.className = "pdf-capability-list";
-    for (const detail of pdfCapabilityDetails(capabilitySummary)) {
-      const row = window.document.createElement("section");
-      row.className = `pdf-capability-row ${detail.capability}`;
-      const rowHeader = window.document.createElement("div");
-      const focus = window.document.createElement("button");
-      focus.type = "button";
-      focus.textContent = `Page ${detail.page}`;
-      focus.addEventListener("click", () => focusPage(detail.page));
-      const label = window.document.createElement("strong");
-      label.textContent = detail.label;
-      const badge = window.document.createElement("span");
-      badge.textContent = detail.directEditingSafe ? "Direct candidate" : "Fallback";
-      rowHeader.append(focus, label, badge);
-      const message = window.document.createElement("p");
-      message.textContent = detail.message;
-      row.append(rowHeader, message);
-      const objectSignal = objectSignals.find((signal) => signal.page === detail.page);
-      const fontSignal = fontSignals.find((signal) => signal.page === detail.page);
-      if (fontSignal) {
-        const fonts = window.document.createElement("p");
-        fonts.className = "pdf-capability-fonts";
-        fonts.textContent = pdfFontSignalMessage(fontSignal);
-        row.appendChild(fonts);
-      }
-      if (objectSignal) {
-        const objects = window.document.createElement("p");
-        objects.className = "pdf-capability-objects";
-        objects.textContent = pdfObjectSignalMessage(objectSignal);
-        row.appendChild(objects);
-        if (objectSignal.objects.length) {
-          const objectList = window.document.createElement("div");
-          objectList.className = "pdf-capability-object-list";
-          objectSignal.objects.forEach((object, index) => {
-            const objectRow = window.document.createElement("div");
-            const objectKind =
-              object.type === "image"
-                ? "Image"
-                : object.type === "annotation"
-                  ? object.label || "Annotation"
-                  : "Vector";
-            const focusObject = window.document.createElement("button");
-            focusObject.type = "button";
-            focusObject.textContent = `${objectKind} ${index + 1}`;
-            focusObject.title = `Focus detected ${object.type} bounds`;
-            focusObject.addEventListener("click", () => {
-              focusPage(object.page);
-              setStatus(
-                `Detected ${object.type} bounds: ${Math.round(object.rect.width)} x ${Math.round(object.rect.height)} pt`,
-              );
-            });
-            const coverObject = window.document.createElement("button");
-            coverObject.type = "button";
-            coverObject.textContent = "Cover";
-            coverObject.title = `Safely cover this detected ${object.type}; source-level object rewrites stay disabled for unsupported PDFs`;
-            coverObject.addEventListener("click", () => {
-              const pageView = pages.find((item) => item.box.page === object.page);
-              if (!pageView) return;
-              applyEditDocument(
-                addPdfEditOperation(editDocument, pageView.box, {
-                  id: operationId(),
-                  type: "coverPatch",
-                  page: object.page,
-                  rect: normalizePdfRect(object.rect, pageView.box),
-                  color: currentCoverColor,
-                  opacity: currentCoverOpacity,
-                }),
-              );
-              renderEditOverlays();
-              focusPage(object.page);
-              setStatus(`Queued cover patch for detected ${object.type} ${index + 1}`);
-            });
-            objectRow.append(focusObject, coverObject);
-            objectList.appendChild(objectRow);
-          });
-          row.appendChild(objectList);
-        }
-      }
-      list.appendChild(row);
-    }
-    capabilityPanel.appendChild(list);
-  };
-  const openCapabilityPanel = (): void => {
-    if (capabilityPanel) {
-      closeCapabilityPanel();
-      return;
-    }
-    capabilityPanel = window.document.createElement("aside");
-    capabilityPanel.className = "pdf-capability-panel";
-    host.appendChild(capabilityPanel);
-    renderCapabilityPanel();
-  };
   const closeThumbnailPanel = (): void => {
     thumbnailPanel?.remove();
     thumbnailPanel = null;
@@ -1322,82 +1215,313 @@ export async function renderPdf(
     host.appendChild(thumbnailPanel);
     renderThumbnailPanel();
   };
-  const closeReviewPanel = (): void => {
-    reviewPanel?.remove();
-    reviewPanel = null;
-    syncToolbar();
+  const make = <K extends keyof HTMLElementTagNameMap>(
+    tag: K,
+    className = "",
+    text?: string,
+  ): HTMLElementTagNameMap[K] => {
+    const node = window.document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
   };
-  const closeProofPanel = (): void => {
-    proofPanel?.remove();
-    proofPanel = null;
+  const field = (label: string, ...children: Node[]): HTMLElement => {
+    const wrap = make("div", "pdf-ins-field");
+    wrap.append(make("span", "pdf-ins-label", label), ...children);
+    return wrap;
   };
-  const renderReviewPanel = (): void => {
-    if (!reviewPanel) return;
-    reviewPanel.innerHTML = "";
-    const editedPages = editDocument.pages.filter((page) => page.operations.length > 0);
-    const header = window.document.createElement("header");
-    const title = window.document.createElement("strong");
-    title.textContent = "Review Edits";
-    const meta = window.document.createElement("span");
-    meta.textContent = editedPages.length
-      ? `${editedPages.length} edited page${editedPages.length === 1 ? "" : "s"}`
-      : "No pending edits";
-    const close = window.document.createElement("button");
-    close.type = "button";
-    close.textContent = "×";
-    close.title = "Close edit review";
-    close.addEventListener("click", closeReviewPanel);
-    header.append(title, meta, close);
-    reviewPanel.appendChild(header);
+  const callout = (text: string, tone: "plain" | "warn" = "plain"): HTMLElement =>
+    make("p", `pdf-ins-callout ${tone}`, text);
+  const actionButton = (
+    label: string,
+    onClick: () => void,
+    tone: "" | "primary" | "danger" = "",
+  ): HTMLButtonElement => {
+    const button = make("button", `pdf-ins-btn ${tone}`.trim(), label);
+    button.type = "button";
+    button.addEventListener("click", onClick);
+    return button;
+  };
+  const pageBox = (page: number): PdfPageBox | undefined =>
+    pages.find((item) => item.box.page === page)?.box;
+  const isTextOperation = (operation: PdfEditOperation): boolean =>
+    operation.type === "textBox" ||
+    operation.type === "replacementText" ||
+    operation.type === "directTextEdit" ||
+    operation.type === "ocrTextBlock";
+  // A text field that previews as you type and records one undo step on leaving.
+  const liveTextArea = (
+    value: string,
+    onText: (text: string) => void,
+    onFocus?: () => void,
+  ): HTMLTextAreaElement => {
+    const textarea = make("textarea");
+    textarea.spellcheck = true;
+    textarea.value = value;
+    textarea.rows = Math.min(5, Math.max(2, value.split(/\r?\n/).length));
+    let beforeTyping: PdfEditDocument | null = null;
+    textarea.addEventListener("focus", () => {
+      beforeTyping = clonePdfEditDocument(editDocument);
+      onFocus?.();
+    });
+    textarea.addEventListener("input", () => onText(textarea.value));
+    textarea.addEventListener("blur", () => {
+      if (beforeTyping) commitTransientEdit(beforeTyping);
+      beforeTyping = null;
+    });
+    return textarea;
+  };
 
-    const list = window.document.createElement("div");
-    list.className = "pdf-review-list";
-    if (!editedPages.length) {
-      const empty = window.document.createElement("p");
-      empty.className = "pdf-review-empty";
-      empty.textContent = "There are no pending PDF edits.";
-      list.appendChild(empty);
+  const propertiesContent = (): PdfInspectorContent => {
+    const operation = selectedOperation();
+    if (!operation) {
+      return { title: "Properties", body: [callout("Select an edit on the page.")] };
     }
+    const kind =
+      operation.type === "textBox"
+        ? "Text box"
+        : operation.type === "replacementText"
+          ? "Visual replacement"
+          : operation.type === "directTextEdit"
+            ? "Direct replacement"
+            : operation.type === "coverPatch"
+              ? "Cover"
+              : operation.type === "imageBox"
+                ? "Image"
+                : "OCR text";
+    const body: Node[] = [];
+    const original =
+      operation.type === "replacementText"
+        ? operation.sourceText
+        : operation.type === "directTextEdit"
+          ? operation.originalText
+          : "";
+    if (original) body.push(field("Original text", make("div", "pdf-ins-original", original)));
+    if (operation.type === "directTextEdit") {
+      body.push(
+        callout(
+          "Save tries to rewrite this text inside the PDF. If the page does not allow it, " +
+            "Save places a visual replacement instead and tells you.",
+        ),
+      );
+    }
+    if (isTextOperation(operation)) {
+      const textarea = liveTextArea(operationText(operation), (text) => {
+        const page = pageBox(operation.page);
+        if (!page) return;
+        applyEditDocument(updatePdfEditOperationText(editDocument, page, operation.id, text), {
+          history: false,
+        });
+        renderEditOverlays({ refreshProof: false });
+      });
+      textarea.setAttribute("aria-label", "Text");
+      body.push(field("Text", textarea));
+    }
+    if (isTextOperation(operation) && operation.type !== "ocrTextBlock") {
+      textStyleGroup.hidden = false;
+      body.push(field("Text style", textStyleGroup));
+    }
+    if (operation.type === "coverPatch") {
+      body.push(
+        callout(
+          "A cover is visual only. It hides content on the page, but the original text stays " +
+            "in the file and can still be searched, copied or extracted. It is not redaction.",
+          "warn",
+        ),
+      );
+    }
+    if (operation.type === "coverPatch" || operation.type === "replacementText") {
+      coverStyleGroup.hidden = false;
+      body.push(field("Cover", coverStyleGroup));
+    }
+    if (operation.type === "imageBox") body.push(field("File", make("div", "pdf-ins-original", operation.name)));
+    const actions = make("div", "pdf-ins-actions");
+    if (isTextOperation(operation)) actions.append(actionButton("Reflow", reflowSelected));
+    actions.append(make("span", "pdf-ins-grow"), actionButton("Delete", deleteSelected, "danger"));
+    body.push(actions);
+    return { title: "Properties", sub: `${kind} · page ${operation.page}`, body };
+  };
+
+  const directAllowed = (page: number): boolean => {
+    const entry = capabilitySummary?.pages.find((item) => item.page === page);
+    return entry ? pdfCapabilityDetail(entry).directEditingSafe : false;
+  };
+  const replaceContent = (): PdfInspectorContent => {
+    const pending = pendingReplace;
+    if (!pending) {
+      return {
+        title: "Replace Text",
+        body: [callout("Select the words on the page that you want to replace.")],
+      };
+    }
+    const page = pending.pageView.box.page;
+    const textarea = make("textarea", "pdf-ins-replace");
+    textarea.spellcheck = true;
+    textarea.value = pending.sourceText;
+    textarea.rows = Math.min(5, Math.max(2, pending.sourceText.split(/\r?\n/).length));
+    textarea.setAttribute("aria-label", "Replace with");
+    const direct = directAllowed(page);
+    const choice = (value: "visual" | "direct", label: string, note: string, disabled: boolean) => {
+      const wrap = make("label", "pdf-ins-choice");
+      const input = make("input");
+      input.type = "radio";
+      input.name = "pdf-replace-method";
+      input.value = value;
+      input.checked = value === "visual";
+      input.disabled = disabled;
+      wrap.append(input, make("b", "", label), make("small", "", note));
+      return { wrap, input };
+    };
+    const visual = choice(
+      "visual",
+      "Visual replacement",
+      "Covers the selected words and places your text on top. Always works.",
+      false,
+    );
+    const rewrite = choice(
+      "direct",
+      "Try direct replacement",
+      direct
+        ? "Rewrites the text inside the PDF. If its font or layout does not allow it, Save " +
+            "falls back to a visual replacement and tells you."
+        : "Not available on this page: its text is too complex or it has no text layer.",
+      !direct,
+    );
+    const apply = (): void => {
+      const value = textarea.value.trim();
+      if (!value) {
+        textarea.focus();
+        return;
+      }
+      applyReplacement(pending, value, rewrite.input.checked ? "direct" : "visual");
+    };
+    textarea.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        apply();
+      }
+    });
+    const actions = make("div", "pdf-ins-actions");
+    actions.append(
+      make("span", "pdf-ins-grow"),
+      actionButton("Cancel", () => inspector.close()),
+      actionButton("Apply", apply, "primary"),
+    );
+    return {
+      title: "Replace Text",
+      sub: `page ${page}`,
+      body: [
+        field("Original text", make("div", "pdf-ins-original", pending.sourceText)),
+        field("Replace with", textarea),
+        field("Method", visual.wrap, rewrite.wrap),
+        actions,
+      ],
+    };
+  };
+
+  const supportContent = (): PdfInspectorContent => {
+    if (!capabilitySummary) {
+      return { title: "Editing Support", body: [callout("Checking pages…")] };
+    }
+    const list = make("div", "pdf-capability-list");
+    for (const detail of pdfCapabilityDetails(capabilitySummary)) {
+      const row = make("section", `pdf-capability-row ${detail.capability}`);
+      const rowHeader = make("div");
+      const focus = actionButton(`Page ${detail.page}`, () => focusPage(detail.page));
+      rowHeader.append(
+        focus,
+        make("strong", "", detail.label),
+        make("span", "", detail.directEditingSafe ? "Direct candidate" : "Fallback"),
+      );
+      row.append(rowHeader, make("p", "", detail.message));
+      const objectSignal = objectSignals.find((signal) => signal.page === detail.page);
+      const fontSignal = fontSignals.find((signal) => signal.page === detail.page);
+      if (fontSignal) row.appendChild(make("p", "pdf-capability-fonts", pdfFontSignalMessage(fontSignal)));
+      if (objectSignal) {
+        row.appendChild(make("p", "pdf-capability-objects", pdfObjectSignalMessage(objectSignal)));
+        if (objectSignal.objects.length) {
+          const objectList = make("div", "pdf-capability-object-list");
+          objectSignal.objects.forEach((object, index) => {
+            const objectRow = make("div");
+            const objectKind =
+              object.type === "image"
+                ? "Image"
+                : object.type === "annotation"
+                  ? object.label || "Annotation"
+                  : "Vector";
+            const focusObject = actionButton(`${objectKind} ${index + 1}`, () => {
+              focusPage(object.page);
+              setStatus(
+                `Detected ${object.type} bounds: ${Math.round(object.rect.width)} x ${Math.round(object.rect.height)} pt`,
+              );
+            });
+            focusObject.title = `Focus detected ${object.type} bounds`;
+            const coverObject = actionButton("Cover", () => {
+              const pageView = pages.find((item) => item.box.page === object.page);
+              if (!pageView) return;
+              applyEditDocument(
+                addPdfEditOperation(editDocument, pageView.box, {
+                  id: operationId(),
+                  type: "coverPatch",
+                  page: object.page,
+                  rect: normalizePdfRect(object.rect, pageView.box),
+                  color: currentCoverColor,
+                  opacity: currentCoverOpacity,
+                }),
+              );
+              renderEditOverlays();
+              focusPage(object.page);
+              setStatus(`Queued cover patch for detected ${object.type} ${index + 1}`);
+            });
+            coverObject.title = `Safely cover this detected ${object.type}; source-level object rewrites stay disabled for unsupported PDFs`;
+            objectRow.append(focusObject, coverObject);
+            objectList.appendChild(objectRow);
+          });
+          row.appendChild(objectList);
+        }
+      }
+      list.appendChild(row);
+    }
+    return {
+      title: "Editing Support",
+      sub: pdfCapabilityMessage(capabilitySummary),
+      body: [list],
+    };
+  };
+
+  const reviewContent = (): PdfInspectorContent => {
+    const editedPages = editDocument.pages.filter((page) => page.operations.length > 0);
+    const list = make("div", "pdf-review-list");
+    if (!editedPages.length) list.appendChild(make("p", "pdf-review-empty", "There are no pending PDF edits."));
     for (const page of editedPages) {
       const pageView = pages.find((item) => item.box.page === page.page);
-      const row = window.document.createElement("section");
-      row.className = "pdf-review-row";
-      const rowHeader = window.document.createElement("div");
-      const focus = window.document.createElement("button");
-      focus.type = "button";
-      focus.textContent = `Page ${page.page}`;
-      focus.addEventListener("click", () => focusPage(page.page));
-      const count = window.document.createElement("span");
-      count.textContent = `${page.operations.length} edit${page.operations.length === 1 ? "" : "s"}`;
-      rowHeader.append(focus, count);
+      const row = make("section", "pdf-review-row");
+      const rowHeader = make("div");
+      rowHeader.append(
+        actionButton(`Page ${page.page}`, () => focusPage(page.page)),
+        make("span", "", `${page.operations.length} edit${page.operations.length === 1 ? "" : "s"}`),
+      );
       row.appendChild(rowHeader);
-
       if (pageView) {
-        const preview = window.document.createElement("div");
-        preview.className = "pdf-review-preview";
+        const preview = make("div", "pdf-review-preview");
         row.appendChild(preview);
         void pageView.snapshot(180).then((source) => {
           if (!source) return;
           const pair = createReviewCanvasPair(source, pageView.box, page.operations);
-          const beforeFigure = window.document.createElement("figure");
-          const beforeLabel = window.document.createElement("figcaption");
-          beforeLabel.textContent = "Before";
-          beforeFigure.append(pair.before, beforeLabel);
-          const afterFigure = window.document.createElement("figure");
-          const afterLabel = window.document.createElement("figcaption");
-          afterLabel.textContent = "After";
-          afterFigure.append(pair.after, afterLabel);
+          const beforeFigure = make("figure");
+          beforeFigure.append(pair.before, make("figcaption", "", "Before"));
+          const afterFigure = make("figure");
+          afterFigure.append(pair.after, make("figcaption", "", "After"));
           preview.append(beforeFigure, afterFigure);
         });
       }
-
-      const summary = window.document.createElement("ul");
-      summary.className = "pdf-review-summary";
+      const summary = make("ul", "pdf-review-summary");
       page.operations.forEach((operation) => {
-        const item = window.document.createElement("li");
+        const item = make("li", "pdf-review-item");
+        item.tabIndex = 0;
         item.textContent =
           operation.type === "directTextEdit"
-            ? `Direct edit fallback: ${operation.replacementText}`
+            ? `Direct attempt (may save as a visual replacement): ${operation.replacementText}`
             : operation.type === "replacementText"
               ? `Replacement: ${operation.text.value}`
               : operation.type === "coverPatch"
@@ -1407,236 +1531,147 @@ export async function renderPdf(
                   : operation.type === "imageBox"
                     ? `Image: ${operation.name}`
                     : `Text: ${operation.text}`;
+        const select = (): void => focusOperation(operation.id);
+        item.addEventListener("click", select);
+        item.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") select();
+        });
         summary.appendChild(item);
       });
       row.appendChild(summary);
       list.appendChild(row);
     }
-    reviewPanel.appendChild(list);
+    return {
+      title: "Review Edits",
+      sub: editedPages.length
+        ? `${editedPages.length} edited page${editedPages.length === 1 ? "" : "s"}`
+        : "No pending edits",
+      body: [list],
+    };
   };
-  const refreshReviewPanel = (): void => {
-    if (reviewPanel) renderReviewPanel();
-  };
-  const openReviewPanel = (): void => {
-    if (reviewPanel) {
-      closeReviewPanel();
-      return;
-    }
-    reviewPanel = window.document.createElement("aside");
-    reviewPanel.className = "pdf-review-panel";
-    host.appendChild(reviewPanel);
-    renderReviewPanel();
-  };
-  const renderProofPanel = (): void => {
-    if (!proofPanel) return;
-    proofPanel.innerHTML = "";
-    const issues = listPdfProofIssues(editDocument);
-    const header = window.document.createElement("header");
-    const title = window.document.createElement("strong");
-    title.textContent = "Proofing";
-    const meta = window.document.createElement("span");
-    meta.textContent = issues.length
-      ? `${issues.length} suggestion${issues.length === 1 ? "" : "s"}`
-      : "No suggestions";
-    const close = window.document.createElement("button");
-    close.type = "button";
-    close.textContent = "×";
-    close.title = "Close proofing";
-    close.addEventListener("click", closeProofPanel);
-    header.append(title, meta, close);
-    proofPanel.appendChild(header);
 
-    const list = window.document.createElement("div");
-    list.className = "pdf-proof-list";
+  const proofContent = (): PdfInspectorContent => {
+    const issues = listPdfProofIssues(editDocument);
+    const list = make("div", "pdf-proof-list");
     if (!issues.length) {
-      const empty = window.document.createElement("p");
-      empty.className = "pdf-proof-empty";
-      empty.textContent = "No proofing suggestions for pending text edits.";
-      list.appendChild(empty);
+      list.appendChild(make("p", "pdf-proof-empty", "No proofing suggestions for pending text edits."));
     }
     for (const issue of issues) {
-      const row = window.document.createElement("section");
-      row.className = "pdf-proof-row";
-      const rowHeader = window.document.createElement("div");
-      const focus = window.document.createElement("button");
-      focus.type = "button";
-      focus.textContent = `Page ${issue.page}`;
-      focus.addEventListener("click", () => focusOperation(issue.operationId));
-      const message = window.document.createElement("span");
-      message.textContent = issue.message;
+      const row = make("section", "pdf-proof-row");
+      const rowHeader = make("div");
       let suggestionText = issue.replacement;
-      const apply = window.document.createElement("button");
-      apply.type = "button";
-      apply.textContent = "Apply";
-      apply.addEventListener("click", () => {
-        const page = pages.find((item) => item.box.page === issue.page)?.box;
+      const apply = actionButton("Apply", () => {
+        const page = pageBox(issue.page);
         if (!page) return;
         applyEditDocument(
-          updatePdfEditOperationText(
-            editDocument,
-            page,
-            issue.operationId,
-            suggestionText,
-          ),
+          updatePdfEditOperationText(editDocument, page, issue.operationId, suggestionText),
         );
         renderEditOverlays();
-        renderProofPanel();
         setStatus("Applied proofing suggestion");
       });
-      rowHeader.append(focus, message, apply);
-      const textarea = window.document.createElement("textarea");
-      textarea.spellcheck = true;
-      textarea.value = issue.replacement;
-      textarea.rows = Math.min(5, Math.max(2, issue.replacement.split(/\r?\n/).length));
-      // Typing previews live; leaving the box records one undo step. The panel is
-      // not rebuilt while typing, so the box keeps focus.
-      let beforeTyping: PdfEditDocument | null = null;
-      textarea.addEventListener("focus", () => {
-        beforeTyping = clonePdfEditDocument(editDocument);
-        focusOperation(issue.operationId);
-      });
-      textarea.addEventListener("input", () => {
-        suggestionText = textarea.value;
-        const page = pages.find((item) => item.box.page === issue.page)?.box;
+      rowHeader.append(
+        actionButton(`Page ${issue.page}`, () => focusOperation(issue.operationId)),
+        make("span", "", issue.message),
+        apply,
+      );
+      // The page is not rebuilt while typing, so the box keeps focus.
+      const textarea = liveTextArea(
+        issue.replacement,
+        (text) => {
+          suggestionText = text;
+          const page = pageBox(issue.page);
+          if (!page) return;
+          applyEditDocument(updatePdfEditOperationText(editDocument, page, issue.operationId, text), {
+            history: false,
+          });
+          renderEditOverlays({ refreshProof: false });
+        },
+        () => focusOperation(issue.operationId),
+      );
+      const reflow = actionButton("Reflow", () => {
+        const page = pageBox(issue.page);
         if (!page) return;
-        applyEditDocument(
-          updatePdfEditOperationText(
-            editDocument,
-            page,
-            issue.operationId,
-            textarea.value,
-          ),
-          { history: false },
-        );
-        renderEditOverlays({ refreshProof: false });
-      });
-      textarea.addEventListener("blur", () => {
-        if (beforeTyping) commitTransientEdit(beforeTyping);
-        beforeTyping = null;
-      });
-      const reflow = window.document.createElement("button");
-      reflow.type = "button";
-      reflow.textContent = "Reflow";
-      reflow.addEventListener("click", () => {
-        const page = pages.find((item) => item.box.page === issue.page)?.box;
-        if (!page) return;
-        applyEditDocument(
-          reflowPdfEditOperationText(editDocument, page, issue.operationId),
-        );
+        applyEditDocument(reflowPdfEditOperationText(editDocument, page, issue.operationId));
         renderEditOverlays();
-        renderProofPanel();
         setStatus("Reflowed PDF edit text");
       });
       row.append(rowHeader, textarea, reflow);
       list.appendChild(row);
     }
-    proofPanel.appendChild(list);
+    return {
+      title: "Check Text",
+      sub: issues.length ? `${issues.length} suggestion${issues.length === 1 ? "" : "s"}` : "No suggestions",
+      body: [list],
+    };
   };
-  const refreshProofPanel = (): void => {
-    if (proofPanel) renderProofPanel();
-  };
-  const openProofPanel = (): void => {
-    if (proofPanel) {
-      closeProofPanel();
-      return;
-    }
-    proofPanel = window.document.createElement("aside");
-    proofPanel.className = "pdf-proof-panel";
-    host.appendChild(proofPanel);
-    renderProofPanel();
-  };
-  const closeOcrReviewPanel = (): void => {
-    ocrReviewPanel?.remove();
-    ocrReviewPanel = null;
-  };
-  const renderOcrReviewPanel = (): void => {
-    if (!ocrReviewPanel) return;
-    ocrReviewPanel.innerHTML = "";
+
+  const ocrReviewContent = (): PdfInspectorContent => {
     const items = listOcrReviewItems(editDocument);
     const summary = summarizeOcrReview(items);
-    const header = window.document.createElement("header");
-    const title = window.document.createElement("strong");
-    title.textContent = "OCR Review";
-    const meta = window.document.createElement("span");
-    meta.textContent =
-      summary.total === 0
-        ? "No blocks"
-        : summary.lowConfidence > 0
-          ? `${summary.lowConfidence} low confidence of ${summary.total}`
-          : `${summary.total} reviewed blocks`;
-    const close = window.document.createElement("button");
-    close.type = "button";
-    close.textContent = "×";
-    close.title = "Close OCR review";
-    close.addEventListener("click", closeOcrReviewPanel);
-    header.append(title, meta, close);
-    ocrReviewPanel.appendChild(header);
-
-    const list = window.document.createElement("div");
-    list.className = "pdf-ocr-review-list";
+    const list = make("div", "pdf-ocr-review-list");
     if (items.length === 0) {
-      const empty = window.document.createElement("p");
-      empty.className = "pdf-ocr-review-empty";
-      empty.textContent = "Run OCR Page to create reviewable text blocks.";
-      list.appendChild(empty);
+      list.appendChild(make("p", "pdf-ocr-review-empty", "Recognize text on a page to create reviewable text blocks."));
     }
     for (const item of items) {
-      const row = window.document.createElement("section");
-      row.className = "pdf-ocr-review-row";
+      const row = make("section", "pdf-ocr-review-row");
       row.classList.toggle("low-confidence", item.confidence < 0.75);
       row.dataset.editId = item.id;
-      const rowHeader = window.document.createElement("div");
-      const focus = window.document.createElement("button");
-      focus.type = "button";
-      focus.textContent = `Page ${item.page}`;
-      focus.addEventListener("click", () => focusOperation(item.id));
-      const confidence = window.document.createElement("span");
-      confidence.textContent = `${Math.round(item.confidence * 100)}%`;
-      const remove = window.document.createElement("button");
-      remove.type = "button";
-      remove.textContent = "Delete";
-      remove.addEventListener("click", () => {
-        applyEditDocument(removeOcrReviewItem(editDocument, item.id));
-        if (selectedOperationId === item.id) setSelectedOperation(null);
-        renderEditOverlays();
-        renderOcrReviewPanel();
-      });
-      rowHeader.append(focus, confidence, remove);
-      const textarea = window.document.createElement("textarea");
-      textarea.value = item.text;
-      textarea.rows = Math.min(5, Math.max(2, item.text.split(/\r?\n/).length));
-      let beforeTyping: PdfEditDocument | null = null;
-      textarea.addEventListener("focus", () => {
-        beforeTyping = clonePdfEditDocument(editDocument);
-        focusOperation(item.id);
-      });
-      textarea.addEventListener("input", () => {
-        applyEditDocument(updateOcrReviewText(editDocument, item.id, textarea.value), {
-          history: false,
-        });
-        renderEditOverlays();
-      });
-      textarea.addEventListener("blur", () => {
-        if (beforeTyping) commitTransientEdit(beforeTyping);
-        beforeTyping = null;
-      });
+      const rowHeader = make("div");
+      rowHeader.append(
+        actionButton(`Page ${item.page}`, () => focusOperation(item.id)),
+        make("span", "", `${Math.round(item.confidence * 100)}%`),
+        actionButton("Delete", () => {
+          applyEditDocument(removeOcrReviewItem(editDocument, item.id));
+          if (selectedOperationId === item.id) setSelectedOperation(null);
+          renderEditOverlays();
+          refreshOcrReviewPanel();
+        }),
+      );
+      const textarea = liveTextArea(
+        item.text,
+        (text) => {
+          applyEditDocument(updateOcrReviewText(editDocument, item.id, text), { history: false });
+          renderEditOverlays();
+        },
+        () => focusOperation(item.id),
+      );
       row.append(rowHeader, textarea);
       list.appendChild(row);
     }
-    ocrReviewPanel.appendChild(list);
+    return {
+      title: "OCR Review",
+      sub:
+        summary.total === 0
+          ? "No blocks"
+          : summary.lowConfidence > 0
+            ? `${summary.lowConfidence} low confidence of ${summary.total}`
+            : `${summary.total} reviewed blocks`,
+      body: [list],
+    };
   };
-  const refreshOcrReviewPanel = (): void => {
-    if (ocrReviewPanel) renderOcrReviewPanel();
-  };
-  const openOcrReviewPanel = (): void => {
-    if (ocrReviewPanel) {
-      closeOcrReviewPanel();
+
+  const renderInspectorPage = (page: PdfInspectorPage): PdfInspectorContent =>
+    page === "properties"
+      ? propertiesContent()
+      : page === "replace"
+        ? replaceContent()
+        : page === "support"
+          ? supportContent()
+          : page === "review"
+            ? reviewContent()
+            : page === "proof"
+              ? proofContent()
+              : ocrReviewContent();
+  const refreshReviewPanel = (): void => inspector.refresh("review");
+  const refreshProofPanel = (): void => inspector.refresh("proof");
+  const refreshOcrReviewPanel = (): void => inspector.refresh("ocr-review");
+  // Toolbar pages toggle; closing returns focus to the control that opened them.
+  const toggleInspector = (page: Exclude<PdfPanel, "replace">): void => {
+    if (inspector.page === page) {
+      inspector.close();
       return;
     }
-    ocrReviewPanel = window.document.createElement("aside");
-    ocrReviewPanel.className = "pdf-ocr-review-panel";
-    host.appendChild(ocrReviewPanel);
-    renderOcrReviewPanel();
+    inspector.open(page, { restoreFocus: () => toolbar.focusCommand(page) });
   };
   const updateSelectedStyle = (options: { history?: boolean } = {}): void => {
     const nextStyle = (base: typeof DEFAULT_PDF_TEXT_STYLE): typeof DEFAULT_PDF_TEXT_STYLE => ({
@@ -1728,6 +1763,15 @@ export async function renderPdf(
   const renderEditOverlays = (options: { refreshProof?: boolean } = {}): void => {
     pages.forEach((pageView) => {
       pageView.overlay.innerHTML = "";
+      if (pendingReplace?.pageView === pageView) {
+        const rects = pendingReplace.coverRects.length ? pendingReplace.coverRects : [pendingReplace.rect];
+        rects.forEach((rect) => {
+          const mark = window.document.createElement("div");
+          mark.className = "pdf-edit-pending";
+          Object.assign(mark.style, scaledRect(rect));
+          pageView.overlay.appendChild(mark);
+        });
+      }
       editDocument.pages
         .find((page) => page.page === pageView.box.page)
         ?.operations.forEach((operation) => {
@@ -1818,6 +1862,8 @@ export async function renderPdf(
             event.stopPropagation();
             setSelectedOperation(operation.id);
             setTool("select");
+            // Keep keyboard focus on the edit so Delete, Cmd+Z and tool keys reach the view.
+            item.focus({ preventScroll: true });
           });
           item.addEventListener("dblclick", (event) => {
             event.stopPropagation();
@@ -1830,6 +1876,7 @@ export async function renderPdf(
             if (item.isContentEditable) return;
             event.preventDefault();
             event.stopPropagation();
+            item.focus({ preventScroll: true });
             setSelectedOperation(operation.id);
             const startX = event.clientX;
             const startY = event.clientY;
@@ -1905,34 +1952,8 @@ export async function renderPdf(
         ),
       );
     } else if (activeTool === "replace") {
-      // No window.prompt here: Tauri's WKWebView does not implement JS dialogs.
-      // Create the operation and drop straight into inline editing instead.
-      const rect = rectFromPointer(event, pageView.element, pageView.box, 190, 34);
-      const operation: PdfEditOperation = {
-        id: operationId(),
-        type: "replacementText",
-        page: pageView.box.page,
-        sourceText: "",
-        cover: {
-          rect,
-          color: currentCoverColor,
-          opacity: currentCoverOpacity,
-        },
-        text: {
-          rect,
-          value: "Replacement",
-          style: currentStyle,
-        },
-      };
-      applyEditDocument(
-        addPdfEditOperation(
-          editDocument,
-          pageView.box,
-          snapIfNeeded(pageView.box, operation),
-        ),
-      );
-      selectedOperationId = operation.id;
-      pendingInlineEditId = operation.id;
+      // Replace Text works from a text selection, captured on mouseup.
+      return;
     } else if (activeTool === "image") {
       if (!pendingImage) {
         setStatus("Choose an image first");
@@ -1993,78 +2014,81 @@ export async function renderPdf(
     syncToolbar();
     setStatus(snapEnabled ? "Snap enabled" : "Snap disabled");
   };
-  const replaceSelectedText = (): void => {
-    const replacement = cachedSelectionReplacement ?? selectionReplacement();
-    cachedSelectionReplacement = null;
-    if (!replacement) {
-      setStatus("Select PDF text first, then choose Replace Selected Text");
-      return;
-    }
-    const operation: PdfEditOperation = {
-      id: operationId(),
-      type: "replacementText",
-      page: replacement.pageView.box.page,
-      sourceText: replacement.sourceText,
-      cover: {
-        rect: replacement.rect,
-        rects: replacement.coverRects.length ? replacement.coverRects : undefined,
-        color: currentCoverColor,
-        opacity: currentCoverOpacity,
-      },
-      text: {
-        rect: replacement.rect,
-        value: replacement.sourceText,
-        style: replacement.style,
-      },
-    };
-    applyEditDocument(
-      addPdfEditOperation(
-        editDocument,
-        replacement.pageView.box,
-        snapIfNeeded(replacement.pageView.box, operation),
-      ),
-    );
-    selectedOperationId = operation.id;
-    pendingInlineEditId = operation.id;
-    window.getSelection()?.removeAllRanges();
+  const applyReplacement = (
+    pending: NonNullable<typeof pendingReplace>,
+    value: string,
+    method: "visual" | "direct",
+  ): void => {
+    const page = pending.pageView.box;
+    const coverRects = pending.coverRects.length ? pending.coverRects : undefined;
+    const operation: PdfEditOperation =
+      method === "direct"
+        ? {
+            id: operationId(),
+            type: "directTextEdit",
+            page: page.page,
+            sourceId: `page-${page.page}-selection`,
+            originalText: pending.sourceText,
+            replacementText: value,
+            rect: pending.rect,
+            fallbackCoverRects: coverRects,
+            fallbackStyle: pending.style,
+          }
+        : {
+            id: operationId(),
+            type: "replacementText",
+            page: page.page,
+            sourceText: pending.sourceText,
+            cover: {
+              rect: pending.rect,
+              rects: coverRects,
+              color: currentCoverColor,
+              opacity: currentCoverOpacity,
+            },
+            text: { rect: pending.rect, value, style: pending.style },
+          };
+    applyEditDocument(addPdfEditOperation(editDocument, page, snapIfNeeded(page, operation)));
+    pendingReplace = null;
+    inspector.close({ restoreFocus: false });
     setTool("select");
     renderEditOverlays();
-    setStatus(`Queued replacement on page ${replacement.pageView.box.page}`);
-  };
-  const directRewriteSelectedText = (): void => {
-    const replacement = cachedSelectionReplacement ?? selectionReplacement();
-    cachedSelectionReplacement = null;
-    if (!replacement) {
-      setStatus("Select PDF text first, then choose Try Direct Rewrite");
-      return;
-    }
-    const operation: PdfEditOperation = {
-      id: operationId(),
-      type: "directTextEdit",
-      page: replacement.pageView.box.page,
-      sourceId: `page-${replacement.pageView.box.page}-selection`,
-      originalText: replacement.sourceText,
-      replacementText: replacement.sourceText,
-      rect: replacement.rect,
-      fallbackCoverRects: replacement.coverRects.length
-        ? replacement.coverRects
-        : undefined,
-      fallbackStyle: replacement.style,
-    };
-    applyEditDocument(
-      addPdfEditOperation(
-        editDocument,
-        replacement.pageView.box,
-        snapIfNeeded(replacement.pageView.box, operation),
-      ),
+    setSelectedOperation(operation.id);
+    host.focus({ preventScroll: true });
+    setStatus(
+      method === "direct"
+        ? `Queued a direct replacement on page ${page.page}. Save falls back to a visual replacement if needed.`
+        : `Queued a replacement on page ${page.page}`,
     );
-    selectedOperationId = operation.id;
-    pendingInlineEditId = operation.id;
-    window.getSelection()?.removeAllRanges();
-    setTool("select");
-    renderEditOverlays();
-    setStatus("Queued direct edit; Save falls back visually if unsafe");
   };
+  // Replace Text starts from selected words; without them the inspector asks for a selection.
+  const beginReplace = (): void => {
+    const selection = cachedSelectionReplacement ?? selectionReplacement();
+    cachedSelectionReplacement = null;
+    if (activeTool !== "replace") setTool("replace");
+    if (selection) {
+      pendingReplace = selection;
+      window.getSelection()?.removeAllRanges();
+      renderEditOverlays();
+    }
+    const restoreFocus = (): void => toolbar.focusCommand("tool:replace");
+    if (inspector.page === "replace") inspector.refresh("replace");
+    else inspector.open("replace", { focus: false, restoreFocus });
+    inspector.element.querySelector<HTMLTextAreaElement>(".pdf-ins-replace")?.focus();
+    inspector.element.querySelector<HTMLTextAreaElement>(".pdf-ins-replace")?.select();
+  };
+  const onReplaceMouseUp = (): void => {
+    if (!editing || activeTool !== "replace") return;
+    // Let the browser settle the selection before reading it.
+    window.setTimeout(() => {
+      if (editing && activeTool === "replace" && selectionReplacement()) beginReplace();
+    }, 0);
+  };
+  container.addEventListener("mouseup", onReplaceMouseUp);
+  // A drawer covers the pages; pressing on them puts it away.
+  const onDrawerOutside = (): void => {
+    if (inspector.page && inspector.layout === "drawer") inspector.close({ restoreFocus: false });
+  };
+  container.addEventListener("pointerdown", onDrawerOutside);
   const reflowSelected = (): void => {
     const selected = selectedOperation();
     if (!selected) return;
@@ -2151,6 +2175,7 @@ export async function renderPdf(
     container.dataset.pdfMode = next ? "edit" : "read";
     if (!next) {
       // Leaving Edit keeps every pending edit and the undo history; only tools reset.
+      if (inspector.page === "replace") inspector.close({ restoreFocus: false });
       setSelectedOperation(null);
       setTool("select");
     }
@@ -2162,6 +2187,7 @@ export async function renderPdf(
     if (command.startsWith("tool:")) {
       const tool = command.slice(5) as PdfEditTool;
       if (tool === "image") void chooseImage();
+      else if (tool === "replace") beginReplace();
       else setTool(tool);
       return;
     }
@@ -2178,40 +2204,33 @@ export async function renderPdf(
       save: () => void saveEditedPdf(),
       "save-copy": () => void saveEditedPdfAs(),
       ocr: runOcr,
-      "ocr-review": openOcrReviewPanel,
-      proof: openProofPanel,
-      support: openCapabilityPanel,
-      "replace-selection": replaceSelectedText,
-      "direct-selection": directRewriteSelectedText,
+      "ocr-review": () => toggleInspector("ocr-review"),
+      proof: () => toggleInspector("proof"),
+      support: () => toggleInspector("support"),
+      "replace-selection": beginReplace,
       reflow: reflowSelected,
       snap: toggleSnap,
       delete: deleteSelected,
       undo: undoPdfEdit,
       redo: redoPdfEdit,
-      review: openReviewPanel,
+      review: () => toggleInspector("review"),
     };
     actions[command]?.();
     syncToolbar();
   };
-  // Escape closes one panel at a time, right-hand panels before Pages, and
-  // returns focus to the button that opened it.
+  // Escape closes one surface at a time: the inspector before Pages, returning
+  // focus to the control that opened it. Closing Properties also deselects.
   const closeTopPanel = (): boolean => {
-    const panels: [HTMLElement | null, () => void, PdfToolbarCommand][] = [
-      [proofPanel, closeProofPanel, "proof"],
-      [reviewPanel, closeReviewPanel, "review"],
-      [ocrReviewPanel, closeOcrReviewPanel, "ocr-review"],
-      [capabilityPanel, closeCapabilityPanel, "support"],
-      [thumbnailPanel, closeThumbnailPanel, "pages"],
-    ];
-    const open = panels.find(([panel]) => panel);
-    if (!open) return false;
-    open[1]();
-    syncToolbar();
-    toolbar.focusCommand(open[2]);
+    if (inspector.close()) return true;
+    if (!thumbnailPanel) return false;
+    closeThumbnailPanel();
+    toolbar.focusCommand("pages");
     return true;
   };
   const keyHandler = (event: KeyboardEvent): void => {
     if (isTextEntryTarget(event.target)) return;
+    // The inspector handles its own keys; its buttons must not delete the edit.
+    if (inspector.element.contains(event.target as HTMLElement)) return;
     if (event.key === "Escape" && (toolbar.closeMenu() || closeTopPanel())) {
       event.preventDefault();
       event.stopPropagation();
@@ -2295,11 +2314,8 @@ export async function renderPdf(
       redoStack = [];
       selectedOperationId = null;
       void storeDraft(path, editDocument);
-      closeOcrReviewPanel();
-      closeCapabilityPanel();
+      inspector.close({ restoreFocus: false });
       closeThumbnailPanel();
-      closeReviewPanel();
-      closeProofPanel();
       options?.onEditDirtyChange?.(false);
       setStatus(`Saved. Backup: ${backupPath}`);
       options?.onReloadRequest?.();
@@ -2598,7 +2614,7 @@ export async function renderPdf(
   capabilitySummary = summarizePdfCapabilities(textSignals);
   setCurrentPage(pages.length ? Math.min(Math.max(options?.initialPage ?? 1, 1), pages.length) : 0);
   syncToolbar();
-  renderCapabilityPanel();
+  inspector.refresh("support");
   if (!hasPdfEdits(editDocument)) {
     setStatus(pdfCapabilityMessage(capabilitySummary));
   }
@@ -2628,7 +2644,8 @@ export async function renderPdf(
   // change zoom while scrolling; Fit Page uses the page in view.
   const fitZoom = (mode: PdfFitMode): number | null => {
     const view = pages[Math.max(currentPage, 1) - 1];
-    const width = host.clientWidth;
+    const docked = inspector.page !== null && inspector.layout === "docked";
+    const width = host.clientWidth - (docked ? PDF_INSPECTOR_WIDTH : 0);
     const height = host.clientHeight - toolbar.element.offsetHeight;
     if (!view || width <= 0 || height <= 0) return null;
     const widest = Math.max(...pages.map((page) => page.box.width));
@@ -2654,6 +2671,8 @@ export async function renderPdf(
     keepAnchor,
     setZoomState: (zoom, fit) => {
       zoomState = { zoom, fit };
+      // The docked inspector's margin is set in screen pixels, undoing the page zoom.
+      container.style.setProperty("--pdf-zoom", String(zoom));
       syncToolbar();
     },
     setQuery: (query) => {
@@ -2696,11 +2715,10 @@ export async function renderPdf(
       window.removeEventListener("scroll", scheduleDrawnPages, { capture: true });
       window.removeEventListener("resize", scheduleDrawnPages);
       pages.forEach((page) => page.release());
-      closeOcrReviewPanel();
-      closeCapabilityPanel();
       closeThumbnailPanel();
-      closeReviewPanel();
-      closeProofPanel();
+      inspector.destroy();
+      container.removeEventListener("mouseup", onReplaceMouseUp);
+      container.removeEventListener("pointerdown", onDrawerOutside);
       host.removeEventListener(PDF_SAVE_EVENT, onMenuSave);
       host.removeEventListener(PDF_SAVE_AS_EVENT, onMenuSaveAs);
       host.removeEventListener("keydown", keyHandler);

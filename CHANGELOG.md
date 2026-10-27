@@ -27,8 +27,24 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   same spot of the page in view. The generic zoom buttons are hidden for PDFs.
 - While editing, V, T, R, C and I pick a tool. Toolbar presses keep the PDF text
   selection, and Escape closes an open toolbar menu before any panel.
+- PDF side panels share one right-hand inspector: Properties, Replace Text, Review,
+  Check Text, OCR Review and Editing Support. Opening one replaces the last, and the
+  Pages rail can stay open beside it. The inspector docks beside the pages (which
+  refit, keeping the page in view) and becomes an overlay drawer when the pane is
+  too narrow. Escape closes the menu, then the inspector, then Pages, one per press,
+  returning focus to the control that opened it.
+- Text and cover styling moved from the extra toolbar row into Properties, shown
+  when an edit is selected, with its text, Reflow and Delete. Covers state that the
+  hidden text stays in the file and is not redacted.
+- Replace Text starts from selected words. Without a selection it asks for one
+  instead of creating an empty replacement; with one, the inspector shows the
+  original text, the replacement and the method: visual replacement, or a direct
+  replacement offered only on pages simple enough to try it. The Actions menu's
+  separate Try Direct Rewrite item is gone.
 
 ### Fixed
+
+- After clicking a PDF edit, Delete, ⌘Z and tool keys now reach the PDF view.
 
 - Undo and redo hide text and cover style controls left from the cleared selection.
 - PDFs wider than the pane no longer open cut off at the right edge.

@@ -5,7 +5,8 @@ import type { PdfFitMode } from "./pdf-navigation";
 
 export type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 
-export type PdfPanel = "pages" | "review" | "proof" | "ocr-review" | "support";
+/** Right-hand inspector pages a toolbar control opens. */
+export type PdfPanel = "replace" | "review" | "proof" | "ocr-review" | "support";
 
 export type PdfToolbarCommand =
   | "pages"
@@ -24,7 +25,6 @@ export type PdfToolbarCommand =
   | "proof"
   | "support"
   | "replace-selection"
-  | "direct-selection"
   | "reflow"
   | "snap"
   | "delete"
@@ -57,6 +57,8 @@ export type PdfToolbarState = {
   pagesReady: boolean;
   /** Editing support summary once pages are inspected; limited flags pages that resist editing. */
   support: { limited: boolean; note: string } | null;
+  /** The Pages rail sits on the left and can be open beside the inspector. */
+  pagesOpen: boolean;
   openPanel: PdfPanel | null;
 };
 
@@ -480,15 +482,13 @@ export function createPdfToolbar(
   const actionsLabel = el("span", "pdf-tb-label pdf-tb-secondary");
   actionsLabel.textContent = "Actions";
   actionsTrigger.append(icon("actions"), actionsLabel, icon("caret"));
-  const replaceSelectionItem = menuItem("replace-selection", "Replace Selected Text");
-  const directSelectionItem = menuItem("direct-selection", "Try Direct Rewrite");
+  const replaceSelectionItem = menuItem("replace-selection", "Replace Selected Text…");
   const reflowItem = menuItem("reflow", "Reflow Text Box");
   const snapItem = menuItem("snap", "Snap to 5-Point Grid", undefined, "checkbox");
   const deleteItem = menuItem("delete", "Delete Selected Edit", "⌫");
   deleteItem.element.classList.add("pdf-tb-narrow-only");
   const actionsMenu = menu(actionsTrigger, "Text actions", [
     replaceSelectionItem,
-    directSelectionItem,
     reflowItem,
     deleteItem,
     separator(),
@@ -563,8 +563,8 @@ export function createPdfToolbar(
     element.dataset.mode = state.editing ? "edit" : "read";
     editButton.classList.toggle("active", state.editing);
     editButton.setAttribute("aria-pressed", String(state.editing));
-    pagesButton.classList.toggle("active", state.openPanel === "pages");
-    pagesButton.setAttribute("aria-pressed", String(state.openPanel === "pages"));
+    pagesButton.classList.toggle("active", state.pagesOpen);
+    pagesButton.setAttribute("aria-pressed", String(state.pagesOpen));
     setDisabled(pagesButton, !state.pagesReady);
 
     saveTrigger.disabled = state.saving;
@@ -604,6 +604,7 @@ export function createPdfToolbar(
     snapItem.element.classList.toggle("checked", state.snap);
     setDisabled(reviewButton, state.saving || state.pending === 0);
     reviewButton.classList.toggle("active", state.openPanel === "review");
+    reviewButton.setAttribute("aria-expanded", String(state.openPanel === "review"));
     reviewBadge.hidden = state.pending === 0;
     reviewBadge.textContent = String(state.pending);
     if (wasEditing !== state.editing) fit();
