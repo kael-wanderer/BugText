@@ -163,6 +163,12 @@ PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
 
+The webview runs under a strict CSP (`tauri.conf.json`). Rendered Markdown is
+sanitized (`src/sanitize.ts`) before it reaches `innerHTML`. HTML file previews load
+from `preview://localhost/__bugtext_doc__/<slot>/<version>` (`preview_set_doc`), not
+`srcdoc`, so their scripts run under their own policy in the sandboxed frame. CSP is
+only enforced in release builds; check policy changes with `npm run tauri build -- --no-bundle`.
+
 Heavy rendering engines are loaded on demand so the startup bundle remains
 below the release chunk-warning threshold.
 

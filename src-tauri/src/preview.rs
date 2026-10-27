@@ -2,7 +2,7 @@
 // documents (relative scripts/styles/images) to the sandboxed preview iframe.
 // Access is scoped to the directories of HTML files the user actually opened.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::http;
@@ -26,7 +26,57 @@ pub fn preview_allow(path: String, state: tauri::State<'_, PreviewRoots>) -> Res
     Ok(())
 }
 
+/// Live HTML documents shown in preview frames, keyed by a per-pane slot.
+/// Serving them here instead of through `srcdoc` gives the frame its own
+/// document, so the app's Content-Security-Policy does not apply to it.
+#[derive(Default)]
+pub struct PreviewDocs(Mutex<HashMap<String, (u64, Vec<u8>)>>);
+
+const DOC_PREFIX: &str = "/__bugtext_doc__/";
+
+fn valid_slot(slot: &str) -> bool {
+    !slot.is_empty()
+        && slot.len() <= 64
+        && slot.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+}
+
+/// Store the HTML for a preview slot and return the URL that serves it. The
+/// version in the URL changes on every update so the frame always reloads.
+#[tauri::command]
+pub fn preview_set_doc(
+    slot: String,
+    html: String,
+    state: tauri::State<'_, PreviewDocs>,
+) -> Result<String, String> {
+    if !valid_slot(&slot) {
+        return Err("invalid preview slot".into());
+    }
+    let mut docs = state.0.lock().map_err(|e| e.to_string())?;
+    let version = docs.get(&slot).map_or(1, |(v, _)| v + 1);
+    docs.insert(slot.clone(), (version, html.into_bytes()));
+    Ok(format!("preview://localhost{DOC_PREFIX}{slot}/{version}"))
+}
+
+fn serve_doc(app: &tauri::AppHandle, rest: &str) -> http::Response<Vec<u8>> {
+    let slot = rest.split('/').next().unwrap_or_default();
+    if !valid_slot(slot) {
+        return status(404);
+    }
+    let docs = app.state::<PreviewDocs>();
+    let docs = docs.0.lock().unwrap_or_else(|e| e.into_inner());
+    match docs.get(slot) {
+        Some((_, bytes)) => http::Response::builder()
+            .header("Content-Type", "text/html; charset=utf-8")
+            .body(bytes.clone())
+            .unwrap_or_else(|_| status(500)),
+        None => status(404),
+    }
+}
+
 pub fn respond(app: &tauri::AppHandle, request: http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
+    if let Some(rest) = request.uri().path().strip_prefix(DOC_PREFIX) {
+        return serve_doc(app, rest);
+    }
     let decoded = percent_decode(request.uri().path());
     // Canonicalize to resolve `..`/symlinks before any access check.
     let Some(real) = std::fs::canonicalize(PathBuf::from(&decoded)).ok() else {
@@ -117,7 +167,16 @@ fn mime_for(path: &Path) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::percent_decode;
+    use super::{percent_decode, valid_slot};
+
+    #[test]
+    fn preview_slots_are_plain_identifiers() {
+        assert!(valid_slot("pane-0f3a_9"));
+        assert!(!valid_slot(""));
+        assert!(!valid_slot("../etc"));
+        assert!(!valid_slot("a/b"));
+        assert!(!valid_slot(&"x".repeat(65)));
+    }
 
     #[test]
     fn decodes_percent_sequences() {

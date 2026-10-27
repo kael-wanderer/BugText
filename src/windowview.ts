@@ -194,6 +194,8 @@ export function createWindowView(
   let textFindMatches: HTMLElement[] = [];
   let textFindIndex = -1;
   let previewFrame: HTMLIFrameElement | null = null;
+  // Identifies this pane's HTML document in the native preview:// store.
+  const previewSlot = crypto.randomUUID();
   let previewCanvas: HTMLElement | null = null;
   let htmlPreviewContentSize: { width: number; height: number } | null = null;
   let lastMode: ViewMode | null = null;
@@ -528,18 +530,24 @@ export function createWindowView(
       // document and flash white on every zoom step.
       const doc = htmlWithPreviewZoom(text, 1);
       const baseHref = pathOrName ? htmlPreviewBaseHref(pathOrName) : null;
-      if (baseHref && pathOrName) {
-        // Register the file's folder with the preview:// protocol first so
-        // relative scripts/styles/images resolve when the srcdoc loads.
-        invoke("preview_allow", { path: pathOrName })
-          .then(() => {
-            frame.srcdoc = htmlWithBaseHref(doc, baseHref);
+      // The document is served from preview:// rather than srcdoc so it gets
+      // its own Content-Security-Policy instead of inheriting the app's.
+      const show = (html: string) =>
+        invoke<string>("preview_set_doc", { slot: previewSlot, html })
+          .then((url) => {
+            if (previewFrame === frame) frame.src = url;
           })
           .catch(() => {
-            frame.srcdoc = doc;
+            frame.srcdoc = html;
           });
+      if (baseHref && pathOrName) {
+        // Register the file's folder with the preview:// protocol first so
+        // relative scripts/styles/images resolve when the document loads.
+        invoke("preview_allow", { path: pathOrName })
+          .then(() => show(htmlWithBaseHref(doc, baseHref)))
+          .catch(() => show(doc));
       } else {
-        frame.srcdoc = doc;
+        void show(doc);
       }
       frame.addEventListener("focus", () => {
         focusedPane = "preview";
