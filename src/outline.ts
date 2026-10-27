@@ -6,7 +6,11 @@ export type OutlineHeading = {
 
 export function plainHeadingText(text: string): string {
   return text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/[*_`~]/g, "").trim();
+    .replace(/(`+)(.*?)\1/g, "$2")
+    .replace(/(\*\*|~~)(?=\S)(.+?\S)\1/g, "$2")
+    .replace(/(^|[^\w])__(?=\S)(.+?\S)__(?=$|[^\w])/g, (match, prefix: string, content: string) => /^init$/.test(content) ? match : prefix + content)
+    .replace(/(^|[^\w])([*_])(?!\2)(?=\S)(.+?\S)\2(?!\2)(?=$|[^\w])/g, "$1$3")
+    .trim();
 }
 
 export function markdownOutline(source: string): OutlineHeading[] {
@@ -45,7 +49,7 @@ export function markdownOutline(source: string): OutlineHeading[] {
       headings.push({ level: atx[1].length, text: plainHeadingText(atx[2].replace(/\s+#+\s*$/, "")), line: i + 1 });
       continue;
     }
-    if (line.trim() && i + 1 < lines.length) {
+    if (line.trim() && !/^ {0,3}(?:> |>(?:$|\s)|[-+*]\s|\d+[.)]\s|(?:\*\s*){3,}$|(?:-\s*){3,}$|(?:_\s*){3,}$)/.test(line) && i + 1 < lines.length) {
       const setext = /^ {0,3}(=+|-+)\s*$/.exec(lines[i + 1]);
       if (setext) {
         headings.push({ level: setext[1][0] === "=" ? 1 : 2, text: plainHeadingText(line), line: i + 1 });

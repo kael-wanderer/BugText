@@ -22,6 +22,8 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "file.save_as", label: "Save As", category: "File", default: "CmdOrCtrl+Shift+S", scope: "menu" },
   { id: "file.close", label: "Close Tab", category: "File", default: "CmdOrCtrl+W", scope: "menu" },
   { id: "view.toggle_explorer", label: "Show/Hide Explorer", category: "View", default: "CmdOrCtrl+B", scope: "menu" },
+  { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
+  { id: "view.sync_scroll", label: "Sync Scroll", category: "View", default: "", scope: "menu" },
   { id: "view.toggle_preview", label: "Show/Hide Preview", category: "View", default: "CmdOrCtrl+P", scope: "menu" },
   { id: "view.reading", label: "Reading View", category: "View", default: "CmdOrCtrl+E", scope: "menu" },
   { id: "view.toggle_lines", label: "Show/Hide Line Numbers", category: "View", default: "", scope: "menu" },

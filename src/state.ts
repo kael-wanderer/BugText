@@ -5,6 +5,7 @@ export type UIState = {
   softWrap: boolean;
   folder: string | null;
   explorerVisible: boolean;
+  sidebarView?: "explorer" | "outline";
   explorerWidth: number;
   aiVisible: boolean;
   aiWidth: number;
@@ -21,6 +22,7 @@ const DEFAULTS: UIState = {
   softWrap: true,
   folder: null,
   explorerVisible: true,
+  sidebarView: "explorer",
   explorerWidth: 240,
   aiVisible: false,
   aiWidth: 320,

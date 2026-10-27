@@ -76,6 +76,7 @@ fn dispatch_open_path(app: &tauri::AppHandle, path: String) {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn sync_view_menu(
     app: tauri::AppHandle,
     wrap: String,
@@ -84,6 +85,7 @@ fn sync_view_menu(
     size: u32,
     explorer_size: u32,
     automatic_updates: bool,
+    sync_scroll: bool,
 ) {
     let set = |id: String, on: bool| {
         if let Some(item) = menu::find_check_item(&app, &id) {
@@ -106,6 +108,7 @@ fn sync_view_menu(
         set(format!("view.explorer_size.{n}"), *n == explorer_size);
     }
     set("help.automatic_updates".into(), automatic_updates);
+    set("view.sync_scroll".into(), sync_scroll);
 }
 
 #[tauri::command]

@@ -1,3 +1,5 @@
+import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from "./scroll-sync";
+import { capturePreviewPlace, restorePreviewPlace } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
 import { invoke } from "@tauri-apps/api/core";
@@ -52,6 +54,8 @@ export type WindowHandlers = {
   onToggleLineNumbers: () => void;
   onToggleSub: () => void;
   onFocusWindow: (windowId: string) => void;
+  onNavigation: (windowId: string) => void;
+  syncScrollEnabled: () => boolean;
   onDocChange: (windowId: string, tabId: string, text: string) => void;
   onPdfEditDirtyChange: (windowId: string, tabId: string, dirty: boolean) => void;
   onSave: (windowId: string) => void;
@@ -68,6 +72,8 @@ export type WindowView = {
   editor: EditorHandle;
   render: () => void;
   renderPreview: (text: string, pathOrName?: string | null) => void;
+  jumpToLine: (line: number) => void;
+  navigationLine: () => number;
   adjustFocusedZoom: (delta: number) => void;
   resetFocusedZoom: () => void;
   requestMeasure: () => void;
@@ -184,6 +190,9 @@ export function createWindowView(
 
   let lineNums = true;
   let focusedPane: "editor" | "preview" = "editor";
+  let cursorLine = 1;
+  let previewDocumentId: string | null = null;
+  let placeObserver: ResizeObserver | null = null;
   let editorZoom = 1;
   let previewZoom = 1;
   // PDF zoom follows a fit mode until the user picks an explicit zoom.
@@ -274,7 +283,10 @@ export function createWindowView(
   });
   previewPane.addEventListener("mousedown", () => {
     focusedPane = "preview";
+    h.onNavigation(windowId);
   });
+  editorPane.addEventListener("focusin", () => { focusedPane = "editor"; h.onNavigation(windowId); });
+  previewPane.addEventListener("focusin", () => { focusedPane = "preview"; h.onNavigation(windowId); });
 
   root.querySelectorAll<HTMLElement>("[data-mode]").forEach((btn) =>
     btn.addEventListener("click", () => h.onSetMode(windowId, btn.dataset.mode as ViewMode))
@@ -313,9 +325,56 @@ export function createWindowView(
     (tabId, text) => h.onDocChange(windowId, tabId, text),
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
+      cursorLine = line;
+      h.onNavigation(windowId);
     },
     (tabId, files) => h.onPasteImages(windowId, tabId, files),
   );
+  const guard = createScrollGuard();
+  function anchors(): ScrollAnchor[] {
+    const top = previewPane.getBoundingClientRect().top;
+    const result: ScrollAnchor[] = [];
+    for (const element of previewPane.querySelectorAll<HTMLElement>("[data-line]")) {
+      const line = Number(element.dataset.line);
+      const offset = element.getBoundingClientRect().top - top + previewPane.scrollTop;
+      if (line > 0 && (!result.length || (line > result[result.length - 1].line && offset >= result[result.length - 1].offset))) result.push({ line, offset });
+    }
+    return result;
+  }
+  function navigationLine(): number {
+    const mode = getWindow(windowId)?.mode;
+    return mode === "preview" || (mode === "split" && focusedPane === "preview")
+      ? offsetToLine(previewPane.scrollTop, anchors()) : cursorLine;
+  }
+  function jumpToLine(line: number): void {
+    const mode = getWindow(windowId)?.mode;
+    if (mode !== "preview") { guard.ignore("editor"); editor.scrollLineToTop(line); }
+    if (mode !== "editor") {
+      let target: HTMLElement | null = null;
+      for (const element of previewPane.querySelectorAll<HTMLElement>("[data-line]")) {
+        if (Number(element.dataset.line) <= line) target = element;
+      }
+      if (target) {
+        guard.ignore("preview");
+        previewPane.scrollTop += target.getBoundingClientRect().top - previewPane.getBoundingClientRect().top;
+        target.classList.add("outline-jump");
+        window.setTimeout(() => target?.classList.remove("outline-jump"), 900);
+      }
+    }
+    h.onNavigation(windowId);
+  }
+  editor.onScroll(() => {
+    if (!h.syncScrollEnabled() || getWindow(windowId)?.mode !== "split" || !guard.drive("editor")) return;
+    guard.ignore("preview");
+    previewPane.scrollTop = lineToOffset(editor.visibleTopLine(), anchors());
+  });
+  let navigationFrame = 0;
+  previewPane.addEventListener("scroll", () => {
+    if (!navigationFrame) navigationFrame = requestAnimationFrame(() => { navigationFrame = 0; h.onNavigation(windowId); });
+    if (!h.syncScrollEnabled() || getWindow(windowId)?.mode !== "split" || !guard.drive("preview")) return;
+    guard.ignore("editor");
+    editor.scrollLineToTop(offsetToLine(previewPane.scrollTop, anchors()), false);
+  });
   editorSurface.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     h.onEditorContextMenu(windowId, event.clientX, event.clientY);
@@ -443,19 +502,14 @@ export function createWindowView(
     text: string,
     pathOrName: string | null = null,
   ): void {
-    const sameDocument = pathOrName === previewPathOrName;
-    const paneTop = previewPane.getBoundingClientRect().top;
-    const visible = sameDocument
-      ? Array.from(previewPane.querySelectorAll<HTMLElement>("[data-line]"))
-          .find((element) => element.getBoundingClientRect().bottom > paneTop)
-      : undefined;
-    const anchorLine = visible?.dataset.line;
-    const anchorOffset = visible ? visible.getBoundingClientRect().top - paneTop : 0;
+    const documentId = getWindow(windowId)?.activeTabId ?? null;
+    const place = documentId && documentId === previewDocumentId && getWindow(windowId)?.mode !== "editor"
+      ? capturePreviewPlace(previewPane) : null;
+    previewDocumentId = documentId;
+    placeObserver?.disconnect();
+    placeObserver = null;
     const restorePlace = (): void => {
-      if (!anchorLine || pathOrName !== previewPathOrName) return;
-      const anchor = Array.from(previewPane.querySelectorAll<HTMLElement>("[data-line]"))
-        .find((element) => element.dataset.line === anchorLine);
-      if (anchor) previewPane.scrollTop += anchor.getBoundingClientRect().top - previewPane.getBoundingClientRect().top - anchorOffset;
+      if (place && documentId === previewDocumentId) restorePreviewPlace(previewPane, place);
     };
     // Reset zoom to 100% on a document switch (new file), but not on the frequent
     // edit-debounce re-renders of the same document — otherwise a manual zoom would
@@ -592,10 +646,21 @@ export function createWindowView(
       previewPane.appendChild(article);
       restorePlace();
       const token = previewRenderToken;
-      const restoredScroll = previewPane.scrollTop;
-      void enhancePreview(previewPane).then(() => {
-        if (token === previewRenderToken && previewPane.scrollTop === restoredScroll) restorePlace();
-      });
+      let restoredScroll = previewPane.scrollTop;
+      const restoreIfUnmoved = (): void => {
+        if (token !== previewRenderToken || Math.abs(previewPane.scrollTop - restoredScroll) > 1) {
+          placeObserver?.disconnect();
+          return;
+        }
+        restorePlace();
+        restoredScroll = previewPane.scrollTop;
+      };
+      if (place) {
+        placeObserver = new ResizeObserver(restoreIfUnmoved);
+        placeObserver.observe(article);
+      }
+      void enhancePreview(previewPane).then(restoreIfUnmoved);
+      h.onNavigation(windowId);
     }
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
@@ -809,6 +874,8 @@ export function createWindowView(
     editor,
     render,
     renderPreview,
+    jumpToLine,
+    navigationLine,
     adjustFocusedZoom: (delta) => {
       if (zoomTarget() === "editor") {
         setEditorZoom(editorZoom + delta);
@@ -831,6 +898,7 @@ export function createWindowView(
     destroy: () => {
       previewRenderToken += 1;
       previewResizeObserver.disconnect();
+      placeObserver?.disconnect();
       root.remove();
     },
     setLineNumbersFlag: (on: boolean) => {

@@ -115,6 +115,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Fonts and sizes",
     keywords: "font typeface in general",
   },
+  { id: "sync-scroll", page: "editing", label: "Sync scroll", keywords: "navigation preview editor" },
   {
     id: "soft-wrap",
     page: "editing",

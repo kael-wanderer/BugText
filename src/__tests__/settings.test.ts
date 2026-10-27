@@ -157,3 +157,12 @@ describe("appIcon", () => {
     }
   });
 });
+
+
+describe("sync scroll", () => {
+  it("defaults off and accepts only true", () => {
+    expect(parseSettings('{}').syncScroll).toBe(false);
+    expect(parseSettings('{"syncScroll":true}').syncScroll).toBe(true);
+    expect(parseSettings('{"syncScroll":"true"}').syncScroll).toBe(false);
+  });
+});
