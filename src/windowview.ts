@@ -21,6 +21,7 @@ import type { ViewMode } from "./state";
 import type { MarkdownFormat } from "./markdown-format";
 import { THEME_OPTIONS, type ThemeName } from "./settings";
 import {
+  PDF_FIND_EVENT,
   PDF_SAVE_AS_EVENT,
   PDF_SAVE_EVENT,
   renderPdf,
@@ -687,6 +688,33 @@ export function createWindowView(
       });
     });
 
+  const openFind = (): boolean => {
+    const state = getWindow(windowId);
+    const tab = state?.tabs.find((item) => item.id === state.activeTabId);
+    const effectiveMode = normalizeDocumentViewMode(
+      tab?.path ?? tab?.name,
+      state?.mode ?? "editor",
+    );
+    if (
+      !isPdfFile(previewPathOrName) &&
+      effectiveMode !== "preview" &&
+      focusedPane !== "preview"
+    ) {
+      return false;
+    }
+    if (!isPdfFile(previewPathOrName) && !isMarkdownFile(previewPathOrName)) {
+      return false;
+    }
+    findBar.classList.remove("hidden");
+    findInput.focus();
+    findInput.select();
+    if (findInput.value) runFind();
+    return true;
+  };
+  previewPane.addEventListener(PDF_FIND_EVENT, () => {
+    openFind();
+  });
+
   return {
     id: windowId,
     editor,
@@ -743,28 +771,6 @@ export function createWindowView(
     checkPdfDisk: async () => {
       if (isPdfFile(previewPathOrName)) await pdfFind?.checkDisk();
     },
-    openFind: () => {
-      const state = getWindow(windowId);
-      const tab = state?.tabs.find((item) => item.id === state.activeTabId);
-      const effectiveMode = normalizeDocumentViewMode(
-        tab?.path ?? tab?.name,
-        state?.mode ?? "editor",
-      );
-      if (
-        !isPdfFile(previewPathOrName) &&
-        effectiveMode !== "preview" &&
-        focusedPane !== "preview"
-      ) {
-        return false;
-      }
-      if (!isPdfFile(previewPathOrName) && !isMarkdownFile(previewPathOrName)) {
-        return false;
-      }
-      findBar.classList.remove("hidden");
-      findInput.focus();
-      findInput.select();
-      if (findInput.value) runFind();
-      return true;
-    },
+    openFind,
   };
 }

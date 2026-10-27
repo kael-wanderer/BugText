@@ -167,17 +167,18 @@ export function installTestDom(): void {
     }
   }
   const body = new Element("body");
-  const doc = {
+  const doc = Object.assign(new EventTarget(), {
     body,
     activeElement: body,
     createElement: (tag: string) => new Element(tag),
+    createElementNS: (_ns: string, tag: string) => new Element(tag),
     createTextNode: (text: string) => {
       const e = new Element("#text");
       e.textContent = text;
       return e;
     },
     getElementById: (id: string) => body.querySelector(`#${id}`),
-  };
+  });
   Object.assign(globalThis, {
     document: doc,
     HTMLElement: Element,
