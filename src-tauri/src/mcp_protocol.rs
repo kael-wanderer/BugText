@@ -34,9 +34,7 @@ impl Session {
         if method.starts_with("notifications/") {
             return None;
         }
-        let Some(id) = id else {
-            return None;
-        };
+        let id = id?;
         let params = request.get("params").cloned().unwrap_or_else(|| json!({}));
         let result = match method {
             "initialize" => {

@@ -114,7 +114,7 @@ pub fn check(path: &str, roots: &Roots, access: Access) -> Result<PathBuf, Strin
     }
 
     let in_folder = folders.iter().any(|root| canonical.starts_with(root));
-    let is_open_file = access != Access::Create && open_files.iter().any(|file| canonical == *file);
+    let is_open_file = access != Access::Create && open_files.contains(&canonical);
     if !in_folder && !is_open_file {
         if access == Access::Create && folders.is_empty() {
             return Err(CREATE_NEEDS_ROOT.to_string());
