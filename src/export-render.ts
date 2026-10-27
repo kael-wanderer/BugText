@@ -130,6 +130,9 @@ export async function buildExportHtml(
         }
       }
     }
+    // The off-screen placement above is for rendering only; left in the
+    // output it would put image captures of the page outside their frame.
+    host.removeAttribute?.("style");
     return (
       "<!doctype html><html><head><meta charset=\"utf-8\">" +
       `<style>${PRINT_CSS}</style></head><body>${host.outerHTML}</body></html>`

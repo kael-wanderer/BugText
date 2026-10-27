@@ -174,4 +174,12 @@ describe("buildExportHtml", () => {
     expect(up.getAttribute("src")).toBe("../secret.png");
     expect(remote.getAttribute("src")).toBe("https://x.test/r.png");
   });
+
+  it("drops the off-screen render position from the exported page", async () => {
+    vi.unstubAllGlobals();
+    vi.mocked(enhancePreview).mockResolvedValueOnce();
+    const html = await buildExportHtml("# Title", { rasterizeSvg: false });
+    expect(html).toContain('<article class="doc">');
+    expect(html).not.toContain("-10000px");
+  });
 });
