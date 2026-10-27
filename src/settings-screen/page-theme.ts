@@ -3,6 +3,13 @@ import { caption, pageHeader, row, segmented, textInput } from "./controls";
 import type { SettingsPage } from "./screen";
 import { type ThemeName, type Settings } from "../settings";
 
+// Search text and list scroll survive re-renders: theme clicks rebuild the list
+// and settings changes from other windows rebuild the page.
+const listView: Record<"dark" | "light", { query: string; scroll: number }> = {
+  dark: { query: "", scroll: 0 },
+  light: { query: "", scroll: 0 },
+};
+
 export const themePage: SettingsPage = {
   id: "theme",
   render(host, deps) {
@@ -29,13 +36,17 @@ export const themePage: SettingsPage = {
       const note = document.createElement("p");
       note.className = "st-note";
       note.textContent = `Used when BugText is ${kind}: always in ${kind === "dark" ? "Dark" : "Light"}, and in System while macOS is ${kind}.`;
-      const search = textInput(`Search ${title.toLowerCase()}s`, "", "Search themes");
+      const view = listView[kind];
+      const search = textInput(`Search ${title.toLowerCase()}s`, view.query, "Search themes");
       search.type = "search";
       search.className = "st-text st-theme-search";
       const box = document.createElement("div");
       box.className = "st-theme-box";
       const options = THEME_CATALOG.filter((o) => o.mode === kind);
       const draw = (): void => {
+        const focused = document.activeElement instanceof HTMLElement && box.contains(document.activeElement)
+          ? document.activeElement.dataset.themeId
+          : undefined;
         box.replaceChildren();
         const current = deps.getSettings()[kind === "dark" ? "darkTheme" : "lightTheme"];
         const shown = options.filter((o) => o.label.toLowerCase().includes(search.value.trim().toLowerCase()));
@@ -51,10 +62,12 @@ export const themePage: SettingsPage = {
         list.className = "st-theme-options";
         list.setAttribute("role", "group");
         list.setAttribute("aria-label", title);
+        list.addEventListener("scroll", () => { view.scroll = list.scrollTop; });
         for (const option of shown) {
           const button = document.createElement("button");
           button.type = "button";
           button.className = "st-theme-option";
+          button.dataset.themeId = option.id;
           button.setAttribute("aria-pressed", String(option.id === current));
           const swatch = document.createElement("span");
           swatch.className = "st-theme-swatch";
@@ -84,8 +97,20 @@ export const themePage: SettingsPage = {
           list.append(button);
         }
         box.append(header, list);
+        list.scrollTop = view.scroll;
+        // A page rebuild draws the list before it is attached, where scrollTop
+        // does not stick; apply it again once it is on screen.
+        if (typeof requestAnimationFrame !== "undefined") {
+          const scroll = view.scroll;
+          requestAnimationFrame(() => { list.scrollTop = scroll; });
+        }
+        if (focused) list.querySelector<HTMLElement>(`[data-theme-id="${CSS.escape(focused)}"]`)?.focus({ preventScroll: true });
       };
-      search.addEventListener("input", draw);
+      search.addEventListener("input", () => {
+        view.query = search.value;
+        view.scroll = 0;
+        draw();
+      });
       draw();
       block.append(heading, note, search, box);
       return block;

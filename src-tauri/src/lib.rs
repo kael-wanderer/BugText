@@ -223,6 +223,7 @@ pub fn run() {
             files::save_file,
             files::write_file_atomic,
             files::save_bytes,
+            files::same_file,
             files::backup_file,
             files::get_initial_file,
             files::word_count,
