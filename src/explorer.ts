@@ -38,7 +38,14 @@ export type ExplorerActions = {
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
   onRefresh?: () => void;
+  isShowingHidden?: () => boolean;
+  onToggleHidden?: () => void;
 };
+
+/** A dot-named entry, hidden with its contents when Show Hidden Files is off. */
+export function isDotName(name: string): boolean {
+  return name.startsWith(".");
+}
 
 export function setExplorerActivePath(path: string | null): void {
   activePath = path;
@@ -563,10 +570,19 @@ function createRow(node: TreeNode, depth: number): HTMLElement {
   return row;
 }
 
-function renderNode(node: TreeNode, depth: number, container: HTMLElement): void {
-  container.appendChild(createRow(node, depth));
+function renderNode(
+  node: TreeNode,
+  depth: number,
+  container: HTMLElement,
+  insideDotted = false,
+): void {
+  const dotted = insideDotted || isDotName(node.name);
+  const row = createRow(node, depth);
+  // CSS hides these rows when Show Hidden Files is off; the tree data keeps them.
+  if (dotted) row.dataset.dotted = "true";
+  container.appendChild(row);
   if (node.isDir && node.expanded && node.children) {
-    for (const child of node.children) renderNode(child, depth + 1, container);
+    for (const child of node.children) renderNode(child, depth + 1, container, dotted);
   }
 }
 
@@ -656,6 +672,11 @@ export function initExplorer(
     showContextMenu(rect.left, rect.bottom + 2, [
       { label: "Hide Explorer", action: () => explorerActions.onHideExplorer?.() },
       { label: "Toggle Line Numbers", action: () => explorerActions.onToggleLineNumbers?.() },
+      "separator",
+      {
+        label: explorerActions.isShowingHidden?.() === false ? "Show Hidden Files" : "Hide Hidden Files",
+        action: () => explorerActions.onToggleHidden?.(),
+      },
     ]);
   });
 

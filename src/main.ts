@@ -947,6 +947,8 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
   const t = w.tabs.find((x) => x.id === tabId);
   const changeKey = `${windowId}:${tabId}`;
   if (cleanReloads.has(changeKey)) return;
+  // A PDF tab's hidden text editor is not the document; PDF edits track their own state.
+  if (t && isPdfFile(t.path ?? t.name)) return;
   if (t && !t.dirty) {
     patchWindow(windowId, {
       tabs: w.tabs.map((x) => (x.id === tabId ? { ...x, dirty: true } : x)),
@@ -2440,6 +2442,9 @@ initExplorer(
     },
     onToggleLineNumbers: () => toggleLineNumbers(),
     onRefresh: () => void refreshWorkspaceFromDisk(true),
+    isShowingHidden: () => currentSettings.showHiddenFiles,
+    onToggleHidden: () =>
+      saveSettingsFromPanel({ ...currentSettings, showHiddenFiles: !currentSettings.showHiddenFiles }),
   },
 );
 

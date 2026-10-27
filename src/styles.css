@@ -1110,6 +1110,10 @@ body.search-active #search-panel {
   text-overflow: ellipsis;
 }
 
+.pdf-tb-status.is-cramped {
+  color: transparent;
+}
+
 .pdf-toolbar .pdf-tb-btn {
   display: inline-flex;
   flex: none;
@@ -3192,3 +3196,6 @@ body.resizing-ai {
   background: color-mix(in srgb, var(--accent) 22%, var(--bg-elev));
   border-color: var(--accent);
 }
+
+/* Settings ▸ General ▸ Show Hidden Files off: dot-named rows and their contents. */
+:root[data-show-hidden="false"] .tree-row[data-dotted] { display: none; }

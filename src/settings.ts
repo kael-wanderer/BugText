@@ -34,6 +34,8 @@ export type Settings = {
   softWrapMode: "off" | "window" | "guide";
   wrapColumn: number;
   explorer: ZoneSettings;
+  /** Dot-named files and folders in the Explorer tree; presentation only. */
+  showHiddenFiles: boolean;
   main: ZoneSettings;
   sub: ZoneSettings;
   keymap: Record<string, string>;
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
   softWrapMode: "window",
   wrapColumn: 80,
   explorer: { font: "", size: 13 },
+  showHiddenFiles: true,
   main: { font: "", size: 15 },
   sub: { font: "", size: 15 },
   keymap: {},
@@ -190,6 +193,11 @@ export function parseSettings(raw: string): Settings {
     softWrapMode,
     wrapColumn,
     explorer: parseZone(data.explorer, DEFAULT_SETTINGS.explorer),
+    // Missing means an older file: keep showing everything, as before the setting.
+    showHiddenFiles:
+      typeof data.showHiddenFiles === "boolean"
+        ? data.showHiddenFiles
+        : DEFAULT_SETTINGS.showHiddenFiles,
     main: parseZone(data.main, DEFAULT_SETTINGS.main),
     sub: parseZone(data.sub, DEFAULT_SETTINGS.sub),
     keymap: parseKeymap(data.keymap),
@@ -214,6 +222,7 @@ export function applySettings(settings: Settings): void {
       : settings.theme;
   root.dataset.theme = theme;
   root.dataset.sidebarLook = settings.sidebarLook;
+  root.dataset.showHidden = String(settings.showHiddenFiles);
   root.style.setProperty("--ui-size", `${settings.interface.size}px`);
   root.style.setProperty("--font-ui", settings.interface.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif');
   root.style.setProperty(

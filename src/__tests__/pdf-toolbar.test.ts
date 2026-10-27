@@ -227,3 +227,16 @@ it("shows the zoom state and checks the matching zoom item", () => {
   expect(radios("zoom-actual").getAttribute("aria-checked")).toBe("true");
   byCommand("zoom-in").dispatchEvent(new Event("click"));
 });
+
+it("hides a status squeezed to a few characters but keeps a roomy one", () => {
+  const { toolbar } = setup();
+  const status = toolbar.status;
+  Object.defineProperty(status, "clientWidth", { configurable: true, value: 30 });
+  toolbar.update(state());
+  toolbar.update(state({ editing: true }));
+  expect(status.classList.contains("is-cramped")).toBe(true);
+  expect(status.getAttribute("role")).toBe("status");
+  Object.defineProperty(status, "clientWidth", { configurable: true, value: 300 });
+  toolbar.update(state({ editing: false }));
+  expect(status.classList.contains("is-cramped")).toBe(false);
+});

@@ -144,6 +144,7 @@ tabs, unsaved text, cursor and split are exactly as you left them. Changes apply
 immediately and show up in every open window. General has Typography — a size and a
 font for the app, File Explorer, Editor and Sub Editor; choose Custom… to type any
 installed font (Enter applies, Escape cancels). PDF pages follow zoom, not these sizes.
+Show Hidden Files (also in the Explorer's ⋯ menu) hides names starting with a dot.
 General also has the app-icon picker, which changes the Dock icon, and buttons to edit
 `settings.json` / `agent.json` as text.
 

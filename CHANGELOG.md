@@ -6,6 +6,13 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- Show Hidden Files: Settings ▸ General and the Explorer's ⋯ menu hide or show names
+  starting with a dot, along with everything inside dot folders. It stays on by default,
+  so nothing changes until you turn it off. The files themselves, search and the MCP
+  bridge are unaffected, and the choice syncs across windows.
+
 ### Changed
 
 - Settings ▸ General has one Typography section: App, File Explorer, Editor and
@@ -62,6 +69,11 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- A narrow PDF toolbar no longer shows its status squeezed to a few letters ("S…");
+  the text hides until there is room for it.
+- Typing while a PDF was shown could save a stray text draft for it, which brought
+  back a "1 unsaved document(s)" banner whose Restore did nothing. PDF tabs no longer
+  create text drafts, and leftover ones are removed at startup.
 - PDF panel text (Review, Check Text, Review OCR Text, Editing Support, Pages and
   the Find count) now follows App Font Size; it stayed at a fixed small size before.
 - After clicking a PDF edit, Delete, ⌘Z and tool keys now reach the PDF view.

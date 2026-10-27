@@ -525,6 +525,11 @@ export function createPdfToolbar(
   const fit = (): void => {
     fitRow(readRow);
     fitRow(editRow);
+    // A status squeezed to a few characters reads as noise ("S…"); hide it visually
+    // while it stays in the accessibility tree.
+    const em =
+      (typeof getComputedStyle === "function" && parseFloat(getComputedStyle(status).fontSize)) || 13;
+    status.classList.toggle("is-cramped", status.clientWidth < em * 5);
   };
   const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
   resize?.observe(element);

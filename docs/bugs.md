@@ -36,6 +36,8 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-028 | 2026-10-24 | PDF editor / Proofread | Minor | — | Typing in a Proofread suggestion box lost focus after each character: every keystroke rebuilt the proof panel | fixed (0.3.1) |
 | BUG-029 | 2026-10-24 | PDF / reload | Minor | — | A clean PDF that reloads after another app changes it jumps back to page 1 | fixed (0.3.2) |
 | BUG-030 | 2026-10-27 | PDF / panels | Cosmetic | — | PDF panel text (Review, Check Text, OCR review, Editing Support, Pages, Find count) ignored App Font Size | fixed (unreleased) |
+| BUG-031 | 2026-10-27 | PDF / toolbar | Cosmetic | — | Cramped PDF toolbar showed its status as a sliver ("S…") | fixed (unreleased) |
+| BUG-032 | 2026-10-27 | Recovery / PDF | Minor | — | Typing on a PDF tab saved a text draft; startup banner offered a Restore that did nothing | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
