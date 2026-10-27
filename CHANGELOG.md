@@ -8,6 +8,15 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Changed
 
+- Settings ▸ General has one Typography section: App, File Explorer, Editor and
+  Sub Editor each get a size and a font. A font picker offers System, curated
+  families and Custom… with a live preview; a custom name applies on Enter or when
+  leaving the field, Escape restores the saved font, and names that are empty, too
+  long or contain CSS characters are refused. A note explains that PDF pages follow
+  zoom while App Font Size changes PDF toolbars and panels. Settings ▸ Editing now
+  covers wrapping and links to General ▸ Typography instead of repeating font rows.
+- The activity-bar Export button works for PDFs: it offers Save a Copy…, and
+  File ▸ Export ▸ PDF… on a PDF saves a copy.
 - PDFs open in Read mode with one toolbar row: Pages, Find, Edit PDF, a Save menu
   (Save Changes, Save a Copy…) and More (OCR, Review OCR Text, OCR language, Check
   Text Edits, Editing Support). Edit PDF adds a second row with icon tools (Select,

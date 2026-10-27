@@ -23,8 +23,14 @@ describe("exportOptionsFor", () => {
     ]);
   });
 
-  it("offers nothing for PDF documents", () => {
-    expect(exportOptionsFor("paper.pdf")).toEqual([]);
+  it("offers only Save a Copy for PDF documents", () => {
+    expect(formats(exportOptionsFor("paper.pdf"))).toEqual(["pdf-copy"]);
+    expect(formats(exportOptionsFor("/Docs/SCAN.PDF"))).toEqual(["pdf-copy"]);
+  });
+
+  it("does not treat names that merely contain pdf as PDF", () => {
+    expect(formats(exportOptionsFor("pdf-notes.md"))).not.toContain("pdf-copy");
+    expect(formats(exportOptionsFor("report.pdf.md"))).not.toContain("pdf-copy");
   });
 
   it("treats untitled and plain text documents as markdown", () => {

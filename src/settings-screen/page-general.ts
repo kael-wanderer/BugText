@@ -1,8 +1,8 @@
 import { mountAppIconPicker } from "./app-icon-picker";
-import { button, caption, group, pageHeader, row, segmented, toggle, stepper, select, textInput } from "./controls";
-import { FONT_OPTIONS } from "./fonts";
+import { button, caption, group, pageHeader, row, segmented, toggle, stepper } from "./controls";
+import { fontPicker } from "./fonts";
 import { defaultZoneSize } from "./page-editing";
-import { DEFAULT_SETTINGS } from "../settings";
+import { DEFAULT_SETTINGS, type Settings } from "../settings";
 import type { SettingsPage } from "./screen";
 
 export const generalPage: SettingsPage = {
@@ -11,34 +11,36 @@ export const generalPage: SettingsPage = {
     pageHeader(host, "general");
     const settings = deps.getSettings();
 
+    const zone = (key: "interface" | "explorer" | "main" | "sub", patch: Partial<Settings["main"]>): void =>
+      deps.onSettingsChange({ ...deps.getSettings(), [key]: { ...deps.getSettings()[key], ...patch } });
+    const sizeRow = (
+      key: "interface" | "explorer" | "main" | "sub",
+      id: string,
+      label: string,
+      note: string,
+    ): HTMLElement =>
+      row(id, label, note, stepper({
+        ariaLabel: label.replace("Font Size", "font size"), value: settings[key].size, min: 10, max: 28, unit: "px",
+        resetTo: key === "interface" ? DEFAULT_SETTINGS.interface.size : defaultZoneSize(key),
+        onChange: (size) => zone(key, { size }),
+      }));
+    const fontRow = (key: "interface" | "explorer" | "main" | "sub", id: string, label: string): HTMLElement =>
+      row(id, label, null, fontPicker(label, settings[key].font, (font) => zone(key, { font })));
+    const scope = document.createElement("p");
+    scope.className = "st-note st-scope";
+    scope.textContent = "PDF pages use zoom. App Font Size changes PDF toolbars and panels, not the page contents.";
+
     host.append(
-      caption("Interface"),
-      row("interface-size", "App Font Size", "Settings, tabs and interface text. Document text has its own controls below.", stepper({
-        ariaLabel: "Interface font size", value: settings.interface.size, min: 10, max: 28, unit: "px", resetTo: DEFAULT_SETTINGS.interface.size,
-        onChange: (size) => deps.onSettingsChange({ ...deps.getSettings(), interface: { ...deps.getSettings().interface, size } }),
-      })),
-      row("interface-font", "Font Family", null, (() => {
-        const input = textInput("Interface font family", settings.interface.font, "System font");
-        input.addEventListener("change", () => deps.onSettingsChange({ ...deps.getSettings(), interface: { ...deps.getSettings().interface, font: input.value.trim() } }));
-        return input;
-      })()),
-      row("explorer-size", "File Explorer Font Size", "Change sidebar file and folder labels independently.", stepper({
-        ariaLabel: "Explorer font size", value: settings.explorer.size, min: 10, max: 28, unit: "px", resetTo: defaultZoneSize("explorer"),
-        onChange: (size) => deps.onSettingsChange({ ...deps.getSettings(), explorer: { ...deps.getSettings().explorer, size } }),
-      })),
-      row("explorer-font", "File Explorer Font Family", null, select("Explorer font family", [
-        ...FONT_OPTIONS,
-        ...(!FONT_OPTIONS.some((f) => f.value === settings.explorer.font) ? [{ value: settings.explorer.font, label: settings.explorer.font }] : []),
-      ], settings.explorer.font, (font) => deps.onSettingsChange({ ...deps.getSettings(), explorer: { ...deps.getSettings().explorer, font } }))),
-      caption("Document text"),
-      ...(["main", "sub"] as const).map((zone) => row(
-        `${zone}-text-size`, zone === "main" ? "Editor Font Size" : "Sub Editor Font Size",
-        zone === "main" ? "Text in the main right panel: editor and reading preview." : "Text in the second document panel when split is open.",
-        stepper({ ariaLabel: `${zone === "main" ? "Editor" : "Sub editor"} font size`, value: settings[zone].size,
-          min: 10, max: 28, unit: "px", resetTo: defaultZoneSize(zone),
-          onChange: (size) => deps.onSettingsChange({ ...deps.getSettings(), [zone]: { ...deps.getSettings()[zone], size } }),
-        }),
-      )),
+      caption("Typography"),
+      scope,
+      sizeRow("interface", "interface-size", "App Font Size", "Settings, toolbars, tabs, status bar, search, menus and the AI panel."),
+      fontRow("interface", "interface-font", "App Font"),
+      sizeRow("explorer", "explorer-size", "File Explorer Font Size", "Sidebar file and folder labels."),
+      fontRow("explorer", "explorer-font", "File Explorer Font"),
+      sizeRow("main", "main-text-size", "Editor Font Size", "Main editor and its reading view."),
+      fontRow("main", "main-font", "Editor Font"),
+      sizeRow("sub", "sub-text-size", "Sub Editor Font Size", "Second panel editor and reading view when split is open."),
+      fontRow("sub", "sub-font", "Sub Editor Font"),
       caption("Startup"),
       row(
         "restore-session",

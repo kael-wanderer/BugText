@@ -23,7 +23,7 @@ it("General changes explorer text size independently of editor text", () => {
   const host = document.createElement("div");
   generalPage.render(host, deps);
   const control = host.querySelector('[data-setting="explorer-size"]')!;
-  control.querySelector('[aria-label="Increase Explorer font size"]')!.dispatchEvent(new Event("click"));
+  control.querySelector('[aria-label="Increase File Explorer font size"]')!.dispatchEvent(new Event("click"));
   expect(settings.explorer.size).toBe(14);
   expect(settings.main.size).toBe(15);
 });

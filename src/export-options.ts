@@ -4,7 +4,8 @@ export type ExportFormat =
   | "doc-pdf"
   | "doc-docx"
   | "img-png"
-  | "img-svg";
+  | "img-svg"
+  | "pdf-copy";
 
 export type ExportItem =
   | { label: string; format: ExportFormat }
@@ -13,7 +14,8 @@ export type ExportItem =
 export function exportOptionsFor(
   pathOrName: string | null | undefined,
 ): ExportItem[] {
-  if (/\.pdf$/i.test(pathOrName ?? "")) return [];
+  // A PDF is already the output format; its output action writes a copy.
+  if (/\.pdf$/i.test(pathOrName ?? "")) return [{ label: "Save a Copy…", format: "pdf-copy" }];
   if (isHtmlFile(pathOrName)) {
     return [
       { label: "PNG Image…", format: "img-png" },

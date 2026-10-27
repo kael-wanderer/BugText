@@ -2275,6 +2275,7 @@ function openExportMenu(x: number, y: number): void {
 }
 
 function runExportFormat(format: ExportFormat): void {
+  if (format === "pdf-copy") return void activeView().savePdfAs();
   if (format === "doc-pdf") return void exportDocument("pdf");
   if (format === "doc-docx") return void exportDocument("docx");
   if (format === "img-png") return void exportImage("png");
@@ -2283,6 +2284,8 @@ function runExportFormat(format: ExportFormat): void {
 
 async function runNativeExport(format: ExportFormat): Promise<void> {
   const tab = activeMeta();
+  // File ▸ Export ▸ PDF… on a PDF means a copy of it.
+  if (format === "doc-pdf" && tab && isPdfFile(tab.path ?? tab.name)) format = "pdf-copy";
   const available = tab
     ? exportOptionsFor(tab.path ?? tab.name).flatMap((item) =>
         "children" in item ? item.children : [item],

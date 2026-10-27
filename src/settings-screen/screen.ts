@@ -58,6 +58,8 @@ export function restoreSettingFocus(pane: Element, key: FocusKey | null): boolea
 
 export type ScreenDeps = AiPageDeps & {
   openAiPage?: (sub: AiSubPage) => void;
+  /** Shows another settings page and scrolls to one of its rows. */
+  openPage?: (id: SettingsPageId, entryId?: string) => void;
   getSettings: () => Settings;
   getAISettings: () => AISettings;
   onSettingsChange: (settings: Settings) => void;
@@ -214,7 +216,14 @@ export function createSettingsScreen(
     if (page)
       page.render(
         section,
-        { ...deps, openAiPage: (sub) => showPage("ai", sub) },
+        {
+          ...deps,
+          openAiPage: (sub) => showPage("ai", sub),
+          openPage: (target, entryId) => {
+            showPage(target);
+            if (entryId) revealSetting(entryId);
+          },
+        },
         lastSub,
       );
     else pageHeader(section, id);
