@@ -22,6 +22,7 @@ const state = (overrides: Partial<PdfToolbarState> = {}): PdfToolbarState => ({
   proofIssues: 0,
   pagesReady: true,
   support: null,
+  pagesOpen: false,
   openPanel: null,
   ...overrides,
 });

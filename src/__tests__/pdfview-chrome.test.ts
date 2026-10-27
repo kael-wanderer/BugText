@@ -131,3 +131,65 @@ it("hands zoom commands to the workbench, which owns zoom", async () => {
   expect(handle.fitZoom("width")).toBeNull();
   handle.destroy();
 });
+
+const command = (host: HTMLElement, name: string): HTMLElement =>
+  Array.from(host.querySelectorAll<HTMLElement>("[data-command]")).find((b) => b.dataset.command === name)!;
+const escapeKey = () => Object.assign(new Event("keydown", { cancelable: true }), { key: "Escape" });
+
+it("opens right-hand pages in one inspector beside the Pages rail", async () => {
+  Object.assign(window, { getSelection: () => null });
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const inspector = host.querySelector<HTMLElement>(".pdf-inspector")!;
+  expect(inspector.hidden).toBe(true);
+
+  command(host, "pages").dispatchEvent(new Event("click"));
+  command(host, "support").dispatchEvent(new Event("click"));
+  expect(inspector.hidden).toBe(false);
+  expect(inspector.textContent).toContain("Editing Support");
+  expect(host.querySelector(".pdf-thumbnail-panel")).not.toBeNull();
+  expect(host.querySelectorAll(".pdf-inspector")).toHaveLength(1);
+
+  // Escape closes the inspector first, then Pages, one surface per press.
+  host.dispatchEvent(escapeKey());
+  expect(inspector.hidden).toBe(true);
+  expect(host.querySelector(".pdf-thumbnail-panel")).not.toBeNull();
+  host.dispatchEvent(escapeKey());
+  expect(host.querySelector(".pdf-thumbnail-panel")).toBeNull();
+  const idle = escapeKey();
+  host.dispatchEvent(idle);
+  expect(idle.defaultPrevented).toBe(false);
+  handle.destroy();
+});
+
+it("asks for a selection before Replace Text and creates no empty edit", async () => {
+  Object.assign(window, { getSelection: () => null });
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const inspector = host.querySelector<HTMLElement>(".pdf-inspector")!;
+  toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
+  host.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "r" }));
+  expect(host.querySelector<HTMLElement>(".pdf-document")!.dataset.pdfTool).toBe("replace");
+  expect(inspector.hidden).toBe(false);
+  expect(inspector.textContent).toContain("Select the words on the page");
+  // Nothing queued: Review has no pending edits to show.
+  expect((command(host, "review") as HTMLButtonElement).disabled).toBe(true);
+
+  // Picking another tool puts the waiting Replace page away.
+  host.dispatchEvent(Object.assign(new Event("keydown", { cancelable: true }), { key: "v" }));
+  expect(inspector.hidden).toBe(true);
+  handle.destroy();
+});
+
+it("closes the Replace page when leaving Edit", async () => {
+  Object.assign(window, { getSelection: () => null });
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const inspector = host.querySelector<HTMLElement>(".pdf-inspector")!;
+  toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
+  command(host, "replace-selection").dispatchEvent(new Event("click"));
+  expect(inspector.hidden).toBe(false);
+  toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
+  expect(inspector.hidden).toBe(true);
+  handle.destroy();
+});
