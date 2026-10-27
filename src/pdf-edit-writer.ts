@@ -356,6 +356,23 @@ export async function writeEditedPdf(
   edits: PdfEditDocument,
   loadFontBytes?: PdfFontBytesLoader,
 ): Promise<Uint8Array> {
+  return (await writeEditedPdfWithReport(originalBytes, edits, loadFontBytes)).bytes;
+}
+
+export type PdfWriteReport = {
+  bytes: Uint8Array;
+  /** Direct replacements written into the page's own text. */
+  directApplied: number;
+  /** Direct replacements that fell back to a visual cover-and-retype. */
+  directFallback: number;
+};
+
+/** Writes the edits and reports how direct replacements were actually saved. */
+export async function writeEditedPdfWithReport(
+  originalBytes: Uint8Array,
+  edits: PdfEditDocument,
+  loadFontBytes?: PdfFontBytesLoader,
+): Promise<PdfWriteReport> {
   const hasDirectEdits = edits.pages.some((page) =>
     page.operations.some((operation) => operation.type === "directTextEdit"),
   );
@@ -390,5 +407,13 @@ export async function writeEditedPdf(
     }
   }
 
-  return pdf.save();
+  const directIds = edits.pages.flatMap((page) =>
+    page.operations.filter((operation) => operation.type === "directTextEdit").map((operation) => operation.id),
+  );
+  const directApplied = directIds.filter((id) => directRewrite.appliedIds.has(id)).length;
+  return {
+    bytes: await pdf.save(),
+    directApplied,
+    directFallback: directIds.length - directApplied,
+  };
 }

@@ -41,10 +41,22 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   original text, the replacement and the method: visual replacement, or a direct
   replacement offered only on pages simple enough to try it. The Actions menu's
   separate Try Direct Rewrite item is gone.
+- Recognize Text opens its own inspector page: choose bundled languages (English,
+  Vietnamese) instead of typing codes, see the page it will read, and follow its
+  running, done, no-text and failure states. OCR still runs offline, one page at a
+  time; results that arrive after the PDF closes are dropped.
+- When a direct replacement can't be written into the PDF's own text, saving now
+  says so: it was saved as a visual replacement instead.
+- Choosing the open PDF as the Save a Copy destination now runs Save Changes, with
+  its backup and changed-on-disk checks, instead of refusing.
+- ⌘E (Reading View) toggles Edit PDF when a PDF is open.
 
 ### Fixed
 
 - After clicking a PDF edit, Delete, ⌘Z and tool keys now reach the PDF view.
+- Pressing Save or Save a Copy again while its dialog is open no longer starts a
+  second save.
+- The Replace Text tool no longer blocks selecting text on the page.
 
 - Undo and redo hide text and cover style controls left from the cleared selection.
 - PDFs wider than the pane no longer open cut off at the right edge.

@@ -23,7 +23,7 @@ vi.mock("pdfjs-dist", () => ({
   getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }), destroy: vi.fn() }),
 }));
 
-import { PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, PDF_ZOOM_EVENT, renderPdf } from "../pdfview";
+import { PDF_EDIT_EVENT, PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, PDF_ZOOM_EVENT, renderPdf } from "../pdfview";
 
 beforeEach(() => {
   installTestDom();
@@ -192,4 +192,56 @@ it("closes the Replace page when leaving Edit", async () => {
   toolbarButton(host, "Edit PDF").dispatchEvent(new Event("click"));
   expect(inspector.hidden).toBe(true);
   handle.destroy();
+});
+
+it("writes one copy when Save a Copy is pressed twice", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  host.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
+  host.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
+  await flush();
+  await flush();
+  expect(calls.saved).toHaveLength(1);
+  // The lock lets go afterwards.
+  host.dispatchEvent(new Event(PDF_SAVE_AS_EVENT));
+  await flush();
+  expect(calls.saved).toHaveLength(2);
+  handle.destroy();
+});
+
+it("recognizes text from its own inspector page with bundled languages", async () => {
+  Object.assign(window, { getSelection: () => null });
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const inspector = host.querySelector<HTMLElement>(".pdf-inspector")!;
+  command(host, "ocr").dispatchEvent(new Event("click"));
+  expect(inspector.hidden).toBe(false);
+  expect(inspector.textContent).toContain("Recognize Text");
+  expect(inspector.textContent).toContain("offline");
+  const english = inspector.querySelector<HTMLButtonElement>('[data-lang="eng"]')!;
+  expect(english.getAttribute("aria-pressed")).toBe("true");
+  // No pages yet: nothing to recognize.
+  const run = Array.from(inspector.querySelectorAll<HTMLButtonElement>("button")).find(
+    (b) => b.textContent === "Recognize Page",
+  )!;
+  expect(run.disabled).toBe(true);
+
+  english.click();
+  expect(inspector.textContent).toContain("Choose at least one language.");
+  expect(inspector.querySelector('[data-lang="eng"]')!.getAttribute("aria-pressed")).toBe("false");
+  handle.destroy();
+});
+
+it("toggles Edit PDF from the workbench shortcut event", async () => {
+  const host = document.createElement("div");
+  const handle = await renderPdf(host, "/notes/a.pdf");
+  const toolbar = host.querySelector<HTMLElement>(".pdf-toolbar")!;
+  host.dispatchEvent(new Event(PDF_EDIT_EVENT));
+  expect(toolbar.dataset.mode).toBe("edit");
+  host.dispatchEvent(new Event(PDF_EDIT_EVENT));
+  expect(toolbar.dataset.mode).toBe("read");
+  handle.destroy();
+  // A destroyed view no longer listens.
+  host.dispatchEvent(new Event(PDF_EDIT_EVENT));
+  expect(toolbar.dataset.mode).toBe("read");
 });

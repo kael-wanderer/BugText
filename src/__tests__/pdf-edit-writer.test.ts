@@ -6,7 +6,12 @@ import {
   createPdfEditDocument,
   type PdfDirectTextEditOperation,
 } from "../pdf-edit-document";
-import { pdfEditColor, standardFontFor, writeEditedPdf } from "../pdf-edit-writer";
+import {
+  pdfEditColor,
+  standardFontFor,
+  writeEditedPdf,
+  writeEditedPdfWithReport,
+} from "../pdf-edit-writer";
 
 async function samplePdf(): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
@@ -215,5 +220,31 @@ describe("pdf edit writer", () => {
 
     expect(output.length).toBeGreaterThan(900);
     expect(loaded.getPageCount()).toBe(1);
+  });
+
+  it("reports a direct replacement written into the page text", async () => {
+    const edits = addPdfEditOperation(
+      createPdfEditDocument("sample"),
+      { page: 1, width: 300, height: 200 },
+      directEdit("Edited text"),
+    );
+    const report = await writeEditedPdfWithReport(minimalPdf("Original text"), edits);
+    expect(report).toMatchObject({ directApplied: 1, directFallback: 0 });
+    await expect(PDFDocument.load(report.bytes)).resolves.toBeTruthy();
+  });
+
+  it("reports a direct replacement that fell back to a visual one", async () => {
+    const edits = addPdfEditOperation(
+      createPdfEditDocument("sample"),
+      { page: 1, width: 300, height: 200 },
+      directEdit("This replacement is too long for direct rewriting"),
+    );
+    const report = await writeEditedPdfWithReport(minimalPdf("Original text"), edits);
+    expect(report).toMatchObject({ directApplied: 0, directFallback: 1 });
+  });
+
+  it("reports nothing when there are no direct replacements", async () => {
+    const report = await writeEditedPdfWithReport(await samplePdf(), createPdfEditDocument("sample"));
+    expect(report).toMatchObject({ directApplied: 0, directFallback: 0 });
   });
 });

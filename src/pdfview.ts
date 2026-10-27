@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
-import { confirm } from "@tauri-apps/plugin-dialog";
+import { confirm, message } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
 import {
@@ -16,6 +16,7 @@ import {
   type PdfInspectorContent,
   type PdfInspectorPage,
 } from "./pdf-inspector";
+import { OCR_LANGUAGES, bundledOcrLanguage, recognizePdfPageCanvas } from "./pdf-ocr";
 import { parsePageInput, pdfFitZoom, pdfZoomLabel, type PdfFitMode } from "./pdf-navigation";
 import {
   pdfCapabilityDetail,
@@ -112,6 +113,8 @@ export class PdfRenderSuperseded extends Error {
 }
 
 export const PDF_SAVE_EVENT = "bugtext:pdf-save";
+/** Toggles Edit PDF; the Reading View shortcut (⌘E) sends it for PDFs. */
+export const PDF_EDIT_EVENT = "bugtext:pdf-edit";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
 /** Raised by the PDF toolbar's Find; the workbench opens its find bar. */
 export const PDF_FIND_EVENT = "bugtext:pdf-find";
@@ -634,6 +637,11 @@ export async function renderPdf(
   let redoStack: PdfEditDocument[] = [];
   let editing = false;
   let ocrBusy = false;
+  let ocrLanguages: string[] = ["eng"];
+  // The last recognition this view ran, for the OCR page.
+  let ocrResult: { page: number; state: "running" | "done" | "empty" | "failed"; count: number } | null =
+    null;
+  let destroyed = false;
   let currentPage = 0;
   let zoomState: { zoom: number; fit: PdfFitMode | null } = { zoom: 1, fit: "auto" };
   const fontFamilySelect = window.document.createElement("select");
@@ -1650,8 +1658,68 @@ export async function renderPdf(
     };
   };
 
+  const ocrContent = (): PdfInspectorContent => {
+    const chips = make("div", "pdf-ins-chips");
+    for (const language of OCR_LANGUAGES) {
+      const on = ocrLanguages.includes(language.code);
+      const chip = actionButton(language.label, () => {
+        ocrLanguages = on
+          ? ocrLanguages.filter((code) => code !== language.code)
+          : [...ocrLanguages, language.code];
+        inspector.refresh("ocr");
+        // The page was rebuilt; keep focus on the same chip.
+        inspector.element.querySelector<HTMLElement>(`[data-lang="${language.code}"]`)?.focus();
+      });
+      chip.dataset.lang = language.code;
+      chip.classList.add("pdf-ins-chip");
+      chip.setAttribute("aria-pressed", String(on));
+      chip.disabled = ocrBusy;
+      chips.appendChild(chip);
+    }
+    const body: Node[] = [
+      field("Languages", chips),
+      field("Scope", make("div", "pdf-ins-original", `Current page (${currentPage} of ${pages.length})`)),
+    ];
+    const result = ocrResult;
+    if (result?.state === "running") {
+      const state = make("p", "pdf-ins-callout", `Reading page ${result.page}… This runs on this Mac; nothing is uploaded.`);
+      state.setAttribute("role", "status");
+      body.push(state);
+    } else if (result?.state === "done") {
+      body.push(
+        callout(
+          result.count === 1
+            ? `Added 1 text block to page ${result.page}. It is saved with your other edits; ` +
+                "review it first if the scan is unclear."
+            : `Added ${result.count} text blocks to page ${result.page}. They are saved with your ` +
+                "other edits; review them first if the scan is unclear.",
+        ),
+      );
+    } else if (result?.state === "empty") {
+      body.push(callout(`No text found on page ${result.page}.`));
+    } else if (result?.state === "failed") {
+      body.push(callout(`Couldn't recognize text on page ${result.page}. Try again.`, "warn"));
+    } else {
+      body.push(
+        callout(
+          "Recognized text is added as an invisible layer so the page can be searched and " +
+            "copied. It runs offline on this Mac.",
+        ),
+      );
+    }
+    if (!ocrLanguages.length) body.push(callout("Choose at least one language.", "warn"));
+    const actions = make("div", "pdf-ins-actions");
+    if (result?.state === "done") actions.append(actionButton("Review OCR Text", () => toggleInspector("ocr-review")));
+    const run = actionButton(ocrBusy ? "Recognizing…" : "Recognize Page", runOcr, "primary");
+    run.disabled = ocrBusy || !ocrLanguages.length || pages.length === 0;
+    actions.append(make("span", "pdf-ins-grow"), run);
+    body.push(actions);
+    return { title: "Recognize Text", sub: "offline", body };
+  };
   const renderInspectorPage = (page: PdfInspectorPage): PdfInspectorContent =>
-    page === "properties"
+    page === "ocr"
+      ? ocrContent()
+      : page === "properties"
       ? propertiesContent()
       : page === "replace"
         ? replaceContent()
@@ -2106,24 +2174,27 @@ export async function renderPdf(
     );
     return index < 0 ? null : pages[index];
   };
+  // Recognizes the page in view, offline. One job at a time; a result that
+  // arrives after this view is gone is dropped.
   const runOcr = (): void => {
-    if (ocrBusy) return;
+    const language = bundledOcrLanguage(ocrLanguages);
+    if (ocrBusy || !language) return;
     void (async () => {
       const page = visiblePage();
       const canvas = await page?.draw();
-      if (!page || !canvas) return;
+      if (!page || !canvas || destroyed) return;
+      const pageNumber = page.box.page;
       ocrBusy = true;
+      ocrResult = { page: pageNumber, state: "running", count: 0 };
       syncToolbar();
-      setStatus(`Running OCR on page ${page.box.page}...`);
+      inspector.refresh("ocr");
+      setStatus(`Recognizing text on page ${pageNumber}…`);
       try {
-        const { recognizePdfPageCanvas } = await import("./pdf-ocr");
-        const operations = await recognizePdfPageCanvas(
-          canvas,
-          page.box,
-          toolbar.ocrLanguage.value,
-        );
+        const operations = await recognizePdfPageCanvas(canvas, page.box, language);
+        if (destroyed) return;
         if (!operations.length) {
-          setStatus(`No OCR text found on page ${page.box.page}`);
+          ocrResult = { page: pageNumber, state: "empty", count: 0 };
+          setStatus(`No text found on page ${pageNumber}`);
           return;
         }
         let nextDocument = editDocument;
@@ -2133,12 +2204,19 @@ export async function renderPdf(
         applyEditDocument(nextDocument);
         renderEditOverlays();
         refreshOcrReviewPanel();
-        setStatus(`Added OCR text layer on page ${page.box.page}`);
+        ocrResult = { page: pageNumber, state: "done", count: operations.length };
+        setStatus(`Added a text layer to page ${pageNumber}`);
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : String(error));
+        if (destroyed) return;
+        console.error("PDF OCR failed", error);
+        ocrResult = { page: pageNumber, state: "failed", count: 0 };
+        setStatus(`Couldn't recognize text on page ${pageNumber}`);
       } finally {
-        ocrBusy = false;
-        updateToolbarState();
+        if (!destroyed) {
+          ocrBusy = false;
+          updateToolbarState();
+          inspector.refresh("ocr");
+        }
       }
     })();
   };
@@ -2146,6 +2224,7 @@ export async function renderPdf(
     if (page === currentPage) return;
     currentPage = page;
     syncToolbar();
+    if (!ocrBusy) inspector.refresh("ocr");
     options?.onPageChange?.(page, pages.length);
   };
   const goToPage = (page: number): void => {
@@ -2203,7 +2282,7 @@ export async function renderPdf(
       edit: () => setEditing(!editing),
       save: () => void saveEditedPdf(),
       "save-copy": () => void saveEditedPdfAs(),
-      ocr: runOcr,
+      ocr: () => toggleInspector("ocr"),
       "ocr-review": () => toggleInspector("ocr-review"),
       proof: () => toggleInspector("proof"),
       support: () => toggleInspector("support"),
@@ -2263,8 +2342,31 @@ export async function renderPdf(
     }
   };
   host.addEventListener("keydown", keyHandler);
-  const saveEditedPdf = async (): Promise<void> => {
-    if (!hasPdfEdits(editDocument) || saving) return;
+  // Tells the person when a direct replacement could not be written directly.
+  const reportFallback = async (fallback: number): Promise<void> => {
+    if (!fallback) return;
+    await message(
+      fallback === 1
+        ? "One direct replacement couldn't be written into the PDF's own text, so it was " +
+            "saved as a visual replacement (covered and retyped) instead."
+        : `${fallback} direct replacements couldn't be written into the PDF's own text, so ` +
+            "they were saved as visual replacements (covered and retyped) instead.",
+      { title: "Saved with visual replacements", kind: "info" },
+    );
+  };
+  // One save at a time, held across the confirmation and file dialogs too.
+  let saveBusy = false;
+  const withSaveLock = async (run: () => Promise<void>): Promise<void> => {
+    if (saveBusy || saving) return;
+    saveBusy = true;
+    try {
+      await run();
+    } finally {
+      saveBusy = false;
+    }
+  };
+  const saveToSource = async (): Promise<void> => {
+    if (!hasPdfEdits(editDocument)) return;
     let onDisk: Uint8Array;
     try {
       onDisk = new Uint8Array(await invoke<number[]>("read_file_bytes", { path }));
@@ -2302,13 +2404,13 @@ export async function renderPdf(
       setStatus("Backing up original PDF...");
       const backupPath = await invoke<string>("backup_file", { path });
       setStatus("Saving edited PDF...");
-      const { writeEditedPdf } = await import("./pdf-edit-writer");
-      const output = await writeEditedPdf(
+      const { writeEditedPdfWithReport } = await import("./pdf-edit-writer");
+      const written = await writeEditedPdfWithReport(
         new Uint8Array(bytes),
         editDocument,
         loadSystemFontBytes,
       );
-      await invoke("save_bytes", { path, bytes: Array.from(output) });
+      await invoke("save_bytes", { path, bytes: Array.from(written.bytes) });
       editDocument = createPdfEditDocument(path);
       undoStack = [];
       redoStack = [];
@@ -2318,6 +2420,7 @@ export async function renderPdf(
       closeThumbnailPanel();
       options?.onEditDirtyChange?.(false);
       setStatus(`Saved. Backup: ${backupPath}`);
+      await reportFallback(written.directFallback);
       options?.onReloadRequest?.();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
@@ -2327,14 +2430,14 @@ export async function renderPdf(
     }
   };
   // Writes a separate copy; the open file, its pending edits and history stay put.
-  const saveEditedPdfAs = async (): Promise<void> => {
-    if (saving) return;
+  const saveCopy = async (): Promise<void> => {
     const out = await pickExportPath("pdf");
     if (!out) return;
+    // Choosing the open file itself goes through Save Changes, with its backup and
+    // changed-on-disk checks; identity is resolved natively (aliases, symlinks).
     if (await invoke<boolean>("same_file", { a: path, b: out }).catch(() => out === path)) {
-      setStatus("Choose another file for the copy. Save writes the original with a backup.", {
-        sticky: true,
-      });
+      if (hasPdfEdits(editDocument)) await saveToSource();
+      else setStatus("That is the open PDF, which has no unsaved changes.", { sticky: true });
       return;
     }
     saving = true;
@@ -2342,13 +2445,17 @@ export async function renderPdf(
     try {
       const edited = hasPdfEdits(editDocument);
       let output: Uint8Array = new Uint8Array(bytes);
+      let fallback = 0;
       if (edited) {
         setStatus("Saving edited PDF copy...");
-        const { writeEditedPdf } = await import("./pdf-edit-writer");
-        output = await writeEditedPdf(output, editDocument, loadSystemFontBytes);
+        const { writeEditedPdfWithReport } = await import("./pdf-edit-writer");
+        const written = await writeEditedPdfWithReport(output, editDocument, loadSystemFontBytes);
+        output = written.bytes;
+        fallback = written.directFallback;
       }
       await invoke("save_bytes", { path: out, bytes: Array.from(output) });
       setStatus(edited ? "Edited copy saved" : "Copy saved", { sticky: true });
+      await reportFallback(fallback);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
     } finally {
@@ -2356,6 +2463,8 @@ export async function renderPdf(
       updateToolbarState();
     }
   };
+  const saveEditedPdf = (): Promise<void> => withSaveLock(saveToSource);
+  const saveEditedPdfAs = (): Promise<void> => withSaveLock(saveCopy);
   // Another app changed the file: reload a clean view; with unsaved edits, offer a
   // reload (which asks whether to keep them) instead of drawing over new content.
   let diskNotice: HTMLElement | null = null;
@@ -2408,6 +2517,8 @@ export async function renderPdf(
   const onMenuSaveAs = (): void => {
     void saveEditedPdfAs();
   };
+  const onMenuEdit = (): void => setEditing(!editing);
+  host.addEventListener(PDF_EDIT_EVENT, onMenuEdit);
   host.addEventListener(PDF_SAVE_EVENT, onMenuSave);
   host.addEventListener(PDF_SAVE_AS_EVENT, onMenuSaveAs);
   setTool("select");
@@ -2705,6 +2816,7 @@ export async function renderPdf(
     clear,
     checkDisk,
     destroy: () => {
+      destroyed = true;
       clear();
       toolbarSize?.disconnect();
       toolbar.destroy();
@@ -2719,6 +2831,7 @@ export async function renderPdf(
       inspector.destroy();
       container.removeEventListener("mouseup", onReplaceMouseUp);
       container.removeEventListener("pointerdown", onDrawerOutside);
+      host.removeEventListener(PDF_EDIT_EVENT, onMenuEdit);
       host.removeEventListener(PDF_SAVE_EVENT, onMenuSave);
       host.removeEventListener(PDF_SAVE_AS_EVENT, onMenuSaveAs);
       host.removeEventListener("keydown", keyHandler);
