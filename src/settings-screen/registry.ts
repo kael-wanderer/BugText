@@ -17,7 +17,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
     id: "general",
     label: "General",
     keywords:
-      "startup session updates version settings.json agent.json app icon",
+      "interface font size sidebar explorer startup session updates version settings.json agent.json app icon",
   },
   {
     id: "editing",
@@ -27,7 +27,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
   },
   {
     id: "theme",
-    label: "Theme",
+    label: "Themes",
     keywords: "colors appearance dark light palette",
   },
   {
@@ -44,9 +44,9 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
-  general: "How BugText starts, updates, and where its settings live.",
+  general: "Interface text, file explorer, startup and updates.",
   editing: "Fonts and text size for each area, and how long lines wrap.",
-  theme: "Colors for the whole app, editor and preview included.",
+  theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
   ai: "Which engine each AI feature uses, and the connections and local tools it can call.\nAPI keys are stored on this Mac.",
@@ -66,6 +66,15 @@ export function shortcutEntryId(commandId: string): string {
 }
 
 export const SETTING_ENTRIES: SettingEntry[] = [
+  { id: "main-text-size", page: "general", label: "Editor Font Size", keywords: "right panel main document editor reading preview text size" },
+  { id: "sub-text-size", page: "general", label: "Sub Editor Font Size", keywords: "second panel split document editor reading preview text size" },
+  { id: "interface-size", page: "general", label: "Font Size", keywords: "interface text size scale" },
+  { id: "interface-font", page: "general", label: "Font Family", keywords: "interface typeface font" },
+  { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },
+  { id: "explorer-font", page: "general", label: "File Explorer Font Family", keywords: "sidebar font typeface" },
+  { id: "dark-theme", page: "theme", label: "Dark Theme", keywords: "appearance theme search" },
+  { id: "light-theme", page: "theme", label: "Light Theme", keywords: "appearance theme search" },
+  { id: "sidebar-look", page: "theme", label: "Left Sidebar Appearance", keywords: "match panel tinted default" },
   {
     id: "restore-session",
     page: "general",
@@ -129,15 +138,9 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   },
 
   {
-    id: "theme-cards",
+    id: "theme-mode",
     page: "theme",
-    label: "Theme",
-    keywords: "color colors dark light system catppuccin everforest nord",
-  },
-  {
-    id: "custom-theme",
-    page: "theme",
-    label: "Custom theme name",
+    label: "Appearance",
     keywords: "theme css",
   },
 

@@ -24,7 +24,7 @@ describe("settings registry", () => {
     const hits = searchSettings("THEME");
     expect(hits[0]).toMatchObject({ kind: "page", page: "theme" });
     expect(
-      hits.some((h) => h.kind === "setting" && h.id === "custom-theme"),
+      hits.some((h) => h.kind === "setting" && h.id === "theme-mode"),
     ).toBe(true);
   });
 

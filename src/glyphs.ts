@@ -29,13 +29,13 @@ export const glyphs: Record<string, string> = {
   collapseAll: wrap(`<path d="M5 6l3-2.5L11 6"/><path d="M5 10l3 2.5L11 10"/>`),
   search: wrap(`<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3.5 3.5"/>`),
   ai: wrap(
-    `<path d="M6 2.8H4.1A2.1 2.1 0 0 0 2 4.9v6.9A2.2 2.2 0 0 0 4.2 14h6.9a2.1 2.1 0 0 0 2.1-2.1V10"/><path d="M5 10.8 6.5 6.7 8 10.8M5.5 9.4h2M9.8 6.8v4"/><path d="m11.7 1.6.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" stroke="none"/>`,
+    `<path d="M8 2.6c0 3 2.4 5.4 5.4 5.4-3 0-5.4 2.4-5.4 5.4 0-3-2.4-5.4-5.4-5.4 3 0 5.4-2.4 5.4-5.4z"/>`,
   ),
   gear: wrap(
-    `<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4"/>`,
+    `<path d="M8 5.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z"/><path d="M6.9 1.5h2.2l.4 1.8 1.1.5 1.6-1 1.5 1.5-1 1.6.5 1.1 1.8.4v2.2l-1.8.4-.5 1.1 1 1.6-1.5 1.5-1.6-1-1.1.5-.4 1.8H6.9l-.4-1.8-1.1-.5-1.6 1-1.5-1.5 1-1.6-.5-1.1-1.8-.4V6.9l1.8-.4.5-1.1-1-1.6 1.5-1.5 1.6 1 1.1-.5z"/>`,
   ),
   export: wrap(
-    `<path d="M8.5 3H4.3A1.3 1.3 0 0 0 3 4.3v7.4A1.3 1.3 0 0 0 4.3 13h7.4A1.3 1.3 0 0 0 13 11.7V7.5"/><path d="M9.5 2.5H13.5V6.5"/><path d="M13.5 2.5 7.5 8.5"/>`,
+    `<path d="M8 11V2"/><path d="M5 5l3-3 3 3"/><path d="M2.5 10v3.5h11V10"/>`,
   ),
   more: wrap(
     `<circle cx="3" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none"/><circle cx="13" cy="8" r="1.1" fill="currentColor" stroke="none"/>`,

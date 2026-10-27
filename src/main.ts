@@ -1,3 +1,4 @@
+import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
 import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
@@ -417,7 +418,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
-      const themeChanged = next.theme !== currentSettings.theme;
+      const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
       applySettings(currentSettings);
       syncMcpEnabled();
@@ -482,7 +483,7 @@ function openAISettings(): void {
 }
 
 function saveSettingsFromPanel(settings: Settings): void {
-  const themeChanged = settings.theme !== currentSettings.theme;
+  const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   currentSettings = settings;
   applySettings(currentSettings);
   syncMcpEnabled();
@@ -1280,7 +1281,7 @@ async function doSave(saveAs = false): Promise<void> {
       if (isMac && currentSettings.appIcon !== previous.appIcon) {
         void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
       }
-      if (currentSettings.theme !== previous.theme) renderAll();
+      if (currentSettings.theme !== previous.theme || currentSettings.darkTheme !== previous.darkTheme || currentSettings.lightTheme !== previous.lightTheme) renderAll();
       broadcastSettingsChange("settings");
     }
     if (target === aiSettingsPath) {
@@ -1765,9 +1766,11 @@ function setMenuExplorerSize(size: number): void {
 }
 
 function setMenuTheme(theme: string): void {
+  const selected = normalizeThemeName(theme) ?? currentSettings.theme;
   currentSettings = {
     ...currentSettings,
-    theme: normalizeThemeName(theme) ?? currentSettings.theme,
+    theme: selected,
+    ...(selected !== "system" ? isLightTheme(selected) ? { lightTheme: selected } : { darkTheme: selected } : {}),
   };
   persistCurrentSettings();
   renderAll();
@@ -2745,3 +2748,7 @@ void initNativeFileDrop().catch((error) => {
   console.warn("Native file drag and drop unavailable:", error);
 });
 void boot();
+
+window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+  if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }
+});

@@ -1,10 +1,6 @@
-export type ThemeName =
-  | "system"
-  | "light"
-  | "dark"
-  | "catppuccin-mocha"
-  | "everforest-dark"
-  | "nord";
+import { THEME_CATALOG, isLightTheme, type ConcreteThemeName, type DarkThemeName, type LightThemeName } from "./theme-catalog";
+
+export type ThemeName = "system" | ConcreteThemeName;
 
 export type ZoneSettings = {
   font: string;
@@ -29,6 +25,10 @@ export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 export type Settings = {
   mcp: { enabled: boolean };
   theme: ThemeName;
+  darkTheme: DarkThemeName;
+  lightTheme: LightThemeName;
+  sidebarLook: "default" | "match" | "tinted";
+  interface: ZoneSettings;
   restoreSession: boolean;
   updateMode: "manual" | "auto";
   softWrapMode: "off" | "window" | "guide";
@@ -42,30 +42,18 @@ export type Settings = {
   appIcon: AppIconId;
 };
 
-export const THEME_OPTIONS: ReadonlyArray<{
-  id: ThemeName;
-  label: string;
-}> = [
-  { id: "system", label: "System" },
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-  { id: "catppuccin-mocha", label: "Catppuccin Mocha" },
-  { id: "everforest-dark", label: "Everforest Dark" },
-  { id: "nord", label: "Nord" },
+export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
+  { id: "system", label: "System" }, ...THEME_CATALOG,
 ];
-
-const THEMES: ThemeName[] = [
-  "system",
-  "light",
-  "dark",
-  "catppuccin-mocha",
-  "everforest-dark",
-  "nord",
-];
+const THEMES = THEME_OPTIONS.map((theme) => theme.id);
 
 export const DEFAULT_SETTINGS: Settings = {
   mcp: { enabled: false },
   theme: "dark",
+  darkTheme: "dark",
+  lightTheme: "light",
+  sidebarLook: "default",
+  interface: { font: "", size: 14 },
   restoreSession: true,
   updateMode: "manual",
   softWrapMode: "window",
@@ -83,6 +71,8 @@ export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
 
 export function normalizeThemeName(value: unknown): ThemeName | null {
   if (typeof value !== "string") return null;
+  const labelMatch = THEME_OPTIONS.find((option) => option.label.toLowerCase() === value.trim().toLowerCase());
+  if (labelMatch) return labelMatch.id;
   const normalized = value
     .trim()
     .toLowerCase()
@@ -181,6 +171,17 @@ export function parseSettings(raw: string): Settings {
   return {
     mcp: { enabled: (data.mcp as { enabled?: unknown } | undefined)?.enabled === true },
     theme,
+    darkTheme: (() => {
+      const name = normalizeThemeName(data.darkTheme);
+      return name && name !== "system" && !isLightTheme(name) ? name
+        : theme !== "system" && !isLightTheme(theme) ? theme : "dark";
+    })(),
+    lightTheme: (() => {
+      const name = normalizeThemeName(data.lightTheme);
+      return name && isLightTheme(name) ? name : isLightTheme(theme) ? theme : "light";
+    })(),
+    sidebarLook: data.sidebarLook === "match" || data.sidebarLook === "tinted" ? data.sidebarLook : "default",
+    interface: parseZone(data.interface, DEFAULT_SETTINGS.interface),
     restoreSession:
       typeof data.restoreSession === "boolean"
         ? data.restoreSession
@@ -208,10 +209,13 @@ export function applySettings(settings: Settings): void {
   const theme =
     settings.theme === "system"
       ? window.matchMedia("(prefers-color-scheme: light)").matches
-        ? "light"
-        : "dark"
+        ? settings.lightTheme
+        : settings.darkTheme
       : settings.theme;
   root.dataset.theme = theme;
+  root.dataset.sidebarLook = settings.sidebarLook;
+  root.style.setProperty("--ui-size", `${settings.interface.size}px`);
+  root.style.setProperty("--font-ui", settings.interface.font || '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif');
   root.style.setProperty(
     "--explorer-font",
     settings.explorer.font || "var(--font-ui)",

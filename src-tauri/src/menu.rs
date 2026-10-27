@@ -17,11 +17,26 @@ pub const SIZE_OPTIONS: &[u32] = &[12, 14, 16, 18, 20, 24];
 
 pub const THEME_OPTIONS: &[(&str, &str)] = &[
     ("System", "system"),
-    ("Light", "light"),
-    ("Dark", "dark"),
+    ("Dark (BugText)", "dark"),
     ("Catppuccin Mocha", "catppuccin-mocha"),
     ("Everforest Dark", "everforest-dark"),
     ("Nord", "nord"),
+    ("Dracula", "dracula"),
+    ("Tokyo Night", "tokyo-night"),
+    ("Solarized Dark", "solarized-dark"),
+    ("One Dark", "one-dark"),
+    ("Monokai", "monokai"),
+    ("Gruvbox Dark", "gruvbox-dark"),
+    ("Light", "light"),
+    ("Catppuccin Latte", "catppuccin-latte"),
+    ("Rosé Pine Dawn", "rose-pine-dawn"),
+    ("Gruvbox Light", "gruvbox-light"),
+    ("Solarized Light", "solarized-light"),
+    ("One Light", "one-light"),
+    ("GitHub Light", "github-light"),
+    ("Tokyo Night Day", "tokyo-night-day"),
+    ("Everforest Light", "everforest-light"),
+    ("Ayu Light", "ayu-light"),
 ];
 
 fn check_submenu<R: Runtime>(

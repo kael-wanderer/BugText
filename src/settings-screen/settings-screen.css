@@ -942,3 +942,51 @@
   color: var(--st-danger);
   font-size: var(--st-t-sm);
 }
+
+/* Interface typography follows the same scale as the workbench. */
+#settings-rail, #settings-pane {
+  --st-t-md: var(--ui-size, 14px);
+  --st-t-sm: calc(var(--ui-size, 14px) - 1px);
+  --st-t-xs: calc(var(--ui-size, 14px) - 2px);
+}
+.st-theme-block { margin-top: 28px; }
+.st-theme-search { width: 100%; margin: 14px 0 10px; }
+.st-theme-box { border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.st-theme-head { padding: 12px 14px; background: var(--st-surface); color: var(--muted); font-size: var(--st-t-sm); }
+.st-theme-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: 0; background: transparent; text-align: left; }
+.st-theme-option:hover, .st-theme-option[aria-pressed="true"] { background: var(--st-surface); }
+.st-theme-option small { margin-left: auto; color: var(--accent); font-size: var(--st-t-xs); }
+.st-theme-swatch { display: flex; overflow: hidden; border-radius: 4px; border: 1px solid var(--border); }
+.st-theme-swatch i { width: 15px; height: 22px; }
+@media (max-width: 850px) {
+  .st-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .st-row > :last-child { justify-self: start; max-width: 100%; }
+  #settings-pane { padding: 26px 20px; }
+}
+
+/* Theme details follow the shared desktop settings reference. */
+.st-theme-page > .st-lede { margin-bottom: 26px; }
+.st-theme-page > .st-caption { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: var(--st-t-md); margin-bottom: 8px; }
+.st-theme-page > .st-seg { display: flex; }
+.st-theme-page > .st-seg button { flex: 1; height: 32px; }
+.st-theme-block { display: grid; gap: 2px; padding: 12px 0; margin-top: 12px; border-top: 1px solid var(--border); }
+.st-theme-block > strong { font-size: var(--st-t-md); }
+.st-theme-block .st-note { margin: 2px 0 0; }
+.st-theme-search { background: var(--bg-editor); margin: 10px 0 8px; }
+.st-theme-search::placeholder { color: var(--muted); }
+.st-theme-box { background: var(--bg-elev); border-radius: 10px; }
+.st-theme-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 10px 14px; background: transparent; font-variant-numeric: tabular-nums; }
+.st-theme-options { max-height: 200px; overflow-y: auto; display: grid; gap: 2px; padding: 6px; border-top: 1px solid var(--border); }
+.st-theme-option { height: 36px; padding: 0 12px; border-radius: 8px; }
+.st-theme-option[aria-pressed="true"] { background: var(--code-bg); }
+.st-theme-option small { color: var(--muted); letter-spacing: .12em; }
+.st-theme-swatch i { width: 10px; height: 14px; }
+.st-theme-page > .st-row { margin-top: 0; border-top: 1px solid var(--border); }
+.st-sidebar-preview { display: grid; grid-template-columns: 34% 1fr; height: 120px; margin-top: 4px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; --preview-side: var(--bg-elev); }
+.st-sidebar-preview[data-look="match"] { --preview-side: var(--bg-editor); }
+.st-sidebar-preview[data-look="tinted"] { --preview-side: color-mix(in srgb, var(--bg-elev) 92%, var(--accent)); }
+.st-sidebar-preview-side { display: grid; align-content: start; gap: 6px; padding: 10px 8px; border-right: 1px solid var(--border); background: var(--preview-side); }
+.st-sidebar-preview-main { display: grid; align-content: start; gap: 8px; padding: 14px; background: var(--bg-editor); }
+.st-sidebar-preview i { display: block; height: 7px; border-radius: 4px; background: var(--muted); opacity: .45; }
+.st-sidebar-preview-side i.on { background: var(--accent); opacity: .9; }
+.st-sidebar-preview-main i { height: 8px; opacity: .3; }

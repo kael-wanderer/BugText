@@ -1,52 +1,48 @@
-/* BugText theme palettes. Each is a fresh CSS-variable set. */
+/* App-family shell palettes mapped to BugText editor and preview tokens. */
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --bg-elev: #f4f4f6;
-  --bg-editor: #ffffff;
-  --bg-preview: #fafafa;
-  --code-bg: #f0f0f3;
-  --border: #e2e2e8;
-  --border-soft: #ededf1;
-  --text: #2a2d34;
-  --text-strong: #1a1c22;
-  --muted: #6a7080;
-  --faint: #aab0bd;
-  --accent: #b9762a;
-  --accent-press: #cf8638;
-  --selection: rgba(185, 118, 42, 0.16);
-  --tok-keyword: #a3308f;
-  --tok-string: #2f7d32;
-  --tok-func: #1f5fb0;
-  --tok-comment: #9aa0ab;
-  --tok-type: #a35b12;
-  --tok-property: #176a8a;
-  --tok-number: #7b4ea3;
-  --tok-operator: #4e5665;
-  --tok-punctuation: #7c8492;
+  --bg: #1b1b1f;
+  --bg-elev: #2f2f37;
+  --bg-editor: #1b1b1f;
+  --bg-preview: #1b1b1f;
+  --code-bg: #232329;
+  --border: #4a4a55;
+  --border-soft: #4a4a55;
+  --text: #e3e3e8;
+  --text-strong: #e3e3e8;
+  --muted: #9a9aa8;
+  --faint: #9a9aa8;
+  --accent: #6a6a7a;
+  --accent-press: #6a6a7a;
+  --selection: color-mix(in srgb, #6a6a7a 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #9a9aa8;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #e3e3e8;
+  --tok-punctuation: #9a9aa8;
 }
 
 :root[data-theme="catppuccin-mocha"] {
   color-scheme: dark;
   --bg: #1e1e2e;
-  --bg-elev: #181825;
+  --bg-elev: #313244;
   --bg-editor: #1e1e2e;
-  --bg-preview: #181825;
-  --code-bg: #313244;
-  --border: #313244;
-  --border-soft: #292a3a;
+  --bg-preview: #1e1e2e;
+  --code-bg: #181825;
+  --border: #45475a;
+  --border-soft: #45475a;
   --text: #cdd6f4;
-  --text-strong: #f5f5ff;
+  --text-strong: #cdd6f4;
   --muted: #a6adc8;
-  --faint: #6c7086;
+  --faint: #a6adc8;
   --accent: #cba6f7;
-  --accent-press: #ddb6ff;
-  --selection: rgba(203, 166, 247, 0.2);
+  --accent-press: #cba6f7;
+  --selection: color-mix(in srgb, #cba6f7 22%, transparent);
   --tok-keyword: #cba6f7;
   --tok-string: #a6e3a1;
   --tok-func: #89b4fa;
@@ -61,19 +57,19 @@
 :root[data-theme="everforest-dark"] {
   color-scheme: dark;
   --bg: #2d353b;
-  --bg-elev: #343f44;
+  --bg-elev: #3d484d;
   --bg-editor: #2d353b;
-  --bg-preview: #343f44;
-  --code-bg: #3d484d;
-  --border: #3d484d;
-  --border-soft: #374247;
+  --bg-preview: #2d353b;
+  --code-bg: #343f44;
+  --border: #4a555b;
+  --border-soft: #4a555b;
   --text: #d3c6aa;
-  --text-strong: #f0e9d2;
+  --text-strong: #d3c6aa;
   --muted: #9da9a0;
-  --faint: #859289;
-  --accent: #e69875;
-  --accent-press: #f0a585;
-  --selection: rgba(230, 152, 117, 0.18);
+  --faint: #9da9a0;
+  --accent: #a7c080;
+  --accent-press: #a7c080;
+  --selection: color-mix(in srgb, #a7c080 22%, transparent);
   --tok-keyword: #d699b6;
   --tok-string: #a7c080;
   --tok-func: #7fbbb3;
@@ -88,19 +84,19 @@
 :root[data-theme="nord"] {
   color-scheme: dark;
   --bg: #2e3440;
-  --bg-elev: #3b4252;
+  --bg-elev: #434c5e;
   --bg-editor: #2e3440;
-  --bg-preview: #3b4252;
-  --code-bg: #434c5e;
-  --border: #434c5e;
-  --border-soft: #3b4252;
-  --text: #d8dee9;
+  --bg-preview: #2e3440;
+  --code-bg: #3b4252;
+  --border: #4c566a;
+  --border-soft: #4c566a;
+  --text: #eceff4;
   --text-strong: #eceff4;
-  --muted: #aeb8c8;
-  --faint: #616e88;
+  --muted: #aeb8c5;
+  --faint: #aeb8c5;
   --accent: #88c0d0;
-  --accent-press: #8fbcbb;
-  --selection: rgba(136, 192, 208, 0.2);
+  --accent-press: #88c0d0;
+  --selection: color-mix(in srgb, #88c0d0 22%, transparent);
   --tok-keyword: #81a1c1;
   --tok-string: #a3be8c;
   --tok-func: #88c0d0;
@@ -110,4 +106,436 @@
   --tok-number: #d08770;
   --tok-operator: #d8dee9;
   --tok-punctuation: #7b88a1;
+}
+
+:root[data-theme="dracula"] {
+  color-scheme: dark;
+  --bg: #282a36;
+  --bg-elev: #44475a;
+  --bg-editor: #282a36;
+  --bg-preview: #282a36;
+  --code-bg: #343746;
+  --border: #4d5066;
+  --border-soft: #4d5066;
+  --text: #f8f8f2;
+  --text-strong: #f8f8f2;
+  --muted: #a4a6b8;
+  --faint: #a4a6b8;
+  --accent: #bd93f9;
+  --accent-press: #bd93f9;
+  --selection: color-mix(in srgb, #bd93f9 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #a4a6b8;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #f8f8f2;
+  --tok-punctuation: #a4a6b8;
+}
+
+:root[data-theme="tokyo-night"] {
+  color-scheme: dark;
+  --bg: #1a1b26;
+  --bg-elev: #292e42;
+  --bg-editor: #1a1b26;
+  --bg-preview: #1a1b26;
+  --code-bg: #16161e;
+  --border: #3b4261;
+  --border-soft: #3b4261;
+  --text: #c0caf5;
+  --text-strong: #c0caf5;
+  --muted: #9aa5ce;
+  --faint: #9aa5ce;
+  --accent: #7aa2f7;
+  --accent-press: #7aa2f7;
+  --selection: color-mix(in srgb, #7aa2f7 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #9aa5ce;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #c0caf5;
+  --tok-punctuation: #9aa5ce;
+}
+
+:root[data-theme="solarized-dark"] {
+  color-scheme: dark;
+  --bg: #002b36;
+  --bg-elev: #0d4452;
+  --bg-editor: #002b36;
+  --bg-preview: #002b36;
+  --code-bg: #073642;
+  --border: #1f4f5a;
+  --border-soft: #1f4f5a;
+  --text: #93a1a1;
+  --text-strong: #93a1a1;
+  --muted: #839496;
+  --faint: #839496;
+  --accent: #268bd2;
+  --accent-press: #268bd2;
+  --selection: color-mix(in srgb, #268bd2 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #839496;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #93a1a1;
+  --tok-punctuation: #839496;
+}
+
+:root[data-theme="one-dark"] {
+  color-scheme: dark;
+  --bg: #282c34;
+  --bg-elev: #333842;
+  --bg-editor: #282c34;
+  --bg-preview: #282c34;
+  --code-bg: #21252b;
+  --border: #3e4451;
+  --border-soft: #3e4451;
+  --text: #abb2bf;
+  --text-strong: #abb2bf;
+  --muted: #7f848e;
+  --faint: #7f848e;
+  --accent: #61afef;
+  --accent-press: #61afef;
+  --selection: color-mix(in srgb, #61afef 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #7f848e;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #abb2bf;
+  --tok-punctuation: #7f848e;
+}
+
+:root[data-theme="monokai"] {
+  color-scheme: dark;
+  --bg: #272822;
+  --bg-elev: #3e3d32;
+  --bg-editor: #272822;
+  --bg-preview: #272822;
+  --code-bg: #1e1f1c;
+  --border: #49483e;
+  --border-soft: #49483e;
+  --text: #f8f8f2;
+  --text-strong: #f8f8f2;
+  --muted: #a59f85;
+  --faint: #a59f85;
+  --accent: #a6e22e;
+  --accent-press: #a6e22e;
+  --selection: color-mix(in srgb, #a6e22e 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #a59f85;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #f8f8f2;
+  --tok-punctuation: #a59f85;
+}
+
+:root[data-theme="gruvbox-dark"] {
+  color-scheme: dark;
+  --bg: #282828;
+  --bg-elev: #3c3836;
+  --bg-editor: #282828;
+  --bg-preview: #282828;
+  --code-bg: #1d2021;
+  --border: #504945;
+  --border-soft: #504945;
+  --text: #ebdbb2;
+  --text-strong: #ebdbb2;
+  --muted: #a89984;
+  --faint: #a89984;
+  --accent: #d79921;
+  --accent-press: #d79921;
+  --selection: color-mix(in srgb, #d79921 22%, transparent);
+  --tok-keyword: #cba6f7;
+  --tok-string: #a6d189;
+  --tok-func: #8caaee;
+  --tok-comment: #a89984;
+  --tok-type: #e5c890;
+  --tok-property: #81c8be;
+  --tok-number: #ef9f76;
+  --tok-operator: #ebdbb2;
+  --tok-punctuation: #a89984;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f5f7;
+  --bg-elev: #e8e8ed;
+  --bg-editor: #f5f5f7;
+  --bg-preview: #f5f5f7;
+  --code-bg: #ffffff;
+  --border: #d0d0d8;
+  --border-soft: #d0d0d8;
+  --text: #1d1d1f;
+  --text-strong: #1d1d1f;
+  --muted: #6e6e76;
+  --faint: #6e6e76;
+  --accent: #3b6ef5;
+  --accent-press: #3b6ef5;
+  --selection: color-mix(in srgb, #3b6ef5 22%, transparent);
+  --tok-keyword: #a3308f;
+  --tok-string: #2f7d32;
+  --tok-func: #1f5fb0;
+  --tok-comment: #9aa0ab;
+  --tok-type: #a35b12;
+  --tok-property: #176a8a;
+  --tok-number: #7b4ea3;
+  --tok-operator: #4e5665;
+  --tok-punctuation: #7c8492;
+}
+
+:root[data-theme="catppuccin-latte"] {
+  color-scheme: light;
+  --bg: #eff1f5;
+  --bg-elev: #dce0e8;
+  --bg-editor: #eff1f5;
+  --bg-preview: #eff1f5;
+  --code-bg: #e6e9ef;
+  --border: #bcc0cc;
+  --border-soft: #bcc0cc;
+  --text: #4c4f69;
+  --text-strong: #4c4f69;
+  --muted: #6c6f85;
+  --faint: #6c6f85;
+  --accent: #8839ef;
+  --accent-press: #8839ef;
+  --selection: color-mix(in srgb, #8839ef 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #6c6f85;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #4c4f69;
+  --tok-punctuation: #6c6f85;
+}
+
+:root[data-theme="rose-pine-dawn"] {
+  color-scheme: light;
+  --bg: #faf4ed;
+  --bg-elev: #f2e9e1;
+  --bg-editor: #faf4ed;
+  --bg-preview: #faf4ed;
+  --code-bg: #fffaf3;
+  --border: #dfdad9;
+  --border-soft: #dfdad9;
+  --text: #575279;
+  --text-strong: #575279;
+  --muted: #797593;
+  --faint: #797593;
+  --accent: #907aa9;
+  --accent-press: #907aa9;
+  --selection: color-mix(in srgb, #907aa9 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #797593;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #575279;
+  --tok-punctuation: #797593;
+}
+
+:root[data-theme="gruvbox-light"] {
+  color-scheme: light;
+  --bg: #fbf1c7;
+  --bg-elev: #ebdbb2;
+  --bg-editor: #fbf1c7;
+  --bg-preview: #fbf1c7;
+  --code-bg: #f2e5bc;
+  --border: #d5c4a1;
+  --border-soft: #d5c4a1;
+  --text: #3c3836;
+  --text-strong: #3c3836;
+  --muted: #7c6f64;
+  --faint: #7c6f64;
+  --accent: #b57614;
+  --accent-press: #b57614;
+  --selection: color-mix(in srgb, #b57614 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #7c6f64;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #3c3836;
+  --tok-punctuation: #7c6f64;
+}
+
+:root[data-theme="solarized-light"] {
+  color-scheme: light;
+  --bg: #fdf6e3;
+  --bg-elev: #e6dfc8;
+  --bg-editor: #fdf6e3;
+  --bg-preview: #fdf6e3;
+  --code-bg: #eee8d5;
+  --border: #d8d0b6;
+  --border-soft: #d8d0b6;
+  --text: #586e75;
+  --text-strong: #586e75;
+  --muted: #839496;
+  --faint: #839496;
+  --accent: #268bd2;
+  --accent-press: #268bd2;
+  --selection: color-mix(in srgb, #268bd2 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #839496;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #586e75;
+  --tok-punctuation: #839496;
+}
+
+:root[data-theme="one-light"] {
+  color-scheme: light;
+  --bg: #fafafa;
+  --bg-elev: #e5e5e6;
+  --bg-editor: #fafafa;
+  --bg-preview: #fafafa;
+  --code-bg: #f0f0f1;
+  --border: #d3d3d5;
+  --border-soft: #d3d3d5;
+  --text: #383a42;
+  --text-strong: #383a42;
+  --muted: #696c77;
+  --faint: #696c77;
+  --accent: #4078f2;
+  --accent-press: #4078f2;
+  --selection: color-mix(in srgb, #4078f2 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #696c77;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #383a42;
+  --tok-punctuation: #696c77;
+}
+
+:root[data-theme="github-light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-elev: #eaeef2;
+  --bg-editor: #ffffff;
+  --bg-preview: #ffffff;
+  --code-bg: #f6f8fa;
+  --border: #d1d9e0;
+  --border-soft: #d1d9e0;
+  --text: #1f2328;
+  --text-strong: #1f2328;
+  --muted: #59636e;
+  --faint: #59636e;
+  --accent: #0969da;
+  --accent-press: #0969da;
+  --selection: color-mix(in srgb, #0969da 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #59636e;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #1f2328;
+  --tok-punctuation: #59636e;
+}
+
+:root[data-theme="tokyo-night-day"] {
+  color-scheme: light;
+  --bg: #e1e2e7;
+  --bg-elev: #c4c8da;
+  --bg-editor: #e1e2e7;
+  --bg-preview: #e1e2e7;
+  --code-bg: #d5d6db;
+  --border: #b4b5b9;
+  --border-soft: #b4b5b9;
+  --text: #3760bf;
+  --text-strong: #3760bf;
+  --muted: #6172b0;
+  --faint: #6172b0;
+  --accent: #2e7de9;
+  --accent-press: #2e7de9;
+  --selection: color-mix(in srgb, #2e7de9 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #6172b0;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #3760bf;
+  --tok-punctuation: #6172b0;
+}
+
+:root[data-theme="everforest-light"] {
+  color-scheme: light;
+  --bg: #fdf6e3;
+  --bg-elev: #efebd4;
+  --bg-editor: #fdf6e3;
+  --bg-preview: #fdf6e3;
+  --code-bg: #f4f0d9;
+  --border: #e0dcc7;
+  --border-soft: #e0dcc7;
+  --text: #5c6a72;
+  --text-strong: #5c6a72;
+  --muted: #829181;
+  --faint: #829181;
+  --accent: #8da101;
+  --accent-press: #8da101;
+  --selection: color-mix(in srgb, #8da101 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #829181;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #5c6a72;
+  --tok-punctuation: #829181;
+}
+
+:root[data-theme="ayu-light"] {
+  color-scheme: light;
+  --bg: #fafafa;
+  --bg-elev: #e7e8e9;
+  --bg-editor: #fafafa;
+  --bg-preview: #fafafa;
+  --code-bg: #f3f4f5;
+  --border: #d9dade;
+  --border-soft: #d9dade;
+  --text: #5c6166;
+  --text-strong: #5c6166;
+  --muted: #8a9199;
+  --faint: #8a9199;
+  --accent: #ff9940;
+  --accent-press: #ff9940;
+  --selection: color-mix(in srgb, #ff9940 22%, transparent);
+  --tok-keyword: #8250a8;
+  --tok-string: #427a26;
+  --tok-func: #285fba;
+  --tok-comment: #8a9199;
+  --tok-type: #986d19;
+  --tok-property: #227b83;
+  --tok-number: #b55124;
+  --tok-operator: #5c6166;
+  --tok-punctuation: #8a9199;
 }

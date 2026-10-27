@@ -24,6 +24,31 @@ describe("parseSettings", () => {
     expect(settings.explorer).toEqual(DEFAULT_SETTINGS.explorer);
   });
 
+  it("keeps existing themes and explorer sizes when adding appearance preferences", () => {
+    const settings = parseSettings('{"theme":"nord","explorer":{"size":19}}');
+    expect(settings.darkTheme).toBe("nord");
+    expect(settings.explorer.size).toBe(19);
+    expect(settings.interface.size).toBe(14);
+  });
+
+  it("validates new appearance fields and preserves system dark choice", () => {
+    const settings = parseSettings('{"theme":"system","darkTheme":"everforest-dark","sidebarLook":"tinted","interface":{"size":100}}');
+    expect(settings.darkTheme).toBe("everforest-dark");
+    expect(settings.sidebarLook).toBe("tinted");
+    expect(settings.interface.size).toBe(28);
+    expect(parseSettings('{"darkTheme":"light","sidebarLook":"invalid"}').darkTheme).toBe("dark");
+  });
+
+  it("round-trips independent light and dark choices in System mode", () => {
+    const settings = parseSettings('{"theme":"system","darkTheme":"dracula","lightTheme":"solarized-light"}');
+    expect(settings.darkTheme).toBe("dracula");
+    expect(settings.lightTheme).toBe("solarized-light");
+    expect(parseSettings(JSON.stringify(settings))).toEqual(settings);
+    expect(parseSettings('{"theme":"catppuccin-latte"}').lightTheme).toBe("catppuccin-latte");
+    expect(parseSettings('{"darkTheme":"ayu-light","lightTheme":"nord"}').darkTheme).toBe("dark");
+    expect(parseSettings('{"lightTheme":"nord"}').lightTheme).toBe("light");
+  });
+
   it("falls back to dark for unknown theme", () => {
     expect(parseSettings('{ "theme": "neon" }').theme).toBe("dark");
   });

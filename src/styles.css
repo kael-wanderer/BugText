@@ -403,7 +403,7 @@ body.resizing-panes iframe {
   width: 100%;
   max-width: none;
   padding: 32px 48px 72px;
-  font-size: calc(max(var(--win-size, var(--base-size)), 17px) * var(--zoom));
+  font-size: calc(var(--win-size, var(--base-size)) * var(--zoom));
   line-height: 1.7;
 }
 
@@ -2907,3 +2907,12 @@ body.resizing-ai {
   padding: 0 10px 8px 0;
   border: 0;
 }
+
+/* General's interface scale also keeps Explorer controls readable. */
+.tree-row { min-height: max(28px, calc(var(--explorer-size, 13px) * 1.85)); }
+:root[data-sidebar-look="match"] #explorer,
+:root[data-sidebar-look="match"] #settings-rail { background: var(--bg-editor); }
+:root[data-sidebar-look="tinted"] #explorer,
+:root[data-sidebar-look="tinted"] #settings-rail { background: color-mix(in srgb, var(--bg-elev) 92%, var(--accent)); }
+.tab, .statusbar, .search-input { font-size: var(--ui-size, 14px); }
+.explorer-header, .explorer-root { font-size: var(--explorer-size, 13px); }

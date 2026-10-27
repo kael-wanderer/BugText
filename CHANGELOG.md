@@ -6,6 +6,23 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Changed
+
+- General now has explicit Editor and Sub Editor Font Size controls, separate from
+  App Font Size and File Explorer Font Size. Reading view honors document size
+  without a hidden minimum.
+- Themes now offers the shared catalog of 10 dark and 10 light palettes, independent
+  saved selections, full-width appearance controls, scrollable searchable lists,
+  selection counts and a live sidebar preview matching the reference settings.
+
+- Activity bar uses the shared gear, AI spark and export-tray glyphs.
+- General exposes interface font size/family and independent file explorer text
+  controls, with taller explorer rows for larger text.
+- Theme follows the shared settings pattern: System/Dark/Light appearance,
+  remembered dark palette, searchable theme lists, and Default/Match Panel/Tinted
+  sidebar appearance. Existing theme and explorer preferences are preserved.
+
+
 ## [0.3.3] - 2026-10-24
 
 ### Changed
