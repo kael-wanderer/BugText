@@ -158,6 +158,7 @@ pub fn run() {
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
         .manage(preview::PreviewRoots::default())
+        .manage(preview::PreviewDocs::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
             preview::respond(ctx.app_handle(), request)
         })
@@ -250,6 +251,7 @@ pub fn run() {
             recovery::recovery_read_snapshot_bytes,
             recovery::recovery_delete_snapshots,
             preview::preview_allow,
+            preview::preview_set_doc,
             take_open_paths,
             sync_view_menu,
             set_accelerators,

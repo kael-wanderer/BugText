@@ -6,6 +6,14 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Changed
+
+- The app now runs under a strict Content-Security-Policy: pages can load scripts only
+  from BugText itself and images only from the app, `data:`/`blob:` and HTTPS, so script
+  injected through a document would still be blocked even if it got past the preview
+  sanitizer. HTML file previews are served from BugText's own `preview://` address, so
+  their own scripts and buttons keep working inside the sandboxed preview.
+
 ## [0.3.5] - 2026-10-27
 
 ### Added
