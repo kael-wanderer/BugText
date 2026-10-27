@@ -15,15 +15,36 @@ pane. Main and Sub have independent tabs and view modes.
 ## Document modes
 
 - **Markdown and HTML:** Editor, Read, or Editor + Preview.
-- **PDF:** read-only, with zoom (see Preview zoom below).
+- **PDF:** opens in Read mode; Edit PDF (`⌘E`) adds editing tools (see PDFs below).
 - **TypeScript, JavaScript, JSON, YAML/YML, and other text/config files:** Editor-only.
 
 ## Preview zoom
 
 The preview toolbar has **zoom out / reset / zoom in** controls (`−` / the percentage /
 `+`), and `⌘−` / `⌘0` / `⌘+` do the same from the keyboard. Zoom applies to the
-Markdown, HTML, and PDF previews; the reset button shows the current percentage and
-returns to 100%. When a document is zoomed in past the pane, scrollbars appear.
+Markdown and HTML previews; the reset button shows the current percentage and
+returns to 100%. When a document is zoomed in past the pane, scrollbars appear. PDFs
+have their own zoom controls in the PDF toolbar.
+
+## PDFs
+
+- **Reading:** the PDF toolbar has Pages (thumbnails), Previous/Next and a page number
+  field (Enter jumps, Escape puts the current page back), zoom − / + with Automatic,
+  Fit Width, Fit Page and Actual Size, Find, Edit PDF, Save and More. Automatic fits the
+  widest page but never enlarges past 100%; `⌘0` returns to it. Narrow panes collapse
+  labels to icons.
+- **Editing:** Edit PDF (`⌘E`) adds a second row: Select, Add Text, Replace Text, Cover
+  and Image (keys V, T, R, C, I), Undo/Redo, text actions, Delete and Review with the
+  number of pending edits. Leaving Edit keeps pending edits.
+- **Inspector:** Properties, Replace Text, Review, Check Text, Recognize Text, Review OCR
+  Text and Editing Support open in one panel on the right. In a narrow pane it opens
+  over the page instead; click outside or press Escape to close it.
+- **Replace Text:** select text with the Replace tool or choose Replace Selected Text…;
+  pick a visual replacement, or a direct rewrite when the PDF allows it safely.
+- **Recognize Text (OCR):** runs offline with bundled English and Vietnamese.
+- **Saving:** Save Changes writes the file (the original is backed up first); Save a
+  Copy… writes elsewhere and keeps the open PDF as it was. If a direct rewrite could not
+  be applied, the save tells you it used a visual replacement instead.
 
 ## Opening and dropping files
 
@@ -120,8 +141,11 @@ Open Settings with `⌘,` or **BugText → Settings…** (or the activity-bar ge
 the window with five pages: General, Editing, Theme, Shortcuts and AI. The search box
 jumps to any setting. Leave with `Esc`, `⌘[`, the Back button, the gear, or `⌘,` again; your
 tabs, unsaved text, cursor and split are exactly as you left them. Changes apply
-immediately and show up in every open window. General has the app-icon picker, which
-changes the Dock icon, and buttons to edit `settings.json` / `agent.json` as text.
+immediately and show up in every open window. General has Typography — a size and a
+font for the app, File Explorer, Editor and Sub Editor; choose Custom… to type any
+installed font (Enter applies, Escape cancels). PDF pages follow zoom, not these sizes.
+General also has the app-icon picker, which changes the Dock icon, and buttons to edit
+`settings.json` / `agent.json` as text.
 
 ## Keyboard shortcuts
 
@@ -159,7 +183,8 @@ BugText checks at most once per 24 hours and always asks before installation.
 
 ## Export
 
-Export options depend on the active document. Rendered PDF/DOCX export requires:
+Export options depend on the active document. For a PDF, Export offers Save a Copy….
+Rendered PDF/DOCX export requires:
 
 ```bash
 brew install pandoc typst

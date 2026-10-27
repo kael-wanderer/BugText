@@ -43,12 +43,13 @@ panel, a PDF reader, and document export.
   math (`$…$`, `$$…$$`), and raw HTML. Standalone HTML previews measure their
   rendered content so wide documents scroll in the preview pane without trapping
   overflow inside the iframe.
-- **PDF reader & editor** — open `.pdf` files rendered with pdf.js, with fit-to-width
-  reset, zoom, horizontal wheel navigation, and Space/middle-mouse panning for enlarged
-  pages while preserving text selection and find. An edit toolbar adds text boxes,
-  cover boxes (color / opacity), and selection edits — either a visual overlay (Edit
-  Text) or a real in-document rewrite (Direct) via pdf-lib — plus per-page OCR
-  (tesseract.js, configurable language such as `eng` or `eng+vie`) for scanned pages.
+- **PDF reader & editor** — open `.pdf` files rendered with pdf.js in Read mode, with
+  page navigation, Automatic / Fit Width / Fit Page / Actual Size zoom, horizontal wheel
+  navigation, and Space/middle-mouse panning while preserving text selection and find.
+  Edit PDF (`⌘E`) adds text boxes, cover boxes (color / opacity), images, and selection
+  replacements — either a visual overlay or a real in-document rewrite (Direct) via
+  pdf-lib — in one right-hand inspector, plus offline per-page OCR (tesseract.js, bundled
+  English and Vietnamese) for scanned pages.
   Edits draft locally until saved; the original is backed up to a hidden
   `.bugtext-pdf-backups/` folder before Save. Text the standard PDF fonts cannot
   encode (Vietnamese, CJK, symbols) is saved with a matching macOS system font, and

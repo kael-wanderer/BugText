@@ -1291,7 +1291,7 @@ body.search-active #search-panel {
   box-sizing: border-box;
   padding: 0 6px;
   color: var(--text);
-  font: 12px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px) var(--font-ui);
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1321,7 +1321,7 @@ body.search-active #search-panel {
   gap: 8px;
   padding: 6px 10px;
   color: var(--text);
-  font: 12px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px) var(--font-ui);
   background: color-mix(in srgb, var(--accent) 14%, var(--bg-elev));
   border-bottom: 1px solid var(--border-soft);
 }
@@ -1330,7 +1330,7 @@ body.search-active #search-panel {
   height: 22px;
   padding: 0 8px;
   color: var(--text);
-  font: 12px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px) var(--font-ui);
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1346,7 +1346,7 @@ body.search-active #search-panel {
   margin: 0;
   padding: 10px;
   color: var(--muted);
-  font: 12px/1.5 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px)/1.5 var(--font-ui);
 }
 
 .pdf-ocr-review-row {
@@ -1374,7 +1374,7 @@ body.search-active #search-panel {
 
 .pdf-ocr-review-row span {
   color: var(--muted);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
 }
 
 .pdf-ocr-review-row textarea {
@@ -1383,7 +1383,7 @@ body.search-active #search-panel {
   resize: vertical;
   padding: 7px 8px;
   color: var(--text);
-  font: 12px/1.4 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px)/1.4 var(--font-ui);
   background: var(--bg-editor);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1421,14 +1421,14 @@ body.search-active #search-panel {
 
 .pdf-capability-row strong {
   color: var(--text-strong);
-  font: 600 12px var(--font-ui);
+  font: 600 calc(var(--ui-size, 14px) - 2px) var(--font-ui);
 }
 
 .pdf-capability-row span,
 .pdf-capability-row p {
   margin: 0;
   color: var(--muted);
-  font: 11px/1.45 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px)/1.45 var(--font-ui);
 }
 
 .pdf-capability-fonts {
@@ -1474,17 +1474,17 @@ body.search-active #search-panel {
 
 .pdf-thumbnail-panel header strong {
   color: var(--text-strong);
-  font: 600 13px var(--font-ui);
+  font: 600 calc(var(--ui-size, 14px) - 1px) var(--font-ui);
 }
 
 .pdf-thumbnail-panel header span {
   color: var(--muted);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
 }
 
 .pdf-thumbnail-panel button {
   color: var(--muted);
-  font: 12px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px) var(--font-ui);
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1531,7 +1531,7 @@ body.search-active #search-panel {
   min-width: 18px;
   padding: 1px 4px;
   color: var(--text-strong);
-  font: 600 10px var(--font-ui);
+  font: 600 calc(var(--ui-size, 14px) - 4px) var(--font-ui);
   text-align: center;
   background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
   border: 1px solid var(--border-soft);
@@ -1553,7 +1553,7 @@ body.search-active #search-panel {
   margin: 0;
   padding: 10px;
   color: var(--muted);
-  font: 12px/1.5 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px)/1.5 var(--font-ui);
 }
 
 .pdf-review-row {
@@ -1577,7 +1577,7 @@ body.search-active #search-panel {
 
 .pdf-review-row > div:first-child span {
   color: var(--muted);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
 }
 
 .pdf-review-preview {
@@ -1604,7 +1604,7 @@ body.search-active #search-panel {
 
 .pdf-review-preview figcaption {
   color: var(--muted);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
 }
 
 .pdf-review-summary {
@@ -1613,7 +1613,7 @@ body.search-active #search-panel {
   margin: 0;
   padding-left: 16px;
   color: var(--muted);
-  font: 11px/1.35 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px)/1.35 var(--font-ui);
 }
 
 .pdf-proof-list {
@@ -1626,7 +1626,7 @@ body.search-active #search-panel {
   margin: 0;
   padding: 10px;
   color: var(--muted);
-  font: 12px/1.5 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px)/1.5 var(--font-ui);
 }
 
 .pdf-proof-row {
@@ -1650,7 +1650,7 @@ body.search-active #search-panel {
 
 .pdf-proof-row span {
   color: var(--muted);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
 }
 
 .pdf-proof-row textarea {
@@ -1659,7 +1659,7 @@ body.search-active #search-panel {
   resize: vertical;
   padding: 7px 8px;
   color: var(--text);
-  font: 12px/1.4 var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 2px)/1.4 var(--font-ui);
   background: var(--bg-editor);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -2036,7 +2036,7 @@ body.search-active #search-panel {
   right: 8px;
   padding: 3px 7px;
   color: var(--text);
-  font: 11px var(--font-ui);
+  font: calc(var(--ui-size, 14px) - 3px) var(--font-ui);
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: 999px;

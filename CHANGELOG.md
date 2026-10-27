@@ -62,6 +62,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- PDF panel text (Review, Check Text, Review OCR Text, Editing Support, Pages and
+  the Find count) now follows App Font Size; it stayed at a fixed small size before.
 - After clicking a PDF edit, Delete, ⌘Z and tool keys now reach the PDF view.
 - Pressing Save or Save a Copy again while its dialog is open no longer starts a
   second save.
