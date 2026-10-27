@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-10-27
+
 ### Added
 
 - Show Hidden Files: Settings ▸ General and the Explorer's ⋯ menu hide or show names
