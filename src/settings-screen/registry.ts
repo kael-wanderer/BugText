@@ -17,13 +17,13 @@ export const SETTINGS_PAGES: ReadonlyArray<{
     id: "general",
     label: "General",
     keywords:
-      "interface font size sidebar explorer startup session updates version settings.json agent.json app icon",
+      "typography interface font size typeface sidebar explorer editor sub startup session updates version settings.json agent.json app icon",
   },
   {
     id: "editing",
     label: "Editing",
     keywords:
-      "font size typeface wrap wrapping column editor explorer main sub",
+      "wrap wrapping column soft lines",
   },
   {
     id: "theme",
@@ -44,8 +44,8 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
-  general: "Interface text, file explorer, startup and updates.",
-  editing: "Fonts and text size for each area, and how long lines wrap.",
+  general: "Typography, startup and updates.",
+  editing: "How long lines wrap.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -66,12 +66,14 @@ export function shortcutEntryId(commandId: string): string {
 }
 
 export const SETTING_ENTRIES: SettingEntry[] = [
-  { id: "main-text-size", page: "general", label: "Editor Font Size", keywords: "right panel main document editor reading preview text size" },
-  { id: "sub-text-size", page: "general", label: "Sub Editor Font Size", keywords: "second panel split document editor reading preview text size" },
-  { id: "interface-size", page: "general", label: "Font Size", keywords: "interface text size scale" },
-  { id: "interface-font", page: "general", label: "Font Family", keywords: "interface typeface font" },
+  { id: "interface-size", page: "general", label: "App Font Size", keywords: "interface text size scale toolbar tabs pdf chrome" },
+  { id: "interface-font", page: "general", label: "App Font", keywords: "interface font family typeface custom" },
   { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },
-  { id: "explorer-font", page: "general", label: "File Explorer Font Family", keywords: "sidebar font typeface" },
+  { id: "explorer-font", page: "general", label: "File Explorer Font", keywords: "sidebar font family typeface custom" },
+  { id: "main-text-size", page: "general", label: "Editor Font Size", keywords: "right panel main document editor reading preview text size px" },
+  { id: "main-font", page: "general", label: "Editor Font", keywords: "main editor font family typeface custom" },
+  { id: "sub-text-size", page: "general", label: "Sub Editor Font Size", keywords: "second panel split document editor reading preview text size px" },
+  { id: "sub-font", page: "general", label: "Sub Editor Font", keywords: "second panel split font family typeface custom" },
   { id: "dark-theme", page: "theme", label: "Dark Theme", keywords: "appearance theme search" },
   { id: "light-theme", page: "theme", label: "Light Theme", keywords: "appearance theme search" },
   { id: "sidebar-look", page: "theme", label: "Left Sidebar Appearance", keywords: "match panel tinted default" },
@@ -107,22 +109,10 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   },
 
   {
-    id: "area",
+    id: "editing-fonts",
     page: "editing",
-    label: "Area",
-    keywords: "explorer main sub zone",
-  },
-  {
-    id: "font-family",
-    page: "editing",
-    label: "Font family",
-    keywords: "typeface custom font",
-  },
-  {
-    id: "font-size",
-    page: "editing",
-    label: "Font size",
-    keywords: "text size px",
+    label: "Fonts and sizes",
+    keywords: "font typeface in general",
   },
   {
     id: "soft-wrap",

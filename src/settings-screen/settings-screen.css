@@ -990,3 +990,43 @@
 .st-sidebar-preview i { display: block; height: 7px; border-radius: 4px; background: var(--muted); opacity: .45; }
 .st-sidebar-preview-side i.on { background: var(--accent); opacity: .9; }
 .st-sidebar-preview-main i { height: 8px; opacity: .3; }
+
+/* Shared font picker: menu, optional custom name, preview in the chosen font. */
+.st-font-picker {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  max-width: 360px;
+}
+
+.st-font-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.st-font-custom[hidden] {
+  display: none;
+}
+
+.st-font-custom .st-text[aria-invalid="true"] {
+  border-color: var(--danger, #d14343);
+}
+
+.st-font-preview {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.st-scope {
+  margin: 4px 0 2px;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--surface, color-mix(in srgb, var(--accent) 8%, transparent));
+  border-radius: 8px;
+}
