@@ -1,4 +1,5 @@
 import { createEditor, type EditorHandle } from "./editor";
+import { resolvePreviewImages } from "./preview-images";
 import { invoke } from "@tauri-apps/api/core";
 import {
   documentViewModes,
@@ -58,6 +59,8 @@ export type WindowHandlers = {
   onThemeChange: (theme: ThemeName) => void;
   getTheme: () => ThemeName;
   onEditorContextMenu: (windowId: string, x: number, y: number) => void;
+  /** Image files pasted into the editor; true when the paste was taken over. */
+  onPasteImages: (windowId: string, tabId: string, files: File[]) => boolean;
 };
 
 export type WindowView = {
@@ -311,6 +314,7 @@ export function createWindowView(
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
     },
+    (tabId, files) => h.onPasteImages(windowId, tabId, files),
   );
   editorSurface.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -570,6 +574,7 @@ export function createWindowView(
       article.className = "doc";
       article.style.zoom = String(previewZoom);
       article.innerHTML = renderMarkdown(text);
+      resolvePreviewImages(article, pathOrName?.startsWith("/") ? pathOrName : null);
       previewPane.appendChild(article);
       void enhancePreview(previewPane);
     }

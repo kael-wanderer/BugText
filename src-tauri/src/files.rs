@@ -414,7 +414,7 @@ pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
 
 /// Write through a temporary sibling, then rename over the target. A symlink is
 /// followed so the link stays a link, and an existing file keeps its permissions.
-fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
 
     let requested = Path::new(path);

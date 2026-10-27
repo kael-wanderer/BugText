@@ -42,6 +42,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-034 | 2026-10-27 | Save | Major | — | Saves truncated the file before writing, so an interrupted save could destroy it | fixed (0.3.5) |
 | BUG-035 | 2026-10-27 | Folder search | Minor | — | Clearing search during a slow search could still show the old results | fixed (0.3.5) |
 | BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | fixed (0.3.5) |
+| BUG-037 | 2026-10-27 | Editor / external changes | Major | — | An edit made just as BugText regains focus could be replaced by the file on disk | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -252,6 +253,20 @@ table and a detail block below. Reference the failing test-case ID.
 - **Notes:** Present before 0.3.5 (not caused by the sanitizer). The SVG lands in Pandoc's own `media-<hash>` folder, not the `bugtext-export-media` folder passed with `--extract-media`. A standalone Pandoc run with small or large inline SVGs did not reproduce it, so the trigger is specific to BugText's export HTML. Two causes: Pandoc re-serialized the inline Mermaid SVG as HTML (an empty `style=""` became a bare `style` attribute, invalid XML for Typst), and Typst read Pandoc's absolute image paths relative to its project root. Mermaid's HTML labels (`<foreignObject>`) would also not render in Typst.
 - **Fix:** Mermaid uses plain SVG text labels; PDF export embeds each SVG as an `XMLSerializer` data-URI image; `export_pdf_html` passes `--pdf-engine-opt=--root=/` (HTML input cannot carry raw Typst, so this grants the document no file access).
 - **Status:** fixed in 0.3.5.
+
+### BUG-037 — Edit lost when BugText regains focus
+
+- **Feature / test case:** Editor / external-change reload
+- **Severity:** Major
+- **Environment:** macOS, 0.3.5 dev build (found while testing M4 paste images)
+- **Steps to reproduce:**
+  1. Paste an image into an untitled note, choose Save… and save it.
+  2. The image link is inserted right after the save panel closes.
+- **Expected:** The link stays in the editor.
+- **Actual:** The editor shows the saved (empty) file; the link is gone while the preview still shows it.
+- **Notes:** On focus, BugText re-reads clean open files. The loop captured each tab's `dirty` flag before the asynchronous read and reloaded afterwards without checking again, so anything typed or inserted during the read was replaced. The focus-check reload path had the same gap. Present before M4; M4's save-then-insert flow made it reliable to hit.
+- **Fix:** Both reload paths re-check the tab's current dirty state (and, for the focus check, the buffer text) after the read and keep the edit.
+- **Status:** fixed (unreleased).
 
 ### BUG-000 (example — delete me)
 

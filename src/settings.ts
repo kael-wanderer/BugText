@@ -1,6 +1,14 @@
+import { validImageFolder } from "./image-insert";
 import { THEME_CATALOG, isLightTheme, type ConcreteThemeName, type DarkThemeName, type LightThemeName } from "./theme-catalog";
 
 export type ThemeName = "system" | ConcreteThemeName;
+
+export type ImageSettings = {
+  /** Folder for pasted/dropped images, relative to the note. */
+  folder: string;
+  pasteName: "note" | "image";
+  dropMode: "copy" | "open";
+};
 
 export type ZoneSettings = {
   font: string;
@@ -42,6 +50,7 @@ export type Settings = {
   workspaceContext: boolean;
   workspaceContextK: number;
   appIcon: AppIconId;
+  images: ImageSettings;
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -68,6 +77,7 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceContext: true,
   workspaceContextK: 5,
   appIcon: DEFAULT_APP_ICON,
+  images: { folder: "assets", pasteName: "note", dropMode: "copy" },
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
@@ -116,6 +126,17 @@ function defaults(): Settings {
     keymap: {},
     workspaceContext: DEFAULT_SETTINGS.workspaceContext,
     workspaceContextK: DEFAULT_SETTINGS.workspaceContextK,
+    images: { ...DEFAULT_SETTINGS.images },
+  };
+}
+
+function parseImages(raw: unknown): ImageSettings {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const fallback = DEFAULT_SETTINGS.images;
+  return {
+    folder: typeof value.folder === "string" && validImageFolder(value.folder) ? value.folder : fallback.folder,
+    pasteName: value.pasteName === "image" ? "image" : fallback.pasteName,
+    dropMode: value.dropMode === "open" ? "open" : fallback.dropMode,
   };
 }
 
@@ -209,6 +230,7 @@ export function parseSettings(raw: string): Settings {
     appIcon: (APP_ICON_IDS as readonly unknown[]).includes(data.appIcon)
       ? (data.appIcon as AppIconId)
       : DEFAULT_APP_ICON,
+    images: parseImages(data.images),
   };
 }
 

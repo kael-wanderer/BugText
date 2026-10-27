@@ -1,5 +1,6 @@
 import { renderMarkdown } from "./preview";
 import { enhancePreview } from "./render-extras";
+import { dirOf, isImagePath, isRelativeImageSrc } from "./image-insert";
 
 const PRINT_CSS = `
 body{margin:0;background:#fff;color:#111;font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -42,9 +43,55 @@ async function svgToPngDataUri(svg: SVGElement): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+};
+
+/**
+ * Image capture draws the page in this webview, where relative paths mean
+ * nothing; embed the note's own images (no `..`, image types only) as data URIs.
+ */
+export async function inlineLocalImages(
+  host: HTMLElement,
+  notePath: string,
+  read: (path: string) => Promise<Uint8Array>,
+): Promise<void> {
+  for (const img of Array.from(host.querySelectorAll("img"))) {
+    const src = img.getAttribute("src") ?? "";
+    if (!isRelativeImageSrc(src)) continue;
+    let relative: string;
+    try {
+      relative = decodeURIComponent(src.split(/[?#]/)[0]);
+    } catch {
+      continue;
+    }
+    if (relative.split("/").includes("..") || !isImagePath(relative)) continue;
+    const type = IMAGE_TYPES[relative.slice(relative.lastIndexOf(".") + 1).toLowerCase()];
+    try {
+      const bytes = await read(`${dirOf(notePath)}/${relative.replace(/^(\.\/)+/, "")}`);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      img.src = `data:${type};base64,${btoa(binary)}`;
+    } catch {
+      // Leave it; the capture shows a broken image like the source would.
+    }
+  }
+}
+
 export async function buildExportHtml(
   markdown: string,
-  options: { rasterizeSvg: boolean; svgAsImage?: boolean },
+  options: {
+    rasterizeSvg: boolean;
+    svgAsImage?: boolean;
+    inlineImages?: { notePath: string; read: (path: string) => Promise<Uint8Array> };
+  },
 ): Promise<string> {
   const host = document.createElement("article");
   host.className = "doc";
@@ -58,6 +105,9 @@ export async function buildExportHtml(
   document.body.appendChild(host);
   try {
     await enhancePreview(host);
+    if (options.inlineImages) {
+      await inlineLocalImages(host, options.inlineImages.notePath, options.inlineImages.read);
+    }
     if (options.svgAsImage) {
       // Pandoc re-serializes inline SVG as HTML (e.g. a bare `style`
       // attribute), which Typst rejects; an image of serialized XML survives.

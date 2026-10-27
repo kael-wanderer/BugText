@@ -6,6 +6,24 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- Paste and drop images into Markdown notes. ⌘V with an image on the clipboard saves it
+  as a PNG in an `assets` folder beside the note and inserts `![](assets/…)` with the
+  cursor ready for alt text. Dropping PNG, JPEG, GIF, WebP or SVG files on a Markdown
+  editor copies them there and inserts a link per image at the drop point (hold ⌥, or
+  change the setting, to open them instead). Untitled notes are saved first. Files are
+  checked by content and size (25 MB) and never written outside the note's folder.
+- The Markdown preview, PDF/DOCX export and PNG/SVG image export now show images linked
+  relative to the note; a missing one shows "Image not found · path" in the preview.
+- Save As to another folder offers to copy the note's linked images along.
+- Settings ▸ Editing ▸ Images: image folder, pasted image name and drop behavior.
+
+### Fixed
+
+- An edit made just as BugText regained focus could be replaced by the file on disk
+  (BUG-037).
+
 ### Changed
 
 - The app now runs under a strict Content-Security-Policy: pages can load scripts only

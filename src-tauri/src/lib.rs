@@ -1,4 +1,5 @@
 mod ai;
+mod assets;
 mod cli_args;
 mod cli_scan;
 mod defaults;
@@ -235,6 +236,9 @@ pub fn run() {
             files::delete_to_trash,
             files::duplicate_path,
             files::copy_into_folder,
+            assets::save_note_image,
+            assets::copy_note_image,
+            assets::copy_note_images,
             files::list_files_recursive,
             files::search_in_folder,
             files::get_settings,

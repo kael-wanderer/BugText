@@ -146,4 +146,14 @@ describe("appIcon", () => {
     }
     expect(parseSettings("{}").appIcon).toBe("bt-lettermark");
   });
+
+  it("reads image settings and refuses unsafe folders", () => {
+    expect(parseSettings("{}").images).toEqual({ folder: "assets", pasteName: "note", dropMode: "copy" });
+    expect(
+      parseSettings(JSON.stringify({ images: { folder: "img/shots", pasteName: "image", dropMode: "open" } })).images,
+    ).toEqual({ folder: "img/shots", pasteName: "image", dropMode: "open" });
+    for (const folder of ["../x", "/abs", "a/b/c", 7]) {
+      expect(parseSettings(JSON.stringify({ images: { folder } })).images.folder).toBe("assets");
+    }
+  });
 });
