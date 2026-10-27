@@ -70,6 +70,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   { id: "interface-font", page: "general", label: "App Font", keywords: "interface font family typeface custom" },
   { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },
   { id: "explorer-font", page: "general", label: "File Explorer Font", keywords: "sidebar font family typeface custom" },
+  { id: "explorer-hidden", page: "general", label: "Show Hidden Files", keywords: "dot files dotfiles folders sidebar explorer git env invisible" },
   { id: "main-text-size", page: "general", label: "Editor Font Size", keywords: "right panel main document editor reading preview text size px" },
   { id: "main-font", page: "general", label: "Editor Font", keywords: "main editor font family typeface custom" },
   { id: "sub-text-size", page: "general", label: "Sub Editor Font Size", keywords: "second panel split document editor reading preview text size px" },

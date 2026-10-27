@@ -36,3 +36,7 @@ images/*
 !images/agent.png
 !images/screenshots/
 !images/screenshots/bugtext-main.png
+
+# Local agent tool state
+.impeccable/
+.superpowers/

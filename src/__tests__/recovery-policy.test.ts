@@ -4,6 +4,7 @@ import {
   draftIdFor,
   fileIdFor,
   hashText,
+  isPdfDraft,
   isRecoverableDraft,
   shouldSnapshot,
   snapshotsToPrune,
@@ -43,6 +44,16 @@ describe("isRecoverableDraft", () => {
 
   it("rejects empty or whitespace-only contents", () => {
     expect(isRecoverableDraft(draft({ contents: "   " }))).toBe(false);
+  });
+
+  it("rejects text drafts left for PDF documents", () => {
+    expect(isRecoverableDraft(draft({ path: "/Docs/scan.PDF", name: "scan.PDF", contents: "t" }))).toBe(false);
+    expect(isPdfDraft(draft({ path: null, name: "report.pdf" }))).toBe(true);
+  });
+
+  it("keeps drafts whose names only contain pdf", () => {
+    expect(isRecoverableDraft(draft({ path: "/pdf-notes.md", name: "pdf-notes.md" }))).toBe(true);
+    expect(isPdfDraft(draft({ path: "/a.pdf.md", name: "a.pdf.md" }))).toBe(false);
   });
 });
 

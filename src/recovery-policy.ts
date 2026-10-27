@@ -28,8 +28,13 @@ export function draftIdFor(path: string | null, fallbackId: string): string {
   return path ? fileIdFor(path) : `u${hashText(fallbackId)}`;
 }
 
+/** PDF edits recover through their own drafts; a text draft for a PDF is noise. */
+export function isPdfDraft(draft: DraftRecord): boolean {
+  return /\.pdf$/i.test(draft.path ?? draft.name);
+}
+
 export function isRecoverableDraft(draft: DraftRecord): boolean {
-  return draft.contents.trim().length > 0;
+  return draft.contents.trim().length > 0 && !isPdfDraft(draft);
 }
 
 export function changeDecision(

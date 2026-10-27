@@ -37,6 +37,14 @@ export const generalPage: SettingsPage = {
       fontRow("interface", "interface-font", "App Font"),
       sizeRow("explorer", "explorer-size", "File Explorer Font Size", "Sidebar file and folder labels."),
       fontRow("explorer", "explorer-font", "File Explorer Font"),
+      row(
+        "explorer-hidden",
+        "Show Hidden Files",
+        "Names starting with a dot, such as .github or .env, in the File Explorer.",
+        toggle("Show Hidden Files", settings.showHiddenFiles, (checked) =>
+          deps.onSettingsChange({ ...deps.getSettings(), showHiddenFiles: checked }),
+        ),
+      ),
       sizeRow("main", "main-text-size", "Editor Font Size", "Main editor and its reading view."),
       fontRow("main", "main-font", "Editor Font"),
       sizeRow("sub", "sub-text-size", "Sub Editor Font Size", "Second panel editor and reading view when split is open."),

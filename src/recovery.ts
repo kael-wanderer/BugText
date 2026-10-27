@@ -6,6 +6,7 @@ import {
   draftIdFor,
   fileIdFor,
   hashText,
+  isPdfDraft,
   isRecoverableDraft,
   shouldSnapshot,
   snapshotsToPrune,
@@ -74,9 +75,10 @@ export async function restoreDrafts(deps: {
 }): Promise<void> {
   let drafts: DraftRecord[];
   try {
-    drafts = (await invoke<DraftRecord[]>("recovery_list_drafts")).filter(
-      isRecoverableDraft,
-    );
+    const stored = await invoke<DraftRecord[]>("recovery_list_drafts");
+    // Earlier versions could leave text drafts for PDF tabs; drop them quietly.
+    for (const draft of stored) if (isPdfDraft(draft)) clearDraftById(draft.id);
+    drafts = stored.filter(isRecoverableDraft);
   } catch {
     return;
   }
