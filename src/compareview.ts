@@ -39,6 +39,7 @@ export function showComparison(
   host: HTMLElement,
   left: { name: string; path: string; text: string },
   right: { name: string; path: string; text: string },
+  actions?: { label: string; primary?: boolean; run: () => void }[],
 ): void {
   host.querySelector(".compare-view")?.remove();
   const view = document.createElement("section");
@@ -79,6 +80,19 @@ export function showComparison(
   };
   leftColumn.addEventListener("scroll", () => syncScroll(leftColumn, rightColumn));
   rightColumn.addEventListener("scroll", () => syncScroll(rightColumn, leftColumn));
-  view.querySelector("button")!.addEventListener("click", () => view.remove());
+  view.querySelector("button")!.addEventListener("click", () => { view.remove(); actions?.find((action) => action.label === "Close")?.run(); });
+  if (actions) {
+    const footer = document.createElement("footer");
+    footer.className = "compare-actions";
+    for (const action of actions) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = action.label;
+      if (action.primary) button.className = "primary";
+      button.addEventListener("click", () => { view.remove(); action.run(); });
+      footer.append(button);
+    }
+    view.append(footer);
+  }
   host.appendChild(view);
 }

@@ -107,6 +107,7 @@ import {
   clearDraft,
   clearDraftById,
   discardDraft,
+  bringBackDiscarded,
   forgetStat,
   hasDiskChanged,
   manualBinarySnapshot,
@@ -119,6 +120,7 @@ import {
 } from "./recovery";
 import { draftIdFor, type DraftRecord } from "./recovery-policy";
 import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
+import { showRecoveryReview } from "./recovery-review";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
   freshState,
@@ -561,6 +563,7 @@ function commandItems(): PaletteItem[] {
     }),
     command("save", "Save", () => void doSave(false)),
     command("saveAs", "Save As…", () => void doSave(true)),
+    command("recover", "Recover unsaved documents", () => openRecoveryReview()),
     command("close", "Close Tab", () => {
       const windowState = activeWindow();
       if (windowState.activeTabId) {
@@ -990,13 +993,21 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
 async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean> {
   if (isPdfFile(tab.path ?? tab.name)) return true;
   try {
+    const editor = views.get(windowId)!.editor;
+    const revision = editor.revision(tab.id);
     if (tab.dirty) {
-      const contents = views.get(windowId)!.editor.getText(tab.id);
+      const contents = editor.getText(tab.id);
       await writeDraftNow({ windowId, tabId: tab.id, path: tab.path, name: tab.name, contents });
     }
-    await discardDraft(draftIdFor(tab.path, tab.id));
+    const file = await discardDraft(draftIdFor(tab.path, tab.id));
+    if (file) showToast(`Discarded ${tab.name}`, 8000, { label: "Undo", run: () => { void bringBackDiscarded(file).catch(() => showToast("Could not bring back draft")); } });
     const recoveredId = recoveredDraftIds.get(tab.id);
     if (recoveredId && recoveredId !== draftIdFor(tab.path, tab.id)) await discardDraft(recoveredId);
+    if (editor.revision(tab.id) !== revision) {
+      await writeDraftNow({ windowId, tabId: tab.id, path: tab.path, name: tab.name, contents: editor.getText(tab.id) });
+      showToast("Document changed while closing; it remains open.");
+      return false;
+    }
     recoveredDraftIds.delete(tab.id);
     return true;
   } catch {
@@ -1383,7 +1394,8 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
     if (recoveredId) clearDraftById(recoveredId);
     recoveredDraftIds.delete(tab.id);
   } else {
-    await writeDraftNow({ windowId: windowState.id, tabId: tab.id, path: target, name: basename(target), contents: view.editor.getText(tab.id) }).catch(() => {});
+    const draft = { windowId: windowState.id, tabId: tab.id, path: target, name: basename(target), contents: view.editor.getText(tab.id) };
+    await writeDraftNow(draft).catch(() => scheduleDraft(draft));
     showToast("Saved · newer edits not saved yet", 3000);
   }
   renderAll();
@@ -1405,7 +1417,10 @@ async function doSave(saveAs = false): Promise<boolean> {
   const text = view.editor.getText(t.id);
   const binding: SaveBinding = { windowId: getState().activeWindowId, tabId: t.id, path: t.path, revision: view.editor.revision(t.id) };
   try {
-    let target = saveAs ? null : t.path;
+    return await runSerialized(`tab:${t.id}`, async (queuedTab) => {
+    const latest = getState().windows.flatMap((window) => window.tabs).find((tab) => tab.id === t.id);
+    if (queuedTab && !saveAs && latest && !latest.dirty && editorForTab(t.id).revision(t.id) === binding.revision) return true;
+    let target = saveAs ? null : (latest?.path ?? t.path);
     if (!target) {
       target = await pickSavePath();
       if (!target) return false;
@@ -1475,6 +1490,7 @@ async function doSave(saveAs = false): Promise<boolean> {
     await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
     return true;
+    });
     });
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
@@ -1686,17 +1702,37 @@ async function refreshWorkspaceFromDisk(force = false): Promise<void> {
   }
 }
 
+function openRecoveryReview(restoreAll = false): void {
+  void showRecoveryReview({
+    host: document.getElementById("app")!,
+    findOpen: (path) => {
+      const found = findTabByPath(getState().windows, path);
+      return found ? { dirty: found.tab.dirty, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
+    },
+    restore: openDraft,
+    preserveOpen: async (path) => {
+      const found = findTabByPath(getState().windows, path);
+      if (!found?.tab.dirty) return;
+      const editor = editorForTab(found.tab.id);
+      await writeDraftNow({ windowId: found.windowId, tabId: found.tab.id, path, name: found.tab.name, contents: editor.getText(found.tab.id) });
+    },
+  }, restoreAll).catch(() => showToast("Could not open recovery"));
+}
+
 function openDraft(draft: DraftRecord): void {
   const preferredWindowId = getWindow(draft.windowId)
     ? draft.windowId
-    : "main";
+    : getState().activeWindowId;
   if (draft.path) {
     const found = findTabByPath(getState().windows, draft.path);
     if (found) {
       activateTab(found.windowId, found.tab.id);
       const view = views.get(found.windowId)!;
       view.editor.setText(draft.contents);
+      const current = getWindow(found.windowId)!;
+      patchWindow(found.windowId, { tabs: current.tabs.map((tab) => tab.id === found.tab.id ? { ...tab, dirty: true } : tab) });
       recoveredDraftIds.set(found.tab.id, draft.id);
+      renderAll();
       return;
     }
   }
@@ -2801,6 +2837,8 @@ listenScoped<string>("menu", (event) => {
       return void doSave(false);
     case "file.save_as":
       return void doSave(true);
+    case "file.recover":
+      return openRecoveryReview();
     case "file.close": {
       const w = activeWindow();
       return w.activeTabId ? void closeTab(w.id, w.activeTabId) : undefined;
@@ -2889,6 +2927,7 @@ const appKeyActions: Record<string, () => void> = {
   "ai.quick.rewrite": () => runQuickActionById("ai.quick.rewrite"),
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
   "ai.quick.outline": () => runQuickActionById("ai.quick.outline"),
+  "file.recover": () => openRecoveryReview(),
   "file.close": () => {
     const w = activeWindow();
     if (w.activeTabId) void closeTab(w.id, w.activeTabId);
@@ -3015,7 +3054,7 @@ async function boot(): Promise<void> {
     renderAll();
   }
   if (isPrimaryNativeWindow) {
-    await restoreDrafts({ openDraft, host: document.getElementById("app")! });
+    await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }
 }
 

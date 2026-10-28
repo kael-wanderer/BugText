@@ -77,3 +77,13 @@ export function snapshotsToPrune(
 import { hashText } from "./hash";
 
 export { hashText } from "./hash";
+
+export type DraftState = "Newer than file" | "File changed after draft" | "New document" | "Same as file" | "File missing" | "Already open, unsaved";
+
+export function draftState(draft: DraftRecord, stat: DiskState, diskText: string | null, openTab: { dirty: boolean; text: string } | null): DraftState {
+  if (openTab?.dirty && openTab.text !== draft.contents) return "Already open, unsaved";
+  if (!draft.path) return "New document";
+  if (!stat) return "File missing";
+  if (diskText === draft.contents) return "Same as file";
+  return stat.mtimeMs > draft.updatedAt ? "File changed after draft" : "Newer than file";
+}

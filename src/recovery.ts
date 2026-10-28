@@ -1,12 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { showComparison } from "./compareview";
+import { runSerialized } from "./save-binding";
 import {
   changeDecision,
   draftIdFor,
   fileIdFor,
   hashText,
-  isPdfDraft,
   isRecoverableDraft,
   shouldSnapshot,
   snapshotsToPrune,
@@ -27,7 +27,7 @@ export async function discardDraft(id: string): Promise<string | null> {
   const timer = draftTimers.get(id);
   if (timer) clearTimeout(timer);
   draftTimers.delete(id);
-  return invoke<string | null>("recovery_discard_draft", { id });
+  return runSerialized(`draft:${id}`, () => invoke<string | null>("recovery_discard_draft", { id }));
 }
 
 export function listDiscarded(): Promise<DiscardedDraft[]> {
@@ -39,7 +39,7 @@ export function bringBackDiscarded(file: string): Promise<void> {
 }
 
 export function clearDraftById(id: string): void {
-  void invoke("recovery_clear_draft", { id }).catch(() => {});
+  void runSerialized(`draft:${id}`, () => invoke("recovery_clear_draft", { id })).catch(() => {});
 }
 
 type DraftInput = {
@@ -51,7 +51,7 @@ export async function writeDraftNow(record: DraftInput): Promise<void> {
   const timer = draftTimers.get(id);
   if (timer) clearTimeout(timer);
   draftTimers.delete(id);
-  await invoke("recovery_write_draft", { draft: { id, path: record.path, name: record.name, contents: record.contents, updatedAt: Date.now(), windowId: record.windowId } });
+  await runSerialized(`draft:${id}`, () => invoke("recovery_write_draft", { draft: { id, path: record.path, name: record.name, contents: record.contents, updatedAt: Date.now(), windowId: record.windowId } }));
 }
 
 export function scheduleDraft(record: {
@@ -77,7 +77,7 @@ export function scheduleDraft(record: {
         updatedAt: Date.now(),
         windowId: record.windowId,
       };
-      void invoke("recovery_write_draft", { draft }).catch(() => {});
+      void runSerialized(`draft:${id}`, () => invoke("recovery_write_draft", { draft })).catch(() => {});
     }, DRAFT_DEBOUNCE_MS),
   );
 }
@@ -93,48 +93,29 @@ export function clearDraft(path: string | null, tabId: string): void {
 }
 
 export async function restoreDrafts(deps: {
-  openDraft: (draft: DraftRecord) => void;
+  review: () => void;
+  restoreAll: () => void;
   host: HTMLElement;
 }): Promise<void> {
   let drafts: DraftRecord[];
-  try {
-    const stored = await invoke<DraftRecord[]>("recovery_list_drafts");
-    // Earlier versions could leave text drafts for PDF tabs; drop them quietly.
-    for (const draft of stored) if (isPdfDraft(draft)) clearDraftById(draft.id);
-    drafts = stored.filter(isRecoverableDraft);
-  } catch {
-    return;
-  }
-  if (drafts.length === 0) return;
-
+  try { drafts = (await invoke<DraftRecord[]>("recovery_list_drafts")).filter(isRecoverableDraft); }
+  catch { return; }
+  if (!drafts.length) return;
   deps.host.querySelector(".recovery-banner")?.remove();
   const banner = document.createElement("div");
   banner.className = "recovery-banner";
-
   const summary = document.createElement("span");
-  summary.textContent =
-    `${drafts.length} unsaved document(s) from your last session: ` +
-    drafts.map((draft) => draft.name).join(", ");
-
-  const actions = document.createElement("span");
-  actions.className = "recovery-actions";
-  const restore = document.createElement("button");
-  restore.type = "button";
-  restore.textContent = "Restore all";
-  restore.addEventListener("click", () => {
-    for (const draft of drafts) deps.openDraft(draft);
-    banner.remove();
-  });
-  const discard = document.createElement("button");
-  discard.type = "button";
-  discard.textContent = "Discard all";
-  discard.addEventListener("click", () => {
-    for (const draft of drafts) void discardDraft(draft.id);
-    banner.remove();
-  });
-  actions.append(restore, discard);
-  banner.append(summary, actions);
-  deps.host.prepend(banner);
+  summary.textContent = `BugText recovered ${drafts.length} unsaved ${drafts.length === 1 ? "document" : "documents"} from your last session.`;
+  const actions = document.createElement("span"); actions.className = "recovery-actions";
+  const review = document.createElement("button"); review.type = "button"; review.textContent = "Review…";
+  review.addEventListener("click", deps.review);
+  const restore = document.createElement("button"); restore.type = "button"; restore.textContent = "Restore all";
+  restore.addEventListener("click", () => { deps.restoreAll(); banner.remove(); });
+  const later = document.createElement("button"); later.type = "button"; later.textContent = "Later ✕";
+  later.addEventListener("click", () => banner.remove());
+  actions.append(review, restore, later); banner.append(summary, actions);
+  const header = deps.host.querySelector(".editor-header");
+  if (header) header.after(banner); else deps.host.prepend(banner);
 }
 
 async function statOf(path: string): Promise<DiskState> {
