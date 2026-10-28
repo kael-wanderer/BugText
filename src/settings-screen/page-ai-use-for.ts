@@ -8,7 +8,7 @@ import {
   resolveUse,
   ENGINE_BADGE,
 } from "../ai/engines";
-import { button, caption, select, stepper, toggle } from "./controls";
+import { button, caption, select, toggle } from "./controls";
 import type { AiPageDeps } from "./page-ai";
 import type { ScreenDeps } from "./screen";
 const LABELS: Record<FeatureId, string> = {
@@ -234,42 +234,5 @@ export function renderUseFor(
       else note.remove();
     }
     draw();
-    if (feature === "chat") {
-      const context = document.createElement("div");
-      context.className = "st-use-context";
-      context.append(text("strong", "Context"));
-      const chars = document.createElement("div");
-      chars.dataset.setting = "context-chars";
-      chars.append(
-        text("span", "Max context characters"),
-        stepper({
-          ariaLabel: "Max context characters",
-          value: deps.getAISettings().maxContextChars,
-          min: 4000,
-          max: 2000000,
-          step: 1000,
-          onChange: (value) => {
-            const next = structuredClone(deps.getAISettings());
-            next.maxContextChars = value;
-            deps.onAISettingsChange(next);
-          },
-        }),
-      );
-      const files = document.createElement("div");
-      files.dataset.setting = "context-files";
-      files.append(
-        text("span", "Files per chat"),
-        stepper({
-          ariaLabel: "Files per chat",
-          value: deps.getSettings().workspaceContextK,
-          min: 1,
-          max: 20,
-          onChange: (workspaceContextK) =>
-            deps.onSettingsChange({ ...deps.getSettings(), workspaceContextK }),
-        }),
-      );
-      context.append(chars, files);
-      page.append(context);
-    }
   }
 }

@@ -3452,3 +3452,13 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .ai-conversation-item small { color: var(--muted); font-size: 10px; white-space: nowrap; }
 .ai-conversation-item [aria-current="true"] { border-color: var(--accent); }
 .ai-conversation-item input { min-width: 0; flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--accent); padding: 4px; }
+
+.ai-context-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
+.ai-context-chips button { font: inherit; font-size: 11px; color: var(--muted); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px; overflow-wrap: anywhere; cursor: pointer; }
+.ai-context-chips button[aria-pressed="true"] { border-color: var(--accent); color: var(--text); }
+.ai-context-chips button[aria-pressed="false"] { opacity: .7; }
+.ai-context-chips button.excluded { color: var(--error, #c45b50); border-color: currentColor; }
+.ai-context-sent { color: var(--muted); font-size: 11px; padding: 4px 10px; }
+.ai-context-sent summary { cursor: pointer; }
+.ai-context-sent ul { padding-left: 18px; margin: 5px 0; overflow-wrap: anywhere; }
+.ai-context-sent button { background: transparent; color: var(--accent); border: 0; padding: 0 4px; text-decoration: underline; cursor: pointer; font: inherit; }

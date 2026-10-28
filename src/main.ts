@@ -170,7 +170,7 @@ import { tableCommandFromId, tableMenuItems } from "./table-menu";
 import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
-const workspaceIndex = createWorkspaceIndex();
+const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
 const linkIndex = createLinkIndex();
 
 const windowsHost = document.getElementById("windows")!;
@@ -700,7 +700,7 @@ const handlers = {
       renderAll();
     }
   },
-  onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) updateOutline(); },
+  onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
   onPdfEditDirtyChange: (wid: string, tid: string, dirty: boolean) =>
@@ -958,7 +958,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 
 function renderAll(): void {
   for (const v of views.values()) v.render();
-  if (views.has(getState().activeWindowId)) updateOutline();
+  if (views.has(getState().activeWindowId)) { updateOutline(); aiPanel?.resize(); }
   document.getElementById("windows")!.classList.toggle("has-sub", getState().windows.length > 1);
   const tab = activeMeta();
   const exportButton = document.getElementById("ab-export") as HTMLButtonElement | null;
@@ -2398,13 +2398,13 @@ function buildAIPanel(): void {
       const tab = activeMeta();
       const selection = view.editor.getSelection();
       return {
+        path: tab?.path ?? null,
         text: tab ? view.editor.getText(tab.id) : "",
         selection: selection.text,
         windowId: getState().activeWindowId,
         tabId: tab?.id ?? "",
         from: selection.from,
         to: selection.to,
-        path: tab?.path ?? null,
       };
     },
     lookupTabText: panelReview.lookupTabText,
@@ -2469,6 +2469,7 @@ function toggleAI(): void {
 function quickActionDeps(actionLabel: string): QuickActionDeps {
   const review = editReviewDeps(actionLabel);
   return {
+    notify: showToast,
     getSettings: () => currentAISettings,
     getClis: () => cliInfos,
     getDoc: () => {
@@ -2476,6 +2477,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
       const tab = activeMeta();
       const selection = view.editor.getSelection();
       return {
+        path: tab?.path ?? null,
         text: tab ? view.editor.getText(tab.id) : "",
         selection: selection.text,
         windowId: getState().activeWindowId,
@@ -2496,12 +2498,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
       setAIVisible(true);
       return aiPanel!.appendBubble(role, text);
     },
-    getWorkingDir: () => {
-      const folder = getState().folder;
-      if (folder) return folder;
-      const path = activeMeta()?.path;
-      return path ? path.replace(/[\\/][^\\/]*$/, "") || null : null;
-    },
+    getWorkingDir: () => getState().folder,
     makeAbort: () => new AbortController(),
   };
 }

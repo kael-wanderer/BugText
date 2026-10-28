@@ -1,3 +1,4 @@
+import type { ContextSent } from "./context-sent";
 import type { ChatContentPart, ChatMessage } from "./providers";
 import { fitContext, type ContextBlock } from "./context-budget";
 
@@ -34,8 +35,9 @@ export function buildMessages(options: {
   editMode: boolean;
   files?: AttachedFile[];
   retrieved?: RetrievedChunk[];
+  notePath?: string;
   maxContextChars: number;
-}): { messages: ChatMessage[]; truncatedChars: number } {
+}): { messages: ChatMessage[]; truncatedChars: number; context: ContextSent } {
   const messages: ChatMessage[] = [
     {
       role: "system",
@@ -46,10 +48,13 @@ export function buildMessages(options: {
   messages.push(...options.history);
 
   const blocks: ContextBlock[] = [];
+  const included: ((chars: number) => void)[] = [];
+  const sent: ContextSent = { excerpts: [], files: [], trimmed: 0 };
   const context = options.selection.trim()
     ? options.selection
     : options.docText;
   if (context.trim()) {
+    included.push(chars => { sent.note = { label: options.selection.trim() ? "Selection" : "This note", path: options.notePath ?? "Untitled", chars }; });
     blocks.push({
       prefix: "<document>\n",
       content: sealBlockContent("document", context),
@@ -57,6 +62,7 @@ export function buildMessages(options: {
     });
   }
   for (const chunk of options.retrieved ?? []) {
+    included.push(chars => { sent.excerpts.push({ path: chunk.path, chars }); });
     const source = escapeAttribute(
       `${chunk.path}${chunk.heading ? `#${chunk.heading}` : ""}`,
     );
@@ -68,6 +74,7 @@ export function buildMessages(options: {
   }
   for (const file of options.files ?? []) {
     if (file.kind === "text") {
+      included.push(chars => { sent.files.push({ name: file.name, chars }); });
       const name = escapeAttribute(file.name);
       blocks.push({
         prefix: `<attachment name="${name}">\n`,
@@ -76,7 +83,8 @@ export function buildMessages(options: {
       });
     }
   }
-  const fitted = fitContext(blocks, options.maxContextChars);
+  const fitted = fitContext(blocks, options.maxContextChars, (index, chars) => included[index](chars));
+  sent.trimmed = fitted.truncatedChars;
   const userText = fitted.text
     ? `${fitted.text}\n\n${options.prompt}`
     : options.prompt;
@@ -99,5 +107,6 @@ export function buildMessages(options: {
   return {
     messages,
     truncatedChars: fitted.truncatedChars,
+    context: sent,
   };
 }

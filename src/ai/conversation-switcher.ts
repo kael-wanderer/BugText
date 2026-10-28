@@ -1,3 +1,4 @@
+import type { ContextChipsState } from "./context-chips";
 import { emit, listen } from "@tauri-apps/api/event";
 import { showToast } from "../toast";
 import { capConversation, conversationTitle, deleteConversation, listConversations, readConversation, restoreConversation, writeConversation, type Conversation, type ConversationEntry } from "./conversations";
@@ -21,6 +22,12 @@ export function createConversationSwitcher(host: HTMLElement, deps: {
   events?: { emit(change: Change): Promise<void>; listen(handler: (change: Change) => void): Promise<() => void> };
 }) {
   const store = deps.store ?? defaultStore;
+  let writes: Promise<void> = Promise.resolve();
+  function persistConversation(folder: string | null, value: Conversation): Promise<void> {
+    const snapshot = structuredClone(value);
+    const next = writes.catch(() => {}).then(() => store.write(folder, snapshot));
+    writes = next; return next;
+  }
   const events = deps.events ?? {
     emit: (change: Change) => emit(CONVERSATION_EVENT, change),
     listen: (handler: (change: Change) => void) => listen<Change>(CONVERSATION_EVENT, event => handler(event.payload)),
@@ -59,7 +66,7 @@ export function createConversationSwitcher(host: HTMLElement, deps: {
         row.append(pick, time, btn("Rename", () => {
           if (streaming || deps.busy?.() || locked(item.id, groupFolder)) return;
           const input = document.createElement("input"); input.value = item.title; input.setAttribute("aria-label", "Conversation title");
-          const save = async () => { const title = input.value.trim(); if (!title) return; try { const value = await store.read(groupFolder, item.id); value.title = title; await store.write(groupFolder, value); await notify("write", item.id, groupFolder); if (folder === groupFolder && active?.id === item.id) active = value; await refresh(); } catch { deps.error("Could not rename conversation."); } };
+          const save = async () => { const title = input.value.trim(); if (!title) return; try { const value = await store.read(groupFolder, item.id); value.title = title; await persistConversation(groupFolder, value); await notify("write", item.id, groupFolder); if (folder === groupFolder && active?.id === item.id) active = value; await refresh(); } catch { deps.error("Could not rename conversation."); } };
           row.replaceChildren(input, btn("Save", () => { void save(); }), btn("Cancel", draw)); input.addEventListener("keydown", e => { if (e.key === "Enter") void save(); if (e.key === "Escape") draw(); }); input.focus();
         }), btn("Delete", () => { void remove(groupFolder, item.id); })); menu.append(row);
       }
@@ -123,19 +130,25 @@ export function createConversationSwitcher(host: HTMLElement, deps: {
     newChat,
     refreshState: draw,
     async folderChanged() { if (deps.folder() === workspaceFolder) return; workspaceFolder = deps.folder(); const version = ++generation; folder = workspaceFolder; active = null; locks.clear(); deps.load(null); await refresh(); if (version !== generation) return; if (entries[0]) await select(workspaceFolder, entries[0].id); },
-    async begin(prompt: string) {
+    async begin(prompt: string, contextChips?: ContextChipsState) {
       if (streaming || locked()) return null;
       active ??= { version: 1, id: crypto.randomUUID(), title: conversationTitle(prompt), updatedAt: Date.now(), messages: [] };
+      if (contextChips) active.contextChips = contextChips;
       streaming = true; draw(); await notify("stream");
       return { folder, value: structuredClone(active) };
     },
     async finish(run: { folder: string | null; value: Conversation }, messages: Conversation["messages"]) {
       const value = capConversation({ ...run.value, updatedAt: Date.now(), messages: [...run.value.messages, ...messages] });
-      try { await store.write(run.folder, value); await notify("write", value.id, run.folder); if (folder === run.folder && active?.id === value.id) active = value; }
+      try { await persistConversation(run.folder, value); await notify("write", value.id, run.folder); if (folder === run.folder && active?.id === value.id) active = value; }
       finally { streaming = false; await notify("idle", value.id, run.folder); await refresh(); if (pendingReload) { pendingReload = false; await reload(); } draw(); }
       return value;
     },
     async cancel() { streaming = false; await notify("idle"); if (pendingReload) { pendingReload = false; await reload(); } draw(); },
+    async updateContext(contextChips: ContextChipsState) {
+      if (streaming || locked() || !active) return;
+      active = { ...active, contextChips };
+      if (active.messages.length) { await persistConversation(folder, active); await notify("write"); }
+    },
     getActive: () => active,
     isReadOnly: locked,
     destroy() { destroyed = true; window.clearInterval(timer); unlisten?.(); },

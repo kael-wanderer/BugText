@@ -8,6 +8,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Context chips per conversation and a saved Context sent disclosure showing note text, excerpts, files and trimming for each reply.
+- Never send to AI patterns in AI ▸ Context, enforced for folder indexing, mentions, attachments, open notes and actions.
 - Named conversations in the AI panel: folder-specific chat lists, New chat (⌥⌘J), inline rename, Delete with Undo, and live updates between windows.
 - Conversation storage per folder, with 400-message retention, seven-day trash and migration of earlier AI chat history.
 - My actions: save prompts in AI settings and run them from the palette, editor AI menu or panel action bar.

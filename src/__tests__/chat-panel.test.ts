@@ -261,3 +261,49 @@ it("persists an Answer action in the active named conversation", async () => {
     expect.objectContaining({ role: "assistant", text: "reply" }),
   ]) }));
 });
+
+it("refuses excluded attachments and hides them from @ before reading", async () => {
+  deps.getSettings().context.exclude = ["private/**"];
+  deps.getFileList = () => [{ path: "/notes/private/salary.md", name: "private/salary.md" }, { path: "/notes/public.md", name: "public.md" }];
+  const panel = createAIPanel(root, deps);
+  await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>(".ai-context-chips button")!.disabled).toBe(false));
+  panel.addAttachments(["/notes/private/salary.md"]);
+  expect(document.body.textContent).toContain("private/salary.md is excluded from AI context in Settings.");
+  expect(root.querySelector(".ai-context-chips")!.textContent).not.toContain("salary");
+  const input = root.querySelector<HTMLTextAreaElement>(".ai-input")!; input.value = "@"; input.selectionStart = 1; input.dispatchEvent(new Event("input"));
+  expect(root.querySelector(".ai-mention")!.textContent).not.toContain("salary");
+  send(); await vi.waitFor(() => expect(streamChat).toHaveBeenCalled());
+  const { invoke } = await import("@tauri-apps/api/core"); expect(invoke).not.toHaveBeenCalledWith("read_file", { path: "/notes/private/salary.md" });
+});
+it("sends prompt only with both chips off and persists chips and Context sent", async () => {
+  const panel = createAIPanel(root, deps); panel.render();
+  await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>(".ai-context-chips button")!.disabled).toBe(false));
+  const chips = root.querySelector(".ai-context-chips")!;
+  [...chips.querySelectorAll("button")].find(b => b.textContent?.includes("This note"))!.click();
+  [...chips.querySelectorAll("button")].find(b => b.textContent?.includes("Folder search"))!.click();
+  send(); await vi.waitFor(() => expect(streamChat).toHaveBeenCalled());
+  const messages = vi.mocked(streamChat).mock.calls[0][2]; expect(JSON.stringify(messages.filter(m => m.role === "user"))).not.toContain("<document>"); expect(deps.workspaceIndex.query).not.toHaveBeenCalled();
+  await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ contextChips: { note: false, search: false, files: [] }, messages: expect.arrayContaining([expect.objectContaining({ role: "assistant", context: expect.objectContaining({ excerpts: [], files: [] }) })]) })));
+  expect(root.textContent).toContain("Context sent");
+});
+it("locks the excluded open note and omits its document block", async () => {
+  deps.getSettings().context.exclude = ["private/**"];
+  const doc = deps.getDoc(); deps.getDoc = () => ({ ...doc, path: "/notes/private/a.md" });
+  createAIPanel(root, deps);
+  expect(root.querySelector<HTMLButtonElement>(".ai-context-chips button")!.disabled).toBe(true);
+  send(); await vi.waitFor(() => expect(streamChat).toHaveBeenCalled());
+  expect(JSON.stringify(vi.mocked(streamChat).mock.calls[0][2].filter(m => m.role === "user"))).not.toContain("<document>");
+});
+
+it("restores optional conversation chips and saved Context sent", async () => {
+  const saved = { version: 1 as const, id: "saved", title: "Saved", updatedAt: 1,
+    contextChips: { note: false, search: false, files: [] },
+    messages: [{ role: "assistant" as const, text: "Old reply", time: 1, context: { note: { path: "old.md", label: "This note", chars: 42 }, excerpts: [], files: [], trimmed: 0 } }],
+  };
+  vi.mocked(listConversations).mockImplementation(async folder => folder === "/notes" ? [saved] : []); vi.mocked(readConversation).mockResolvedValue(saved);
+  createAIPanel(root, deps);
+  await vi.waitFor(() => expect(root.textContent).toContain("old.md (42 chars)"));
+  const note = [...root.querySelectorAll<HTMLButtonElement>(".ai-context-chips button")].find(b => b.textContent?.includes("This note"))!;
+  expect(note.getAttribute("aria-pressed")).toBe("false"); note.click();
+  await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ contextChips: { note: true, search: false, files: [] } })));
+});

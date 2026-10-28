@@ -1,3 +1,4 @@
+import { renderContext } from "./page-ai-context";
 import { renderActions, type ActionsPageDeps } from "./page-ai-actions";
 import type { CliInfo } from "../ai/engines";
 import { pageHeader } from "./controls";
@@ -18,6 +19,7 @@ export const aiPage: SettingsPage = {
   render(host, deps, sub = "use-for") {
     pageHeader(host, "ai");
     if (sub === "use-for") renderUseFor(host, deps);
+    else if (sub === "context") renderContext(host, deps);
     else if (sub === "actions") renderActions(host, deps);
     else if (sub === "local-cli") renderLocalCli(host, deps);
     else if (sub === "mcp" && deps.mcp) renderMcpPage(host, deps.mcp);

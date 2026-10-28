@@ -164,8 +164,12 @@ The AI panel is Chat only, with named conversations per folder and a No folder g
 Its header switches chats, starts a new chat (⌥⌘J), renames and deletes with Undo.
 Conversation events refresh other windows; streaming chats are read-only elsewhere
 until the reply finishes. Its engine/model picker reads and updates `uses.chat`.
-The open note is always context; when a folder is open, keyword retrieval adds the
-top `workspaceContextK` chunks on every question. Replies show timing, model and
+Context chips select the open note or selection, folder search and attachments per
+conversation. Both note and search default on; replies save a Context sent summary.
+Settings ▸ AI ▸ Context stores `context.exclude` patterns in agent.json; indexing,
+mentions, attachment reads, open-note context and actions enforce them before sending.
+An excluded note chip is locked off. Keyword retrieval adds up to
+`workspaceContextK` chunks while Folder search is on. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents

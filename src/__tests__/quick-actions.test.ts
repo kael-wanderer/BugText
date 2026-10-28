@@ -192,3 +192,14 @@ describe("saved action runner", () => {
     expect(review).toHaveBeenCalledWith("hello world", "REVISED", expect.objectContaining({ from: 0, to: 11 }));
   });
 });
+
+it("refuses built-in and saved action inputs from excluded notes", async () => {
+  vi.mocked(streamChat).mockClear();
+  const settings = structuredClone(DEFAULT_AI_SETTINGS); settings.context.exclude = ["private/**"];
+  for (const action of [QUICK_ACTIONS[0], { id: "custom", name: "Extract", instruction: "Extract", input: "note" as const, result: "answer" as const, engine: null, panel: true }]) {
+    const append = vi.fn(() => bubble()); const deps = baseDeps();
+    await runQuickAction(action, { ...deps, getSettings: () => settings, getWorkingDir: () => "/notes", getDoc: () => ({ ...deps.getDoc(), path: "/notes/private/a.md" }), appendBubble: append });
+    expect(append).toHaveBeenCalledWith("system", "private/a.md is excluded from AI context in Settings.");
+  }
+  expect(streamChat).not.toHaveBeenCalled();
+});

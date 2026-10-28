@@ -40,3 +40,16 @@ describe("workspace index generations", () => {
     expect((await query).length).toBeGreaterThan(0);
   });
 });
+
+it("excludes files before reads and updates, and rebuilds after patterns change", async () => {
+  mocks.list.mockResolvedValue(["private/a.md", "public.md"]);
+  mocks.read.mockResolvedValue("banana content");
+  let patterns = ["private/**"];
+  const index = createWorkspaceIndex(() => patterns);
+  expect((await index.query("/notes", "banana", 5)).map(c => c.path)).toEqual(["/notes/public.md"]);
+  expect(mocks.read).not.toHaveBeenCalledWith("read_file", { path: "/notes/private/a.md" });
+  index.onFileChanged("/notes/private/a.md", "banana secrets");
+  expect((await index.query("/notes", "banana", 5)).every(c => !c.path.includes("private"))).toBe(true);
+  patterns = ["**"];
+  expect(await index.query("/notes", "banana", 5)).toEqual([]);
+});

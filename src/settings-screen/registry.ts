@@ -3,7 +3,7 @@
 
 import { KEYMAP_COMMANDS } from "../keymap";
 
-export type AiSubPage = "use-for" | "actions" | "local-cli" | "api" | "mcp";
+export type AiSubPage = "use-for" | "context" | "actions" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
   "general" | "editing" | "theme" | "shortcuts" | "ai";
@@ -226,17 +226,20 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     keywords: "quick action",
   },
   {
+    id: "context-exclude", page: "ai", sub: "context", label: "Never send to AI", keywords: "exclude glob private patterns",
+  },
+  {
     id: "context-chars",
     page: "ai",
-    label: "Max context characters",
-    sub: "use-for",
+    label: "Maximum context characters",
+    sub: "context",
     keywords: "context limit",
   },
   {
     id: "context-files",
     page: "ai",
-    label: "Files per chat",
-    sub: "use-for",
+    label: "Folder search excerpts",
+    sub: "context",
     keywords: "workspace context count",
   },
   {

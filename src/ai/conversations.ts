@@ -1,6 +1,7 @@
+import type { ContextChipsState } from "./context-chips";
 import { invoke } from "@tauri-apps/api/core";
 export type ConversationMessage = { role: "user" | "assistant" | "system"; text: string; time: number; engine?: string; context?: unknown };
-export type Conversation = { version: 1; id: string; title: string; updatedAt: number; messages: ConversationMessage[]; earlierMessagesRemoved?: boolean };
+export type Conversation = { version: 1; id: string; title: string; updatedAt: number; messages: ConversationMessage[]; earlierMessagesRemoved?: boolean; contextChips?: ContextChipsState };
 export type ConversationEntry = Pick<Conversation, "id" | "title" | "updatedAt">;
 export function conversationTitle(question: string): string { return question.replace(/\s+/g, " ").trim().slice(0, 60); }
 export function capConversation(value: Conversation): Conversation {

@@ -168,6 +168,7 @@ export function createSettingsScreen(
       for (const [sub, label, section] of [
         ["use-for", "Use for", "FEATURES"],
         ["actions", "Actions", ""],
+        ["context", "Context", ""],
         ["local-cli", "Local CLI", "ENGINES"],
         ["api", "API providers", ""],
         ["mcp", "MCP server", "AGENTS"],

@@ -40,6 +40,7 @@ export type AISettings = {
   enabled: Record<FeatureId, boolean>;
   uses: Partial<Record<FeatureId, UseRow>>;
   localCli: LocalCli;
+  context: { exclude: string[] };
   maxContextChars: number;
 };
 
@@ -59,6 +60,7 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
     codex: { codexHome: "", executablePath: "", proxyBaseUrl: "" },
     pi: { executablePath: "" },
   },
+  context: { exclude: [] },
   maxContextChars: 120_000,
 };
 
@@ -69,6 +71,7 @@ export const DEFAULT_AI_SETTINGS_JSON = JSON.stringify(
     enabled: DEFAULT_AI_SETTINGS.enabled,
     uses: DEFAULT_AI_SETTINGS.uses,
     localCli: DEFAULT_AI_SETTINGS.localCli,
+    context: DEFAULT_AI_SETTINGS.context,
     maxContextChars: DEFAULT_AI_SETTINGS.maxContextChars,
   },
   null,
@@ -232,6 +235,7 @@ function parseV2(data: Record<string, unknown>): AISettings {
     enabled,
     uses,
     localCli: parseLocalCli(data.localCli),
+    context: { exclude: Array.isArray(record(data.context)?.exclude) ? (record(data.context)!.exclude as unknown[]).filter((p): p is string => typeof p === "string") : [] },
     maxContextChars,
   };
 }

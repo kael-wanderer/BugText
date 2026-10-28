@@ -1,3 +1,5 @@
+import type { ContextSent } from "./context-sent";
+import { isContextExcluded, exclusionMessage } from "./context-exclude";
 import type { AISettings, FeatureId } from "./aisettings";
 import { type CliInfo } from "./engines";
 import { actionEngine, type RunnableAction } from "./actions";
@@ -67,9 +69,12 @@ export function enabledQuickActions(settings: AISettings): typeof QUICK_ACTIONS 
 export type BubbleHandle = { textContent: string | null };
 
 export type QuickActionDeps = {
+  notify?: (text: string) => void;
+  onContext?: (context: ContextSent) => void;
   getSettings: () => AISettings;
   getClis: () => CliInfo[];
   getDoc: () => {
+    path?: string | null;
     text: string;
     selection: string;
     windowId: string;
@@ -94,6 +99,10 @@ export async function runQuickAction(
     engine: null, feature: action.feature, panel: true,
   } : action;
   const doc = deps.getDoc();
+  if (isContextExcluded(doc.path, deps.getWorkingDir(), deps.getSettings().context.exclude)) {
+    const message = exclusionMessage(doc.path!, deps.getWorkingDir());
+    deps.notify?.(message); deps.appendBubble("system", message); return;
+  }
   const scope = actionScope(normalized.input === "note" ? "" : doc.selection, doc.text);
   if (!scope.text.trim()) {
     deps.appendBubble("system", "Nothing to send — the selection and note are empty.");
@@ -117,8 +126,12 @@ export async function runQuickAction(
     selection: "",
     editMode: normalized.result === "edit",
     files: [],
+    notePath: doc.path ? doc.path.split(/[\\/]/).pop() : "Untitled",
     maxContextChars: settings.maxContextChars,
   });
+  built.context.action = true;
+  if (built.context.note) built.context.note.label = scope.whole ? "This note" : "Selection";
+  deps.onContext?.(built.context);
   if (built.truncatedChars > 0) {
     deps.appendBubble("system", contextTrimWarning(built.truncatedChars));
   }

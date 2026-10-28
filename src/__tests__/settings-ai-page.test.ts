@@ -105,6 +105,7 @@ it("shows rail subitems in order", () => {
   expect(Array.from(items).map((x) => x.textContent)).toEqual([
     "Use for",
     "Actions",
+    "Context",
     "Local CLI",
     "API providers",
     "MCP server",

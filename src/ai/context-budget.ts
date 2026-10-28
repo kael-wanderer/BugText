@@ -18,16 +18,18 @@ function renderBlock(block: ContextBlock): string {
 export function fitContext(
   blocks: ContextBlock[],
   cap: number,
+  onKept?: (index: number, chars: number) => void,
 ): FittedContext {
   const original = blocks.map(renderBlock).join(BLOCK_SEPARATOR);
   const limit = Number.isFinite(cap) ? Math.max(0, Math.floor(cap)) : 0;
   const kept: string[] = [];
   let used = 0;
 
-  for (const block of blocks) {
+  for (const [index, block] of blocks.entries()) {
     const separator = kept.length ? BLOCK_SEPARATOR : "";
     const rendered = renderBlock(block);
     if (used + separator.length + rendered.length <= limit) {
+      onKept?.(index, block.content.length);
       kept.push(rendered);
       used += separator.length + rendered.length;
       continue;
@@ -37,6 +39,7 @@ export function fitContext(
     const wrapperLength = block.prefix.length + block.suffix.length;
     if (available >= wrapperLength) {
       const contentLength = available - wrapperLength;
+      onKept?.(index, contentLength);
       kept.push(
         `${block.prefix}${block.content.slice(0, contentLength)}${block.suffix}`,
       );
