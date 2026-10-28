@@ -14,6 +14,8 @@ export type PlanOptions = {
   defaultFolder: string;
   /** Explorer folder (relative to the open folder); wins over the header. */
   targetDir?: string | null;
+  /** File name template when the header has no `name:`; defaults to the title. */
+  defaultName?: string;
 };
 
 export function planNote(raw: string, options: PlanOptions): NotePlan {
@@ -21,7 +23,7 @@ export function planNote(raw: string, options: PlanOptions): NotePlan {
   const values = placeholderValues(options.now, options.title, options.format);
   const fill = (value: string): string => fillTemplate(value, values).text;
   const folder = options.targetDir ?? fill(header.folder ?? options.defaultFolder);
-  const destination = relativeDestination(folder, fill(header.name ?? "{{title}}"));
+  const destination = relativeDestination(folder, fill(header.name ?? options.defaultName ?? "{{title}}"));
   const body = fillTemplate(header.body, values);
   return { destination, text: body.text, cursor: body.cursor };
 }

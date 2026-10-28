@@ -551,6 +551,7 @@ function commandItems(): PaletteItem[] {
   return [
     command("new", "New File", newDoc),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
+    command("quickNote", "Quick Note…", () => templateActions.quickNote()),
     command("open", "Open File…", () => void doOpen()),
     command("openFolder", "Open Folder…", () => {
       void pickFolder().then(async (folder) => {
@@ -1407,6 +1408,17 @@ const templateActions = createTemplateActions({
     editorForTab(found.tab.id).focus();
   },
   revealInFinder,
+  findOpenTab: (path) => {
+    const found = findTabByPath(getState().windows, path);
+    return found ? { tabId: found.tab.id, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
+  },
+  appendToTab: (tabId, text) => editorForTab(tabId).appendText(tabId, text),
+  afterDiskWrite: (path) => {
+    void invoke<string>("read_file", { path }).then((text) => {
+      workspaceIndex.onFileChanged(path, text);
+      aiPanel?.updateWorkspaceFile(path, text);
+    }).catch(() => {});
+  },
 });
 
 function newDoc(): void {
@@ -2862,6 +2874,8 @@ listenScoped<string>("menu", (event) => {
       return newDoc();
     case "file.new_from_template":
       return templateActions.newFromTemplate();
+    case "file.quick_note":
+      return templateActions.quickNote();
     case "file.open":
       return void doOpen();
     case "file.open_folder":

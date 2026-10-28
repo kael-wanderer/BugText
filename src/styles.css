@@ -3398,3 +3398,11 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .tpl-empty { padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .tpl-empty p { margin: 0 0 8px; color: var(--muted); }
 @media (max-width: 640px) { .tpl-pick { grid-template-columns: 1fr; } .tpl-left { border-right: 0; border-bottom: 1px solid var(--border); max-height: 180px; } }
+
+/* Quick Note */
+.qn { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 90; width: min(520px, calc(100vw - 32px)); padding: 10px 12px; background: var(--bg-editor); color: var(--text); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px rgba(0,0,0,.25); }
+.qn-input { display: block; width: 100%; box-sizing: border-box; resize: none; font: inherit; color: var(--text); background: var(--bg-editor); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; }
+.qn-info { display: flex; justify-content: space-between; gap: 12px; margin-top: 6px; color: var(--muted); font-size: 11px; }
+.qn-target { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
+.qn-target.err { color: var(--error, #c45b50); }
+.qn-hints { white-space: nowrap; }
