@@ -6,6 +6,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Fixed
+
+- Saves stay bound to the document and revision that started them, so edits made during a save remain unsaved and recoverable. Switching panes or saving through MCP no longer replaces another tab’s state.
+
 ## [0.4.0] - 2026-10-28
 
 ### Added

@@ -25,6 +25,18 @@ export function clearDraftById(id: string): void {
   void invoke("recovery_clear_draft", { id }).catch(() => {});
 }
 
+type DraftInput = {
+  windowId: string; tabId: string; path: string | null; name: string; contents: string; replacedDraftId?: string;
+};
+
+export async function writeDraftNow(record: DraftInput): Promise<void> {
+  const id = draftIdFor(record.path, record.tabId);
+  const timer = draftTimers.get(id);
+  if (timer) clearTimeout(timer);
+  draftTimers.delete(id);
+  await invoke("recovery_write_draft", { draft: { id, path: record.path, name: record.name, contents: record.contents, updatedAt: Date.now(), windowId: record.windowId } });
+}
+
 export function scheduleDraft(record: {
   windowId: string;
   tabId: string;

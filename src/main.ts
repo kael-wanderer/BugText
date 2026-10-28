@@ -114,8 +114,10 @@ import {
   restoreDrafts,
   scheduleDraft,
   snapshotOnSave,
+  writeDraftNow,
 } from "./recovery";
 import type { DraftRecord } from "./recovery-policy";
+import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
   freshState,
@@ -247,22 +249,23 @@ const mcpHandler = createMcpHandler({
     editorForTab(id).applyChanges(id, changes);
   },
   async saveTab(id) {
-    for (const windowState of getState().windows) {
-      const tab = windowState.tabs.find((candidate) => candidate.id === id);
-      const view = views.get(windowState.id);
-      if (!tab || !view || !tab.path) continue;
-      const text = view.editor.getText(id);
-      await invoke<void>("save_file", { path: tab.path, contents: text });
-      await recordStat(tab.path);
-      clearDraft(tab.path, id);
-      const recoveredId = recoveredDraftIds.get(id);
-      if (recoveredId) clearDraftById(recoveredId);
-      recoveredDraftIds.delete(id);
-      workspaceIndex.onFileChanged(tab.path, text);
-      aiPanel?.updateWorkspaceFile(tab.path, text);
-      patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === id ? { ...item, dirty: false } : item) });
-      return;
-    }
+    const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === id));
+    const tab = windowState?.tabs.find((item) => item.id === id);
+    const view = windowState && views.get(windowState.id);
+    if (!windowState || !tab?.path || !view) return;
+    const path = tab.path;
+    const text = view.editor.getText(id);
+    const binding: SaveBinding = { windowId: windowState.id, tabId: id, path, revision: view.editor.revision(id) };
+    await runSerialized(path, async (queued) => {
+      const current = getState().windows.find((item) => item.tabs.some((candidate) => candidate.id === id));
+      const currentTab = current?.tabs.find((candidate) => candidate.id === id);
+      if (queued && currentTab && !currentTab.dirty && editorForTab(id).revision(id) === binding.revision) return;
+      await invoke<void>("save_file", { path, contents: text });
+      await recordStat(path);
+      workspaceIndex.onFileChanged(path, text);
+      aiPanel?.updateWorkspaceFile(path, text);
+      await finishBoundSave(binding, path);
+    });
   },
   readDisk: (path) => invoke<string>("read_file", { path }),
   writeDiskAtomic: async (path, text) => {
@@ -1352,6 +1355,27 @@ function newDoc(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "Untitled", text: "" });
 }
 
+async function finishBoundSave(binding: SaveBinding, target: string): Promise<void> {
+  const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === binding.tabId));
+  const tab = windowState?.tabs.find((item) => item.id === binding.tabId);
+  const view = windowState && views.get(windowState.id);
+  if (!windowState || !tab || !view) return;
+  const clean = completeSave(binding, view.editor.revision(tab.id)) === "clean";
+  patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === tab.id
+    ? { ...item, path: target, name: basename(target), dirty: !clean } : item) });
+  view.editor.setDocumentKind(tab.id, editorKind(target));
+  if (clean) {
+    clearDraft(binding.path, tab.id);
+    const recoveredId = recoveredDraftIds.get(tab.id);
+    if (recoveredId) clearDraftById(recoveredId);
+    recoveredDraftIds.delete(tab.id);
+  } else {
+    await writeDraftNow({ windowId: windowState.id, tabId: tab.id, path: target, name: basename(target), contents: view.editor.getText(tab.id) }).catch(() => {});
+    showToast("Saved · newer edits not saved yet", 3000);
+  }
+  renderAll();
+}
+
 async function doSave(saveAs = false): Promise<boolean> {
   const t = activeMeta();
   if (!t) return false;
@@ -1365,6 +1389,8 @@ async function doSave(saveAs = false): Promise<boolean> {
     return false;
   }
 
+  const text = view.editor.getText(t.id);
+  const binding: SaveBinding = { windowId: getState().activeWindowId, tabId: t.id, path: t.path, revision: view.editor.revision(t.id) };
   try {
     let target = saveAs ? null : t.path;
     if (!target) {
@@ -1382,7 +1408,11 @@ async function doSave(saveAs = false): Promise<boolean> {
       }
     }
 
-    const text = view.editor.getText(t.id);
+    const saveTarget = target;
+    return await runSerialized(saveTarget, async (queued) => {
+    const currentWindow = getState().windows.find((item) => item.tabs.some((tab) => tab.id === t.id));
+    const currentTab = currentWindow?.tabs.find((tab) => tab.id === t.id);
+    if (queued && currentTab && !currentTab.dirty && editorForTab(t.id).revision(t.id) === binding.revision && currentTab.path === saveTarget) return true;
     if (t.path && (await hasDiskChanged(t.path))) {
       const overwrite = await confirm(
         `"${t.path}" changed on disk since you opened it. Overwrite it with your version?`,
@@ -1404,10 +1434,6 @@ async function doSave(saveAs = false): Promise<boolean> {
       aiPanel?.removeWorkspaceFile(previousPath);
     }
     aiPanel?.updateWorkspaceFile(target, text);
-    clearDraft(previousPath, t.id);
-    const recoveredId = recoveredDraftIds.get(t.id);
-    if (recoveredId) clearDraftById(recoveredId);
-    recoveredDraftIds.delete(t.id);
     void recordStat(target);
     void snapshotOnSave(target, text);
     if (target === settingsPath) {
@@ -1433,16 +1459,10 @@ async function doSave(saveAs = false): Promise<boolean> {
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
-    patchWindow(getState().activeWindowId, {
-      tabs: activeWindow().tabs.map((x) =>
-        x.id === t.id ? { ...x, path: target, name: basename(target), dirty: false } : x
-      ),
-    });
-    view.editor.setDocumentKind(t.id, editorKind(target));
-    view.renderPreview(text, target);
+    await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
-    renderAll();
     return true;
+    });
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     await message(text, { title: "Save file", kind: "error" });
@@ -2028,7 +2048,7 @@ async function moveTabToWindow(
     sourceView.renderPreview("");
   }
 
-  const movedId = nextId();
+  const movedId = tabId;
   targetView.editor.openState(
     movedId,
     text,
@@ -2053,7 +2073,7 @@ async function toggleSub(): Promise<void> {
     const main = mainWindow();
     const moved: TabMeta[] = [];
     for (const t of sub.tabs) {
-      const id = nextId();
+      const id = t.id;
       moved.push({ ...t, id });
       views
         .get("main")!

@@ -21,6 +21,16 @@ function setup(text: string, cursor: number) {
 }
 
 describe("editor tasks and tables", () => {
+  it("tracks revisions of active and inactive documents", () => {
+    const { editor } = setup("one", 0);
+    const before = editor.revision("note");
+    editor.setText("two");
+    expect(editor.revision("note")).toBe(before + 1);
+    editor.openState("other-revision-test", "other");
+    editor.setTextFor("note", "three");
+    expect(editor.revision("note")).toBe(before + 2);
+    expect(editor.revision("other-revision-test")).toBe(0);
+  });
   it("toggles a task from the preview without moving the cursor, undone in one step", () => {
     const text = "- [ ] a\n- [ ] b";
     const { editor, view } = setup(text, 2);
