@@ -44,6 +44,7 @@ export function createSearchPanel(
   let state = new SearchRun();
   let timer: number | undefined;
   let token = 0;
+  let cancellation = Promise.resolve();
   const options: SearchOptions = {
     caseSensitive: false,
     wholeWord: false,
@@ -53,13 +54,14 @@ export function createSearchPanel(
   function cancel(): void {
     window.clearTimeout(timer);
     ++token;
-    void invoke("search_cancel").catch(() => {});
+    cancellation = cancellation.then(() => invoke<void>("search_cancel")).catch(() => {});
   }
 
   function render(query: string): void {
     results.replaceChildren();
     status.textContent = state.status;
     status.classList.toggle("search-error", state.phase === "error");
+    if (state.phase === "error") status.setAttribute("role", "alert"); else status.removeAttribute("role");
     input.setAttribute("aria-invalid", String(state.phase === "error"));
     notes.replaceChildren();
     for (const text of state.notes) {
@@ -123,6 +125,8 @@ export function createSearchPanel(
     if (!folder) { status.textContent = "Open a folder to search its files."; return; }
     if (query.length < 2) { status.textContent = query ? "Type at least 2 characters." : ""; return; }
     state.phase = "text"; render(query);
+    await cancellation;
+    if (current !== token) return;
     try {
       const result = await searchInFolder(folder, query, options, current);
       if (current !== token || result.cancelled) return;
@@ -138,11 +142,12 @@ export function createSearchPanel(
     for (const relative of pdfs) {
       if (current !== token || state.hitLimit) break;
       progress.hidden = false; progress.replaceChildren();
+      const spinner = document.createElement("span"); spinner.className = "search-spinner"; spinner.setAttribute("aria-hidden", "true");
       const label = document.createElement("span"); label.textContent = `Searching PDFs · ${state.pdfDone + 1} of ${state.pdfTotal} · ${relative}`;
       const meter = document.createElement("progress"); meter.max = state.pdfTotal; meter.value = state.pdfDone;
       const stop = document.createElement("button"); stop.type = "button"; stop.textContent = "Stop";
       stop.addEventListener("click", () => { cancel(); state.phase = "stopped"; progress.hidden = true; render(query); });
-      progress.append(label, meter, stop);
+      progress.append(spinner, label, meter, stop);
       const separator = folder.includes("\\") ? "\\" : "/";
       const path = `${folder.replace(/[\\/]$/, "")}${separator}${relative}`;
       try { const hits = await searchPdf(path, relative, query, options, () => current === token); if (current !== token) return; state.add(hits); }

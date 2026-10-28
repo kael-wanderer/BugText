@@ -54,10 +54,10 @@ pub fn should_skip(name: &str) -> bool {
 }
 
 pub fn walk_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
-    walk_files_capped(dir, root, out);
+    walk_files_capped(dir, root, out, &|| true);
 }
 
-fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>) -> bool {
+fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>, is_current: &impl Fn() -> bool) -> bool {
     if out.len() >= WALK_CAP {
         return true;
     }
@@ -68,6 +68,7 @@ fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>) -> bool {
     let mut items: Vec<_> = read.filter_map(Result::ok).collect();
     items.sort_by_key(|entry| entry.file_name());
     for entry in items {
+        if !is_current() { return false; }
         if out.len() >= WALK_CAP {
             return true;
         }
@@ -78,7 +79,7 @@ fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>) -> bool {
         let path = entry.path();
         let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
         if is_dir {
-            if walk_files_capped(&path, root, out) {
+            if walk_files_capped(&path, root, out, is_current) {
                 return true;
             }
         } else if let Ok(relative) = path.strip_prefix(root) {
@@ -136,7 +137,10 @@ fn search_pattern(query: &str, options: &SearchOptions) -> Result<regex::Regex, 
     RegexBuilder::new(&source)
         .case_insensitive(!options.case_sensitive)
         .build()
-        .map_err(|_| "Invalid pattern".to_string())
+        .map_err(|error| {
+            let message = error.to_string();
+            message.lines().last().unwrap_or("Invalid pattern").trim_start_matches("error: ").to_string()
+        })
 }
 
 #[cfg(test)]
@@ -182,6 +186,29 @@ mod search_tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    #[test]
+    fn limits_and_skipped_files_are_reported() {
+        use std::fs;
+        let dir = std::env::temp_dir().join(format!("bugtext-search-limits-{}", std::process::id()));
+        fs::create_dir_all(dir.join("node_modules")).unwrap();
+        fs::write(dir.join("large.md"), vec![b'x'; 2_000_001]).unwrap();
+        fs::write(dir.join("binary.dat"), [0xff]).unwrap();
+        fs::write(dir.join(".hidden"), [0xff]).unwrap();
+        fs::write(dir.join("node_modules/hidden"), [0xff]).unwrap();
+        #[cfg(unix)] std::os::unix::fs::symlink(dir.join("missing"), dir.join("broken")).unwrap();
+        let pattern = regex::Regex::new("hello").unwrap();
+        let result = super::search_folder_at(&dir, &pattern, || true);
+        assert!(result.skipped.iter().any(|s| s.reason == "too_large"));
+        assert!(result.skipped.iter().any(|s| s.reason == "not_text"));
+        #[cfg(unix)] assert!(result.skipped.iter().any(|s| s.reason == "unreadable"));
+        assert!(!result.skipped.iter().any(|s| s.relative.contains("hidden")));
+        fs::write(dir.join("hits.md"), "hello\n".repeat(501)).unwrap();
+        assert!(super::search_folder_at(&dir, &pattern, || true).hit_limit);
+        for i in 0..5001 { fs::write(dir.join(format!("file{i:04}")), "").unwrap(); }
+        assert!(super::search_folder_at(&dir, &pattern, || true).walk_limit);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
 }
 
 #[derive(Default)]
@@ -211,7 +238,8 @@ fn search_folder_at(
 ) -> SearchResult {
     let mut result = SearchResult::default();
     let mut files = Vec::new();
-    result.walk_limit = walk_files_capped(root, root, &mut files);
+    result.walk_limit = walk_files_capped(root, root, &mut files, &is_current);
+    if !is_current() { result.cancelled = true; return result; }
     for relative in files {
         if !is_current() {
             result.cancelled = true;

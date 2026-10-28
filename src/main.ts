@@ -500,7 +500,8 @@ void listenScoped<McpRequest>("bugtext://mcp-request", async ({ payload }) => {
 
 async function refreshFileList(): Promise<void> {
   const folder = getState().folder;
-  fileList = folder ? await listFilesRecursive(folder).catch(() => []) : [];
+  const files = folder ? await listFilesRecursive(folder).catch(() => []) : [];
+  if (getState().folder === folder) fileList = files;
 }
 
 // Opening a settings file shows it as a tab, so leave the settings screen first.

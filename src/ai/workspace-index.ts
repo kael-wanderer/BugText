@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listFilesRecursive } from "../filesys";
+import { listDir, listFilesRecursive } from "../filesys";
 import { buildIndex, chunkDocument, retrieve, retrieveScored, type Chunk } from "./retrieval";
 
 const TEXT_EXT = /\.(md|markdown|txt)$/i;
@@ -28,6 +28,8 @@ export function createWorkspaceIndex() {
     index = buildIndex(chunks);
   }
   async function build(folder: string, current: number): Promise<void> {
+    await listDir(folder);
+    if (current !== generation) return;
     const files = await listFilesRecursive(folder);
     const next: Chunk[] = [];
     for (const relative of files) {

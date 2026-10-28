@@ -140,6 +140,8 @@ clipboard HTML through an inert DOMParser and cell text only. Paste as Plain Tex
 the `clipboard-manager:allow-read-text` capability. `⌘Enter` is the native
 Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
+Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
+
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 The open note is always context; when a folder is open, keyword retrieval adds the
 top `workspaceContextK` chunks on every question. Replies show timing, model and

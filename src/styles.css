@@ -3365,3 +3365,6 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .search-note ul { padding-left: 16px; }
 .search-error { color: var(--error, #c45b50); }
 .search-input[aria-invalid="true"] { border-color: var(--error, #c45b50); }
+.search-progress .search-spinner { flex: none; width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: search-spin .9s linear infinite; }
+@keyframes search-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .search-progress .search-spinner { animation: none; } }

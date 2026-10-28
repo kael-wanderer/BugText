@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ list: vi.fn(), read: vi.fn() }));
-vi.mock("../filesys", () => ({ listFilesRecursive: mocks.list }));
+vi.mock("../filesys", () => ({ listDir: () => Promise.resolve([]), listFilesRecursive: mocks.list }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.read }));
 import { createWorkspaceIndex } from "../ai/workspace-index";
 
@@ -12,6 +12,7 @@ describe("workspace index generations", () => {
     mocks.read.mockResolvedValue("banana unique");
     const index = createWorkspaceIndex();
     const a = index.query("/a", "banana", 5);
+    await Promise.resolve();
     const b = await index.query("/b", "banana", 5);
     resolve(["a.md"]);
     expect((await a)).toEqual([]);
@@ -33,7 +34,7 @@ describe("workspace index generations", () => {
     mocks.read.mockImplementation(() => new Promise<string>((r) => { resolve = r; }));
     const index = createWorkspaceIndex();
     const query = index.query("/a", "banana", 5);
-    await Promise.resolve();
+    await Promise.resolve(); await Promise.resolve();
     index.onFileChanged("/a/a.md", "banana updated");
     resolve("old text");
     expect((await query).length).toBeGreaterThan(0);
