@@ -8,6 +8,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Named conversations in the AI panel: folder-specific chat lists, New chat (⌥⌘J), inline rename, Delete with Undo, and live updates between windows.
 - Conversation storage per folder, with 400-message retention, seven-day trash and migration of earlier AI chat history.
 - My actions: save prompts in AI settings and run them from the palette, editor AI menu or panel action bar.
 - Note-link completion after `](` and reference definitions, including heading suggestions.

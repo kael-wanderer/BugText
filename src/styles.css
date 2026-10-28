@@ -3440,3 +3440,15 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .st-action-form textarea { min-height: 90px; width: 100%; resize: vertical; }
 .st-row[draggable] { cursor: grab; }
 .st-action-notice:not(:empty) { position: sticky; bottom: 12px; padding: 10px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; }
+
+.ai-conversation-switcher { position: relative; display: flex; gap: 6px; flex: 1; min-width: 0; }
+.ai-conversation-switcher button { font: inherit; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+.ai-conversation-switcher button:disabled { opacity: .5; cursor: default; }
+.ai-conversation-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-conversation-menu { position: absolute; top: 100%; left: 0; width: min(420px, 80vw); max-height: 360px; overflow: auto; z-index: 20; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 8px; box-shadow: 0 10px 30px #0004; }
+.ai-conversation-group { color: var(--muted); padding: 8px 4px 4px; font-size: 11px; }
+.ai-conversation-item { display: flex; align-items: center; gap: 4px; margin: 5px 0; }
+.ai-conversation-item > button:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ai-conversation-item small { color: var(--muted); font-size: 10px; white-space: nowrap; }
+.ai-conversation-item [aria-current="true"] { border-color: var(--accent); }
+.ai-conversation-item input { min-width: 0; flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--accent); padding: 4px; }

@@ -160,7 +160,10 @@ Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
 
-The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
+The AI panel is Chat only, with named conversations per folder and a No folder group.
+Its header switches chats, starts a new chat (⌥⌘J), renames and deletes with Undo.
+Conversation events refresh other windows; streaming chats are read-only elsewhere
+until the reply finishes. Its engine/model picker reads and updates `uses.chat`.
 The open note is always context; when a folder is open, keyword retrieval adds the
 top `workspaceContextK` chunks on every question. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff

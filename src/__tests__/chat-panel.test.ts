@@ -1,7 +1,8 @@
-import { beforeEach, expect, it, vi } from "vitest";
-import { installTestDom } from "./setup";
+// @vitest-environment jsdom
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { DEFAULT_AI_SETTINGS } from "../ai/aisettings";
-import { createAIPanel, type AIPanelDeps } from "../ai/panel";
+import { createAIPanel as buildPanel, type AIPanelDeps, type AIPanel } from "../ai/panel";
+import { listConversations, readConversation, writeConversation } from "../ai/conversations";
 import { streamChat } from "../ai/client";
 import { captureFolderState } from "../ai/run-summary";
 vi.mock("../ai/client", () => ({
@@ -25,12 +26,23 @@ vi.mock("../ai/run-summary", async () => ({
   ...(await vi.importActual("../ai/run-summary")),
   captureFolderState: vi.fn().mockResolvedValue(new Map()),
 }));
+vi.mock("../ai/conversations", async () => ({
+  ...(await vi.importActual("../ai/conversations")),
+  listConversations: vi.fn(async () => []),
+  readConversation: vi.fn(),
+  writeConversation: vi.fn(async () => {}),
+}));
+vi.mock("@tauri-apps/api/event", () => ({ emit: vi.fn(async () => {}), listen: vi.fn(async () => () => {}) }));
+const panels: AIPanel[] = [];
+function createAIPanel(...args: Parameters<typeof buildPanel>) { const panel = buildPanel(...args); panels.push(panel); return panel; }
+afterEach(() => { panels.splice(0).forEach(panel => panel.destroy()); });
 let deps: AIPanelDeps;
 let root: HTMLElement;
 beforeEach(() => {
-  installTestDom();
   localStorage.clear();
   vi.clearAllMocks();
+  vi.mocked(listConversations).mockResolvedValue([]);
+  vi.mocked(readConversation).mockReset();
   vi.mocked(captureFolderState).mockReset().mockResolvedValue(new Map());
   const settings = structuredClone(DEFAULT_AI_SETTINGS);
   settings.uses.chat = {
@@ -221,4 +233,31 @@ it("inlines outside-folder CLI attachments instead of passing their paths", asyn
   const [, , messages, , options] = vi.mocked(streamChat).mock.calls[vi.mocked(streamChat).mock.calls.length - 1];
   expect(JSON.stringify(messages)).toContain("private attachment text");
   expect(options.attachmentPaths).toEqual([]);
+});
+
+it("loads the active saved chat and saves replies in its folder", async () => {
+  const value = { version: 1 as const, id: "saved", title: "Saved chat", updatedAt: 1, messages: [{ role: "user" as const, text: "Previous question", time: 1 }] };
+  vi.mocked(listConversations).mockImplementation(async folder => folder === "/notes" ? [value] : []);
+  vi.mocked(readConversation).mockResolvedValue(value);
+  const panel = createAIPanel(root, deps);
+  await vi.waitFor(() => expect(root.textContent).toContain("Previous question"));
+  send();
+  await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ id: "saved", messages: expect.arrayContaining([expect.objectContaining({ text: "reply" })]) })));
+  expect(localStorage.getItem("test-chat")).toBeNull();
+  await vi.waitFor(() => expect(root.textContent).toContain("Save as new note"));
+  panel.newChat();
+  await vi.waitFor(() => expect(root.querySelector(".ai-messages")!.textContent).toBe(""));
+});
+
+it("persists an Answer action in the active named conversation", async () => {
+  const panel = createAIPanel(root, deps);
+  await panel.runAction({ id: "custom", name: "Extract", instruction: "Extract tasks", input: "note", result: "answer", engine: null, panel: true }, {
+    getSettings: deps.getSettings, getClis: deps.getClis, getDoc: deps.getDoc,
+    reviewEdit: vi.fn(), appendBubble: panel.appendBubble, getWorkingDir: deps.getWorkingDir,
+    makeAbort: () => new AbortController(),
+  });
+  expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ messages: expect.arrayContaining([
+    expect.objectContaining({ role: "user", text: "▸ Extract · on note" }),
+    expect.objectContaining({ role: "assistant", text: "reply" }),
+  ]) }));
 });

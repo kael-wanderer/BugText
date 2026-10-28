@@ -32,7 +32,6 @@ import { permitAISettingsSave } from "./ai/aisettings-write-guard";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
-  runQuickAction,
   type QuickActionDeps,
 } from "./ai/quick-actions";
 import { clampAgentPanelWidth } from "./ai-layout";
@@ -587,6 +586,7 @@ function commandItems(): PaletteItem[] {
   const recent = loadRecent();
   return [
     command("new", "New File", newDoc),
+    command("ai.new_chat", "AI: New chat", newAIChat),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
     command("quickNote", "Quick Note…", () => templateActions.quickNote()),
     command("open", "Open File…", () => void doOpen()),
@@ -2432,6 +2432,7 @@ function buildAIPanel(): void {
     }),
     getActions: availableActions,
     runAction: runQuickActionById,
+    windowLabel: nativeWindowLabel,
     historyKey: `bugtext.ai.history.${nativeWindowLabel}`,
     legacyHistoryKey: `bugtext.ai.history.${nativeWindowLabel}`,
   });
@@ -2453,6 +2454,8 @@ function setAIVisible(aiVisible: boolean): void {
   requestWindowMeasure();
   requestAnimationFrame(() => aiPanel?.resize());
 }
+
+function newAIChat(): void { setAIVisible(true); aiPanel?.newChat(); }
 
 function toggleAI(): void {
   if (!currentAISettings.enabled.chat) return;
@@ -2502,7 +2505,8 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
 function runQuickActionById(id: string): void {
   const action = availableActions().find((a) => a.id === id);
   if (!action) return;
-  void runQuickAction(action, quickActionDeps(action.name));
+  setAIVisible(true);
+  void aiPanel!.runAction(action, quickActionDeps(action.name));
 }
 
 async function openInSub(path: string): Promise<void> {
@@ -2605,7 +2609,7 @@ const settingsScreen = createSettingsScreen(
       getFile: () => currentActions,
       hasError: () => actionsError,
       save: async file => { await saveActions(actionsIO(nativeWindowLabel), file); currentActions = file; actionsError = false; aiPanel?.render(); },
-      run: action => { settingsScreen.close(); void runQuickAction(action, quickActionDeps(action.name)); },
+      run: action => { settingsScreen.close(); setAIVisible(true); void aiPanel!.runAction(action, quickActionDeps(action.name)); },
       openFile: () => { if (actionsPath) void doOpenPath(actionsPath); settingsScreen.close(); },
     },
     onSettingsChange: saveSettingsFromPanel,
@@ -3131,6 +3135,7 @@ const appKeyActions: Record<string, () => void> = {
   "search.find_in_files": () => toggleSearch(),
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
+  "ai.new_chat": newAIChat,
   "ai.quick.proofread": () => runQuickActionById("ai.quick.proofread"),
   "ai.quick.rewrite": () => runQuickActionById("ai.quick.rewrite"),
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),

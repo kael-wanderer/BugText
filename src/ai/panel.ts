@@ -1,4 +1,6 @@
-import { migrateHistory, writeConversation, conversationTitle, EARLIER_MESSAGES_NOTICE, type Conversation } from "./conversations";
+import { runQuickAction, type QuickActionDeps } from "./quick-actions";
+import { migrateHistory, EARLIER_MESSAGES_NOTICE } from "./conversations";
+import { createConversationSwitcher } from "./conversation-switcher";
 import { renderActionBar } from "./action-bar";
 import type { RunnableAction } from "./actions";
 import { invoke } from "@tauri-apps/api/core";
@@ -74,10 +76,14 @@ export type AIPanelDeps = {
   getWorkingDir(): string | null;
   getFileList(): { path: string; name: string }[];
   getWorkspaceContext(): { k: number };
+  windowLabel?: string;
   historyKey: string;
   legacyHistoryKey?: string;
 };
 export type AIPanel = {
+  runAction(action: RunnableAction, deps: QuickActionDeps): Promise<void>;
+  destroy(): void;
+  newChat(): void;
   render(): void;
   resize(): void;
   addAttachments(paths: string[]): void;
@@ -104,27 +110,6 @@ function button(text: string, click: () => void, cls = ""): HTMLButtonElement {
   node.type = "button";
   node.addEventListener("click", click);
   return node;
-}
-function loadHistory(key: string, legacy?: string): ChatMessage[] {
-  try {
-    const value: unknown = JSON.parse(
-      localStorage.getItem(key) ??
-        (legacy ? localStorage.getItem(legacy) : null) ??
-        "[]",
-    );
-    return Array.isArray(value)
-      ? value
-          .filter(
-            (m) =>
-              m &&
-              ["user", "assistant", "system"].includes(m.role) &&
-              typeof m.content === "string",
-          )
-          .slice(-400)
-      : [];
-  } catch {
-    return [];
-  }
 }
 export function createAIPanel(
   panelElement: HTMLElement,
@@ -182,27 +167,50 @@ export function createAIPanel(
   inputRow.append(actionBar, attachments, inputWrap, tools);
   const header = panelElement.querySelector<HTMLElement>(".ai-header");
   if (header) {
+    header.querySelector("strong")?.remove();
     header.append(picker);
     body.replaceChildren(messagesElement, inputRow);
   } else body.replaceChildren(picker, messagesElement, inputRow);
-  const history = loadHistory(deps.historyKey, deps.legacyHistoryKey);
-  let activeConversation: Conversation | null = null;
-  let migrationFailed = false;
-  const historyReady = migrateHistory(deps.historyKey, deps.legacyHistoryKey).then(value => {
-    activeConversation = value;
-    if (value?.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
-  }).catch(() => { migrationFailed = true; });
+  const history: ChatMessage[] = [];
   const workspaceIndex = deps.workspaceIndex;
   let referencedFiles: string[] = [];
   let activeRequest: AbortController | null = null;
+  let remotelyLocked = false;
+  let loadedConversationId: string | null = null;
+  const readOnlyNotice = element("div", "ai-note");
+  readOnlyNotice.hidden = true;
+  readOnlyNotice.setAttribute("role", "status");
+  messagesElement.before(readOnlyNotice);
+  const switcher = createConversationSwitcher(header ?? body, {
+    from: deps.windowLabel ?? deps.historyKey,
+    folder: deps.getWorkingDir,
+    busy: () => !!activeRequest,
+    load(value) {
+      history.splice(0, history.length, ...(value?.messages ?? []).map(m => ({ role: m.role, content: m.text })));
+      messagesElement.replaceChildren();
+      if (!value || value.id !== loadedConversationId) { referencedFiles = []; renderAttachments(); }
+      loadedConversationId = value?.id ?? null;
+      if (value?.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
+      for (const message of history) appendBubble(message.role, chatContentText(message.content));
+    },
+    readOnly(value) {
+      remotelyLocked = value;
+      readOnlyNotice.textContent = "Updated in another window";
+      readOnlyNotice.hidden = !value;
+      input.disabled = value; sendButton.disabled = value;
+      actionBar.querySelectorAll("button").forEach(button => { button.disabled = value; });
+    },
+    error: text => appendBubble("error", text),
+  });
+  const historyReady = migrateHistory(deps.historyKey, deps.legacyHistoryKey)
+    .catch(() => { appendBubble("system", "Earlier chat could not be moved yet; it stays in place and is retried next launch."); return null; })
+    .then(value => switcher.init(value));
   function appendBubble(role: string, text: string): HTMLElement {
     const bubble = element("div", `ai-bubble ai-${role}`, text);
     messagesElement.append(bubble);
     messagesElement.scrollTop = messagesElement.scrollHeight;
     return bubble;
   }
-  for (const message of history)
-    appendBubble(message.role, chatContentText(message.content));
   function saveChatRow(row: UseRow): void {
     const next = structuredClone(deps.getSettings());
     next.uses.chat = row;
@@ -210,7 +218,8 @@ export function createAIPanel(
     render();
   }
   function render(): void {
-    renderActionBar(actionBar, deps.getActions?.() ?? [], id => deps.runAction?.(id));
+    renderActionBar(actionBar, deps.getActions?.() ?? [], id => { if (!remotelyLocked) deps.runAction?.(id); });
+    actionBar.querySelectorAll("button").forEach(button => { button.disabled = remotelyLocked; });
     const settings = deps.getSettings();
     const row = resolveUse(settings, "chat", deps.getClis());
     engineSelect.replaceChildren();
@@ -411,7 +420,7 @@ export function createAIPanel(
   }
   async function send(): Promise<void> {
     await historyReady;
-    if (migrationFailed) { migrationFailed = false; appendBubble("system", "Earlier chat could not be moved yet; it stays in place and is retried next launch."); }
+    if (remotelyLocked) return;
     if (activeRequest) {
       activeRequest.abort();
       return;
@@ -428,6 +437,8 @@ export function createAIPanel(
       );
       return;
     }
+    const conversationRun = await switcher.begin(prompt);
+    if (!conversationRun) return;
     const request = new AbortController();
     activeRequest = request;
     sendButton.textContent = "Cancel";
@@ -568,10 +579,6 @@ export function createAIPanel(
           { role: "user", content: prompt },
           { role: "assistant", content: reply },
         );
-        activeConversation ??= { version: 1, id: crypto.randomUUID(), title: conversationTitle(prompt), updatedAt: Date.now(), messages: [] };
-        activeConversation.updatedAt = Date.now();
-        activeConversation.messages.push(...history.slice(-2).map(m => ({ role: m.role, text: chatContentText(m.content), time: Date.now() })));
-        void writeConversation(null, activeConversation).catch(() => appendBubble("error", "Could not save conversation."));
         const connection =
           row.engine.kind === "api"
             ? settings.connections.find(
@@ -586,6 +593,14 @@ export function createAIPanel(
           (row.engine.kind === "cli"
             ? CLI_LABELS[row.engine.tool]
             : "Default model");
+        try {
+          const value = await switcher.finish(conversationRun, [
+            { role: "user", text: prompt, time: started },
+            { role: "assistant", text: reply, time: Date.now(), engine: model },
+          ]);
+          history.splice(0, history.length, ...value.messages.map(m => ({ role: m.role, content: m.text })));
+          if (value.earlierMessagesRemoved && !conversationRun.value.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
+        } catch { appendBubble("error", "Could not save conversation."); }
         const sources = [...new Set(retrieved.map((chunk) => chunk.path))];
         const meta = element(
           "div",
@@ -597,7 +612,7 @@ export function createAIPanel(
             button(basename(path), () => deps.onOpenNote(path), "ai-source"),
           );
         messagesElement.append(meta, replyActions(reply, binding));
-      } else replyElement?.remove();
+      } else { replyElement?.remove(); await switcher.cancel(); }
       if (isCli && !workingDir)
         messagesElement.append(
           element("p", "ai-note", "Open a folder to let agents write files."),
@@ -622,6 +637,8 @@ export function createAIPanel(
         }
       }
       activeRequest = null;
+      switcher.refreshState();
+      await switcher.folderChanged();
       sendButton.textContent = "Send";
       sendButton.classList.remove("cancel");
       render();
@@ -658,11 +675,34 @@ export function createAIPanel(
   });
   render();
   return {
+    async runAction(action, actionDeps) {
+      await historyReady;
+      if (remotelyLocked || activeRequest) return;
+      if (action.result === "edit") { await runQuickAction(action, actionDeps); return; }
+      const run = await switcher.begin(action.name);
+      if (!run) return;
+      const request = actionDeps.makeAbort(); activeRequest = request;
+      const bubbles: { role: string; node: { textContent: string | null } }[] = [];
+      try {
+        await runQuickAction(action, { ...actionDeps, makeAbort: () => request,
+          appendBubble(role, text) { const node = actionDeps.appendBubble(role, text); bubbles.push({ role, node }); return node; },
+        });
+        const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now() }));
+        if (messages.some(m => m.role === "assistant")) {
+          const value = await switcher.finish(run, messages);
+          if (value.earlierMessagesRemoved && !run.value.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
+          history.splice(0, history.length, ...value.messages.map(m => ({ role: m.role, content: m.text })));
+        } else await switcher.cancel();
+      } catch { await switcher.cancel(); appendBubble("error", "Could not save conversation."); }
+      finally { activeRequest = null; switcher.refreshState(); await switcher.folderChanged(); }
+    },
+    destroy: () => { activeRequest?.abort(); switcher.destroy(); },
+    newChat: () => { void historyReady.then(() => switcher.newChat()); },
     render,
     resize: () => {},
     addAttachments,
     appendBubble,
-    resetWorkspaceContext: () => workspaceIndex.reset(),
+    resetWorkspaceContext: () => { workspaceIndex.reset(); if (activeRequest) activeRequest.abort(); else void historyReady.then(() => switcher.folderChanged()); },
     updateWorkspaceFile: (path, text) =>
       workspaceIndex.onFileChanged(path, text),
     removeWorkspaceFile: (path) => workspaceIndex.onFileRemoved(path),
