@@ -39,6 +39,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "table.format", label: "Format Table", category: "Table", default: "", scope: "menu" },
   { id: "table.delete", label: "Delete Table", category: "Table", default: "", scope: "menu" },
   { id: "view.toggle_explorer", label: "Show/Hide Explorer", category: "View", default: "CmdOrCtrl+B", scope: "menu" },
+  { id: "edit.open_link", label: "Open Link", category: "Edit", default: "", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
   { id: "view.sync_scroll", label: "Sync Scroll", category: "View", default: "", scope: "menu" },
   { id: "view.toggle_preview", label: "Show/Hide Preview", category: "View", default: "CmdOrCtrl+P", scope: "menu" },

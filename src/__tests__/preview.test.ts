@@ -4,12 +4,12 @@ import { renderMarkdown } from "../preview";
 
 describe("renderMarkdown", () => {
   it("renders headings", () => {
-    expect(renderMarkdown("# Hi")).toContain('<h1 data-line="1">Hi</h1>');
+    expect(renderMarkdown("# Hi")).toContain('<h1 data-line="1" data-anchor="hi">Hi</h1>');
   });
 
   it("anchors blocks and removes other data attributes", () => {
     const html = renderMarkdown('# Head\n\nParagraph\n\n<div data-other="x" onclick="evil()">Hi</div>');
-    expect(html).toContain('<h1 data-line="1">');
+    expect(html).toContain('<h1 data-line="1" data-anchor="head">');
     expect(html).toContain('<p data-line="3">');
     expect(html).not.toContain('data-other');
     expect(html).not.toContain('onclick');

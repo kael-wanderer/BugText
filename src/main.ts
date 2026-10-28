@@ -1,3 +1,4 @@
+import { configureLinks, followEditorLink } from "./links/follow";
 import { createLinkIndex } from "./links/index";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
@@ -2794,6 +2795,22 @@ initExplorer(
   },
 );
 
+configureLinks({
+  index: linkIndex,
+  context: (id) => {
+    const found = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
+    return found && isMarkdownFile(found.path ?? found.name) ? { path: found.path ?? `${getState().folder}/untitled.md`, text: editorForTab(id).getText(id), folder: getState().folder } : null;
+  },
+  open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
+  jump: (line) => activeView().jumpToLine(line),
+  read: async (path) => {
+    const found = findTabByPath(getState().windows, path);
+    return found ? editorForTab(found.tab.id).getText(found.tab.id) : invoke<string>("read_file", { path });
+  },
+  create: async (folder, path) => { await invoke("create_link_note", { folder, path }); linkIndex.onFileChanged(path, ""); },
+  toast: (text, action) => showToast(text, 6000, action),
+});
+
 makeView("main", true);
 if (ui.aiVisible) buildAIPanel();
 patchWindow("main", { mode: ui.viewMode });
@@ -2923,6 +2940,11 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-svg");
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
+    case "edit.open_link": {
+      const tab = activeMeta();
+      if (tab) followEditorLink(tab.id, activeView().editor.getText(tab.id), activeView().editor.getSelection().from);
+      return;
+    }
     case "edit.toggle_task":
       return void activeView().editor.toggleTasks();
     case "edit.paste_plain":

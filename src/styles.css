@@ -3406,3 +3406,5 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .qn-target { font-family: var(--font-mono, monospace); overflow-wrap: anywhere; }
 .qn-target.err { color: var(--error, #c45b50); }
 .qn-hints { white-space: nowrap; }
+
+a.broken-note-link { text-decoration: underline dotted var(--warning, var(--accent)); }

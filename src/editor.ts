@@ -1,3 +1,4 @@
+import { followEditorLink } from "./links/follow";
 import { defaultKeymap, history, historyKeymap, indentWithTab, insertBlankLine } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
@@ -257,6 +258,12 @@ export function createEditor(
     wrap.of(wrapExtension()),
     theme,
     EditorView.domEventHandlers({
+      mousedown(event, view) {
+        if (!event.metaKey && !event.ctrlKey) return false;
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null || !followEditorLink(id, view.state.doc.toString(), pos)) return false;
+        event.preventDefault(); return true;
+      },
       paste(event, view) {
         const data = event.clipboardData;
         if (!data) return false;

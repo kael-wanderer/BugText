@@ -198,3 +198,12 @@ mod tests {
         }
     }
 }
+
+#[tauri::command]
+pub fn create_link_note(folder: String, path: String) -> Result<(), String> {
+    let root = Path::new(&folder).canonicalize().map_err(|_| "Folder unavailable")?;
+    let target = Path::new(&path);
+    let parent = target.parent().and_then(|p| p.canonicalize().ok()).ok_or("Folder unavailable")?;
+    if !parent.starts_with(root) { return Err("Note outside folder".into()); }
+    crate::files::create_file_at(&path).map_err(|_| "Could not create note".into())
+}

@@ -1,3 +1,4 @@
+import { bindPreviewLinks } from "./links/follow";
 import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from "./scroll-sync";
 import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
@@ -337,6 +338,12 @@ export function createWindowView(
     (tabId, files) => h.onPasteImages(windowId, tabId, files),
     (tabId, html, text, inCode) => h.onPasteText(windowId, tabId, html, text, inCode),
   );
+  const unbindLinks = bindPreviewLinks(previewPane, () => {
+    const w = getWindow(windowId);
+    const tab = w?.tabs.find((t) => t.id === w.activeTabId);
+    if (!tab || !isMarkdownFile(tab.path ?? tab.name)) return null;
+    return { path: tab.path ?? `${getState().folder}/untitled.md`, text: editor.getText(tab.id), folder: getState().folder };
+  });
   const guard = createScrollGuard();
   // Anchor offsets are measured once per layout: scrolling only moves the pane, and
   // a re-render, image load, zoom or resize changes the scroll height or width.
@@ -928,6 +935,7 @@ export function createWindowView(
       editor.focus();
     },
     destroy: () => {
+      unbindLinks();
       previewRenderToken += 1;
       previewResizeObserver.disconnect();
       placeObserver?.disconnect();

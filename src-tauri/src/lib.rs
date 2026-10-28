@@ -253,6 +253,7 @@ pub fn run() {
             assets::copy_note_images,
             files::list_files_recursive,
             links::scan_note_links,
+            links::create_link_note,
             links::scan_note_links_for,
             files::search_in_folder,
             files::search_cancel,
