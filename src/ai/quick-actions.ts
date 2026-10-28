@@ -105,7 +105,7 @@ export async function runQuickAction(
   if (row.engine.kind === "none") {
     deps.appendBubble(
       "system",
-      `Choose an engine for ${normalized.name} in Settings ▸ AI ▸ Actions.`,
+      `Choose an engine for ${normalized.name} in Settings ▸ AI ▸ ${normalized.engine ? "Actions" : "Use for"}.`,
     );
     return;
   }
@@ -124,7 +124,8 @@ export async function runQuickAction(
   }
 
   if (normalized.result === "answer") {
-    const where = scope.whole ? "on note" : `on selection (${scope.text.split("\n").length} lines)`;
+    const lines = scope.text.split("\n").length;
+    const where = scope.whole ? "on note" : `on selection (${lines} line${lines === 1 ? "" : "s"})`;
     deps.appendBubble("user", `▸ ${normalized.name} · ${where}`);
   }
   const bubble = deps.appendBubble("assistant", "");
