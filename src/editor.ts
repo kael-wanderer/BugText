@@ -1,4 +1,4 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, indentWithTab, insertBlankLine } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { html } from "@codemirror/lang-html";
@@ -24,6 +24,10 @@ import {
   applyMarkdownFormat,
   type MarkdownFormat,
 } from "./markdown-format";
+import { scanMarkdownLines } from "./markdown-blocks";
+import { runTableCommand, tableContextAt, tableKeymap } from "./table-keys";
+import type { TableCommand, TableContext } from "./table";
+import { taskToggleChange, toggleTaskChanges } from "./tasks";
 
 export type EditorDocumentKind =
   | "markdown"
@@ -54,6 +58,8 @@ export type EditorHandle = {
   replaceRange(from: number, to: number, text: string): void;
   /** Document position under a viewport point, or null when outside the text. */
   posAtPoint(x: number, y: number): number | null;
+  /** Right-click: moves the caret to the point unless it falls inside the selection. */
+  placeCaretAtPoint(x: number, y: number): void;
   /**
    * Inserts text into a document (at `at`, or over the selection) as one undo
    * step, then puts the cursor `cursor` characters into the inserted text.
@@ -69,8 +75,21 @@ export type EditorHandle = {
   scrollLineToTop(line: number, cursor?: boolean): void;
   visibleTopLine(): number;
   onScroll(callback: () => void): void;
+  /** Toggle Task on every line touched by the selection; one undo step. */
+  toggleTasks(): boolean;
+  /**
+   * Flips the task on 1-based `line` of a document without moving the cursor
+   * or scroll; false when that line is no longer a task.
+   */
+  toggleTaskAt(id: string, line: number): boolean;
+  /** The table cell under the cursor, or null outside a table. */
+  tableContext(): TableContext | null;
+  runTableCommand(command: TableCommand): boolean;
   focus(): void;
 };
+
+/** Clipboard text offered to the document; returns what to insert instead, or null. */
+export type PasteTextHandler = (id: string, html: string, text: string, inCode: boolean) => string | null;
 
 export function agentChangeTransaction(
   state: EditorState,
@@ -176,7 +195,7 @@ function languageExtension(kind: EditorDocumentKind): Extension {
   if (kind === "yaml") return yaml();
   if (kind === "sql") return sql();
   if (kind === "plain") return [];
-  return markdown({ codeLanguages: languages });
+  return [markdown({ codeLanguages: languages }), tableKeymap()];
 }
 
 export function createEditor(
@@ -185,6 +204,7 @@ export function createEditor(
   onCursorChange: (position: CursorPosition) => void = () => {},
   /** Image files pasted into a document; return true to take over the paste. */
   onPasteFiles: (id: string, files: File[]) => boolean = () => false,
+  onPasteText: PasteTextHandler = () => null,
 ): EditorHandle {
   const states = new Map<string, EditorState>();
   let activeId: string | null = null;
@@ -226,9 +246,23 @@ export function createEditor(
     wrap.of(wrapExtension()),
     theme,
     EditorView.domEventHandlers({
-      paste(event) {
+      paste(event, view) {
         const data = event.clipboardData;
-        if (!data || data.getData("text/plain")) return false;
+        if (!data) return false;
+        const text = data.getData("text/plain");
+        if (text) {
+          const html = data.getData("text/html");
+          // Only tables are replaced; ordinary paste skips the document scan.
+          if (view.state.selection.ranges.length > 1 || (!text.includes("\t") && !/<table/i.test(html))) return false;
+          const head = view.state.selection.main.head;
+          const line = view.state.doc.lineAt(head).number;
+          const inCode = scanMarkdownLines(view.state.doc.toString())[line - 1]?.code ?? false;
+          const replacement = onPasteText(id, html, text, inCode);
+          if (replacement === null) return false;
+          event.preventDefault();
+          view.dispatch(view.state.replaceSelection(replacement), { scrollIntoView: true, userEvent: "input.paste" });
+          return true;
+        }
         const files = Array.from(data.files).filter((file) => file.type.startsWith("image/"));
         if (!files.length || !onPasteFiles(id, files)) return false;
         event.preventDefault();
@@ -347,6 +381,12 @@ export function createEditor(
     posAtPoint(x, y) {
       return view.posAtCoords({ x, y });
     },
+    placeCaretAtPoint(x, y) {
+      const pos = view.posAtCoords({ x, y });
+      if (pos === null) return;
+      if (view.state.selection.ranges.some((range) => !range.empty && range.from <= pos && pos <= range.to)) return;
+      view.dispatch({ selection: { anchor: pos } });
+    },
     insertText(id, text, at, cursor = text.length) {
       const state = id === activeId ? view.state : states.get(id);
       if (!state) return;
@@ -423,6 +463,48 @@ export function createEditor(
       return view.state.doc.lineAt(block.from).number;
     },
     onScroll(callback) { view.scrollDOM.addEventListener("scroll", callback); },
+    toggleTasks() {
+      if (!activeId) return false;
+      const { state } = view;
+      const lines = new Set<number>();
+      for (const range of state.selection.ranges) {
+        const first = state.doc.lineAt(range.from).number;
+        // A selection ending at the start of a line does not include that line.
+        const lastPos = range.to > range.from && state.doc.lineAt(range.to).from === range.to ? range.to - 1 : range.to;
+        for (let n = first; n <= state.doc.lineAt(lastPos).number; n++) lines.add(n);
+      }
+      const changes = toggleTaskChanges(state.doc.toString(), [...lines]);
+      if (!changes.length) return false;
+      view.dispatch({ changes, userEvent: "input.task" });
+      view.focus();
+      return true;
+    },
+    toggleTaskAt(id, line) {
+      const state = id === activeId ? view.state : states.get(id);
+      if (!state || line < 1 || line > state.doc.lines) return false;
+      const info = state.doc.line(line);
+      const change = taskToggleChange(info.text, info.from);
+      if (!change) return false;
+      if (id === activeId) {
+        view.dispatch({ changes: change, userEvent: "input.task" });
+        return true;
+      }
+      const updated = state.update({ changes: change, userEvent: "input.task" }).state;
+      states.set(id, updated);
+      onChange(id, updated.doc.toString());
+      return true;
+    },
+    tableContext() {
+      return activeId ? tableContextAt(view.state) : null;
+    },
+    runTableCommand(command) {
+      if (!activeId) return false;
+      // ⌘Enter is Insert Row Below; outside a table it keeps the editor's
+      // usual "new line below" behavior, but only while the editor has focus.
+      const done = runTableCommand(view, command) || (command === "row_below" && view.hasFocus && insertBlankLine(view));
+      if (done) view.focus();
+      return done;
+    },
     focus() {
       view.focus();
     },

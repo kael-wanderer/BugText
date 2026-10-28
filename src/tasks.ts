@@ -1,27 +1,55 @@
-import { markdownCodeLines } from "./markdown-blocks";
+// Markdown task items (`- [ ] text`, `1. [x] text`): find the marker on a
+// source line and build the edits that tick or untick it.
+import { scanMarkdownLines } from "./markdown-blocks";
 
-export type TaskMarker = { offset: number; checked: boolean };
-const marker = /^\s*(?:[-*+]\s+|\d+[.)]\s+)\[([ xX])\]/;
+export type TaskMarker = {
+  /** Offset of the character between the brackets. */
+  offset: number;
+  checked: boolean;
+};
+
+export type TextChange = { from: number; to: number; insert: string };
+
+const TASK = /^(\s*(?:[-*+]|\d{1,9}[.)])[ \t]+)\[([ xX])\](?=\s|$)/;
+const LIST_ITEM = /^(\s*(?:[-*+]|\d{1,9}[.)])[ \t]+)/;
+
 export function taskAt(line: string): TaskMarker | null {
-  const match = marker.exec(line);
+  const match = TASK.exec(line);
   if (!match) return null;
-  return { offset: match.index + match[0].lastIndexOf("[") + 1, checked: match[1].toLowerCase() === "x" };
+  return { offset: match[1].length + 1, checked: match[2] !== " " };
 }
-export function toggleTaskLine(line: string): string {
+
+/** The one-character change that flips the task on `line`, or null. */
+export function taskToggleChange(line: string, lineStart: number): TextChange | null {
   const task = taskAt(line);
-  if (!task) return line;
-  return line.slice(0, task.offset) + (task.checked ? " " : "x") + line.slice(task.offset + 1);
+  if (!task) return null;
+  const from = lineStart + task.offset;
+  return { from, to: from + 1, insert: task.checked ? " " : "x" };
 }
-export function toggleTaskLines(source: string, lineNumbers: number[]): { from: number; to: number; insert: string }[] {
-  const lines = source.split(/\r?\n/), blocked = markdownCodeLines(source), edits = [] as { from: number; to: number; insert: string }[];
-  let offset = 0;
-  for (let i = 0; i < lines.length; i++) {
-    if (lineNumbers.includes(i + 1) && !blocked[i]) {
-      const task = taskAt(lines[i]);
-      if (task) edits.push({ from: offset + task.offset, to: offset + task.offset + 1, insert: task.checked ? " " : "x" });
-      else edits.push({ from: offset, to: offset, insert: "- [ ] " });
+
+/**
+ * Toggle Task over 1-based `lineNumbers` of a "\n"-separated source: tasks flip,
+ * list items gain `[ ] `, other text lines become `- [ ] ` items. Code, front
+ * matter, commented-out and blank lines are left alone.
+ */
+export function toggleTaskChanges(source: string, lineNumbers: number[]): TextChange[] {
+  const wanted = new Set(lineNumbers);
+  const scanned = scanMarkdownLines(source);
+  const changes: TextChange[] = [];
+  let start = 0;
+  source.split("\n").forEach((line, index) => {
+    const lineStart = start;
+    start += line.length + 1;
+    const info = scanned[index];
+    if (!wanted.has(index + 1) || info.code || !line.trim() || info.text !== line) return;
+    const toggle = taskToggleChange(line, lineStart);
+    if (toggle) {
+      changes.push(toggle);
+      return;
     }
-    offset += lines[i].length + (i < lines.length - 1 ? 1 : 0);
-  }
-  return edits;
+    const item = LIST_ITEM.exec(line);
+    const at = lineStart + (item ? item[1].length : line.length - line.trimStart().length);
+    changes.push({ from: at, to: at, insert: item ? "[ ] " : "- [ ] " });
+  });
+  return changes;
 }

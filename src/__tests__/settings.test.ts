@@ -166,3 +166,17 @@ describe("sync scroll", () => {
     expect(parseSettings('{"syncScroll":"true"}').syncScroll).toBe(false);
   });
 });
+
+describe("table settings", () => {
+  it("defaults both table options on", () => {
+    expect(parseSettings("{}").tables).toEqual({ formatOnEdit: true, pasteAsTable: true });
+  });
+
+  it("turns an option off only for an explicit false", () => {
+    expect(parseSettings('{"tables":{"formatOnEdit":false,"pasteAsTable":"no"}}').tables).toEqual({
+      formatOnEdit: false,
+      pasteAsTable: true,
+    });
+    expect(parseSettings('{"tables":7}').tables).toEqual({ formatOnEdit: true, pasteAsTable: true });
+  });
+});

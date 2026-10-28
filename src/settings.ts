@@ -10,6 +10,13 @@ export type ImageSettings = {
   dropMode: "copy" | "open";
 };
 
+export type TableSettings = {
+  /** Tab, Enter and table commands line up the pipes. */
+  formatOnEdit: boolean;
+  /** Spreadsheet cells on the clipboard paste as a Markdown table. */
+  pasteAsTable: boolean;
+};
+
 export type ZoneSettings = {
   font: string;
   size: number;
@@ -52,6 +59,7 @@ export type Settings = {
   workspaceContextK: number;
   appIcon: AppIconId;
   images: ImageSettings;
+  tables: TableSettings;
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -80,6 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceContextK: 5,
   appIcon: DEFAULT_APP_ICON,
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
+  tables: { formatOnEdit: true, pasteAsTable: true },
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
@@ -129,6 +138,7 @@ function defaults(): Settings {
     workspaceContext: DEFAULT_SETTINGS.workspaceContext,
     workspaceContextK: DEFAULT_SETTINGS.workspaceContextK,
     images: { ...DEFAULT_SETTINGS.images },
+    tables: { ...DEFAULT_SETTINGS.tables },
   };
 }
 
@@ -139,6 +149,14 @@ function parseImages(raw: unknown): ImageSettings {
     folder: typeof value.folder === "string" && validImageFolder(value.folder) ? value.folder : fallback.folder,
     pasteName: value.pasteName === "image" ? "image" : fallback.pasteName,
     dropMode: value.dropMode === "open" ? "open" : fallback.dropMode,
+  };
+}
+
+function parseTables(raw: unknown): TableSettings {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    formatOnEdit: value.formatOnEdit !== false,
+    pasteAsTable: value.pasteAsTable !== false,
   };
 }
 
@@ -234,6 +252,7 @@ export function parseSettings(raw: string): Settings {
       ? (data.appIcon as AppIconId)
       : DEFAULT_APP_ICON,
     images: parseImages(data.images),
+    tables: parseTables(data.tables),
   };
 }
 

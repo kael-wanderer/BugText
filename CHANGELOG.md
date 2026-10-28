@@ -8,9 +8,20 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
-- M6 checklist and table editing foundations: shared Markdown block scanning, task-line
-  parsing/toggling, Unicode display widths, safe preview checkbox enhancement, table
-  parsing/formatting, and spreadsheet TSV/HTML-to-table conversion.
+- Checklists: `- [ ]` items show as checkboxes in the preview. Clicking one (or Space
+  on a focused box) ticks the item in the source as one undo step, without moving the
+  cursor. Edit ▸ Toggle Task (⌘⇧X) turns the selected lines into tasks or flips them.
+  Exported documents show ☐ / ☑.
+- Tables: Tab / Shift-Tab move between cells, Enter moves down (adding a row at the
+  end), Shift-Enter adds a line break in a cell, and ⌘Enter inserts a row below. Pipes
+  line up as you edit, including wide CJK and emoji text. Insert, delete, align, format
+  and delete-table commands live in Edit ▸ Table, the editor's right-click menu and
+  the format bar's table button. Right-clicking outside the selection now moves the
+  caret to the click first, so the menu acts on the cell you clicked.
+- Pasting cells from Numbers, Excel or Google Sheets inserts a Markdown table (⌘Z
+  undoes it). Edit ▸ Paste as Plain Text (⌥⇧⌘V) keeps the original text.
+- Settings ▸ Editing ▸ Tables: format tables while editing, paste spreadsheet cells as
+  a table.
 - Outline navigation for Markdown notes, preview place preservation, and optional Sync Scroll.
 
 - Paste and drop images into Markdown notes. ⌘V with an image on the clipboard saves it
@@ -27,6 +38,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ### Fixed
 
 - A pending preview refresh no longer replaces the newly selected tab's preview.
+- Outline no longer drops a heading that has an HTML comment on the same line.
 - Heading search ignores fenced code, front matter, comments and indented code, and recognizes setext headings.
 - An edit made just as BugText regained focus could be replaced by the file on disk
   (BUG-037).

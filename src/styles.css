@@ -509,6 +509,52 @@ body[data-wrap="guide"] .doc {
   color: var(--accent);
 }
 
+/* task list items: the marker is replaced by a checkbox */
+.doc li.task {
+  list-style: none;
+}
+
+.doc li.task > .task-box,
+.doc li.task > p:first-child > .task-box {
+  margin-left: -1.4em;
+}
+
+.task-box {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.45em;
+  vertical-align: -0.1em;
+  border: 1.5px solid var(--muted);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.task-box:hover {
+  border-color: var(--accent);
+}
+
+.task-box:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.task-box[aria-checked="true"] {
+  background: var(--accent) no-repeat center / 80%
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.6 9.6 3.6' fill='none' stroke='%23111' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  border-color: var(--accent);
+}
+
+.task-box[aria-disabled="true"] {
+  cursor: default;
+}
+
+.doc li.task-done {
+  color: var(--muted);
+}
+
 .doc blockquote {
   margin: 1.2em 0;
   padding: 0.2em 1.1em;

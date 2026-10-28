@@ -147,6 +147,11 @@ import { createWindowView, type WindowView } from "./windowview";
 import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert";
 import { createNoteImages } from "./note-images";
 import { showToast } from "./toast";
+import { readText } from "@tauri-apps/plugin-clipboard-manager";
+import { tableFromClipboard } from "./table-paste";
+import { setTableFormatting } from "./table-keys";
+import { tableCommandFromId, tableMenuItems } from "./table-menu";
+import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex();
@@ -344,6 +349,7 @@ async function loadSettings(): Promise<void> {
     currentSettings = parseSettings("{}");
   }
   applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
   applySoftWrap();
   applyKeymap();
@@ -440,6 +446,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
       applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -505,6 +512,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   currentSettings = settings;
   applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
   applySoftWrap();
   applyKeymap();
@@ -664,6 +672,7 @@ const handlers = {
       setState({ activeWindowId: wid });
       renderAll();
     }
+    const table = activeView().editor.tableContext();
     showContextMenu(x, y, [
       {
         label: "AI",
@@ -672,7 +681,18 @@ const handlers = {
           action: () => runQuickActionById(action.id),
         })),
       },
+      ...(table ? ["separator" as const, { label: "Table", children: tableMenuItems(table, runTableCommand) }] : []),
     ]);
+  },
+  onTableMenu: (wid: string, x: number, y: number) => {
+    const table = views.get(wid)?.editor.tableContext();
+    if (table) showContextMenu(x, y, tableMenuItems(table, runTableCommand));
+  },
+  onPasteText: (wid: string, tid: string, html: string, text: string, inCode: boolean) => {
+    if (inCode || !currentSettings.tables.pasteAsTable || !isImageNote(wid, tid)) return null;
+    const table = tableFromClipboard(html, text);
+    if (table) showToast("Pasted as a table. ⌘Z to undo.");
+    return table;
   },
   onPasteImages: (wid: string, tid: string, files: File[]) => {
     if (!isImageNote(wid, tid)) return false;
@@ -1394,6 +1414,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -1885,6 +1906,7 @@ function syncViewMenu(): void {
 
 function persistCurrentSettings(): void {
   applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
   requestWindowMeasure();
   syncViewMenu();
   writeSettings(currentSettings);
@@ -1960,6 +1982,7 @@ function ensureSubWindow(): void {
   addSplitter();
   makeView("sub", false);
   applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
   renderAll();
   requestWindowMeasure();
 }
@@ -2711,6 +2734,8 @@ listenScoped<string>("menu", (event) => {
   if (id.startsWith("view.wrap.")) {
     return setWrapMode(id.slice("view.wrap.".length) as SoftWrapMode);
   }
+  const tableCommand = tableCommandFromId(id);
+  if (tableCommand) return runTableCommand(tableCommand);
   if (id.startsWith("view.font.")) {
     return setMenuFont(id.slice("view.font.".length));
   }
@@ -2757,6 +2782,10 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-svg");
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
+    case "edit.toggle_task":
+      return void activeView().editor.toggleTasks();
+    case "edit.paste_plain":
+      return void pastePlainText();
     case "view.sync_scroll":
       currentSettings = { ...currentSettings, syncScroll: !currentSettings.syncScroll };
       return persistCurrentSettings();
@@ -2798,6 +2827,22 @@ listenScoped<string>("menu", (event) => {
       return toggleAutomaticUpdates();
   }
 });
+
+function runTableCommand(command: TableCommand): void {
+  activeView().editor.runTableCommand(command);
+}
+
+/** Edit ▸ Paste as Plain Text: the clipboard text, never turned into a table. */
+async function pastePlainText(): Promise<void> {
+  const tab = activeMeta();
+  if (!tab) return;
+  try {
+    const text = await readText();
+    if (text) activeView().editor.insertText(tab.id, text);
+  } catch {
+    // An empty or non-text clipboard pastes nothing.
+  }
+}
 
 // App-level shortcut fallbacks. Menu-scoped commands are handled by the native
 // menu's accelerator (which consumes the keystroke first on macOS); these are the
@@ -2854,6 +2899,7 @@ async function restoreWindows(): Promise<void> {
     addSplitter();
     makeView("sub", false);
     applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit);
   }
   patchWindow("main", { mode: saved[0]?.mode ?? "split" });
   for (let i = 0; i < saved.length; i++) {
@@ -2956,5 +3002,6 @@ void initNativeFileDrop().catch((error) => {
 void boot();
 
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-  if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }
+  if (currentSettings.theme === "system") { applySettings(currentSettings);
+  setTableFormatting(currentSettings.tables.formatOnEdit); renderAll(); }
 });

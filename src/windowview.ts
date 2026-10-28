@@ -2,6 +2,7 @@ import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from
 import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
+import { enhancePreviewTasks } from "./preview-tasks";
 import { invoke } from "@tauri-apps/api/core";
 import {
   documentViewModes,
@@ -65,6 +66,10 @@ export type WindowHandlers = {
   onEditorContextMenu: (windowId: string, x: number, y: number) => void;
   /** Image files pasted into the editor; true when the paste was taken over. */
   onPasteImages: (windowId: string, tabId: string, files: File[]) => boolean;
+  /** Clipboard text pasted into a document; returns a replacement (a table) or null. */
+  onPasteText: (windowId: string, tabId: string, html: string, text: string, inCode: boolean) => string | null;
+  /** The format bar's table button while the cursor is in a table. */
+  onTableMenu: (windowId: string, x: number, y: number) => void;
 };
 
 export type WindowView = {
@@ -330,6 +335,7 @@ export function createWindowView(
       h.onNavigation(windowId);
     },
     (tabId, files) => h.onPasteImages(windowId, tabId, files),
+    (tabId, html, text, inCode) => h.onPasteText(windowId, tabId, html, text, inCode),
   );
   const guard = createScrollGuard();
   // Anchor offsets are measured once per layout: scrolling only moves the pane, and
@@ -385,6 +391,7 @@ export function createWindowView(
   });
   editorSurface.addEventListener("contextmenu", (event) => {
     event.preventDefault();
+    editor.placeCaretAtPoint(event.clientX, event.clientY);
     h.onEditorContextMenu(windowId, event.clientX, event.clientY);
   });
   formatToolbar
@@ -392,6 +399,11 @@ export function createWindowView(
     .forEach((button) => {
       button.addEventListener("mousedown", (event) => event.preventDefault());
       button.addEventListener("click", () => {
+        if (button.dataset.format === "table" && editor.tableContext()) {
+          const rect = button.getBoundingClientRect();
+          h.onTableMenu(windowId, rect.left, rect.bottom + 4);
+          return;
+        }
         editor.applyMarkdownFormat(
           button.dataset.format as MarkdownFormat,
         );
@@ -654,6 +666,15 @@ export function createWindowView(
       article.style.zoom = String(previewZoom);
       article.innerHTML = renderMarkdown(text);
       resolvePreviewImages(article, pathOrName?.startsWith("/") ? pathOrName : null);
+      // Ticking a box edits that source line. A preview older than the text
+      // (typing still debounced) could point at the wrong line, so it only
+      // re-renders.
+      enhancePreviewTasks(article, documentId ? (line) => {
+        const current = editor.getText(documentId);
+        if (current === text && editor.toggleTaskAt(documentId, line)) return true;
+        renderPreview(current, pathOrName);
+        return false;
+      } : null);
       previewPane.appendChild(article);
       restorePlace();
       const token = previewRenderToken;

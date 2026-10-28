@@ -30,6 +30,15 @@ md.core.ruler.push("source_lines", (state) => {
     }
   }
 });
+// List items starting with `[ ]` / `[x]` are tasks; their boxes are added after
+// sanitizing (`preview-tasks.ts`), since the sanitizer forbids form controls.
+md.core.ruler.push("task_items", (state) => {
+  const tokens = state.tokens;
+  for (let i = 0; i + 2 < tokens.length; i++) {
+    if (tokens[i].type !== "list_item_open" || tokens[i + 1].type !== "paragraph_open") continue;
+    if (/^\[[ xX]\](?:\s|$)/.test(tokens[i + 2].content)) tokens[i].attrJoin("class", "task");
+  }
+});
 for (const name of ["fence", "code_block"] as const) {
   const render = md.renderer.rules[name]!;
   md.renderer.rules[name] = (tokens, index, options, env, renderer) => {

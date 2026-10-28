@@ -1,4 +1,5 @@
 import { renderMarkdown } from "./preview";
+import { staticTaskMarks } from "./preview-tasks";
 import { enhancePreview } from "./render-extras";
 import { dirOf, isImagePath, isRelativeImageSrc } from "./image-insert";
 
@@ -102,6 +103,7 @@ export async function buildExportHtml(
     width: "800px",
   });
   host.innerHTML = renderMarkdown(markdown);
+  staticTaskMarks(host);
   document.body.appendChild(host);
   try {
     await enhancePreview(host);
