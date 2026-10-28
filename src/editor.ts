@@ -66,6 +66,10 @@ export type EditorHandle = {
    * step, then puts the cursor `cursor` characters into the inserted text.
    */
   insertText(id: string, text: string, at?: number, cursor?: number): void;
+  /** Appends text at the end of a document as one undo step, leaving cursor and focus alone. */
+  appendText(id: string, text: string): void;
+  /** Puts the cursor at `offset` of a document and scrolls it into view. */
+  setCursor(id: string, offset: number): void;
   setText(text: string): void;
   setTextFor(id: string, text: string): void;
   setSoftWrap(on: boolean): void;
@@ -415,6 +419,25 @@ export function createEditor(
       const updated = state.update(spec).state;
       states.set(id, updated);
       changed(id, updated.doc.toString());
+    },
+    appendText(id, text) {
+      const state = id === activeId ? view.state : states.get(id);
+      if (!state) return;
+      const spec = { changes: { from: state.doc.length, insert: text } };
+      if (id === activeId) {
+        view.dispatch(spec);
+        return;
+      }
+      const updated = state.update(spec).state;
+      states.set(id, updated);
+      changed(id, updated.doc.toString());
+    },
+    setCursor(id, offset) {
+      const state = id === activeId ? view.state : states.get(id);
+      if (!state) return;
+      const spec = { selection: { anchor: Math.min(Math.max(0, offset), state.doc.length) }, scrollIntoView: true };
+      if (id === activeId) view.dispatch(spec);
+      else states.set(id, state.update(spec).state);
     },
     setText(text) {
       view.dispatch({
