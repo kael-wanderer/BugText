@@ -77,7 +77,12 @@ export function scheduleDraft(record: {
         updatedAt: Date.now(),
         windowId: record.windowId,
       };
-      void runSerialized(`draft:${id}`, () => invoke("recovery_write_draft", { draft })).catch(() => {});
+      void runSerialized(`draft:${id}`, () => invoke("recovery_write_draft", { draft }))
+        .then(() => {
+          // A restored draft is superseded once the tab's own draft holds newer text.
+          if (record.replacedDraftId && record.replacedDraftId !== id) clearDraftById(record.replacedDraftId);
+        })
+        .catch(() => {});
     }, DRAFT_DEBOUNCE_MS),
   );
 }

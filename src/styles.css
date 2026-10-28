@@ -3355,4 +3355,4 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .compare-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
 .app-toast button { border: 0; color: var(--accent); background: transparent; font: inherit; cursor: pointer; }
 .recovery-state { color: var(--accent); white-space: nowrap; }
-.recovery-sheet td:nth-child(3) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.recovery-sheet td:nth-child(3) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, monospace); color: var(--muted); }

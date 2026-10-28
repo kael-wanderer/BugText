@@ -26,3 +26,19 @@ describe("recovery review", () => {
     expect(invoke.mock.calls.some(([command]) => command === "recovery_discard_draft")).toBe(false);
   });
 });
+
+describe("recovery review locations", () => {
+  it("shortens long folders from the left and keeps the full path on hover", async () => {
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "recovery_list_drafts") return [{ id: "f1", path: "/Users/kael/notes/2026/todo.md", name: "todo.md", contents: "x", updatedAt: 1, windowId: "main" }];
+      if (command === "recovery_list_discarded") return [];
+      if (command === "file_stat") return null;
+      throw new Error("unexpected command");
+    });
+    const host = document.createElement("div"); document.body.append(host);
+    await showRecoveryReview({ host, findOpen: () => null, restore: vi.fn() });
+    const where = host.querySelectorAll("tr")[1].children[2];
+    expect(where.textContent).toBe("…/notes/2026");
+    expect(where.getAttribute("title")).toBe("/Users/kael/notes/2026/todo.md");
+  });
+});

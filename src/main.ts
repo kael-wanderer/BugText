@@ -1388,6 +1388,7 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
   patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === tab.id
     ? { ...item, path: target, name: basename(target), dirty: !clean } : item) });
   view.editor.setDocumentKind(tab.id, editorKind(target));
+  if (windowState.activeTabId === tab.id) view.renderPreview(view.editor.getText(tab.id), target);
   if (clean) {
     clearDraft(binding.path, tab.id);
     const recoveredId = recoveredDraftIds.get(tab.id);

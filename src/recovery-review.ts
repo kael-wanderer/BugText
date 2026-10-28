@@ -17,6 +17,13 @@ function button(label: string, run: () => void): HTMLButtonElement {
   return element;
 }
 
+/** The last two folders of a path, so long locations stay readable. */
+function shortFolder(path: string | null): string {
+  if (!path) return "Never saved";
+  const parts = path.split("/").slice(0, -1).filter(Boolean);
+  return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : `/${parts.join("/")}`;
+}
+
 function relativeTime(timestamp: number): string {
   const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
   if (minutes < 1) return "Just now";
@@ -108,10 +115,11 @@ export async function showRecoveryReview(deps: ReviewDeps, restoreAll = false): 
       const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = row.selected; checkbox.setAttribute("aria-label", `Select ${row.draft.name}`);
       checkbox.addEventListener("change", () => { row.selected = checkbox.checked; void render(); }); checkboxCell.append(checkbox); tr.append(checkboxCell);
       const words = row.draft.contents.trim() ? row.draft.contents.trim().split(/\s+/).length : 0;
-      for (const value of [row.draft.name, row.draft.path?.replace(/\/[^/]*$/, "") || "Never saved", relativeTime(row.draft.updatedAt), `${words} words`, row.state]) {
+      for (const value of [row.draft.name, shortFolder(row.draft.path), relativeTime(row.draft.updatedAt), `${words} words`, row.state]) {
         const cell = document.createElement("td"); cell.textContent = value; tr.append(cell);
       }
       tr.children[3].setAttribute("title", new Date(row.draft.updatedAt).toLocaleString());
+      if (row.draft.path) tr.children[2].setAttribute("title", row.draft.path);
       tr.children[5].className = "recovery-state";
       const actions = document.createElement("td");
       if (row.state !== "Same as file") {
