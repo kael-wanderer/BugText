@@ -446,7 +446,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
       applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+      setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -1414,7 +1414,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+      setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -2899,7 +2899,7 @@ async function restoreWindows(): Promise<void> {
     addSplitter();
     makeView("sub", false);
     applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+    setTableFormatting(currentSettings.tables.formatOnEdit);
   }
   patchWindow("main", { mode: saved[0]?.mode ?? "split" });
   for (let i = 0; i < saved.length; i++) {
@@ -3002,6 +3002,5 @@ void initNativeFileDrop().catch((error) => {
 void boot();
 
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-  if (currentSettings.theme === "system") { applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit); renderAll(); }
+  if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }
 });
