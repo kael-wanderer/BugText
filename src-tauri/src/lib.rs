@@ -19,6 +19,7 @@ mod preview;
 mod recovery;
 mod sandbox;
 mod secrets;
+mod templates;
 mod update_feed;
 
 use std::collections::{HashMap, HashSet};
@@ -240,6 +241,12 @@ pub fn run() {
             files::delete_to_trash,
             files::duplicate_path,
             files::copy_into_folder,
+            templates::templates_folder,
+            templates::list_templates,
+            templates::read_template,
+            templates::create_template,
+            templates::create_from_template,
+            templates::append_note,
             assets::save_note_image,
             assets::copy_note_image,
             assets::copy_note_images,

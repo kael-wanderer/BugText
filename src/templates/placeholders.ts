@@ -73,7 +73,7 @@ export function fillTemplate(text: string, values: Placeholders): { text: string
     if (key === "cursor") {
       if (cursor >= 0) continue;
       replacement = "";
-    } else if (Object.hasOwn(values, key)) {
+    } else if (Object.prototype.hasOwnProperty.call(values, key)) {
       replacement = values[key as keyof Placeholders];
     } else {
       continue;
