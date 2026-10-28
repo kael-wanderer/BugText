@@ -35,6 +35,8 @@ function relativeTime(timestamp: number): string {
 }
 
 export async function showRecoveryReview(deps: ReviewDeps, restoreAll = false): Promise<void> {
+  const existing = deps.host.querySelector<HTMLElement>(".recovery-scrim");
+  if (existing) { existing.querySelector<HTMLButtonElement>("button")?.focus(); return; }
   const drafts = (await invoke<DraftRecord[]>("recovery_list_drafts")).filter(isRecoverableDraft);
   const discarded = await listDiscarded();
   if (!drafts.length && !discarded.length) { showToast("Nothing to recover"); return; }
@@ -115,7 +117,7 @@ export async function showRecoveryReview(deps: ReviewDeps, restoreAll = false): 
       const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = row.selected; checkbox.setAttribute("aria-label", `Select ${row.draft.name}`);
       checkbox.addEventListener("change", () => { row.selected = checkbox.checked; void render(); }); checkboxCell.append(checkbox); tr.append(checkboxCell);
       const words = row.draft.contents.trim() ? row.draft.contents.trim().split(/\s+/).length : 0;
-      for (const value of [row.draft.name, shortFolder(row.draft.path), relativeTime(row.draft.updatedAt), `${words} words`, row.state]) {
+      for (const value of [row.draft.name, shortFolder(row.draft.path), relativeTime(row.draft.updatedAt), `${words} ${words === 1 ? "word" : "words"}`, row.state]) {
         const cell = document.createElement("td"); cell.textContent = value; tr.append(cell);
       }
       tr.children[3].setAttribute("title", new Date(row.draft.updatedAt).toLocaleString());

@@ -42,3 +42,17 @@ describe("recovery review locations", () => {
     expect(where.getAttribute("title")).toBe("/Users/kael/notes/2026/todo.md");
   });
 });
+
+describe("recovery review reopen", () => {
+  it("keeps a single sheet when opened again while open", async () => {
+    invoke.mockImplementation(async (command: string) => {
+      if (command === "recovery_list_drafts") return [{ id: "u1", path: null, name: "Untitled", contents: "x", updatedAt: 1, windowId: "main" }];
+      if (command === "recovery_list_discarded") return [];
+      throw new Error("unexpected command");
+    });
+    const host = document.createElement("div"); document.body.append(host);
+    await showRecoveryReview({ host, findOpen: () => null, restore: vi.fn() });
+    await showRecoveryReview({ host, findOpen: () => null, restore: vi.fn() });
+    expect(host.querySelectorAll(".recovery-scrim")).toHaveLength(1);
+  });
+});
