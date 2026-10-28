@@ -2455,7 +2455,11 @@ function setAIVisible(aiVisible: boolean): void {
   requestAnimationFrame(() => aiPanel?.resize());
 }
 
-function newAIChat(): void { setAIVisible(true); aiPanel?.newChat(); }
+function newAIChat(): void {
+  if (!currentAISettings.enabled.chat) return;
+  setAIVisible(true);
+  aiPanel?.newChat();
+}
 
 function toggleAI(): void {
   if (!currentAISettings.enabled.chat) return;
