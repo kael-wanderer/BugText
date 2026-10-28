@@ -167,6 +167,7 @@ export function createSettingsScreen(
     if (page.id === "ai") {
       for (const [sub, label, section] of [
         ["use-for", "Use for", "FEATURES"],
+        ["actions", "Actions", ""],
         ["local-cli", "Local CLI", "ENGINES"],
         ["api", "API providers", ""],
         ["mcp", "MCP server", "AGENTS"],

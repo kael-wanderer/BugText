@@ -179,6 +179,11 @@ Before a folder-writing run, dirty open tabs receive labeled Recovery snapshots;
 afterward the changed-files card lists added/modified/deleted files, and affected
 open tabs use the existing Reload / Keep mine conflict flow.
 
+Saved actions live in `<app config dir>/ai-actions.json` (version 1). Settings ▸ AI ▸
+Actions manages prompts, result type, input scope and optional engine overrides; the
+palette, editor AI menu and panel bar share the runnable catalog. Saved actions use
+the Chat engine by default and send only their input without folder access.
+
 Quick actions (Proofread / Rewrite / Summarize / Generate outline) use their own
 `uses` rows and are hidden when disabled. CLI quick actions always run answer-only
 without folder access. Proofread and Rewrite review edits against the original

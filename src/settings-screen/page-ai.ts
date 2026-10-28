@@ -1,3 +1,4 @@
+import { renderActions, type ActionsPageDeps } from "./page-ai-actions";
 import type { CliInfo } from "../ai/engines";
 import { pageHeader } from "./controls";
 import { renderLocalCli } from "./page-ai-local-cli";
@@ -10,12 +11,14 @@ export type AiPageDeps = {
   rescan(): Promise<void>;
   getModelsCache(): Record<string, string[]>;
   mcp?: McpPageDeps;
+  actions?: ActionsPageDeps;
 };
 export const aiPage: SettingsPage = {
   id: "ai",
   render(host, deps, sub = "use-for") {
     pageHeader(host, "ai");
     if (sub === "use-for") renderUseFor(host, deps);
+    else if (sub === "actions") renderActions(host, deps);
     else if (sub === "local-cli") renderLocalCli(host, deps);
     else if (sub === "mcp" && deps.mcp) renderMcpPage(host, deps.mcp);
     else renderApi(host, deps);

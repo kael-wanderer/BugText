@@ -8,6 +8,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- My actions: save prompts in AI settings and run them from the palette, editor AI menu or panel action bar.
 - Note-link completion after `](` and reference definitions, including heading suggestions.
 - Insert Link to Note… (⌥⌘L) with fuzzy note filtering and optional headings.
 - Follow note and web links from preview, or use ⌘-click / Open Link in the editor.

@@ -3,7 +3,7 @@
 
 import { KEYMAP_COMMANDS } from "../keymap";
 
-export type AiSubPage = "use-for" | "local-cli" | "api" | "mcp";
+export type AiSubPage = "use-for" | "actions" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
   "general" | "editing" | "theme" | "shortcuts" | "ai";
@@ -187,6 +187,9 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     keywords: `${command.category} shortcut`,
   })),
 
+  {
+    id: "my-actions", page: "ai", label: "My actions", sub: "actions", keywords: "saved prompts built-in instruction edit answer panel",
+  },
   {
     id: "use-chat",
     page: "ai",

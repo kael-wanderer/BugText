@@ -1,3 +1,5 @@
+import { renderActionBar } from "./action-bar";
+import type { RunnableAction } from "./actions";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AISettings, UseRow } from "./aisettings";
@@ -37,6 +39,8 @@ import { chatContentText, type ChatMessage } from "./providers";
 import { contextTrimWarning } from "./context-budget";
 import { prepareCliAttachments } from "./attachments";
 export type AIPanelDeps = {
+  getActions?(): RunnableAction[];
+  runAction?(id: string): void;
   workspaceIndex: WorkspaceIndex;
   getSettings(): AISettings;
   onSettingsChange(settings: AISettings): void;
@@ -173,7 +177,8 @@ export function createAIPanel(
     "ai-send",
   );
   tools.append(attach, sendButton);
-  inputRow.append(attachments, inputWrap, tools);
+  const actionBar = element("div", "ai-action-bar");
+  inputRow.append(actionBar, attachments, inputWrap, tools);
   const header = panelElement.querySelector<HTMLElement>(".ai-header");
   if (header) {
     header.append(picker);
@@ -198,6 +203,7 @@ export function createAIPanel(
     render();
   }
   function render(): void {
+    renderActionBar(actionBar, deps.getActions?.() ?? [], id => deps.runAction?.(id));
     const settings = deps.getSettings();
     const row = resolveUse(settings, "chat", deps.getClis());
     engineSelect.replaceChildren();

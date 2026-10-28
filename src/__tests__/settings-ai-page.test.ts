@@ -104,6 +104,7 @@ it("shows rail subitems in order", () => {
     .querySelectorAll(".st-sub-nav");
   expect(Array.from(items).map((x) => x.textContent)).toEqual([
     "Use for",
+    "Actions",
     "Local CLI",
     "API providers",
     "MCP server",
