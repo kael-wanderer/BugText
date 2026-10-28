@@ -3408,3 +3408,8 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .qn-hints { white-space: nowrap; }
 
 a.broken-note-link { text-decoration: underline dotted var(--warning, var(--accent)); }
+.link-picker input { margin: 12px 18px; width: calc(100% - 36px); background: var(--bg-editor); color: var(--text); border: 1px solid var(--accent); padding: 8px; border-radius: 5px; }
+.link-picker-columns { display: grid; grid-template-columns: 1fr 1fr; min-height: 220px; }
+.link-picker-list { max-height: 320px; overflow: auto; padding: 8px; }
+.link-picker-list button { width: 100%; display: block; text-align: left; margin-bottom: 3px; overflow-wrap: anywhere; }
+.link-picker-preview { white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; border-left: 1px solid var(--border); font-size: 12px; }

@@ -144,6 +144,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&close)
         .build()?;
 
+    let insert_note_link = MenuItemBuilder::with_id("edit.insert_note_link", "Insert Link to Note…").accelerator("CmdOrCtrl+Alt+L").build(app)?;
     let open_link = MenuItemBuilder::with_id("edit.open_link", "Open Link").build(app)?;
     let paste_plain = MenuItemBuilder::with_id("edit.paste_plain", "Paste as Plain Text")
         .accelerator("CmdOrCtrl+Alt+Shift+V")
@@ -185,6 +186,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .paste()
         .item(&paste_plain)
         .item(&open_link)
+        .item(&insert_note_link)
         .select_all()
         .separator()
         .item(&toggle_task)

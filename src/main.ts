@@ -1,3 +1,5 @@
+import { configureLinkCompletion } from "./links/complete";
+import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink } from "./links/follow";
 import { createLinkIndex } from "./links/index";
 import { createOutlineView } from "./outline-view";
@@ -945,6 +947,22 @@ function requestWindowMeasure(): void {
 
 function activeView(): WindowView {
   return views.get(getState().activeWindowId)!;
+}
+
+function insertNoteLink(): void {
+  const tab = activeMeta();
+  if (!tab || !isMarkdownFile(tab.path ?? tab.name)) return;
+  const folder = getState().folder;
+  if (!folder) { showToast("No folder open — links between notes need a folder."); return; }
+  linkIndex.setFolder(folder);
+  const editor = activeView().editor;
+  const selection = editor.getSelection(); const revision = editor.revision(tab.id);
+  void showInsertLinkPicker({ index: linkIndex, path: tab.path ?? `${folder}/untitled.md`, untitled: !tab.path, selection: selection.text,
+    insert: (text) => {
+      if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the link again."); return; }
+      editor.applyChanges(tab.id, [{ from: selection.from, to: selection.to, insert: text }]);
+    },
+  });
 }
 
 function activeMeta(): TabMeta | undefined {
@@ -2795,6 +2813,14 @@ initExplorer(
   },
 );
 
+configureLinkCompletion({
+  index: linkIndex,
+  context: (id) => {
+    const tab = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
+    return tab ? { path: tab.path ?? `${getState().folder}/untitled.md`, untitled: !tab.path } : null;
+  },
+  enabled: () => currentSettings.links.complete,
+});
 configureLinks({
   index: linkIndex,
   context: (id) => {
@@ -2940,6 +2966,7 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-svg");
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
+    case "edit.insert_note_link": return insertNoteLink();
     case "edit.open_link": {
       const tab = activeMeta();
       if (tab) followEditorLink(tab.id, activeView().editor.getText(tab.id), activeView().editor.getSelection().from);

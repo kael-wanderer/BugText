@@ -73,6 +73,7 @@ export type Settings = {
   workspaceContextK: number;
   appIcon: AppIconId;
   images: ImageSettings;
+  links: { complete: boolean; onRename: "ask" | "never" };
   tables: TableSettings;
   templates: TemplateSettings;
 };
@@ -103,6 +104,7 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceContextK: 5,
   appIcon: DEFAULT_APP_ICON,
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
+  links: { complete: true, onRename: "ask" },
   tables: { formatOnEdit: true, pasteAsTable: true },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
@@ -154,6 +156,7 @@ function defaults(): Settings {
     workspaceContext: DEFAULT_SETTINGS.workspaceContext,
     workspaceContextK: DEFAULT_SETTINGS.workspaceContextK,
     images: { ...DEFAULT_SETTINGS.images },
+    links: { ...DEFAULT_SETTINGS.links },
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
   };
@@ -283,6 +286,7 @@ export function parseSettings(raw: string): Settings {
       ? (data.appIcon as AppIconId)
       : DEFAULT_APP_ICON,
     images: parseImages(data.images),
+    links: parseLinks(data.links),
     tables: parseTables(data.tables),
     templates: parseTemplates(data.templates),
   };
@@ -315,4 +319,9 @@ export function applySettings(settings: Settings): void {
     element.style.setProperty("--win-font", settings[id].font || "var(--font-mono)");
     element.style.setProperty("--win-size", `${settings[id].size}px`);
   }
+}
+
+function parseLinks(value: unknown): Settings["links"] {
+  const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  return { complete: typeof data.complete === "boolean" ? data.complete : true, onRename: data.onRename === "never" ? "never" : "ask" };
 }
