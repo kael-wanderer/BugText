@@ -83,7 +83,7 @@ export type ScreenDeps = AiPageDeps & {
 
 export type SettingsPage = {
   id: SettingsPageId;
-  render(host: HTMLElement, deps: ScreenDeps, sub?: AiSubPage): void;
+  render(host: HTMLElement, deps: ScreenDeps, sub?: AiSubPage): void | Promise<void>;
   /** True while the page owns Esc (e.g. recording a shortcut). */
   blocksEscape?(): boolean;
 };
@@ -167,6 +167,8 @@ export function createSettingsScreen(
     if (page.id === "ai") {
       for (const [sub, label, section] of [
         ["use-for", "Use for", "FEATURES"],
+        ["actions", "Actions", ""],
+        ["context", "Context", ""],
         ["local-cli", "Local CLI", "ENGINES"],
         ["api", "API providers", ""],
         ["mcp", "MCP server", "AGENTS"],
@@ -214,14 +216,23 @@ export function createSettingsScreen(
     render();
   });
 
+  // Wait for lazy pages before revealing a search hit or restoring control focus.
+  let pageReady: Promise<void> | null = null;
+  let renderVersion = 0;
+  function afterPage(run: () => void): void {
+    const version = renderVersion;
+    if (pageReady) void pageReady.then(() => { if (open && version === renderVersion) run(); });
+    else run();
+  }
+
   // ---- Pane ----
   function renderPage(id: SettingsPageId): void {
     const page = pages.find((p) => p.id === id);
     const section = document.createElement("section");
     section.className = "st-page";
     section.dataset.page = id;
-    if (page)
-      page.render(
+    if (page) {
+      const ready = page.render(
         section,
         {
           ...deps,
@@ -233,7 +244,8 @@ export function createSettingsScreen(
         },
         lastSub,
       );
-    else pageHeader(section, id);
+      pageReady = ready ? ready.catch(() => { section.textContent = "Could not load settings page."; }) : null;
+    } else pageHeader(section, id);
     pane.replaceChildren(section);
   }
 
@@ -274,20 +286,22 @@ export function createSettingsScreen(
   }
 
   function revealSetting(id: string): void {
-    const target = pane.querySelector<HTMLElement>(
-      `[data-setting="${CSS.escape(id)}"]`,
-    );
-    if (!target) return;
-    target.scrollIntoView({ block: "center" });
-    pane
-      .querySelectorAll(".flash")
-      .forEach((node) => node.classList.remove("flash"));
-    target.classList.add("flash");
-    window.clearTimeout(flashTimer);
-    flashTimer = window.setTimeout(
-      () => target.classList.remove("flash"),
-      FLASH_MS,
-    );
+    afterPage(() => {
+      const target = pane.querySelector<HTMLElement>(
+        `[data-setting="${CSS.escape(id)}"]`,
+      );
+      if (!target) return;
+      target.scrollIntoView({ block: "center" });
+      pane
+        .querySelectorAll(".flash")
+        .forEach((node) => node.classList.remove("flash"));
+      target.classList.add("flash");
+      window.clearTimeout(flashTimer);
+      flashTimer = window.setTimeout(
+        () => target.classList.remove("flash"),
+        FLASH_MS,
+      );
+    });
   }
 
   function syncRail(): void {
@@ -307,6 +321,8 @@ export function createSettingsScreen(
   }
 
   function render(): void {
+    renderVersion++;
+    pageReady = null;
     syncRail();
     if (query.trim()) renderResults();
     else renderPage(lastPage);
@@ -362,8 +378,10 @@ export function createSettingsScreen(
     const scroll = pane.scrollTop;
     const focus = settingFocusKey(pane, document.activeElement);
     render();
-    pane.scrollTop = scroll;
-    restoreSettingFocus(pane, focus);
+    afterPage(() => {
+      pane.scrollTop = scroll;
+      restoreSettingFocus(pane, focus);
+    });
   }
 
   window.addEventListener("keydown", (event) => {

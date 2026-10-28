@@ -1,3 +1,6 @@
+import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
+import { runnableActions } from "./ai/actions";
+import { appConfigDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
@@ -29,8 +32,6 @@ import { permitAISettingsSave } from "./ai/aisettings-write-guard";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
-  enabledQuickActions,
-  runQuickAction,
   type QuickActionDeps,
 } from "./ai/quick-actions";
 import { clampAgentPanelWidth } from "./ai-layout";
@@ -169,7 +170,7 @@ import { tableCommandFromId, tableMenuItems } from "./table-menu";
 import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
-const workspaceIndex = createWorkspaceIndex();
+const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
 const linkIndex = createLinkIndex();
 
 const windowsHost = document.getElementById("windows")!;
@@ -338,6 +339,17 @@ const mcpHandler = createMcpHandler({
   },
 });
 
+let currentActions: ActionsFile = { version: 1, actions: [] };
+let actionsError = false;
+let actionsPath = "";
+async function reloadActions(): Promise<void> {
+  if (!actionsPath) actionsPath = await join(await appConfigDir(), "ai-actions.json");
+  const result = await loadActions(actionsIO(nativeWindowLabel));
+  actionsError = result.error;
+  if (result.file) currentActions = result.file;
+  aiPanel?.render();
+}
+function availableActions() { return runnableActions(currentAISettings, currentActions.actions); }
 let onSettingsSynced: (() => void) | null = null;
 
 function broadcastSettingsChange(file: SettingsFile): void {
@@ -468,7 +480,9 @@ async function getSavedAIKeyIds(): Promise<ReadonlySet<string>> {
 /** Reload one settings file after another window changed it. Never writes or re-broadcasts. */
 async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
   try {
-    if (file === "settings") {
+    if (file === "ai-actions") {
+      await reloadActions();
+    } else if (file === "settings") {
       const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
@@ -482,7 +496,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       syncViewMenu();
       requestWindowMeasure();
       if (themeChanged) renderAll();
-    } else {
+    } else if (file === "agent") {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
       if (!next) return;
@@ -572,6 +586,7 @@ function commandItems(): PaletteItem[] {
   const recent = loadRecent();
   return [
     command("new", "New File", newDoc),
+    command("ai.new_chat", "AI: New chat", newAIChat),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
     command("quickNote", "Quick Note…", () => templateActions.quickNote()),
     command("open", "Open File…", () => void doOpen()),
@@ -613,8 +628,8 @@ function commandItems(): PaletteItem[] {
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
-    ...enabledQuickActions(currentAISettings).map((action) =>
-      command(action.id, `AI: ${action.label}`, () =>
+    ...availableActions().map((action) =>
+      command(action.id, `AI: ${action.name}`, () =>
         runQuickActionById(action.id),
       ),
     ),
@@ -685,7 +700,7 @@ const handlers = {
       renderAll();
     }
   },
-  onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) updateOutline(); },
+  onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
   onPdfEditDirtyChange: (wid: string, tid: string, dirty: boolean) =>
@@ -709,10 +724,11 @@ const handlers = {
     showContextMenu(x, y, [
       {
         label: "AI",
-        children: enabledQuickActions(currentAISettings).map((action) => ({
-          label: action.label,
+        children: availableActions().flatMap((action, index, all) => [
+          ...(index > 0 && !action.feature && all[index - 1].feature ? ["separator" as const] : []), {
+          label: action.name,
           action: () => runQuickActionById(action.id),
-        })),
+        }]),
       },
       ...(table ? ["separator" as const, { label: "Table", children: tableMenuItems(table, runTableCommand) }] : []),
     ]);
@@ -942,7 +958,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 
 function renderAll(): void {
   for (const v of views.values()) v.render();
-  if (views.has(getState().activeWindowId)) updateOutline();
+  if (views.has(getState().activeWindowId)) { updateOutline(); aiPanel?.resize(); }
   document.getElementById("windows")!.classList.toggle("has-sub", getState().windows.length > 1);
   const tab = activeMeta();
   const exportButton = document.getElementById("ab-export") as HTMLButtonElement | null;
@@ -1572,6 +1588,10 @@ async function doSave(saveAs = false): Promise<boolean> {
       applyAIVisibility();
       aiPanel?.render();
       broadcastSettingsChange("agent");
+    }
+    if (target === actionsPath) {
+      await reloadActions();
+      broadcastSettingsChange("ai-actions");
     }
     await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
@@ -2378,13 +2398,13 @@ function buildAIPanel(): void {
       const tab = activeMeta();
       const selection = view.editor.getSelection();
       return {
+        path: tab?.path ?? null,
         text: tab ? view.editor.getText(tab.id) : "",
         selection: selection.text,
         windowId: getState().activeWindowId,
         tabId: tab?.id ?? "",
         from: selection.from,
         to: selection.to,
-        path: tab?.path ?? null,
       };
     },
     lookupTabText: panelReview.lookupTabText,
@@ -2410,6 +2430,9 @@ function buildAIPanel(): void {
     getWorkspaceContext: () => ({
       k: currentSettings.workspaceContextK,
     }),
+    getActions: availableActions,
+    runAction: runQuickActionById,
+    windowLabel: nativeWindowLabel,
     historyKey: `bugtext.ai.history.${nativeWindowLabel}`,
     legacyHistoryKey: `bugtext.ai.history.${nativeWindowLabel}`,
   });
@@ -2432,6 +2455,12 @@ function setAIVisible(aiVisible: boolean): void {
   requestAnimationFrame(() => aiPanel?.resize());
 }
 
+function newAIChat(): void {
+  if (!currentAISettings.enabled.chat) return;
+  setAIVisible(true);
+  aiPanel?.newChat();
+}
+
 function toggleAI(): void {
   if (!currentAISettings.enabled.chat) return;
   setAIVisible(!ui.aiVisible);
@@ -2440,6 +2469,7 @@ function toggleAI(): void {
 function quickActionDeps(actionLabel: string): QuickActionDeps {
   const review = editReviewDeps(actionLabel);
   return {
+    notify: showToast,
     getSettings: () => currentAISettings,
     getClis: () => cliInfos,
     getDoc: () => {
@@ -2447,6 +2477,7 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
       const tab = activeMeta();
       const selection = view.editor.getSelection();
       return {
+        path: tab?.path ?? null,
         text: tab ? view.editor.getText(tab.id) : "",
         selection: selection.text,
         windowId: getState().activeWindowId,
@@ -2467,20 +2498,16 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
       setAIVisible(true);
       return aiPanel!.appendBubble(role, text);
     },
-    getWorkingDir: () => {
-      const folder = getState().folder;
-      if (folder) return folder;
-      const path = activeMeta()?.path;
-      return path ? path.replace(/[\\/][^\\/]*$/, "") || null : null;
-    },
+    getWorkingDir: () => getState().folder,
     makeAbort: () => new AbortController(),
   };
 }
 
 function runQuickActionById(id: string): void {
-  const action = enabledQuickActions(currentAISettings).find((a) => a.id === id);
+  const action = availableActions().find((a) => a.id === id);
   if (!action) return;
-  void runQuickAction(action, quickActionDeps(action.label));
+  setAIVisible(true);
+  void aiPanel!.runAction(action, quickActionDeps(action.name));
 }
 
 async function openInSub(path: string): Promise<void> {
@@ -2579,6 +2606,13 @@ const settingsScreen = createSettingsScreen(
     rescan: rescanClis,
     getModelsCache: () => modelsCache,
     mcp: mcpPageDeps,
+    actions: {
+      getFile: () => currentActions,
+      hasError: () => actionsError,
+      save: async file => { await saveActions(actionsIO(nativeWindowLabel), file); currentActions = file; actionsError = false; aiPanel?.render(); },
+      run: action => { settingsScreen.close(); setAIVisible(true); void aiPanel!.runAction(action, quickActionDeps(action.name)); },
+      openFile: () => { if (actionsPath) void doOpenPath(actionsPath); settingsScreen.close(); },
+    },
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
@@ -3102,6 +3136,7 @@ const appKeyActions: Record<string, () => void> = {
   "search.find_in_files": () => toggleSearch(),
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
+  "ai.new_chat": newAIChat,
   "ai.quick.proofread": () => runQuickActionById("ai.quick.proofread"),
   "ai.quick.rewrite": () => runQuickActionById("ai.quick.rewrite"),
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
@@ -3200,6 +3235,7 @@ async function boot(): Promise<void> {
     void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
   }
   await loadAISettings();
+  await reloadActions();
   applyAIVisibility();
   await rescanClis();
   modelsCache = await loadModelsCache();

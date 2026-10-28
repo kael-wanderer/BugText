@@ -177,3 +177,29 @@ describe("runQuickAction", () => {
     expect(binding).toMatchObject({ from: 0, to: "hello world".length, selection: "" });
   });
 });
+
+describe("saved action runner", () => {
+  const action = { id: "custom", name: "Extract", instruction: "Extract tasks", result: "answer" as const, input: "selection-or-note" as const, engine: null, panel: true };
+  it("sends only selected input and labels the answer", async () => {
+    const append = vi.fn(() => bubble());
+    await runQuickAction(action, { ...baseDeps(), appendBubble: append });
+    expect(append).toHaveBeenCalledWith("user", "▸ Extract · on selection (1 line)");
+    expect(streamChat).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.any(Array), expect.any(Function), expect.objectContaining({ folder: null, write: false }));
+  });
+  it("reviews a whole-note edit", async () => {
+    const review = vi.fn();
+    await runQuickAction({ ...action, result: "edit", input: "note" }, { ...baseDeps(), reviewEdit: review });
+    expect(review).toHaveBeenCalledWith("hello world", "REVISED", expect.objectContaining({ from: 0, to: 11 }));
+  });
+});
+
+it("refuses built-in and saved action inputs from excluded notes", async () => {
+  vi.mocked(streamChat).mockClear();
+  const settings = structuredClone(DEFAULT_AI_SETTINGS); settings.context.exclude = ["private/**"];
+  for (const action of [QUICK_ACTIONS[0], { id: "custom", name: "Extract", instruction: "Extract", input: "note" as const, result: "answer" as const, engine: null, panel: true }]) {
+    const append = vi.fn(() => bubble()); const deps = baseDeps();
+    await runQuickAction(action, { ...deps, getSettings: () => settings, getWorkingDir: () => "/notes", getDoc: () => ({ ...deps.getDoc(), path: "/notes/private/a.md" }), appendBubble: append });
+    expect(append).toHaveBeenCalledWith("system", "private/a.md is excluded from AI context in Settings.");
+  }
+  expect(streamChat).not.toHaveBeenCalled();
+});

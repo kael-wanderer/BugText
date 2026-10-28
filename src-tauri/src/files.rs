@@ -384,6 +384,26 @@ pub fn get_settings(app: tauri::AppHandle, default: String) -> Result<SettingsFi
 }
 
 #[tauri::command]
+pub fn read_ai_actions(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri::Manager;
+    let dir = app.path().app_config_dir().map_err(|_| "Cannot read actions")?;
+    match fs::read_to_string(dir.join("ai-actions.json")) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err("Cannot read actions".into()),
+    }
+}
+
+#[tauri::command]
+pub fn write_ai_actions(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    use tauri::Manager;
+    let dir = app.path().app_config_dir().map_err(|_| "Cannot save actions")?;
+    fs::create_dir_all(&dir).map_err(|_| "Cannot save actions")?;
+    let path = dir.join("ai-actions.json");
+    write_atomic(&path.to_string_lossy(), contents.as_bytes()).map_err(|_| "Cannot save actions".into())
+}
+
+#[tauri::command]
 pub fn get_ai_settings(app: tauri::AppHandle, default: String) -> Result<SettingsFile, String> {
     use tauri::Manager;
 

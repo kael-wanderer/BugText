@@ -1,5 +1,8 @@
+import type { ContextSent } from "./context-sent";
+import { isContextExcluded, exclusionMessage } from "./context-exclude";
 import type { AISettings, FeatureId } from "./aisettings";
-import { resolveUse, type CliInfo } from "./engines";
+import { type CliInfo } from "./engines";
+import { actionEngine, type RunnableAction } from "./actions";
 import { hashText } from "../hash";
 import { buildMessages } from "./conversation";
 import { streamChat } from "./client";
@@ -66,9 +69,12 @@ export function enabledQuickActions(settings: AISettings): typeof QUICK_ACTIONS 
 export type BubbleHandle = { textContent: string | null };
 
 export type QuickActionDeps = {
+  notify?: (text: string) => void;
+  onContext?: (context: ContextSent) => void;
   getSettings: () => AISettings;
   getClis: () => CliInfo[];
   getDoc: () => {
+    path?: string | null;
     text: string;
     selection: string;
     windowId: string;
@@ -84,39 +90,57 @@ export type QuickActionDeps = {
 };
 
 export async function runQuickAction(
-  action: QuickAction & { feature: FeatureId },
+  action: (QuickAction & { feature: FeatureId }) | RunnableAction,
   deps: QuickActionDeps,
 ): Promise<void> {
+  const normalized: RunnableAction = "label" in action ? {
+    id: action.id, name: action.label, instruction: action.prompt,
+    result: action.kind === "edit" ? "edit" : "answer", input: "selection-or-note",
+    engine: null, feature: action.feature, panel: true,
+  } : action;
   const doc = deps.getDoc();
-  const scope = actionScope(doc.selection, doc.text);
+  if (isContextExcluded(doc.path, deps.getWorkingDir(), deps.getSettings().context.exclude)) {
+    const message = exclusionMessage(doc.path!, deps.getWorkingDir());
+    deps.notify?.(message); deps.appendBubble("system", message); return;
+  }
+  const scope = actionScope(normalized.input === "note" ? "" : doc.selection, doc.text);
   if (!scope.text.trim()) {
-    deps.appendBubble("system", "Nothing to send — the document is empty.");
+    deps.appendBubble("system", "Nothing to send — the selection and note are empty.");
     return;
   }
   const settings = deps.getSettings();
-  if (!settings.enabled[action.feature]) return;
-  const row = resolveUse(settings, action.feature, deps.getClis());
+  if (normalized.feature && !settings.enabled[normalized.feature]) return;
+  const row = actionEngine(normalized, settings, deps.getClis());
   if (row.engine.kind === "none") {
     deps.appendBubble(
       "system",
-      `Choose an engine for ${action.label} in Settings ▸ AI ▸ Use for.`,
+      `Choose an engine for ${normalized.name} in Settings ▸ AI ▸ ${normalized.engine ? "Actions" : "Use for"}.`,
     );
     return;
   }
 
   const built = buildMessages({
     history: [],
-    prompt: action.prompt,
+    prompt: normalized.instruction,
     docText: scope.text,
     selection: "",
-    editMode: action.kind === "edit",
+    editMode: normalized.result === "edit",
     files: [],
+    notePath: doc.path ? doc.path.split(/[\\/]/).pop() : "Untitled",
     maxContextChars: settings.maxContextChars,
   });
+  built.context.action = true;
+  if (built.context.note) built.context.note.label = scope.whole ? "This note" : "Selection";
+  deps.onContext?.(built.context);
   if (built.truncatedChars > 0) {
     deps.appendBubble("system", contextTrimWarning(built.truncatedChars));
   }
 
+  if (normalized.result === "answer") {
+    const lines = scope.text.split("\n").length;
+    const where = scope.whole ? "on note" : `on selection (${lines} line${lines === 1 ? "" : "s"})`;
+    deps.appendBubble("user", `▸ ${normalized.name} · ${where}`);
+  }
   const bubble = deps.appendBubble("assistant", "");
   let reply = "";
   const abort = deps.makeAbort();
@@ -145,7 +169,7 @@ export async function runQuickAction(
     return;
   }
 
-  if (action.kind === "edit") {
+  if (normalized.result === "edit") {
     const binding: EditBinding = {
       windowId: doc.windowId,
       tabId: doc.tabId,

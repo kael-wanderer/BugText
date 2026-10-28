@@ -81,7 +81,7 @@ Settings is a full-window screen (`src/settings-screen/`) laid over the workbenc
 `⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, `⌘[`, Back, the
 gear or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
 tabs, unsaved text, cursor, scroll and split survive. Pages in fixed order: General,
-Editing, Theme, Shortcuts, AI (Use for, Local CLI, API providers sub-pages, plus
+Editing, Theme, Shortcuts, AI (Use for, Actions, Context, Local CLI, API providers sub-pages, plus
 search over `registry.ts`; every row carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
 no page is recording a shortcut (`blocksEscape`) and focus is not in a text field. User
 strings (font, theme, agent, model names) render via `textContent`/`.value`, never
@@ -160,9 +160,21 @@ Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
 
+Saved actions live in `<app config dir>/ai-actions.json` v1 and run from the palette,
+editor AI menu or panel bar; Edit uses diff review, Answer replies in Chat, and both
+send only their input without folder access. Their default engine follows `uses.chat`.
+Named conversations live under `<app config dir>/conversations/<folder-id>/`, with
+Rust hashing the canonical folder path (`no-folder` for null), atomic writes, a
+400-message cap and seven-day trash. Earlier window history migrates to "Earlier chat"
+and removes its old key only after a successful write. The switcher supports ⌥⌘J, rename,
+Delete/Undo and cross-window updates with read-only streaming notices. Per-conversation
+chips choose context; replies save Context sent. `agent.json`'s `context.exclude` globs
+apply to indexing, mentions, attachment reads, note context and actions. Excluded notes
+are locked off; folder-access CLI agents can still open those files themselves.
+
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
-The open note is always context; when a folder is open, keyword retrieval adds the
-top `workspaceContextK` chunks on every question. Replies show timing, model and
+Note/selection and Folder search chips default on; keyword retrieval adds up to
+`workspaceContextK` chunks while search is on. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents
