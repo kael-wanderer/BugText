@@ -124,6 +124,11 @@ scanner with the command palette. Preview block `data-line` anchors support head
 jumps, place preservation and optional Sync Scroll between editor and preview; the
 sidebar selection persists in view state and Sync Scroll in settings.json.
 
+Markdown task markers are parsed from source lines outside code blocks; preview checkboxes
+are added after sanitizing and toggle only the source marker character. Table editing and
+spreadsheet paste use plain Markdown source changes, with clipboard HTML read only through
+cell text content.
+
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 The open note is always context; when a folder is open, keyword retrieval adds the
 top `workspaceContextK` chunks on every question. Replies show timing, model and

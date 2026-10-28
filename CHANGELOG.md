@@ -8,6 +8,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- M6 checklist and table editing foundations: shared Markdown block scanning, task-line
+  parsing/toggling, Unicode display widths, safe preview checkbox enhancement, table
+  parsing/formatting, and spreadsheet TSV/HTML-to-table conversion.
 - Outline navigation for Markdown notes, preview place preservation, and optional Sync Scroll.
 
 - Paste and drop images into Markdown notes. ⌘V with an image on the clipboard saves it

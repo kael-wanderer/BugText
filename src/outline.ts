@@ -16,34 +16,12 @@ export function plainHeadingText(text: string): string {
 export function markdownOutline(source: string): OutlineHeading[] {
   const lines = source.split(/\r?\n/);
   const headings: OutlineHeading[] = [];
-  let fence: { char: string; length: number } | null = null;
-  let comment = false;
-  let frontMatter = lines[0]?.trim() === "---";
+  const blocked = markdownCodeLines(source);
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i];
-    if (frontMatter) {
-      if (i > 0 && /^(---|\.\.\.)\s*$/.test(line.trim())) frontMatter = false;
-      continue;
-    }
-    if (comment) {
-      const end = line.indexOf("-->");
-      if (end < 0) continue;
-      line = line.slice(end + 3);
-      comment = false;
-    }
-    while (line.includes("<!--")) {
-      const start = line.indexOf("<!--");
-      const end = line.indexOf("-->", start + 4);
-      if (end < 0) { line = line.slice(0, start); comment = true; break; }
-      line = line.slice(0, start) + line.slice(end + 3);
-    }
+    if (blocked[i]) continue;
     const marker = /^ {0,3}(`{3,}|~{3,})/.exec(line);
-    if (fence) {
-      if (marker && marker[1][0] === fence.char && marker[1].length >= fence.length && /^\s*$/.test(line.slice(marker[0].length))) fence = null;
-      continue;
-    }
-    if (marker) { fence = { char: marker[1][0], length: marker[1].length }; continue; }
-    if (/^(?: {4}|\t)/.test(line)) continue;
+    if (marker) continue;
     const atx = /^ {0,3}(#{1,6})(?:\s+|$)(.*)$/.exec(line);
     if (atx) {
       headings.push({ level: atx[1].length, text: plainHeadingText(atx[2].replace(/\s+#+\s*$/, "")), line: i + 1 });
@@ -59,3 +37,4 @@ export function markdownOutline(source: string): OutlineHeading[] {
   }
   return headings;
 }
+import { markdownCodeLines } from "./markdown-blocks";
