@@ -6,6 +6,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
 ### Added
 
 - Checklists: `- [ ]` items show as checkboxes in the preview. Clicking one (or Space
