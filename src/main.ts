@@ -1,3 +1,6 @@
+import { createWorkspaceController } from "./workspaces/controller";
+import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
+import { workspacesIO } from "./workspaces/store";
 import { captureLayout, sessionLayout } from "./workspaces/layout";
 import { createPositionTracker } from "./workspaces/positions";
 import { restoreLayout } from "./workspaces/restore";
@@ -252,10 +255,31 @@ function flushUiState(): void {
   saveState(ui);
 }
 function persistUiState(): void {
+  workspaceController.changed();
   if (!isPrimaryNativeWindow || !sessionReady) return;
   window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(flushUiState, 300);
 }
+const workspaceController = createWorkspaceController({
+  io: workspacesIO(nativeWindowLabel),
+  capture: () => {
+    for (const view of views.values()) view.captureReadingPosition();
+    return { folder: getState().folder, layout: captureLayout(getState(), ui, readingPositions.snapshot()) };
+  },
+  claim: id => invoke<string | null>("workspace_claim", { id }),
+  release: () => invoke<void>("workspace_release"),
+  display: name => {
+    document.title = name ? `${name} — BugText` : "BugText";
+    void currentNativeWindow?.setTitle(document.title).catch(() => {});
+    const header = document.querySelector<HTMLElement>("#explorer");
+    if (!header) return;
+    let element = header.querySelector<HTMLElement>(".workspace-name");
+    if (!name) { element?.remove(); return; }
+    if (!element) { element = document.createElement("div"); element.className = "workspace-name"; header.insertBefore(element, header.querySelector(".explorer-header")); }
+    element.textContent = name;
+  },
+});
+function saveWorkspace(): void { showSaveWorkspaceSheet(getState().folder, workspaceController.save); }
 window.addEventListener("pagehide", flushUiState);
 window.addEventListener("beforeunload", flushUiState);
 
@@ -530,7 +554,8 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
 
 void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
   const file = shouldReload(event.payload, nativeWindowLabel);
-  if (file) void reloadSettingsFromDisk(file);
+  if (file === "workspaces") void workspaceController.reload();
+  else if (file) void reloadSettingsFromDisk(file);
 });
 
 function syncMcpEnabled(): void {
@@ -621,6 +646,8 @@ function commandItems(): PaletteItem[] {
     }),
     command("save", "Save", () => void doSave(false)),
     command("saveAs", "Save As…", () => void doSave(true)),
+    command("file.save_workspace", "Save Workspace As…", saveWorkspace),
+    command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
     command("close", "Close Tab", () => {
       const windowState = activeWindow();
@@ -3062,6 +3089,10 @@ listenScoped<string>("menu", (event) => {
       return void doSave(false);
     case "file.save_as":
       return void doSave(true);
+    case "file.save_workspace":
+      return saveWorkspace();
+    case "file.close_workspace":
+      return void workspaceController.close();
     case "file.recover":
       return openRecoveryReview();
     case "file.close": {
