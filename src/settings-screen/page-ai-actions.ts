@@ -44,7 +44,7 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
       item.draggable = true; item.setAttribute("aria-label", `Reorder ${a.name}`);
       item.addEventListener("dragstart", () => { dragged = a.id; });
       item.addEventListener("dragover", e => e.preventDefault());
-      item.addEventListener("drop", e => { e.preventDefault(); const next = [...actions]; const from = next.findIndex(x => x.id === dragged); if (from < 0) return; const [moved] = next.splice(from, 1); next.splice(next.findIndex(x => x.id === a.id), 0, moved); void persist(next); });
+      item.addEventListener("drop", e => { e.preventDefault(); const next = [...actions]; const from = next.findIndex(x => x.id === dragged); if (from < 0) return; const to = next.findIndex(x => x.id === a.id); const [moved] = next.splice(from, 1); next.splice(to, 0, moved); void persist(next); });
       page.append(item);
     }
     if (!actions.length) {

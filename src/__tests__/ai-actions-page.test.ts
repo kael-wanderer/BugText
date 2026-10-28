@@ -31,4 +31,9 @@ describe("Actions settings", () => {
     const rows = ui.host.querySelectorAll('[draggable="true"]'); rows[1].dispatchEvent(new Event("dragstart")); rows[0].dispatchEvent(new Event("drop", { cancelable: true }));
     await vi.waitFor(() => expect(ui.file().actions.map(a => a.id)).toEqual(["two", "one"]));
   });
+  it("moves a row down onto the next row", async () => {
+    const ui = setup({ version: 1, actions: [action("one", "One"), action("two", "Two"), action("three", "Three")] });
+    const rows = ui.host.querySelectorAll('[draggable="true"]'); rows[0].dispatchEvent(new Event("dragstart")); rows[1].dispatchEvent(new Event("drop", { cancelable: true }));
+    await vi.waitFor(() => expect(ui.file().actions.map(a => a.id)).toEqual(["two", "one", "three"]));
+  });
 });

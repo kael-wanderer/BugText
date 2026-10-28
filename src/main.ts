@@ -342,7 +342,9 @@ const mcpHandler = createMcpHandler({
 
 let currentActions: ActionsFile = { version: 1, actions: [] };
 let actionsError = false;
+let actionsPath = "";
 async function reloadActions(): Promise<void> {
+  if (!actionsPath) actionsPath = await join(await appConfigDir(), "ai-actions.json");
   const result = await loadActions(actionsIO(nativeWindowLabel));
   actionsError = result.error;
   if (result.file) currentActions = result.file;
@@ -1587,6 +1589,10 @@ async function doSave(saveAs = false): Promise<boolean> {
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
+    if (target === actionsPath) {
+      await reloadActions();
+      broadcastSettingsChange("ai-actions");
+    }
     await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
     return true;
@@ -2600,7 +2606,7 @@ const settingsScreen = createSettingsScreen(
       hasError: () => actionsError,
       save: async file => { await saveActions(actionsIO(nativeWindowLabel), file); currentActions = file; actionsError = false; aiPanel?.render(); },
       run: action => { settingsScreen.close(); void runQuickAction(action, quickActionDeps(action.name)); },
-      openFile: () => { void appConfigDir().then(dir => join(dir, "ai-actions.json")).then(path => doOpenPath(path)); settingsScreen.close(); },
+      openFile: () => { if (actionsPath) void doOpenPath(actionsPath); settingsScreen.close(); },
     },
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
