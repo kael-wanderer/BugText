@@ -1,3 +1,4 @@
+mod conversations;
 mod ai;
 mod assets;
 mod cli_args;
@@ -258,6 +259,11 @@ pub fn run() {
             files::search_in_folder,
             files::search_cancel,
             files::get_settings,
+            conversations::conversations_list,
+            conversations::conversation_read,
+            conversations::conversation_write,
+            conversations::conversation_delete,
+            conversations::conversation_restore,
             files::get_ai_settings,
             files::read_ai_actions,
             files::write_ai_actions,

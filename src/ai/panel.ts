@@ -1,3 +1,4 @@
+import { migrateHistory, writeConversation, conversationTitle, EARLIER_MESSAGES_NOTICE, type Conversation } from "./conversations";
 import { renderActionBar } from "./action-bar";
 import type { RunnableAction } from "./actions";
 import { invoke } from "@tauri-apps/api/core";
@@ -119,7 +120,7 @@ function loadHistory(key: string, legacy?: string): ChatMessage[] {
               ["user", "assistant", "system"].includes(m.role) &&
               typeof m.content === "string",
           )
-          .slice(-100)
+          .slice(-400)
       : [];
   } catch {
     return [];
@@ -185,6 +186,12 @@ export function createAIPanel(
     body.replaceChildren(messagesElement, inputRow);
   } else body.replaceChildren(picker, messagesElement, inputRow);
   const history = loadHistory(deps.historyKey, deps.legacyHistoryKey);
+  let activeConversation: Conversation | null = null;
+  let migrationFailed = false;
+  const historyReady = migrateHistory(deps.historyKey, deps.legacyHistoryKey).then(value => {
+    activeConversation = value;
+    if (value?.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
+  }).catch(() => { migrationFailed = true; });
   const workspaceIndex = deps.workspaceIndex;
   let referencedFiles: string[] = [];
   let activeRequest: AbortController | null = null;
@@ -403,6 +410,8 @@ export function createAIPanel(
     messagesElement.append(card);
   }
   async function send(): Promise<void> {
+    await historyReady;
+    if (migrationFailed) { appendBubble("error", "Could not migrate earlier chat. Please reopen the panel to retry."); return; }
     if (activeRequest) {
       activeRequest.abort();
       return;
@@ -559,12 +568,10 @@ export function createAIPanel(
           { role: "user", content: prompt },
           { role: "assistant", content: reply },
         );
-        try {
-          localStorage.setItem(
-            deps.historyKey,
-            JSON.stringify(history.slice(-100)),
-          );
-        } catch {}
+        activeConversation ??= { version: 1, id: crypto.randomUUID(), title: conversationTitle(prompt), updatedAt: Date.now(), messages: [] };
+        activeConversation.updatedAt = Date.now();
+        activeConversation.messages.push(...history.slice(-2).map(m => ({ role: m.role, text: chatContentText(m.content), time: Date.now() })));
+        void writeConversation(null, activeConversation).catch(() => appendBubble("error", "Could not save conversation."));
         const connection =
           row.engine.kind === "api"
             ? settings.connections.find(

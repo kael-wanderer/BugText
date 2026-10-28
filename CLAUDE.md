@@ -238,3 +238,8 @@ The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
 (started at 249). Raise it by one for every build handed out, even when the version
 is unchanged, and never reuse a number. `build.rs` bakes it in as `BUGTEXT_BUILD`
 (the runtime config omits bundle settings) for Settings ▸ General and About.
+
+AI conversations are stored atomically under `<app config dir>/conversations/`, grouped
+by a Rust-derived hash of the canonical folder path. Each group has an index; deleted
+chats remain in trash for seven days. Earlier window history migrates to an
+"Earlier chat" in No folder, with the old key removed only after a successful write.
