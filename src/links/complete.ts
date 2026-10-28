@@ -1,4 +1,5 @@
 import { startCompletion, autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import { markdownOutline } from "../outline";
 import { scanMarkdownLines } from "../markdown-blocks";
 import { rankItems } from "../fuzzy";
 import { headingAnchors, formatLinkTarget } from "./parse";
@@ -17,6 +18,11 @@ export function completionSource(id: string) {
     const before = line.text.slice(0, context.pos - line.from);
     const match = /(?:\]\(|^ {0,3}\[[^\]]+\]:\s+)([^\n]*)$/.exec(before);
     if (!match || /\)\s/.test(match[1])) return null;
+    for (const span of line.text.matchAll(/(`+).*?\1/g)) {
+      const at = span.index!;
+      const position = context.pos - line.from;
+      if (at < position && position <= at + span[0].length) return null;
+    }
     const from = context.pos - match[1].length;
     if (!s.index.ready) {
       // The pending source is retried after the first background scan.
@@ -32,7 +38,7 @@ export function completionSource(id: string) {
       const target = raw.slice(0, hash).replace(/>$/, "");
       const resolved = resolveLink(target || "#", note.path, s.index.folder);
       const targetNote = s.index.get(resolved.path ?? "");
-      const headings = headingAnchors(targetNote?.headings ?? []);
+      const headings = headingAnchors(resolved.path === note.path ? markdownOutline(context.state.doc.toString()) : targetNote?.headings ?? []);
       return { from, filter: false, options: rankItems(raw.slice(hash + 1), headings, (h) => h.text).map((h) => ({ label: h.text, detail: `#${h.anchor}`, apply: target ? formatLinkTarget(note.path, resolved.path!, h.anchor) + suffix : `#${h.anchor}${suffix}` })) };
     }
     return { from, filter: false, options: rankItems(raw, s.index.notes(), (n) => n.path).slice(0, 100).map((n) => ({ label: n.path.split("/").pop()!, detail: detail ?? n.path.slice(s.index.folder!.length + 1), apply: formatLinkTarget(note.path, n.path) + suffix })) };

@@ -45,7 +45,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
-  editing: "How lines wrap, how tables behave, where pasted images go, and where templates and quick notes live.",
+  editing: "How lines wrap, how links and tables behave, where pasted images go, and where templates and quick notes live.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -115,6 +115,8 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Fonts and sizes",
     keywords: "font typeface in general",
   },
+  { id: "links-complete", page: "editing", label: "Suggest notes while typing links", keywords: "links completion notes markdown" },
+  { id: "links-on-rename", page: "editing", label: "When renaming or moving notes", keywords: "links rename move backlinks ask never" },
   { id: "sync-scroll", page: "editing", label: "Sync scroll", keywords: "navigation preview editor" },
   {
     id: "soft-wrap",

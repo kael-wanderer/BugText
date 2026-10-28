@@ -140,6 +140,14 @@ scanner with the command palette. Preview block `data-line` anchors support head
 jumps, place preservation and optional Sync Scroll between editor and preview; the
 sidebar selection persists in view state and Sync Scroll in settings.json.
 
+Standard relative Markdown note links support completion, Insert Link to Note (⌥⌘L),
+preview/editor navigation and heading anchors (`data-anchor`, never `id`). The per-window
+link index builds lazily off-thread, refreshes changed notes and supplies the Links tab
+beside Outline (⇧⌥⌘O). Explorer rename/move offers a checked target-only review: open tabs
+receive one undoable edit; closed notes are compared with the scan, snapshotted in Recovery
+and written atomically inside the open folder. Settings ▸ Editing controls suggestions and
+whether to ask on rename.
+
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
 sanitizing (`preview-tasks.ts`, never `<input>`) and toggle only the source marker

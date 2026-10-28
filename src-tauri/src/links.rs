@@ -48,8 +48,9 @@ fn plain(text: &str) -> String {
         (r"\[([^\]]+)\]\([^)]*\)", "$1"),
         (r"`+([^`]*?)`+", "$1"),
         (r"\*\*(.+?)\*\*|~~(.+?)~~", "$1$2"),
-        (r"__(.+?)__", "$1"),
-        (r"\*([^*]+)\*|_([^_]+)_", "$1$2"),
+        (r"(^|[^\w])__(\S(?:.*?\S)?)__($|[^\w])", "$1$2$3"),
+        (r"(^|[^\w])\*(\S(?:.*?\S)?)\*($|[^\w])", "$1$2$3"),
+        (r"(^|[^\w])_(\S(?:.*?\S)?)_($|[^\w])", "$1$2$3"),
     ] {
         text = regex::Regex::new(pattern)
             .unwrap()
@@ -274,7 +275,7 @@ fn scan(
         let path = if Path::new(&relative).is_absolute() {
             relative.into()
         } else {
-            root.join(relative)
+            Path::new(&folder).join(relative)
         };
         let extension = path
             .extension()
@@ -405,5 +406,10 @@ pub fn create_link_note(folder: String, path: String) -> Result<(), String> {
     if !parent.starts_with(root) {
         return Err("Note outside folder".into());
     }
-    crate::files::create_file_at(&path).map_err(|_| "Could not create note".into())
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map(|_| ())
+        .map_err(|_| "Could not create note".into())
 }

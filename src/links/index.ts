@@ -75,6 +75,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         const next = result.stamps ?? {};
         for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) notes.delete(path);
         for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) notes.set(note.path, note);
+        for (const path of result.skipped) if (versions.get(path) === before.get(path)) notes.delete(path);
         stamps = next; skipped = result.skipped; notify();
       } finally { if (current === generation) refreshing = false; }
     },

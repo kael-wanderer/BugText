@@ -39,6 +39,13 @@ describe("rename links", () => {
     deps.findOpen.mockReturnValue({ text: "changed", apply: vi.fn() });
     expect(await applyRename(plans, folder, deps)).toBe(1);
   });
+  it("skips a closed note when its Recovery snapshot fails", async () => {
+    const source = "[a](b.md)";
+    const plans = planRename([parseNote("/r/a.md", source)], "/r/b.md", "/r/c.md", folder);
+    const deps = writer(source); deps.snapshot.mockRejectedValue(new Error("unavailable"));
+    expect(await applyRename(plans, folder, deps)).toBe(1);
+    expect(deps.write).not.toHaveBeenCalled();
+  });
   it("Don't Update writes nothing and untrusted names stay text", async () => {
     const source = "[<img src=x onerror=evil>](b.md)";
     const plans = planRename([parseNote("/r/<img src=x>.md", source)], "/r/b.md", "/r/c.md", folder);

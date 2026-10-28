@@ -38,6 +38,7 @@ export function editedText(source: string, edits: LinkEdit[]): string {
   return source;
 }
 export type RenameWriter = {
+  onFailure?: () => void;
   findOpen: (path: string) => { text: string; apply: (changes: { from: number; to: number; insert: string }[]) => void } | null;
   read: (path: string) => Promise<string>;
   snapshot: (path: string, source: string) => Promise<unknown>;
@@ -60,7 +61,7 @@ export async function applyRename(plans: NoteEdits[], folder: string, deps: Rena
       await deps.snapshot(plan.path, plan.source);
       if (deps.findOpen(plan.path) || await deps.read(plan.path) !== plan.source) { skipped++; continue; }
       await deps.write(plan.path, editedText(plan.source, edits), plan.source);
-    } catch { skipped++; }
+    } catch { skipped++; deps.onFailure?.(); }
   }
   return skipped;
 }

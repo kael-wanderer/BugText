@@ -2026,7 +2026,7 @@ function handleExplorerPathChange(from: string, to: string | null): void {
       return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes) };
     },
     read: (path) => invoke<string>("read_file", { path }),
-    snapshot: (path, text) => manualSnapshot(path, text, "Before updating note links"),
+    snapshot: (path, text) => manualSnapshot(path, text, "Before updating note links", true),
     write: async (path, contents, expected) => {
       if (getState().folder !== folder) throw new Error("Folder changed");
       await invoke("write_file_atomic", { path, contents, folder, expected });

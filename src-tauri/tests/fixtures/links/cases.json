@@ -66,5 +66,27 @@
         "line": 2
       }
     ]
+  },
+  {
+    "name": "heading underscores and emphasis",
+    "source": "# snake_case_title\n## __Bold title__\n## _Emphasis title_",
+    "links": [],
+    "headings": [
+      {
+        "text": "snake_case_title",
+        "level": 1,
+        "line": 1
+      },
+      {
+        "text": "Bold title",
+        "level": 2,
+        "line": 2
+      },
+      {
+        "text": "Emphasis title",
+        "level": 2,
+        "line": 3
+      }
+    ]
   }
 ]

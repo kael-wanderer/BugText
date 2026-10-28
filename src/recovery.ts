@@ -221,6 +221,7 @@ async function writeSnapshot(
   path: string,
   contents: string,
   label?: string,
+  required = false,
 ): Promise<void> {
   const fileId = fileIdFor(path);
   const ts = Date.now();
@@ -243,7 +244,8 @@ async function writeSnapshot(
     if (timestamps.length > 0) {
       await invoke("recovery_delete_snapshots", { fileId, timestamps });
     }
-  } catch {
+  } catch (error) {
+    if (required) throw error;
     // Version history is best-effort and must never block a real save.
   }
 }
@@ -301,8 +303,9 @@ export async function manualSnapshot(
   path: string,
   contents: string,
   label?: string,
+  required = false,
 ): Promise<void> {
-  await writeSnapshot(path, contents, label);
+  await writeSnapshot(path, contents, label, required);
 }
 
 export async function manualBinarySnapshot(

@@ -37,8 +37,12 @@ export function showRenameReview(plans: NoteEdits[], folder: string, deps: Renam
     }
     apply.onclick = () => {
       apply.disabled = true; cancel.disabled = true;
-      void applyRename(plans, folder, deps).then((skipped) => {
-        if (skipped) report(`Skipped ${skipped} note${skipped === 1 ? "" : "s"} that changed on disk`);
+      sheet.querySelectorAll("input").forEach((input) => { input.disabled = true; });
+      let failures = 0;
+      void applyRename(plans, folder, { ...deps, onFailure: () => { failures++; } }).then((skipped) => {
+        const changed = skipped - failures;
+        if (changed) report(`Skipped ${changed} note${changed === 1 ? "" : "s"} that changed on disk`);
+        if (failures) report(`Skipped ${failures} note${failures === 1 ? "" : "s"} that could not be safely updated`);
         close();
       }).catch(() => { report("Could not update links"); close(); });
     };

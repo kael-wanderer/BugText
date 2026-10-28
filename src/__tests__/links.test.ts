@@ -1,3 +1,4 @@
+import { parseSettings } from "../settings";
 import { describe, expect, it } from "vitest";
 import { formatLinkTarget, headingAnchors, noteLinks } from "../links/parse";
 import { resolveLink } from "../links/resolve";
@@ -38,5 +39,14 @@ describe("note links", () => {
   it("allows only web schemes and rejects malformed encoding and protocol-relative paths", () => {
     for (const target of ["https://example.com", "http://example.com", "mailto:a@b.c"]) expect(resolveLink(target, "/r/a.md", "/r").kind).toBe("web");
     for (const target of ["javascript:alert(1)", "file:/r/a.md", "%zz", "//example.com", "%00.md"]) expect(resolveLink(target, "/r/a.md", "/r").kind).toBe("invalid");
+  });
+});
+
+
+describe("link settings", () => {
+  it("uses per-field fallbacks and round trips valid preferences", () => {
+    expect(parseSettings('{"links":{"complete":false,"onRename":"invalid"}}').links).toEqual({ complete: false, onRename: "ask" });
+    expect(parseSettings('{"links":{"complete":"no","onRename":"never"}}').links).toEqual({ complete: true, onRename: "never" });
+    expect(parseSettings('{"links":null}').links).toEqual({ complete: true, onRename: "ask" });
   });
 });

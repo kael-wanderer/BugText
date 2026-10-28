@@ -11,6 +11,22 @@ describe("link index", () => {
       expect(markdownOutline(fixture.source), fixture.name).toEqual(fixture.headings);
     }
   });
+  it("refreshes changed and removed notes without losing saves during the scan", async () => {
+    let finish!: (value: LinkScan) => void;
+    let calls = 0;
+    const index = createLinkIndex(async () => {
+      if (!calls++) return { notes: [parseNote("/r/a.md", "old"), parseNote("/r/deleted.md", "")], stamps: { "/r/a.md": "1", "/r/deleted.md": "1" }, skipped: [] };
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    await index.ensure("/r");
+    const refresh = index.refresh();
+    index.onFileChanged("/r/a.md", "saved while scanning");
+    finish({ notes: [parseNote("/r/a.md", "disk"), parseNote("/r/new.md", "new")], stamps: { "/r/a.md": "2", "/r/new.md": "1" }, skipped: [] });
+    await refresh;
+    expect(index.get("/r/a.md")?.source).toBe("saved while scanning");
+    expect(index.get("/r/deleted.md")).toBeUndefined();
+    expect(index.get("/r/new.md")?.source).toBe("new");
+  });
   it("rejects stale builds and applies saves received during a build", async () => {
     let finish!: (value: LinkScan) => void;
     const index = createLinkIndex(() => new Promise((resolve) => { finish = resolve; }));
