@@ -133,6 +133,37 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&close)
         .build()?;
 
+    let paste_plain = MenuItemBuilder::with_id("edit.paste_plain", "Paste as Plain Text")
+        .accelerator("CmdOrCtrl+Alt+Shift+V")
+        .build(app)?;
+    let toggle_task = MenuItemBuilder::with_id("edit.toggle_task", "Toggle Task")
+        .accelerator("CmdOrCtrl+Shift+X")
+        .build(app)?;
+    let table_item = |id: &str, label: &str| MenuItemBuilder::with_id(id, label).build(app);
+    let align_menu = SubmenuBuilder::new(app, "Align Column")
+        .item(&table_item("table.align_left", "Align Column Left")?)
+        .item(&table_item("table.align_center", "Align Column Center")?)
+        .item(&table_item("table.align_right", "Align Column Right")?)
+        .item(&table_item("table.align_none", "Remove Column Alignment")?)
+        .build()?;
+    let table_menu = SubmenuBuilder::new(app, "Table")
+        .item(&table_item("table.row_above", "Insert Row Above")?)
+        .item(
+            &MenuItemBuilder::with_id("table.row_below", "Insert Row Below")
+                .accelerator("CmdOrCtrl+Enter")
+                .build(app)?,
+        )
+        .item(&table_item("table.col_left", "Insert Column Left")?)
+        .item(&table_item("table.col_right", "Insert Column Right")?)
+        .separator()
+        .item(&table_item("table.delete_row", "Delete Row")?)
+        .item(&table_item("table.delete_col", "Delete Column")?)
+        .separator()
+        .item(&align_menu)
+        .item(&table_item("table.format", "Format Table")?)
+        .separator()
+        .item(&table_item("table.delete", "Delete Table")?)
+        .build()?;
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .undo()
         .redo()
@@ -140,7 +171,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .cut()
         .copy()
         .paste()
+        .item(&paste_plain)
         .select_all()
+        .separator()
+        .item(&toggle_task)
+        .item(&table_menu)
         .build()?;
 
     let toggle_explorer = MenuItemBuilder::with_id("view.toggle_explorer", "Show/Hide Explorer")

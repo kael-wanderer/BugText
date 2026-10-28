@@ -124,6 +124,16 @@ scanner with the command palette. Preview block `data-line` anchors support head
 jumps, place preservation and optional Sync Scroll between editor and preview; the
 sidebar selection persists in view state and Sync Scroll in settings.json.
 
+Markdown task markers are parsed from source lines outside code blocks
+(`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
+sanitizing (`preview-tasks.ts`, never `<input>`) and toggle only the source marker
+character, refusing when the preview is stale. Tables (`table.ts`, keys in
+`table-keys.ts`, menu in `table-menu.ts`) are edited as plain Markdown source; each
+command is one dispatch, so one undo step. Spreadsheet paste (`table-paste.ts`) reads
+clipboard HTML through an inert DOMParser and cell text only. Paste as Plain Text needs
+the `clipboard-manager:allow-read-text` capability. `⌘Enter` is the native
+Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
+
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 The open note is always context; when a folder is open, keyword retrieval adds the
 top `workspaceContextK` chunks on every question. Replies show timing, model and

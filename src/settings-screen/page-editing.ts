@@ -69,6 +69,19 @@ export const editingPage: SettingsPage = {
       ),
       caption("Navigation"),
       row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
+      caption("Tables"),
+      row(
+        "table-format-on-edit",
+        "Format tables while editing",
+        "Line up the pipes when you move between cells.",
+        toggle("Format tables while editing", settings.tables.formatOnEdit, (formatOnEdit) => setTables(deps, { formatOnEdit })),
+      ),
+      row(
+        "table-paste",
+        "Paste spreadsheet cells as a table",
+        "Paste as Plain Text (⌥⇧⌘V) keeps the tabs.",
+        toggle("Paste spreadsheet cells as a table", settings.tables.pasteAsTable, (pasteAsTable) => setTables(deps, { pasteAsTable })),
+      ),
       caption("Images"),
       imageFolderRow(settings, deps),
       row(
@@ -108,6 +121,11 @@ type Deps = Parameters<SettingsPage["render"]>[1];
 function setImages(deps: Deps, patch: Partial<Settings["images"]>): void {
   const current = deps.getSettings();
   deps.onSettingsChange({ ...current, images: { ...current.images, ...patch } });
+}
+
+function setTables(deps: Deps, patch: Partial<Settings["tables"]>): void {
+  const current = deps.getSettings();
+  deps.onSettingsChange({ ...current, tables: { ...current.tables, ...patch } });
 }
 
 function imageFolderRow(settings: Settings, deps: Deps): HTMLElement {

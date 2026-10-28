@@ -45,7 +45,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
-  editing: "How lines wrap and where pasted images go.",
+  editing: "How lines wrap, how tables behave and where pasted images go.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -127,6 +127,18 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     page: "editing",
     label: "Wrap column",
     keywords: "wrapping guide width",
+  },
+  {
+    id: "table-format-on-edit",
+    page: "editing",
+    label: "Format tables while editing",
+    keywords: "tables markdown align pipes columns",
+  },
+  {
+    id: "table-paste",
+    page: "editing",
+    label: "Paste spreadsheet cells as a table",
+    keywords: "tables paste excel numbers sheets spreadsheet csv tsv",
   },
   {
     id: "image-folder",
