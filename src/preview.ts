@@ -1,3 +1,5 @@
+import { headingAnchors } from "./links/parse";
+import { markdownOutline } from "./outline";
 import MarkdownIt from "markdown-it";
 import hljs from "highlight.js/lib/common";
 import katex from "katex";
@@ -24,9 +26,14 @@ const md = new MarkdownIt({
 
 // Source maps attach navigation anchors to rendered block elements.
 md.core.ruler.push("source_lines", (state) => {
+  const headings = headingAnchors(markdownOutline(state.src));
   for (const token of state.tokens) {
     if (token.map && token.block && token.nesting === 1) {
       token.attrSet("data-line", String(token.map[0] + 1));
+      if (token.type === "heading_open") {
+        const heading = headings.find((h) => h.line === token.map![0] + 1);
+        if (heading) token.attrSet("data-anchor", heading.anchor);
+      }
     }
   }
 });

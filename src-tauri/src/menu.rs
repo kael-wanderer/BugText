@@ -144,6 +144,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&close)
         .build()?;
 
+    let insert_note_link = MenuItemBuilder::with_id("edit.insert_note_link", "Insert Link to Note…").accelerator("CmdOrCtrl+Alt+L").build(app)?;
+    let open_link = MenuItemBuilder::with_id("edit.open_link", "Open Link").build(app)?;
     let paste_plain = MenuItemBuilder::with_id("edit.paste_plain", "Paste as Plain Text")
         .accelerator("CmdOrCtrl+Alt+Shift+V")
         .build(app)?;
@@ -183,6 +185,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .copy()
         .paste()
         .item(&paste_plain)
+        .item(&open_link)
+        .item(&insert_note_link)
         .select_all()
         .separator()
         .item(&toggle_task)
@@ -192,6 +196,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let toggle_explorer = MenuItemBuilder::with_id("view.toggle_explorer", "Show/Hide Explorer")
         .accelerator("CmdOrCtrl+B")
         .build(app)?;
+    let links_panel = MenuItemBuilder::with_id("view.links_panel", "Links").accelerator("CmdOrCtrl+Alt+Shift+O").build(app)?;
     let outline = MenuItemBuilder::with_id("view.outline", "Outline").accelerator("CmdOrCtrl+Alt+O").build(app)?;
     let sync_scroll = CheckMenuItemBuilder::with_id("view.sync_scroll", "Sync Scroll").build(app)?;
     let toggle_preview = MenuItemBuilder::with_id("view.toggle_preview", "Show/Hide Preview")
@@ -263,6 +268,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&toggle_explorer)
         .item(&outline)
+        .item(&links_panel)
         .item(&sync_scroll)
         .item(&toggle_preview)
         .item(&reading)

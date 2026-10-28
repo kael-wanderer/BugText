@@ -1,3 +1,11 @@
+import { createLinksPanel } from "./links/panel";
+import { planRename, movedPath } from "./links/rename-plan";
+import { showRenameReview } from "./links/rename-review";
+import { parseNote, type IndexedNote } from "./links/index";
+import { configureLinkCompletion } from "./links/complete";
+import { showInsertLinkPicker } from "./links/insert-picker";
+import { configureLinks, followEditorLink } from "./links/follow";
+import { createLinkIndex } from "./links/index";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -162,6 +170,7 @@ import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex();
+const linkIndex = createLinkIndex();
 
 const windowsHost = document.getElementById("windows")!;
 
@@ -180,8 +189,17 @@ const isPrimaryNativeWindow = nativeWindowLabel === "main";
 const startupUi = isPrimaryNativeWindow ? loadState() : freshState();
 let ui = { ...startupUi, aiVisible: false };
 let outlineKey = "";
-const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus());
+const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus(), (tab) => {
+  ui = { ...ui, outlineTab: tab }; persistUiState();
+  void linksPanel.show(tab === "links");
+});
+const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
+  const tab = activeMeta();
+  return tab && views.has(getState().activeWindowId) && isMarkdownFile(tab.path ?? tab.name)
+    ? { path: tab.path ?? `${getState().folder}/untitled.md`, text: activeView().editor.getText(tab.id) } : null;
+}, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line));
 function updateOutline(force = false): void {
+  linkIndex.setFolder(getState().folder);
   const tab = activeMeta();
   const key = `${getState().activeWindowId}:${tab?.id ?? ""}`;
   if (force || key !== outlineKey) {
@@ -190,6 +208,7 @@ function updateOutline(force = false): void {
     const markdown = !tab || isMarkdownFile(tab.path ?? tab.name);
     outlineView.update(tab?.path ?? key, tab && markdown ? markdownOutline(activeView().editor.getText(tab.id)) : [], markdown);
   }
+  linksPanel.render();
   const view = views.get(getState().activeWindowId);
   if (view) outlineView.setActive(view.navigationLine());
 }
@@ -268,6 +287,7 @@ const mcpHandler = createMcpHandler({
       await invoke<void>("save_file", { path, contents: text });
       await recordStat(path);
       workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
       aiPanel?.updateWorkspaceFile(path, text);
       await finishBoundSave(binding, path);
     });
@@ -276,6 +296,7 @@ const mcpHandler = createMcpHandler({
   writeDiskAtomic: async (path, text) => {
     await invoke<void>("write_file_atomic", { path, contents: text });
     workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
   },
   exists: async (path) => {
     try { await invoke("file_stat", { path }); return true; } catch { return false; }
@@ -941,6 +962,22 @@ function activeView(): WindowView {
   return views.get(getState().activeWindowId)!;
 }
 
+function insertNoteLink(): void {
+  const tab = activeMeta();
+  if (!tab || !isMarkdownFile(tab.path ?? tab.name)) return;
+  const folder = getState().folder;
+  if (!folder) { showToast("No folder open — links between notes need a folder."); return; }
+  linkIndex.setFolder(folder);
+  const editor = activeView().editor;
+  const selection = editor.getSelection(); const revision = editor.revision(tab.id);
+  void showInsertLinkPicker({ index: linkIndex, path: tab.path ?? `${folder}/untitled.md`, untitled: !tab.path, selection: selection.text,
+    insert: (text) => {
+      if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the link again."); return; }
+      editor.applyChanges(tab.id, [{ from: selection.from, to: selection.to, insert: text }]);
+    },
+  });
+}
+
 function activeMeta(): TabMeta | undefined {
   const w = activeWindow();
   return w.tabs.find((t) => t.id === w.activeTabId);
@@ -1417,6 +1454,7 @@ const templateActions = createTemplateActions({
   afterDiskWrite: (path) => {
     void invoke<string>("read_file", { path }).then((text) => {
       workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
       aiPanel?.updateWorkspaceFile(path, text);
     }).catch(() => {});
   },
@@ -1713,6 +1751,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       } catch {
         continue;
       }
+      linkIndex.onFileChanged(tab.path, text);
       if (text === view.editor.getText(tab.id)) continue;
       // The read is async; an edit made meanwhile must not be replaced.
       if (isTabDirty(windowState.id, tab.id)) continue;
@@ -1744,6 +1783,7 @@ async function refreshWorkspaceFromDisk(force = false): Promise<void> {
       await refreshExpandedDirs().catch(() => {});
       await refreshFileList();
     }
+    await linkIndex.refresh().catch(() => {});
     await refreshCleanOpenFilesFromDisk();
   } finally {
     autoRefreshRunning = false;
@@ -1904,7 +1944,19 @@ function openHelp(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "BugText Help", text: helpDoc });
 }
 
+let renameNotes: IndexedNote[] = [];
 function handleExplorerPathChange(from: string, to: string | null): void {
+  const folder = getState().folder;
+  const plans = to && folder && currentSettings.links.onRename === "ask" ? planRename(renameNotes, from, to, folder) : [];
+  renameNotes = [];
+  for (const note of linkIndex.notes()) {
+    const path = to ? movedPath(note.path, from, to) : note.path;
+    if (note.path === from || note.path.startsWith(from + "/")) {
+      linkIndex.onFileRemoved(note.path);
+      if (to) linkIndex.onFileChanged(path, note.source);
+    }
+  }
+
   const separatorMatches = (path: string): boolean =>
     path === from || path.startsWith(`${from}/`) || path.startsWith(`${from}\\`);
 
@@ -1966,6 +2018,21 @@ function handleExplorerPathChange(from: string, to: string | null): void {
 
   syncExplorerActivePath();
   renderAll();
+  if (folder && plans.length) void showRenameReview(plans, folder, {
+    findOpen: (path) => {
+      const found = findTabByPath(getState().windows, path);
+      if (!found) return null;
+      const editor = editorForTab(found.tab.id);
+      return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes) };
+    },
+    read: (path) => invoke<string>("read_file", { path }),
+    snapshot: (path, text) => manualSnapshot(path, text, "Before updating note links", true),
+    write: async (path, contents, expected) => {
+      if (getState().folder !== folder) throw new Error("Folder changed");
+      await invoke("write_file_atomic", { path, contents, folder, expected });
+      linkIndex.onFileChanged(path, contents);
+    },
+  }, showToast);
 }
 
 function setMode(windowId: string, mode: ViewMode): void {
@@ -2763,6 +2830,17 @@ initExplorer(
   (path) => void doOpenPath(path),
   handleExplorerPathChange,
   {
+    onBeforePathChange: async () => {
+      const folder = getState().folder;
+      renameNotes = [];
+      if (!folder || currentSettings.links.onRename === "never") return;
+      await linkIndex.ensure(folder);
+      await linkIndex.refresh();
+      renameNotes = linkIndex.notes().map((note) => {
+        const found = findTabByPath(getState().windows, note.path);
+        return found ? parseNote(note.path, editorForTab(found.tab.id).getText(found.tab.id)) : note;
+      });
+    },
     onOpenPreview: (path) => {
       void doOpenPath(path).then(() => {
         const windowId = getState().activeWindowId;
@@ -2787,6 +2865,30 @@ initExplorer(
   },
 );
 
+configureLinkCompletion({
+  index: linkIndex,
+  context: (id) => {
+    const tab = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
+    return tab ? { path: tab.path ?? `${getState().folder}/untitled.md`, untitled: !tab.path } : null;
+  },
+  enabled: () => currentSettings.links.complete,
+});
+configureLinks({
+  index: linkIndex,
+  context: (id) => {
+    const found = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
+    return found && isMarkdownFile(found.path ?? found.name) ? { path: found.path ?? `${getState().folder}/untitled.md`, text: editorForTab(id).getText(id), folder: getState().folder } : null;
+  },
+  open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
+  jump: (line) => activeView().jumpToLine(line),
+  read: async (path) => {
+    const found = findTabByPath(getState().windows, path);
+    return found ? editorForTab(found.tab.id).getText(found.tab.id) : invoke<string>("read_file", { path });
+  },
+  create: async (folder, path) => { await invoke("create_link_note", { folder, path }); linkIndex.onFileChanged(path, ""); },
+  toast: (text, action) => showToast(text, 6000, action),
+});
+
 makeView("main", true);
 if (ui.aiVisible) buildAIPanel();
 patchWindow("main", { mode: ui.viewMode });
@@ -2795,6 +2897,7 @@ for (const v of views.values()) {
   v.editor.setLineNumbers(ui.lineNumbers);
 }
 renderAll();
+outlineView.selectTab(ui.outlineTab === "links" ? "links" : "outline");
 
 let reportTimer: number | undefined;
 function reportWindow(): void {
@@ -2818,6 +2921,7 @@ subscribe(() => {
   const s = getState();
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
+    linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
     searchPanel.cancel();
     void refreshFileList().then(() => {
@@ -2914,8 +3018,20 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-png");
     case "export.image.svg":
       return void runNativeExport("img-svg");
+    case "view.links_panel":
+      settingsScreen.close();
+      if (document.body.classList.contains("search-active")) setSearchActive(false);
+      ui = { ...ui, sidebarView: "outline", outlineTab: "links" };
+      showExplorerColumn(); applySidebarView(); outlineView.selectTab("links"); updateOutline(true);
+      return;
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
+    case "edit.insert_note_link": return insertNoteLink();
+    case "edit.open_link": {
+      const tab = activeMeta();
+      if (tab) followEditorLink(tab.id, activeView().editor.getText(tab.id), activeView().editor.getSelection().from);
+      return;
+    }
     case "edit.toggle_task":
       return void activeView().editor.toggleTasks();
     case "edit.paste_plain":

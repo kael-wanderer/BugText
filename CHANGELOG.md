@@ -8,6 +8,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Note-link completion after `](` and reference definitions, including heading suggestions.
+- Insert Link to Note… (⌥⌘L) with fuzzy note filtering and optional headings.
+- Follow note and web links from preview, or use ⌘-click / Open Link in the editor.
+- Links tab beside Outline (⇧⌥⌘O), with backlinks, context and broken targets.
+- Update links? review after Explorer rename/move, with checked target edits, one undo step in open tabs and Recovery snapshots before closed-file writes.
+- Links settings under Settings ▸ Editing for suggestions and rename review.
 - New from Template (⌥⌘N, File menu, ⌘K and the Explorer context menu): pick a template, type a title, and get a dated, named note in the right folder with the cursor ready. Three starter templates are created on first use.
 - Quick Note (⌃⌘N): add a timestamped line to today's daily note or an inbox file without leaving your document.
 - Templates settings under Settings ▸ Editing: templates folder, default folder, date format, and where quick notes go.
@@ -18,6 +24,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Clicking a link in the preview did nothing.
+- Heading anchors now preserve underscores.
+- Link updates skip a closed note if its Recovery snapshot cannot be saved.
+- Note-link suggestions and the Insert Link to Note filter match a note's path inside the open folder, so the folder's own name no longer matches every note; broken links show in the error color.
 - Folder search no longer freezes the window or reports an invalid regular expression as no results.
 - AI folder context no longer uses a previous folder or stays unavailable after a failed index build.
 - PDF documents are released after folder search.

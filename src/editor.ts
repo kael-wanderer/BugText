@@ -1,3 +1,5 @@
+import { linkCompletion } from "./links/complete";
+import { followEditorLink } from "./links/follow";
 import { defaultKeymap, history, historyKeymap, indentWithTab, insertBlankLine } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
@@ -192,7 +194,7 @@ const wrap = new Compartment();
 const gutter = new Compartment();
 const language = new Compartment();
 
-function languageExtension(kind: EditorDocumentKind): Extension {
+function languageExtension(kind: EditorDocumentKind, id = ""): Extension {
   if (kind === "html") return html({ autoCloseTags: true });
   if (kind === "typescript") return javascript({ typescript: true, jsx: true });
   if (kind === "javascript") return javascript({ jsx: true });
@@ -200,7 +202,7 @@ function languageExtension(kind: EditorDocumentKind): Extension {
   if (kind === "yaml") return yaml();
   if (kind === "sql") return sql();
   if (kind === "plain") return [];
-  return [markdown({ codeLanguages: languages }), tableKeymap()];
+  return [markdown({ codeLanguages: languages }), tableKeymap(), linkCompletion(id)];
 }
 
 const revisions = new Map<string, number>();
@@ -252,11 +254,17 @@ export function createEditor(
     highlightActiveLine(),
     keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
     search({ top: true }),
-    language.of(languageExtension(kind)),
+    language.of(languageExtension(kind, id)),
     syntaxHighlighting(editorHighlight, { fallback: true }),
     wrap.of(wrapExtension()),
     theme,
     EditorView.domEventHandlers({
+      mousedown(event, view) {
+        if (!event.metaKey && !event.ctrlKey) return false;
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        if (pos === null || !followEditorLink(id, view.state.doc.toString(), pos)) return false;
+        event.preventDefault(); return true;
+      },
       paste(event, view) {
         const data = event.clipboardData;
         if (!data) return false;
@@ -330,7 +338,7 @@ export function createEditor(
     setDocumentKind(id, kind) {
       if (id === activeId) {
         view.dispatch({
-          effects: language.reconfigure(languageExtension(kind)),
+          effects: language.reconfigure(languageExtension(kind, id)),
         });
         return;
       }
@@ -339,7 +347,7 @@ export function createEditor(
       states.set(
         id,
         state.update({
-          effects: language.reconfigure(languageExtension(kind)),
+          effects: language.reconfigure(languageExtension(kind, id)),
         }).state,
       );
     },

@@ -601,7 +601,15 @@ pub fn save_file(path: String, contents: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn write_file_atomic(path: String, contents: String) -> Result<(), String> {
+pub fn write_file_atomic(path: String, contents: String, folder: Option<String>, expected: Option<String>) -> Result<(), String> {
+    if let Some(folder) = folder {
+        let root = Path::new(&folder).canonicalize().map_err(|_| "Folder unavailable")?;
+        let target = Path::new(&path).canonicalize().map_err(|_| "Note unavailable")?;
+        if !target.starts_with(root) { return Err("Note outside folder".into()); }
+        if let Some(expected) = expected {
+            if fs::read_to_string(&target).map_err(|_| "Note unavailable")? != expected { return Err("Note changed on disk".into()); }
+        }
+    }
     write_atomic(&path, contents.as_bytes())
 }
 
@@ -762,7 +770,12 @@ mod atomic_write_tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
         fs::write(&path, "old").unwrap();
-        write_file_atomic(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
+        write_file_atomic(path.to_string_lossy().into_owned(), "new".to_string(), None, None).unwrap();
+        assert!(write_file_atomic(path.to_string_lossy().into_owned(), "unsafe".into(), Some(dir.to_string_lossy().into_owned()), Some("old".into())).is_err());
+        let elsewhere = std::env::temp_dir().join(format!("bugtext-outside-{}", std::process::id()));
+        fs::create_dir_all(&elsewhere).unwrap();
+        assert!(write_file_atomic(path.to_string_lossy().into_owned(), "unsafe".into(), Some(elsewhere.to_string_lossy().into_owned()), Some("new".into())).is_err());
+        fs::remove_dir_all(elsewhere).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         fs::remove_dir_all(dir).unwrap();

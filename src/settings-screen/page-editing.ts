@@ -70,6 +70,17 @@ export const editingPage: SettingsPage = {
       ),
       caption("Navigation"),
       row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
+      caption("Links"),
+      row("links-complete", "Suggest notes while typing links", "After ]( in Markdown notes.",
+        toggle("Suggest notes while typing links", settings.links.complete, (complete) => {
+          const current = deps.getSettings(); deps.onSettingsChange({ ...current, links: { ...current.links, complete } });
+        })),
+      row("links-on-rename", "When renaming or moving notes", "Review each link before updating it.",
+        select<Settings["links"]["onRename"]>("When renaming or moving notes", [
+          { value: "ask", label: "Ask to update links" }, { value: "never", label: "Never update links" },
+        ], settings.links.onRename, (onRename) => {
+          const current = deps.getSettings(); deps.onSettingsChange({ ...current, links: { ...current.links, onRename } });
+        })),
       caption("Tables"),
       row(
         "table-format-on-edit",
