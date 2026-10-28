@@ -21,6 +21,23 @@ const diskStats = new Map<string, DiskState>();
 const pendingStats = new Map<string, Promise<void>>();
 const lastSnapshotHashes = new Map<string, string>();
 
+export type DiscardedDraft = { file: string; name: string; path: string | null; updatedAt: number; discardedAt: number };
+
+export async function discardDraft(id: string): Promise<string | null> {
+  const timer = draftTimers.get(id);
+  if (timer) clearTimeout(timer);
+  draftTimers.delete(id);
+  return invoke<string | null>("recovery_discard_draft", { id });
+}
+
+export function listDiscarded(): Promise<DiscardedDraft[]> {
+  return invoke("recovery_list_discarded");
+}
+
+export function bringBackDiscarded(file: string): Promise<void> {
+  return invoke("recovery_restore_discarded", { file });
+}
+
 export function clearDraftById(id: string): void {
   void invoke("recovery_clear_draft", { id }).catch(() => {});
 }
@@ -60,13 +77,7 @@ export function scheduleDraft(record: {
         updatedAt: Date.now(),
         windowId: record.windowId,
       };
-      void invoke("recovery_write_draft", { draft })
-        .then(() => {
-          if (record.replacedDraftId && record.replacedDraftId !== id) {
-            clearDraftById(record.replacedDraftId);
-          }
-        })
-        .catch(() => {});
+      void invoke("recovery_write_draft", { draft }).catch(() => {});
     }, DRAFT_DEBOUNCE_MS),
   );
 }
@@ -118,7 +129,7 @@ export async function restoreDrafts(deps: {
   discard.type = "button";
   discard.textContent = "Discard all";
   discard.addEventListener("click", () => {
-    for (const draft of drafts) clearDraftById(draft.id);
+    for (const draft of drafts) void discardDraft(draft.id);
     banner.remove();
   });
   actions.append(restore, discard);

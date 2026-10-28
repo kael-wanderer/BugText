@@ -106,6 +106,7 @@ import {
   checkExternalChange,
   clearDraft,
   clearDraftById,
+  discardDraft,
   forgetStat,
   hasDiskChanged,
   manualBinarySnapshot,
@@ -116,7 +117,7 @@ import {
   snapshotOnSave,
   writeDraftNow,
 } from "./recovery";
-import type { DraftRecord } from "./recovery-policy";
+import { draftIdFor, type DraftRecord } from "./recovery-policy";
 import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
@@ -765,11 +766,8 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
   for (const id of toClose) {
     const tab = w.tabs.find((item) => item.id === id);
     if (tab) {
-      clearDraft(tab.path, tab.id);
+      if (!(await discardTabDraft(windowId, tab))) { toClose.delete(id); continue; }
       if (tab.path && isPdfFile(tab.path)) void clearPdfEditDraft(tab.path);
-      const recoveredId = recoveredDraftIds.get(tab.id);
-      if (recoveredId) clearDraftById(recoveredId);
-      recoveredDraftIds.delete(tab.id);
       if (tab.path) forgetStat(tab.path);
     }
     view.editor.closeState(id);
@@ -989,6 +987,24 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
   activateTab(windowId, id);
 }
 
+async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean> {
+  if (isPdfFile(tab.path ?? tab.name)) return true;
+  try {
+    if (tab.dirty) {
+      const contents = views.get(windowId)!.editor.getText(tab.id);
+      await writeDraftNow({ windowId, tabId: tab.id, path: tab.path, name: tab.name, contents });
+    }
+    await discardDraft(draftIdFor(tab.path, tab.id));
+    const recoveredId = recoveredDraftIds.get(tab.id);
+    if (recoveredId && recoveredId !== draftIdFor(tab.path, tab.id)) await discardDraft(recoveredId);
+    recoveredDraftIds.delete(tab.id);
+    return true;
+  } catch {
+    await message("Could not discard the draft. The document remains open.", { title: "Close tab", kind: "error" });
+    return false;
+  }
+}
+
 async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   const w = getWindow(windowId)!;
   const t = w.tabs.find((x) => x.id === tabId);
@@ -1002,11 +1018,8 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
     if (!approved) return false;
   }
 
-  clearDraft(t.path, t.id);
+  if (!(await discardTabDraft(windowId, t))) return false;
   if (t.path && isPdfFile(t.path)) void clearPdfEditDraft(t.path);
-  const recoveredId = recoveredDraftIds.get(t.id);
-  if (recoveredId) clearDraftById(recoveredId);
-  recoveredDraftIds.delete(t.id);
   if (t.path) forgetStat(t.path);
   const next = nextActiveAfterClose(w.tabs, tabId, w.activeTabId);
   views.get(windowId)!.editor.closeState(tabId);

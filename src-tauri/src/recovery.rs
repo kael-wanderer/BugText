@@ -95,6 +95,117 @@ pub fn list_drafts_at(dir: &Path) -> Vec<DraftRecord> {
     drafts
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscardedDraft {
+    file: String,
+    name: String,
+    path: Option<String>,
+    updated_at: i64,
+    discarded_at: i64,
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
+}
+
+fn discarded_parts(file: &str) -> Option<(&str, i64)> {
+    let stem = file.strip_suffix(".json")?;
+    let (id, timestamp) = stem.rsplit_once('-')?;
+    if !safe_id(id) || timestamp.is_empty() || !timestamp.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((id, timestamp.parse().ok()?))
+}
+
+pub fn discard_draft_at(dir: &Path, id: &str) -> Result<Option<String>, String> {
+    if !safe_id(id) {
+        return Err("invalid draft id".into());
+    }
+    let source = dir.join("drafts").join(format!("{id}.json"));
+    if !source.exists() {
+        return Ok(None);
+    }
+    let discarded = dir.join("drafts-discarded");
+    fs::create_dir_all(&discarded).map_err(|_| "could not discard draft")?;
+    let mut timestamp = now_ms();
+    loop {
+        let file = format!("{id}-{timestamp}.json");
+        let destination = discarded.join(&file);
+        if !destination.exists() {
+            fs::rename(&source, destination).map_err(|_| "could not discard draft")?;
+            return Ok(Some(file));
+        }
+        timestamp += 1;
+    }
+}
+
+pub fn list_discarded_at(dir: &Path, now: i64) -> Vec<DiscardedDraft> {
+    let mut result = Vec::new();
+    let Ok(entries) = fs::read_dir(dir.join("drafts-discarded")) else {
+        return result;
+    };
+    for entry in entries.flatten() {
+        let Some(file) = entry.file_name().to_str().map(str::to_owned) else {
+            continue;
+        };
+        let Some((id, discarded_at)) = discarded_parts(&file) else {
+            continue;
+        };
+        if now.saturating_sub(discarded_at) > 7 * 24 * 60 * 60 * 1000 {
+            let _ = fs::remove_file(entry.path());
+            continue;
+        }
+        let Ok(bytes) = fs::read(entry.path()) else {
+            continue;
+        };
+        let Ok(draft) = serde_json::from_slice::<DraftRecord>(&bytes) else {
+            continue;
+        };
+        if draft.id != id {
+            continue;
+        }
+        result.push(DiscardedDraft {
+            file,
+            name: draft.name,
+            path: draft.path,
+            updated_at: draft.updated_at,
+            discarded_at,
+        });
+    }
+    result.sort_by_key(|draft| std::cmp::Reverse(draft.discarded_at));
+    result
+}
+
+pub fn restore_discarded_at(dir: &Path, file: &str) -> Result<(), String> {
+    let (id, _) = discarded_parts(file).ok_or("invalid discarded draft")?;
+    let source = dir.join("drafts-discarded").join(file);
+    let candidate: DraftRecord =
+        serde_json::from_slice(&fs::read(&source).map_err(|_| "could not restore draft")?)
+            .map_err(|_| "could not restore draft")?;
+    if candidate.id != id {
+        return Err("invalid discarded draft".into());
+    }
+    let target = dir.join("drafts").join(format!("{id}.json"));
+    fs::create_dir_all(dir.join("drafts")).map_err(|_| "could not restore draft")?;
+    if target.exists() {
+        let live: DraftRecord =
+            serde_json::from_slice(&fs::read(&target).map_err(|_| "could not restore draft")?)
+                .map_err(|_| "could not restore draft")?;
+        if live.id != id {
+            return Err("invalid draft".into());
+        }
+        if live.updated_at >= candidate.updated_at {
+            return Ok(());
+        }
+        discard_draft_at(dir, id)?;
+    }
+    fs::rename(source, target).map_err(|_| "could not restore draft".into())
+}
+
 pub fn stat_at(path: &Path) -> Result<FileStat, String> {
     use std::time::UNIX_EPOCH;
 
@@ -229,6 +340,21 @@ pub fn recovery_list_drafts(app: tauri::AppHandle) -> Result<Vec<DraftRecord>, S
 }
 
 #[tauri::command]
+pub fn recovery_discard_draft(app: tauri::AppHandle, id: String) -> Result<Option<String>, String> {
+    discard_draft_at(&recovery_dir(&app)?, &id)
+}
+
+#[tauri::command]
+pub fn recovery_list_discarded(app: tauri::AppHandle) -> Result<Vec<DiscardedDraft>, String> {
+    Ok(list_discarded_at(&recovery_dir(&app)?, now_ms()))
+}
+
+#[tauri::command]
+pub fn recovery_restore_discarded(app: tauri::AppHandle, file: String) -> Result<(), String> {
+    restore_discarded_at(&recovery_dir(&app)?, &file)
+}
+
+#[tauri::command]
 pub fn file_stat(path: String) -> Result<FileStat, String> {
     stat_at(Path::new(&path))
 }
@@ -331,6 +457,46 @@ mod tests {
             updated_at: 1,
             window_id: "main".into(),
         }
+    }
+
+    #[test]
+    fn discard_restore_and_validate_names() {
+        let dir = tmp();
+        write_draft_at(&dir, &draft("f123")).unwrap();
+        let file = discard_draft_at(&dir, "f123").unwrap().unwrap();
+        assert_eq!(list_drafts_at(&dir).len(), 0);
+        assert_eq!(list_discarded_at(&dir, now_ms()).len(), 1);
+        for invalid in [
+            "../x-1.json",
+            "x/1-1.json",
+            "x-abc.json",
+            "x-1.txt",
+            "x\\1-1.json",
+        ] {
+            assert!(restore_discarded_at(&dir, invalid).is_err());
+        }
+        assert!(discard_draft_at(&dir, "../x").is_err());
+        restore_discarded_at(&dir, &file).unwrap();
+        assert_eq!(list_drafts_at(&dir).len(), 1);
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn restore_keeps_both_versions_and_prunes_old_discards() {
+        let dir = tmp();
+        write_draft_at(&dir, &draft("f123")).unwrap();
+        let file = discard_draft_at(&dir, "f123").unwrap().unwrap();
+        let mut newer = draft("f123");
+        newer.updated_at = 2;
+        write_draft_at(&dir, &newer).unwrap();
+        restore_discarded_at(&dir, &file).unwrap();
+        assert_eq!(list_drafts_at(&dir)[0].updated_at, 2);
+        assert_eq!(list_discarded_at(&dir, now_ms()).len(), 1);
+        assert_eq!(
+            list_discarded_at(&dir, now_ms() + 8 * 24 * 60 * 60 * 1000).len(),
+            0
+        );
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]
