@@ -4,84 +4,75 @@ import { buildIndex, chunkDocument, retrieve, retrieveScored, type Chunk } from 
 
 const TEXT_EXT = /\.(md|markdown|txt)$/i;
 const MAX_BYTES = 1_000_000;
-
 export type WorkspaceIndex = ReturnType<typeof createWorkspaceIndex>;
 
 function joinPath(folder: string, relative: string): string {
   return folder.replace(/[\\/]$/, "") + "/" + relative;
+}
+function contains(folder: string, path: string): boolean {
+  const prefix = folder.replace(/\\/g, "/").replace(/\/+$/, "") + "/";
+  return path.replace(/\\/g, "/").startsWith(prefix);
 }
 
 export function createWorkspaceIndex() {
   let builtFolder: string | null = null;
   let chunks: Chunk[] = [];
   let index = buildIndex([]);
-  let building: Promise<void> | null = null;
+  let generation = 0;
+  let building: { folder: string; promise: Promise<void> } | null = null;
+  let pending = new Map<string, string | null>();
 
-  function rebuild(): void {
+  function apply(path: string, text: string | null): void {
+    chunks = chunks.filter((chunk) => chunk.path !== path);
+    if (text !== null && TEXT_EXT.test(path) && text.length <= MAX_BYTES) chunks.push(...chunkDocument(path, text));
     index = buildIndex(chunks);
   }
-
-  async function build(folder: string): Promise<void> {
+  async function build(folder: string, current: number): Promise<void> {
     const files = await listFilesRecursive(folder);
     const next: Chunk[] = [];
     for (const relative of files) {
+      if (current !== generation) return;
       if (!TEXT_EXT.test(relative)) continue;
       const path = joinPath(folder, relative);
       let text: string;
-      try {
-        text = await invoke<string>("read_file", { path });
-      } catch {
-        continue;
-      }
-      if (text.length > MAX_BYTES) continue;
-      next.push(...chunkDocument(path, text));
+      try { text = await invoke<string>("read_file", { path }); } catch { continue; }
+      if (current !== generation) return;
+      if (text.length <= MAX_BYTES) next.push(...chunkDocument(path, text));
     }
-    builtFolder = folder;
-    chunks = next;
-    rebuild();
+    if (current !== generation) return;
+    builtFolder = folder; chunks = next; index = buildIndex(chunks);
+    for (const [path, text] of pending) apply(path, text);
+    pending.clear();
   }
-
+  async function ensure(folder: string): Promise<boolean> {
+    if (builtFolder === folder && !building) return true;
+    if (!building || building.folder !== folder) {
+      const current = ++generation;
+      pending = new Map();
+      const promise = build(folder, current);
+      building = { folder, promise };
+      void promise.finally(() => { if (building?.promise === promise) building = null; }).catch(() => {});
+    }
+    await building.promise;
+    return builtFolder === folder && (!building || building.folder === folder);
+  }
   return {
-    async query(
-      folder: string,
-      q: string,
-      k: number,
-      excludePath?: string,
-    ): Promise<Chunk[]> {
-      if (builtFolder !== folder) {
-        if (!building) building = build(folder);
-        await building;
-        building = null;
-      }
-      return retrieve(index, q, k, excludePath);
+    async query(folder: string, q: string, k: number, excludePath?: string): Promise<Chunk[]> {
+      return await ensure(folder) ? retrieve(index, q, k, excludePath) : [];
     },
     async queryScored(folder: string, q: string, k: number, excludePath?: string): Promise<{ chunk: Chunk; score: number }[]> {
-      if (builtFolder !== folder) {
-        if (!building) building = build(folder);
-        await building;
-        building = null;
-      }
-      return retrieveScored(index, q, k, excludePath);
+      return await ensure(folder) ? retrieveScored(index, q, k, excludePath) : [];
     },
     onFileChanged(path: string, text: string): void {
-      if (!builtFolder || !TEXT_EXT.test(path)) return;
-      chunks = chunks.filter((chunk) => chunk.path !== path);
-      if (text.length <= MAX_BYTES) {
-        chunks.push(...chunkDocument(path, text));
-      }
-      rebuild();
+      if (building && contains(building.folder, path)) { pending.set(path, text); return; }
+      if (builtFolder && contains(builtFolder, path)) apply(path, text);
     },
     onFileRemoved(path: string): void {
-      if (!builtFolder) return;
-      const before = chunks.length;
-      chunks = chunks.filter((chunk) => chunk.path !== path);
-      if (chunks.length !== before) rebuild();
+      if (building && contains(building.folder, path)) { pending.set(path, null); return; }
+      if (builtFolder && contains(builtFolder, path)) apply(path, null);
     },
     reset(): void {
-      builtFolder = null;
-      chunks = [];
-      index = buildIndex([]);
-      building = null;
+      generation++; builtFolder = null; chunks = []; index = buildIndex([]); building = null; pending.clear();
     },
   };
 }
