@@ -193,6 +193,7 @@ mod search_tests {
         fs::create_dir_all(dir.join("node_modules")).unwrap();
         fs::write(dir.join("large.md"), vec![b'x'; 2_000_001]).unwrap();
         fs::write(dir.join("binary.dat"), [0xff]).unwrap();
+        fs::write(dir.join("photo.png"), [0xff]).unwrap();
         fs::write(dir.join(".hidden"), [0xff]).unwrap();
         fs::write(dir.join("node_modules/hidden"), [0xff]).unwrap();
         #[cfg(unix)] std::os::unix::fs::symlink(dir.join("missing"), dir.join("broken")).unwrap();
@@ -202,6 +203,7 @@ mod search_tests {
         assert!(result.skipped.iter().any(|s| s.reason == "not_text"));
         #[cfg(unix)] assert!(result.skipped.iter().any(|s| s.reason == "unreadable"));
         assert!(!result.skipped.iter().any(|s| s.relative.contains("hidden")));
+        assert!(!result.skipped.iter().any(|s| s.relative == "photo.png"));
         fs::write(dir.join("hits.md"), "hello\n".repeat(501)).unwrap();
         assert!(super::search_folder_at(&dir, &pattern, || true).hit_limit);
         for i in 0..5001 { fs::write(dir.join(format!("file{i:04}")), "").unwrap(); }
@@ -231,6 +233,17 @@ pub struct SkippedFile {
     reason: &'static str,
 }
 
+fn is_known_binary(extension: &str) -> bool {
+    const BINARY: &[&str] = &[
+        "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff", "ico", "icns",
+        "mp3", "m4a", "wav", "aac", "flac", "ogg", "mp4", "mov", "m4v", "webm", "avi", "mkv",
+        "zip", "gz", "tgz", "bz2", "xz", "7z", "rar", "dmg", "pkg",
+        "ttf", "otf", "woff", "woff2", "docx", "xlsx", "pptx", "key", "numbers", "pages",
+        "sqlite", "db", "exe", "dll", "dylib", "so", "o", "a", "class", "jar", "wasm",
+    ];
+    BINARY.iter().any(|known| extension.eq_ignore_ascii_case(known))
+}
+
 fn search_folder_at(
     root: &Path,
     pattern: &regex::Regex,
@@ -250,10 +263,12 @@ fn search_folder_at(
             break;
         }
         let path = root.join(&relative);
+        // PDFs are searched by the webview; media and archives are never text, so they
+        // are left out instead of being reported as skipped.
         if path
             .extension()
             .and_then(|v| v.to_str())
-            .is_some_and(|v| v.eq_ignore_ascii_case("pdf"))
+            .is_some_and(|v| v.eq_ignore_ascii_case("pdf") || is_known_binary(v))
         {
             continue;
         }

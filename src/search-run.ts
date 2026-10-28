@@ -25,8 +25,11 @@ export class SearchRun {
     if (this.phase === "text") return "Searching…";
     if (this.phase === "error") return "Invalid regular expression";
     const files = new Set(this.hits.map((h) => h.relative)).size;
-    const count = `${this.hits.length} result${this.hits.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`;
-    return this.phase === "stopped" ? `Stopped · ${count} · ${this.pdfTotal - this.pdfDone} PDFs not searched` : count;
+    const count = this.hits.length
+      ? `${this.hits.length} result${this.hits.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
+      : "No results";
+    const left = this.pdfTotal - this.pdfDone;
+    return this.phase === "stopped" ? `Stopped · ${count} · ${left} PDF${left === 1 ? "" : "s"} not searched` : count;
   }
   get notes(): string[] {
     const notes: string[] = [];

@@ -3358,7 +3358,7 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .recovery-sheet td:nth-child(3) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, monospace); color: var(--muted); }
 
 .search-progress:not([hidden]) { display: flex; align-items: center; gap: 6px; margin: 0 12px 6px; padding: 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 11px; }
-.search-progress span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.search-progress span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .search-progress progress { width: 35px; accent-color: var(--accent); }
 .search-progress button { font: inherit; cursor: pointer; }
 .search-note { padding: 0 12px 4px; color: var(--muted); font-size: 11px; }

@@ -69,7 +69,7 @@ export function createSearchPanel(
     }
     if (state.skipped.length) {
       const details = document.createElement("details"); details.className = "search-note";
-      const summary = document.createElement("summary"); summary.textContent = `${state.skipped.length} files skipped`; details.append(summary);
+      const summary = document.createElement("summary"); summary.textContent = `${state.skipped.length} file${state.skipped.length === 1 ? "" : "s"} skipped`; details.append(summary);
       const list = document.createElement("ul");
       const reasons: Record<string, string> = { too_large: "over 2 MB", not_text: "not text", unreadable: "couldn't read", pdf: "PDF couldn't be opened" };
       for (const skipped of state.skipped.slice(0, 50)) { const item = document.createElement("li"); item.textContent = `${skipped.relative} — ${reasons[skipped.reason] ?? skipped.reason}`; list.append(item); }
