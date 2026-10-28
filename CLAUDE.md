@@ -81,7 +81,7 @@ Settings is a full-window screen (`src/settings-screen/`) laid over the workbenc
 `⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, `⌘[`, Back, the
 gear or `⌘,` leave it. Opening only toggles a body class, so the editor never resizes and
 tabs, unsaved text, cursor, scroll and split survive. Pages in fixed order: General,
-Editing, Theme, Shortcuts, AI (Use for, Local CLI, API providers sub-pages, plus
+Editing, Theme, Shortcuts, AI (Use for, Actions, Context, Local CLI, API providers sub-pages, plus
 search over `registry.ts`; every row carries `data-setting="<entry id>"` matching a registry entry). Esc leaves only when
 no page is recording a shortcut (`blocksEscape`) and focus is not in a text field. User
 strings (font, theme, agent, model names) render via `textContent`/`.value`, never
@@ -160,16 +160,21 @@ Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
 
-The AI panel is Chat only, with named conversations per folder and a No folder group.
-Its header switches chats, starts a new chat (⌥⌘J), renames and deletes with Undo.
-Conversation events refresh other windows; streaming chats are read-only elsewhere
-until the reply finishes. Its engine/model picker reads and updates `uses.chat`.
-Context chips select the open note or selection, folder search and attachments per
-conversation. Both note and search default on; replies save a Context sent summary.
-Settings ▸ AI ▸ Context stores `context.exclude` patterns in agent.json; indexing,
-mentions, attachment reads, open-note context and actions enforce them before sending.
-An excluded note chip is locked off. Keyword retrieval adds up to
-`workspaceContextK` chunks while Folder search is on. Replies show timing, model and
+Saved actions live in `<app config dir>/ai-actions.json` v1 and run from the palette,
+editor AI menu or panel bar; Edit uses diff review, Answer replies in Chat, and both
+send only their input without folder access. Their default engine follows `uses.chat`.
+Named conversations live under `<app config dir>/conversations/<folder-id>/`, with
+Rust hashing the canonical folder path (`no-folder` for null), atomic writes, a
+400-message cap and seven-day trash. Earlier window history migrates to "Earlier chat"
+and removes its old key only after a successful write. The switcher supports ⌥⌘J, rename,
+Delete/Undo and cross-window updates with read-only streaming notices. Per-conversation
+chips choose context; replies save Context sent. `agent.json`'s `context.exclude` globs
+apply to indexing, mentions, attachment reads, note context and actions. Excluded notes
+are locked off; folder-access CLI agents can still open those files themselves.
+
+The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
+Note/selection and Folder search chips default on; keyword retrieval adds up to
+`workspaceContextK` chunks while search is on. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents
@@ -185,11 +190,6 @@ The child environment is cleared and rebuilt from an allowlist. Runs time out at
 Before a folder-writing run, dirty open tabs receive labeled Recovery snapshots;
 afterward the changed-files card lists added/modified/deleted files, and affected
 open tabs use the existing Reload / Keep mine conflict flow.
-
-Saved actions live in `<app config dir>/ai-actions.json` (version 1). Settings ▸ AI ▸
-Actions manages prompts, result type, input scope and optional engine overrides; the
-palette, editor AI menu and panel bar share the runnable catalog. Saved actions use
-the Chat engine by default and send only their input without folder access.
 
 Quick actions (Proofread / Rewrite / Summarize / Generate outline) use their own
 `uses` rows and are hidden when disabled. CLI quick actions always run answer-only
@@ -245,8 +245,3 @@ The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
 (started at 249). Raise it by one for every build handed out, even when the version
 is unchanged, and never reuse a number. `build.rs` bakes it in as `BUGTEXT_BUILD`
 (the runtime config omits bundle settings) for Settings ▸ General and About.
-
-AI conversations are stored atomically under `<app config dir>/conversations/`, grouped
-by a Rust-derived hash of the canonical folder path. Each group has an index; deleted
-chats remain in trash for seven days. Earlier window history migrates to an
-"Earlier chat" in No folder, with the old key removed only after a successful write.

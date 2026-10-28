@@ -129,3 +129,21 @@ it("keeps the engine badge outside the select text area", () => {
   expect(badge.classList.contains("st-engine-badge-inline")).toBe(true);
   expect(control.children[0]).toBe(badge);
 });
+
+it("reveals a search hit after its lazy page finishes rendering", async () => {
+  for (const id of ["settings-rail", "settings-pane", "ab-settings"]) {
+    const node = document.createElement("div"); node.id = id; document.body.append(node);
+  }
+  let finish!: () => void;
+  const screen = createSettingsScreen(deps, [{ id: "ai", render: host => new Promise<void>(resolve => {
+    finish = () => { const row = document.createElement("div"); row.dataset.setting = "my-actions"; host.append(row); resolve(); };
+  }) }]);
+  screen.open("ai");
+  const search = document.body.querySelector<HTMLInputElement>('[aria-label="Search settings"]')!;
+  search.value = "My actions"; search.dispatchEvent(new Event("input"));
+  const result = [...document.getElementById("settings-pane")!.querySelectorAll("button")].find(button => button.textContent?.includes("My actions"));
+  expect(result).toBeTruthy(); result!.click();
+  finish();
+  await vi.waitFor(() => expect(document.body.querySelector('[data-setting="my-actions"]')?.classList.contains("flash")).toBe(true));
+  screen.close();
+});

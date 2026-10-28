@@ -8,11 +8,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
-- Context chips per conversation and a saved Context sent disclosure showing note text, excerpts, files and trimming for each reply.
-- Never send to AI patterns in AI ▸ Context, enforced for folder indexing, mentions, attachments, open notes and actions.
-- Named conversations in the AI panel: folder-specific chat lists, New chat (⌥⌘J), inline rename, Delete with Undo, and live updates between windows.
-- Conversation storage per folder, with 400-message retention, seven-day trash and migration of earlier AI chat history.
-- My actions: save prompts in AI settings and run them from the palette, editor AI menu or panel action bar.
+- My actions in Settings ▸ AI ▸ Actions: save Edit or Answer prompts, choose their input and engine, and run them from ⌘K, the editor AI menu or the panel bar. Actions send only their input without folder access.
+- Named conversations per folder and a No folder group, with New chat (⌥⌘J), rename, Delete with Undo, cross-window updates, 400-message retention, seven-day trash and migration of earlier chat history.
+- Context chips saved per conversation and a Context sent disclosure showing the note or selection, retained excerpts, files and trimming for each reply.
+- Never send to AI patterns in Settings ▸ AI ▸ Context, enforced for indexing, mentions, attachment reads, open-note context and actions. Local CLI agents with folder access can still open those files themselves.
 - Note-link completion after `](` and reference definitions, including heading suggestions.
 - Insert Link to Note… (⌥⌘L) with fuzzy note filtering and optional headings.
 - Follow note and web links from preview, or use ⌘-click / Open Link in the editor.
@@ -29,6 +28,11 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- The new AI settings pages load on demand to keep the startup bundle below the existing chunk-warning limit.
+- Action reorder moves a row down by one correctly, and saving ai-actions.json from a document tab applies the actions immediately.
+- Built-in action engine hints point to Use for, and selection labels use the correct singular or plural line count.
+- Broken conversation files no longer hide other chats, and failed history migration leaves Chat usable and the old history available for retry.
+- New chat does nothing while Chat is disabled.
 - Clicking a link in the preview did nothing.
 - Heading anchors now preserve underscores.
 - Link updates skip a closed note if its Recovery snapshot cannot be saved.
