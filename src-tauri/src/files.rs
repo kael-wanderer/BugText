@@ -1,7 +1,9 @@
 use regex::RegexBuilder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize)]
@@ -52,18 +54,22 @@ pub fn should_skip(name: &str) -> bool {
 }
 
 pub fn walk_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
+    walk_files_capped(dir, root, out);
+}
+
+fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>) -> bool {
     if out.len() >= WALK_CAP {
-        return;
+        return true;
     }
     let read = match fs::read_dir(dir) {
         Ok(read) => read,
-        Err(_) => return,
+        Err(_) => return false,
     };
     let mut items: Vec<_> = read.filter_map(Result::ok).collect();
     items.sort_by_key(|entry| entry.file_name());
     for entry in items {
         if out.len() >= WALK_CAP {
-            return;
+            return true;
         }
         let name = entry.file_name().to_string_lossy().into_owned();
         if should_skip(&name) {
@@ -72,11 +78,14 @@ pub fn walk_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
         let path = entry.path();
         let is_dir = entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false);
         if is_dir {
-            walk_files(&path, root, out);
+            if walk_files_capped(&path, root, out) {
+                return true;
+            }
         } else if let Ok(relative) = path.strip_prefix(root) {
             out.push(relative.to_string_lossy().into_owned());
         }
     }
+    false
 }
 
 #[tauri::command]
@@ -113,12 +122,7 @@ pub struct SearchOptions {
 const SEARCH_HIT_CAP: usize = 500;
 const SEARCH_FILE_BYTES: u64 = 2_000_000;
 
-/// Searchable text for a file: read as UTF-8 (binaries fail and are skipped).
-fn searchable_text(path: &Path) -> Option<String> {
-    fs::read_to_string(path).ok()
-}
-
-fn search_pattern(query: &str, options: &SearchOptions) -> Option<regex::Regex> {
+fn search_pattern(query: &str, options: &SearchOptions) -> Result<regex::Regex, String> {
     let source = if options.regex {
         query.to_string()
     } else {
@@ -132,7 +136,7 @@ fn search_pattern(query: &str, options: &SearchOptions) -> Option<regex::Regex> 
     RegexBuilder::new(&source)
         .case_insensitive(!options.case_sensitive)
         .build()
-        .ok()
+        .map_err(|_| "Invalid pattern".to_string())
 }
 
 #[cfg(test)]
@@ -165,44 +169,97 @@ mod search_tests {
         assert!(regex.is_match("v123"));
         assert!(!regex.is_match("V123"));
     }
+    #[test]
+    fn cancellation_and_invalid_pattern_are_reported() {
+        let options = SearchOptions { case_sensitive: false, whole_word: false, regex: true };
+        assert!(search_pattern("foo(", &options).is_err());
+        let dir = std::env::temp_dir().join(format!("bugtext-search-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.md"), "hello").unwrap();
+        let result = super::search_folder_at(&dir, &search_pattern("hello", &options).unwrap(), || false);
+        assert!(result.cancelled);
+        assert!(result.hits.is_empty());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
 }
 
-#[tauri::command]
-pub fn search_in_folder(folder: String, query: String, options: SearchOptions) -> Vec<SearchHit> {
-    let needle = query.trim();
-    let mut hits = Vec::new();
-    if needle.is_empty() {
-        return hits;
-    }
-    let Some(pattern) = search_pattern(needle, &options) else {
-        return hits;
-    };
-    let root = Path::new(&folder);
+#[derive(Default)]
+pub struct SearchRequests(pub Arc<Mutex<HashMap<String, u64>>>);
+
+// Search results use snake_case, matching SearchHit.
+#[derive(Default, Serialize)]
+pub struct SearchResult {
+    hits: Vec<SearchHit>,
+    files_searched: usize,
+    skipped: Vec<SkippedFile>,
+    walk_limit: bool,
+    hit_limit: bool,
+    cancelled: bool,
+}
+
+#[derive(Serialize)]
+pub struct SkippedFile {
+    relative: String,
+    reason: &'static str,
+}
+
+fn search_folder_at(
+    root: &Path,
+    pattern: &regex::Regex,
+    is_current: impl Fn() -> bool,
+) -> SearchResult {
+    let mut result = SearchResult::default();
     let mut files = Vec::new();
-    walk_files(root, root, &mut files);
+    result.walk_limit = walk_files_capped(root, root, &mut files);
     for relative in files {
-        if hits.len() >= SEARCH_HIT_CAP {
+        if !is_current() {
+            result.cancelled = true;
+            break;
+        }
+        if result.hits.len() >= SEARCH_HIT_CAP {
+            result.hit_limit = true;
             break;
         }
         let path = root.join(&relative);
-        if fs::metadata(&path)
-            .map(|meta| meta.len() > SEARCH_FILE_BYTES)
-            .unwrap_or(false)
-        {
-            continue;
-        }
         if path
             .extension()
-            .and_then(|value| value.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"))
+            .and_then(|v| v.to_str())
+            .is_some_and(|v| v.eq_ignore_ascii_case("pdf"))
         {
             continue;
         }
-        let Some(text) = searchable_text(&path) else {
-            continue;
+        let reason = match fs::metadata(&path) {
+            Ok(meta) if meta.len() > SEARCH_FILE_BYTES => Some("too_large"),
+            Err(_) => Some("unreadable"),
+            _ => None,
         };
+        if let Some(reason) = reason {
+            result.skipped.push(SkippedFile { relative, reason });
+            continue;
+        }
+        let text = match fs::read_to_string(&path) {
+            Ok(text) if !text.contains('\0') => text,
+            Ok(_) => {
+                result.skipped.push(SkippedFile {
+                    relative,
+                    reason: "not_text",
+                });
+                continue;
+            }
+            Err(e) => {
+                let reason = if e.kind() == std::io::ErrorKind::InvalidData {
+                    "not_text"
+                } else {
+                    "unreadable"
+                };
+                result.skipped.push(SkippedFile { relative, reason });
+                continue;
+            }
+        };
+        result.files_searched += 1;
         for (index, line) in text.lines().enumerate() {
-            if hits.len() >= SEARCH_HIT_CAP {
+            if result.hits.len() >= SEARCH_HIT_CAP {
                 break;
             }
             if let Some(found) = pattern.find(line) {
@@ -213,7 +270,7 @@ pub fn search_in_folder(folder: String, query: String, options: SearchOptions) -
                     .saturating_sub(trimmed_start)
                     .min(snippet.len());
                 let match_end = found.end().saturating_sub(trimmed_start).min(snippet.len());
-                hits.push(SearchHit {
+                result.hits.push(SearchHit {
                     path: path.to_string_lossy().into_owned(),
                     relative: relative.clone(),
                     line: (index + 1) as u32,
@@ -224,7 +281,43 @@ pub fn search_in_folder(folder: String, query: String, options: SearchOptions) -
             }
         }
     }
-    hits
+    result.hit_limit |= result.hits.len() >= SEARCH_HIT_CAP;
+    result
+}
+
+#[tauri::command]
+pub async fn search_in_folder(
+    window: tauri::Window,
+    state: tauri::State<'_, SearchRequests>,
+    folder: String,
+    query: String,
+    options: SearchOptions,
+    request: u64,
+) -> Result<SearchResult, String> {
+    let pattern = search_pattern(query.trim(), &options)?;
+    let label = window.label().to_owned();
+    let requests = state.0.clone();
+    requests
+        .lock()
+        .map_err(|_| "Search unavailable")?
+        .insert(label.clone(), request);
+    tauri::async_runtime::spawn_blocking(move || {
+        search_folder_at(Path::new(&folder), &pattern, || {
+            requests
+                .lock()
+                .map(|map| map.get(&label) == Some(&request))
+                .unwrap_or(false)
+        })
+    })
+    .await
+    .map_err(|_| "Search failed".to_string())
+}
+
+#[tauri::command]
+pub fn search_cancel(window: tauri::Window, state: tauri::State<'_, SearchRequests>) {
+    if let Ok(mut map) = state.0.lock() {
+        map.remove(window.label());
+    }
 }
 
 #[tauri::command]
@@ -422,9 +515,13 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
         Ok(real) => real,
         Err(_) => requested.to_path_buf(),
     };
-    let parent = target.parent().ok_or_else(|| "Invalid file path".to_string())?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| "Invalid file path".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    let name = target.file_name().ok_or_else(|| "Invalid file path".to_string())?;
+    let name = target
+        .file_name()
+        .ok_or_else(|| "Invalid file path".to_string())?;
     let permissions = fs::metadata(&target).ok().map(|meta| meta.permissions());
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -614,7 +711,10 @@ mod atomic_write_tests {
         let dir = std::env::temp_dir().join(format!(
             "bugtext-atomic-write-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
@@ -627,7 +727,14 @@ mod atomic_write_tests {
 
     #[test]
     fn save_bytes_replaces_and_leaves_no_temp() {
-        let dir = std::env::temp_dir().join(format!("bugtext-save-bytes-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-save-bytes-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
         fs::write(&path, "old").unwrap();
@@ -641,14 +748,24 @@ mod atomic_write_tests {
     #[test]
     fn save_file_keeps_symlink() {
         use std::os::unix::fs::symlink;
-        let dir = std::env::temp_dir().join(format!("bugtext-save-link-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-save-link-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         let real = dir.join("real.md");
         let link = dir.join("link.md");
         fs::write(&real, "old").unwrap();
         symlink("real.md", &link).unwrap();
         save_file(link.to_string_lossy().into_owned(), "new".to_string()).unwrap();
-        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(fs::read_to_string(&real).unwrap(), "new");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 2);
         fs::remove_dir_all(dir).unwrap();
@@ -658,19 +775,36 @@ mod atomic_write_tests {
     #[test]
     fn save_file_keeps_permissions() {
         use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("bugtext-save-mode-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-save-mode-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
         fs::write(&path, "old").unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
         save_file(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
-        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
     fn save_file_creates_new_file() {
-        let dir = std::env::temp_dir().join(format!("bugtext-save-new-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-save-new-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
         save_file(path.to_string_lossy().into_owned(), "new".to_string()).unwrap();
@@ -682,8 +816,17 @@ mod atomic_write_tests {
     #[test]
     fn save_file_failure_keeps_original() {
         use std::os::unix::fs::PermissionsExt;
-        if std::env::var("USER") == Ok("root".into()) { return; }
-        let dir = std::env::temp_dir().join(format!("bugtext-save-fail-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        if std::env::var("USER") == Ok("root".into()) {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "bugtext-save-fail-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("note.md");
         fs::write(&path, "old").unwrap();
@@ -691,7 +834,11 @@ mod atomic_write_tests {
         assert!(save_file(path.to_string_lossy().into_owned(), "new".to_string()).is_err());
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "old");
-        assert!(!fs::read_dir(&dir).unwrap().any(|entry| entry.unwrap().file_name().to_string_lossy().contains(".bugtext-tmp-")));
+        assert!(!fs::read_dir(&dir).unwrap().any(|entry| entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .contains(".bugtext-tmp-")));
         fs::remove_dir_all(dir).unwrap();
     }
 }

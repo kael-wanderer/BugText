@@ -58,7 +58,7 @@ export function createSearchPanel(
     status.textContent = "Searching…";
     let hits: SearchHit[];
     try {
-      const textHits = await searchInFolder(folder, query, options);
+      const textHits = (await searchInFolder(folder, query, options, current)).hits;
       const pdfHits: SearchHit[] = [];
       for (const relative of deps
         .getFiles()
