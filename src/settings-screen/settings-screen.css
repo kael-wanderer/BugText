@@ -1031,3 +1031,6 @@
   background: var(--surface, color-mix(in srgb, var(--accent) 8%, transparent));
   border-radius: 8px;
 }
+
+.st-inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.st-path { min-width: 220px; flex: 1; }

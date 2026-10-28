@@ -35,6 +35,7 @@ export type ExplorerActions = {
   onOpenSide?: (path: string) => void;
   onCompare?: (selectedPath: string, path: string) => void;
   onAddToChat?: (path: string) => void;
+  onNewFromTemplate?: (directory: string) => void;
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
   onRefresh?: () => void;
@@ -424,6 +425,7 @@ function rowMenu(node: TreeNode): MenuItem[] {
   return [
     { label: "New File", action: () => startCreate(directory, "file") },
     { label: "New Folder", action: () => startCreate(directory, "dir") },
+    { label: "New from Template…", action: () => explorerActions.onNewFromTemplate?.(directory) },
     "separator",
     { label: "Rename", action: () => startRename(node.path, node.name) },
     {
@@ -692,6 +694,7 @@ export function initExplorer(
     showContextMenu(event.clientX, event.clientY, [
       { label: "New File", action: () => startCreate(folder, "file") },
       { label: "New Folder", action: () => startCreate(folder, "dir") },
+      { label: "New from Template…", action: () => explorerActions.onNewFromTemplate?.(folder) },
     ]);
   };
   document.getElementById("explorer-tree")!.addEventListener("contextmenu", rootMenu);

@@ -1,4 +1,5 @@
 import { validImageFolder } from "./image-insert";
+import { DATE_FORMATS, type DateFormat } from "./templates/placeholders";
 import { THEME_CATALOG, isLightTheme, type ConcreteThemeName, type DarkThemeName, type LightThemeName } from "./theme-catalog";
 
 export type ThemeName = "system" | ConcreteThemeName;
@@ -15,6 +16,19 @@ export type TableSettings = {
   formatOnEdit: boolean;
   /** Spreadsheet cells on the clipboard paste as a Markdown table. */
   pasteAsTable: boolean;
+};
+
+export type TemplateSettings = {
+  /** Folder holding the templates; empty means `<app config dir>/templates`. */
+  folder: string;
+  /** Folder for new notes whose template names none, relative to the open folder. */
+  defaultFolder: string;
+  dateFormat: DateFormat;
+  quickTarget: "daily" | "inbox";
+  /** Quick Note inbox, relative to the open folder. */
+  inboxFile: string;
+  /** Template name preselected in the picker. */
+  lastUsed: string;
 };
 
 export type ZoneSettings = {
@@ -60,6 +74,7 @@ export type Settings = {
   appIcon: AppIconId;
   images: ImageSettings;
   tables: TableSettings;
+  templates: TemplateSettings;
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -89,6 +104,7 @@ export const DEFAULT_SETTINGS: Settings = {
   appIcon: DEFAULT_APP_ICON,
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
   tables: { formatOnEdit: true, pasteAsTable: true },
+  templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
@@ -139,6 +155,7 @@ function defaults(): Settings {
     workspaceContextK: DEFAULT_SETTINGS.workspaceContextK,
     images: { ...DEFAULT_SETTINGS.images },
     tables: { ...DEFAULT_SETTINGS.tables },
+    templates: { ...DEFAULT_SETTINGS.templates },
   };
 }
 
@@ -157,6 +174,20 @@ function parseTables(raw: unknown): TableSettings {
   return {
     formatOnEdit: value.formatOnEdit !== false,
     pasteAsTable: value.pasteAsTable !== false,
+  };
+}
+
+function parseTemplates(raw: unknown): TemplateSettings {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const fallback = DEFAULT_SETTINGS.templates;
+  const text = (field: unknown, def: string): string => (typeof field === "string" ? field.trim() : def);
+  return {
+    folder: text(value.folder, fallback.folder),
+    defaultFolder: text(value.defaultFolder, fallback.defaultFolder),
+    dateFormat: (DATE_FORMATS as readonly unknown[]).includes(value.dateFormat) ? (value.dateFormat as DateFormat) : fallback.dateFormat,
+    quickTarget: value.quickTarget === "inbox" ? "inbox" : fallback.quickTarget,
+    inboxFile: text(value.inboxFile, fallback.inboxFile) || fallback.inboxFile,
+    lastUsed: text(value.lastUsed, fallback.lastUsed),
   };
 }
 
@@ -253,6 +284,7 @@ export function parseSettings(raw: string): Settings {
       : DEFAULT_APP_ICON,
     images: parseImages(data.images),
     tables: parseTables(data.tables),
+    templates: parseTemplates(data.templates),
   };
 }
 

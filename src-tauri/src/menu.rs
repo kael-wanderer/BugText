@@ -89,6 +89,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let new_window = MenuItemBuilder::with_id("file.new_window", "New Window")
         .accelerator("CmdOrCtrl+Shift+N")
         .build(app)?;
+    let new_from_template =
+        MenuItemBuilder::with_id("file.new_from_template", "New from Template…")
+            .accelerator("CmdOrCtrl+Alt+N")
+            .build(app)?;
+    let quick_note = MenuItemBuilder::with_id("file.quick_note", "Quick Note…")
+        .accelerator("Ctrl+Cmd+N")
+        .build(app)?;
     let open = MenuItemBuilder::with_id("file.open", "Open File…")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
@@ -123,6 +130,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&new)
         .item(&new_window)
+        .item(&new_from_template)
+        .item(&quick_note)
         .separator()
         .item(&open)
         .item(&open_folder)

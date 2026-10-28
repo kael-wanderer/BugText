@@ -152,6 +152,8 @@ import { createWindowView, type WindowView } from "./windowview";
 import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert";
 import { createNoteImages } from "./note-images";
 import { showToast } from "./toast";
+import { createTemplateActions } from "./templates/actions";
+import { templatesFolder } from "./templates/library";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { tableFromClipboard } from "./table-paste";
 import { setTableFormatting } from "./table-keys";
@@ -549,6 +551,8 @@ function commandItems(): PaletteItem[] {
   const recent = loadRecent();
   return [
     command("new", "New File", newDoc),
+    command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
+    command("quickNote", "Quick Note…", () => templateActions.quickNote()),
     command("open", "Open File…", () => void doOpen()),
     command("openFolder", "Open Folder…", () => {
       void pickFolder().then(async (folder) => {
@@ -1375,6 +1379,48 @@ function openPdf(windowId: string, path: string): void {
     if (hasDraft) onPdfEditDirtyChange(found.windowId, found.tab.id, true);
   });
 }
+
+const templateActions = createTemplateActions({
+  host: () => document.getElementById("app")!,
+  getFolder: () => getState().folder,
+  getTemplates: () => currentSettings.templates,
+  setLastUsed: (lastUsed) => {
+    if (lastUsed === currentSettings.templates.lastUsed) return;
+    currentSettings = { ...currentSettings, templates: { ...currentSettings.templates, lastUsed } };
+    writeSettings(currentSettings);
+  },
+  refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
+  revealInExplorer: revealExplorerPath,
+  openPath: (path) => doOpenPath(path),
+  openUntitled: (text, cursor) => {
+    const windowId = getState().activeWindowId;
+    openInWindow(windowId, { path: null, name: "Untitled", text });
+    const tabId = getWindow(windowId)?.activeTabId;
+    if (!tabId) return;
+    const w = getWindow(windowId)!;
+    patchWindow(windowId, { tabs: w.tabs.map((tab) => (tab.id === tabId ? { ...tab, dirty: true } : tab)) });
+    editorForTab(tabId).setCursor(tabId, cursor);
+    editorForTab(tabId).focus();
+  },
+  placeCursor: (path, offset) => {
+    const found = findTabByPath(getState().windows, path);
+    if (!found) return;
+    editorForTab(found.tab.id).setCursor(found.tab.id, offset);
+    editorForTab(found.tab.id).focus();
+  },
+  revealInFinder,
+  findOpenTab: (path) => {
+    const found = findTabByPath(getState().windows, path);
+    return found ? { tabId: found.tab.id, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
+  },
+  appendToTab: (tabId, text) => editorForTab(tabId).appendText(tabId, text),
+  afterDiskWrite: (path) => {
+    void invoke<string>("read_file", { path }).then((text) => {
+      workspaceIndex.onFileChanged(path, text);
+      aiPanel?.updateWorkspaceFile(path, text);
+    }).catch(() => {});
+  },
+});
 
 function newDoc(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "Untitled", text: "" });
@@ -2470,6 +2516,12 @@ const settingsScreen = createSettingsScreen(
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
     onOpenAISettingsFile: openAISettings,
+    templates: {
+      resolveFolder: templatesFolder,
+      chooseFolder: pickFolder,
+      openFolder: () => templateActions.openTemplatesFolder(),
+      newTemplate: () => templateActions.newTemplate(),
+    },
     onCheckForUpdates: () => void checkForUpdates(),
     getActiveTabName: () => activeMeta()?.name ?? null,
     getAppVersion: async () => {
@@ -2723,6 +2775,7 @@ initExplorer(
     onAddToChat: (path) => {
       void doOpenPath(path).then(() => setAIVisible(true));
     },
+    onNewFromTemplate: (directory) => templateActions.newFromTemplate(directory),
     onHideExplorer: () => {
       if (getState().explorerVisible) document.getElementById("ab-explorer")!.click();
     },
@@ -2826,6 +2879,10 @@ listenScoped<string>("menu", (event) => {
   switch (id) {
     case "file.new":
       return newDoc();
+    case "file.new_from_template":
+      return templateActions.newFromTemplate();
+    case "file.quick_note":
+      return templateActions.quickNote();
     case "file.open":
       return void doOpen();
     case "file.open_folder":
