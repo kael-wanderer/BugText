@@ -14,7 +14,7 @@ export function showRenameReview(plans: NoteEdits[], folder: string, deps: Renam
     foot.append(node("span", "Closed notes get a Recovery snapshot first."), cancel, apply);
     const close = () => { scrim.remove(); previous?.focus(); resolve(); };
     cancel.onclick = close;
-    const count = () => { const n = plans.reduce((sum, p) => sum + p.edits.filter((e) => e.checked).length, 0); apply.textContent = `Update ${n} links`; apply.disabled = n === 0; };
+    const count = () => { const n = plans.reduce((sum, p) => sum + p.edits.filter((e) => e.checked).length, 0); apply.textContent = `Update ${n} link${n === 1 ? "" : "s"}`; apply.disabled = n === 0; };
     sheet.append(head, intro);
     for (const inside of [false, true]) {
       const group = plans.filter((p) => p.edits.some((e) => e.inside === inside));

@@ -23,6 +23,13 @@ describe("writing note links", () => {
     const ref = await completionSource("a")(context("[id]: ret"));
     expect(ref?.options[0].apply).toBe("<../meetings/2026-10-28 Retro.md>");
   });
+  it("matches notes on their path inside the folder, not the folder itself", async () => {
+    const index = createLinkIndex(async () => ({ notes: [parseNote("/long/x/sre.md", ""), parseNote("/long/x/long.md", "")], skipped: [] }));
+    await index.ensure("/long/x");
+    configureLinkCompletion({ index, context: () => ({ path: "/long/x/a.md", untitled: false }), enabled: () => true });
+    const result = await completionSource("a")(context("[a](long"));
+    expect(result?.options.map((option) => option.label)).toEqual(["long.md"]);
+  });
   it("respects disabled suggestions and code blocks", async () => {
     await setup(false); expect(await completionSource("a")(context("[a](ret"))).toBeNull();
     await setup(); expect(await completionSource("a")(context("```\n[a](ret"))).toBeNull();

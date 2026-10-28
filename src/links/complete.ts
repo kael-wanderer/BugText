@@ -41,7 +41,7 @@ export function completionSource(id: string) {
       const headings = headingAnchors(resolved.path === note.path ? markdownOutline(context.state.doc.toString()) : targetNote?.headings ?? []);
       return { from, filter: false, options: rankItems(raw.slice(hash + 1), headings, (h) => h.text).map((h) => ({ label: h.text, detail: `#${h.anchor}`, apply: target ? formatLinkTarget(note.path, resolved.path!, h.anchor) + suffix : `#${h.anchor}${suffix}` })) };
     }
-    return { from, filter: false, options: rankItems(raw, s.index.notes(), (n) => n.path).slice(0, 100).map((n) => ({ label: n.path.split("/").pop()!, detail: detail ?? n.path.slice(s.index.folder!.length + 1), apply: formatLinkTarget(note.path, n.path) + suffix })) };
+    return { from, filter: false, options: rankItems(raw, s.index.notes(), (n) => n.path.slice(s.index.folder!.length + 1)).slice(0, 100).map((n) => ({ label: n.path.split("/").pop()!, detail: detail ?? n.path.slice(s.index.folder!.length + 1), apply: formatLinkTarget(note.path, n.path) + suffix })) };
   };
 }
 export const linkCompletion = (id: string) => autocompletion({ override: [completionSource(id)] });

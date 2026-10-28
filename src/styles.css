@@ -3407,7 +3407,7 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .qn-target.err { color: var(--error, #c45b50); }
 .qn-hints { white-space: nowrap; }
 
-a.broken-note-link { text-decoration: underline dotted var(--warning, var(--accent)); }
+a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline dotted var(--error, #c45b50); }
 .link-picker input { margin: 12px 18px; width: calc(100% - 36px); background: var(--bg-editor); color: var(--text); border: 1px solid var(--accent); padding: 8px; border-radius: 5px; }
 .link-picker-columns { display: grid; grid-template-columns: 1fr 1fr; min-height: 220px; }
 .link-picker-list { max-height: 320px; overflow: auto; padding: 8px; }
@@ -3423,7 +3423,8 @@ a.broken-note-link { text-decoration: underline dotted var(--warning, var(--acce
 .link-panel-row small { color: var(--muted); }
 .link-panel-row span { font-size: 11px; }
 .link-panel-row mark { background: var(--selection); color: inherit; }
-.link-panel-row.broken > span { color: var(--warning, var(--accent)); }
+.link-panel-row.broken > span { color: var(--error, #c45b50); }
+.link-panel-note { padding: 8px; font-size: 11px; color: var(--muted); }
 .link-review-intro { padding: 6px 18px; }
 .link-review-note { margin: 12px 18px; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
 .link-review-note small { color: var(--muted); margin-left: 10px; }

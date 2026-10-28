@@ -38,7 +38,7 @@ export async function showInsertLinkPicker(deps: { index: LinkIndex; path: strin
   function render() {
     list.replaceChildren();
     if (!headingMode) {
-      shown = rankItems(filter.value, deps.index.notes(), (n) => n.path);
+      shown = rankItems(filter.value, deps.index.notes(), (n) => n.path.slice((deps.index.folder?.length ?? 0) + 1));
       position = Math.max(0, Math.min(position, shown.length - 1)); selected = shown[position]; anchor = undefined;
       shown.slice(0, 100).forEach((note, i) => {
         const row = node("button", note.path.slice((deps.index.folder?.length ?? 0) + 1), "outline-row");
