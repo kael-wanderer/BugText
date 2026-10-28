@@ -119,6 +119,12 @@ runtime via the `set_accelerators` command (`item.set_accelerator`); app-scoped
 shortcuts (palette, AI send) and the JS fallback handlers match against the
 resolved keymap.
 
+Saves bind the initiating tab and its editor revision, serialize writes per path, and
+leave newer edits dirty with an immediate recovery draft. The recovery strip and File ▸
+Recover Unsaved Documents… open a per-document review with comparisons; discards move
+to a seven-day store and can be brought back. Restores remain unsaved until explicitly
+saved, and closing the review leaves undecided drafts in place.
+
 The Outline sidebar follows the focused window's Markdown tab and shares its heading
 scanner with the command palette. Preview block `data-line` anchors support heading
 jumps, place preservation and optional Sync Scroll between editor and preview; the

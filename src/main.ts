@@ -106,6 +106,8 @@ import {
   checkExternalChange,
   clearDraft,
   clearDraftById,
+  discardDraft,
+  bringBackDiscarded,
   forgetStat,
   hasDiskChanged,
   manualBinarySnapshot,
@@ -114,8 +116,11 @@ import {
   restoreDrafts,
   scheduleDraft,
   snapshotOnSave,
+  writeDraftNow,
 } from "./recovery";
-import type { DraftRecord } from "./recovery-policy";
+import { draftIdFor, type DraftRecord } from "./recovery-policy";
+import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
+import { showRecoveryReview } from "./recovery-review";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
   freshState,
@@ -247,22 +252,23 @@ const mcpHandler = createMcpHandler({
     editorForTab(id).applyChanges(id, changes);
   },
   async saveTab(id) {
-    for (const windowState of getState().windows) {
-      const tab = windowState.tabs.find((candidate) => candidate.id === id);
-      const view = views.get(windowState.id);
-      if (!tab || !view || !tab.path) continue;
-      const text = view.editor.getText(id);
-      await invoke<void>("save_file", { path: tab.path, contents: text });
-      await recordStat(tab.path);
-      clearDraft(tab.path, id);
-      const recoveredId = recoveredDraftIds.get(id);
-      if (recoveredId) clearDraftById(recoveredId);
-      recoveredDraftIds.delete(id);
-      workspaceIndex.onFileChanged(tab.path, text);
-      aiPanel?.updateWorkspaceFile(tab.path, text);
-      patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === id ? { ...item, dirty: false } : item) });
-      return;
-    }
+    const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === id));
+    const tab = windowState?.tabs.find((item) => item.id === id);
+    const view = windowState && views.get(windowState.id);
+    if (!windowState || !tab?.path || !view) return;
+    const path = tab.path;
+    const text = view.editor.getText(id);
+    const binding: SaveBinding = { windowId: windowState.id, tabId: id, path, revision: view.editor.revision(id) };
+    await runSerialized(path, async (queued) => {
+      const current = getState().windows.find((item) => item.tabs.some((candidate) => candidate.id === id));
+      const currentTab = current?.tabs.find((candidate) => candidate.id === id);
+      if (queued && currentTab && !currentTab.dirty && editorForTab(id).revision(id) === binding.revision) return;
+      await invoke<void>("save_file", { path, contents: text });
+      await recordStat(path);
+      workspaceIndex.onFileChanged(path, text);
+      aiPanel?.updateWorkspaceFile(path, text);
+      await finishBoundSave(binding, path);
+    });
   },
   readDisk: (path) => invoke<string>("read_file", { path }),
   writeDiskAtomic: async (path, text) => {
@@ -446,7 +452,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
       applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+      setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -557,6 +563,7 @@ function commandItems(): PaletteItem[] {
     }),
     command("save", "Save", () => void doSave(false)),
     command("saveAs", "Save As…", () => void doSave(true)),
+    command("recover", "Recover unsaved documents", () => openRecoveryReview()),
     command("close", "Close Tab", () => {
       const windowState = activeWindow();
       if (windowState.activeTabId) {
@@ -762,11 +769,8 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
   for (const id of toClose) {
     const tab = w.tabs.find((item) => item.id === id);
     if (tab) {
-      clearDraft(tab.path, tab.id);
+      if (!(await discardTabDraft(windowId, tab))) { toClose.delete(id); continue; }
       if (tab.path && isPdfFile(tab.path)) void clearPdfEditDraft(tab.path);
-      const recoveredId = recoveredDraftIds.get(tab.id);
-      if (recoveredId) clearDraftById(recoveredId);
-      recoveredDraftIds.delete(tab.id);
       if (tab.path) forgetStat(tab.path);
     }
     view.editor.closeState(id);
@@ -986,6 +990,32 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
   activateTab(windowId, id);
 }
 
+async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean> {
+  if (isPdfFile(tab.path ?? tab.name)) return true;
+  try {
+    const editor = views.get(windowId)!.editor;
+    const revision = editor.revision(tab.id);
+    if (tab.dirty) {
+      const contents = editor.getText(tab.id);
+      await writeDraftNow({ windowId, tabId: tab.id, path: tab.path, name: tab.name, contents });
+    }
+    const file = await discardDraft(draftIdFor(tab.path, tab.id));
+    if (file) showToast(`Discarded ${tab.name}`, 8000, { label: "Undo", run: () => { void bringBackDiscarded(file).catch(() => showToast("Could not bring back draft")); } });
+    const recoveredId = recoveredDraftIds.get(tab.id);
+    if (recoveredId && recoveredId !== draftIdFor(tab.path, tab.id)) await discardDraft(recoveredId);
+    if (editor.revision(tab.id) !== revision) {
+      await writeDraftNow({ windowId, tabId: tab.id, path: tab.path, name: tab.name, contents: editor.getText(tab.id) });
+      showToast("Document changed while closing; it remains open.");
+      return false;
+    }
+    recoveredDraftIds.delete(tab.id);
+    return true;
+  } catch {
+    await message("Could not discard the draft. The document remains open.", { title: "Close tab", kind: "error" });
+    return false;
+  }
+}
+
 async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   const w = getWindow(windowId)!;
   const t = w.tabs.find((x) => x.id === tabId);
@@ -999,11 +1029,8 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
     if (!approved) return false;
   }
 
-  clearDraft(t.path, t.id);
+  if (!(await discardTabDraft(windowId, t))) return false;
   if (t.path && isPdfFile(t.path)) void clearPdfEditDraft(t.path);
-  const recoveredId = recoveredDraftIds.get(t.id);
-  if (recoveredId) clearDraftById(recoveredId);
-  recoveredDraftIds.delete(t.id);
   if (t.path) forgetStat(t.path);
   const next = nextActiveAfterClose(w.tabs, tabId, w.activeTabId);
   views.get(windowId)!.editor.closeState(tabId);
@@ -1352,6 +1379,29 @@ function newDoc(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "Untitled", text: "" });
 }
 
+async function finishBoundSave(binding: SaveBinding, target: string): Promise<void> {
+  const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === binding.tabId));
+  const tab = windowState?.tabs.find((item) => item.id === binding.tabId);
+  const view = windowState && views.get(windowState.id);
+  if (!windowState || !tab || !view) return;
+  const clean = completeSave(binding, view.editor.revision(tab.id)) === "clean";
+  patchWindow(windowState.id, { tabs: windowState.tabs.map((item) => item.id === tab.id
+    ? { ...item, path: target, name: basename(target), dirty: !clean } : item) });
+  view.editor.setDocumentKind(tab.id, editorKind(target));
+  if (windowState.activeTabId === tab.id) view.renderPreview(view.editor.getText(tab.id), target);
+  if (clean) {
+    clearDraft(binding.path, tab.id);
+    const recoveredId = recoveredDraftIds.get(tab.id);
+    if (recoveredId) clearDraftById(recoveredId);
+    recoveredDraftIds.delete(tab.id);
+  } else {
+    const draft = { windowId: windowState.id, tabId: tab.id, path: target, name: basename(target), contents: view.editor.getText(tab.id) };
+    await writeDraftNow(draft).catch(() => scheduleDraft(draft));
+    showToast("Saved · newer edits not saved yet", 3000);
+  }
+  renderAll();
+}
+
 async function doSave(saveAs = false): Promise<boolean> {
   const t = activeMeta();
   if (!t) return false;
@@ -1365,8 +1415,13 @@ async function doSave(saveAs = false): Promise<boolean> {
     return false;
   }
 
+  const text = view.editor.getText(t.id);
+  const binding: SaveBinding = { windowId: getState().activeWindowId, tabId: t.id, path: t.path, revision: view.editor.revision(t.id) };
   try {
-    let target = saveAs ? null : t.path;
+    return await runSerialized(`tab:${t.id}`, async (queuedTab) => {
+    const latest = getState().windows.flatMap((window) => window.tabs).find((tab) => tab.id === t.id);
+    if (queuedTab && !saveAs && latest && !latest.dirty && editorForTab(t.id).revision(t.id) === binding.revision) return true;
+    let target = saveAs ? null : (latest?.path ?? t.path);
     if (!target) {
       target = await pickSavePath();
       if (!target) return false;
@@ -1382,7 +1437,11 @@ async function doSave(saveAs = false): Promise<boolean> {
       }
     }
 
-    const text = view.editor.getText(t.id);
+    const saveTarget = target;
+    return await runSerialized(saveTarget, async (queued) => {
+    const currentWindow = getState().windows.find((item) => item.tabs.some((tab) => tab.id === t.id));
+    const currentTab = currentWindow?.tabs.find((tab) => tab.id === t.id);
+    if (queued && currentTab && !currentTab.dirty && editorForTab(t.id).revision(t.id) === binding.revision && currentTab.path === saveTarget) return true;
     if (t.path && (await hasDiskChanged(t.path))) {
       const overwrite = await confirm(
         `"${t.path}" changed on disk since you opened it. Overwrite it with your version?`,
@@ -1404,17 +1463,13 @@ async function doSave(saveAs = false): Promise<boolean> {
       aiPanel?.removeWorkspaceFile(previousPath);
     }
     aiPanel?.updateWorkspaceFile(target, text);
-    clearDraft(previousPath, t.id);
-    const recoveredId = recoveredDraftIds.get(t.id);
-    if (recoveredId) clearDraftById(recoveredId);
-    recoveredDraftIds.delete(t.id);
     void recordStat(target);
     void snapshotOnSave(target, text);
     if (target === settingsPath) {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+      setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
       applyKeymap();
@@ -1433,16 +1488,11 @@ async function doSave(saveAs = false): Promise<boolean> {
       aiPanel?.render();
       broadcastSettingsChange("agent");
     }
-    patchWindow(getState().activeWindowId, {
-      tabs: activeWindow().tabs.map((x) =>
-        x.id === t.id ? { ...x, path: target, name: basename(target), dirty: false } : x
-      ),
-    });
-    view.editor.setDocumentKind(t.id, editorKind(target));
-    view.renderPreview(text, target);
+    await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
-    renderAll();
     return true;
+    });
+    });
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     await message(text, { title: "Save file", kind: "error" });
@@ -1653,17 +1703,37 @@ async function refreshWorkspaceFromDisk(force = false): Promise<void> {
   }
 }
 
+function openRecoveryReview(restoreAll = false): void {
+  void showRecoveryReview({
+    host: document.getElementById("app")!,
+    findOpen: (path) => {
+      const found = findTabByPath(getState().windows, path);
+      return found ? { dirty: found.tab.dirty, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
+    },
+    restore: openDraft,
+    preserveOpen: async (path) => {
+      const found = findTabByPath(getState().windows, path);
+      if (!found?.tab.dirty) return;
+      const editor = editorForTab(found.tab.id);
+      await writeDraftNow({ windowId: found.windowId, tabId: found.tab.id, path, name: found.tab.name, contents: editor.getText(found.tab.id) });
+    },
+  }, restoreAll).catch(() => showToast("Could not open recovery"));
+}
+
 function openDraft(draft: DraftRecord): void {
   const preferredWindowId = getWindow(draft.windowId)
     ? draft.windowId
-    : "main";
+    : getState().activeWindowId;
   if (draft.path) {
     const found = findTabByPath(getState().windows, draft.path);
     if (found) {
       activateTab(found.windowId, found.tab.id);
       const view = views.get(found.windowId)!;
       view.editor.setText(draft.contents);
+      const current = getWindow(found.windowId)!;
+      patchWindow(found.windowId, { tabs: current.tabs.map((tab) => tab.id === found.tab.id ? { ...tab, dirty: true } : tab) });
       recoveredDraftIds.set(found.tab.id, draft.id);
+      renderAll();
       return;
     }
   }
@@ -2028,7 +2098,7 @@ async function moveTabToWindow(
     sourceView.renderPreview("");
   }
 
-  const movedId = nextId();
+  const movedId = tabId;
   targetView.editor.openState(
     movedId,
     text,
@@ -2053,7 +2123,7 @@ async function toggleSub(): Promise<void> {
     const main = mainWindow();
     const moved: TabMeta[] = [];
     for (const t of sub.tabs) {
-      const id = nextId();
+      const id = t.id;
       moved.push({ ...t, id });
       views
         .get("main")!
@@ -2768,6 +2838,8 @@ listenScoped<string>("menu", (event) => {
       return void doSave(false);
     case "file.save_as":
       return void doSave(true);
+    case "file.recover":
+      return openRecoveryReview();
     case "file.close": {
       const w = activeWindow();
       return w.activeTabId ? void closeTab(w.id, w.activeTabId) : undefined;
@@ -2856,6 +2928,7 @@ const appKeyActions: Record<string, () => void> = {
   "ai.quick.rewrite": () => runQuickActionById("ai.quick.rewrite"),
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
   "ai.quick.outline": () => runQuickActionById("ai.quick.outline"),
+  "file.recover": () => openRecoveryReview(),
   "file.close": () => {
     const w = activeWindow();
     if (w.activeTabId) void closeTab(w.id, w.activeTabId);
@@ -2899,7 +2972,7 @@ async function restoreWindows(): Promise<void> {
     addSplitter();
     makeView("sub", false);
     applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit);
+    setTableFormatting(currentSettings.tables.formatOnEdit);
   }
   patchWindow("main", { mode: saved[0]?.mode ?? "split" });
   for (let i = 0; i < saved.length; i++) {
@@ -2982,7 +3055,7 @@ async function boot(): Promise<void> {
     renderAll();
   }
   if (isPrimaryNativeWindow) {
-    await restoreDrafts({ openDraft, host: document.getElementById("app")! });
+    await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }
 }
 
@@ -3002,6 +3075,5 @@ void initNativeFileDrop().catch((error) => {
 void boot();
 
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-  if (currentSettings.theme === "system") { applySettings(currentSettings);
-  setTableFormatting(currentSettings.tables.formatOnEdit); renderAll(); }
+  if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }
 });

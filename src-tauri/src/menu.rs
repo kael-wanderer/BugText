@@ -101,6 +101,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let save_as = MenuItemBuilder::with_id("file.save_as", "Save As…")
         .accelerator("CmdOrCtrl+Shift+S")
         .build(app)?;
+    let recover = MenuItemBuilder::with_id("file.recover", "Recover Unsaved Documents…").build(app)?;
     let close = MenuItemBuilder::with_id("file.close", "Close Tab")
         .accelerator("CmdOrCtrl+W")
         .build(app)?;
@@ -128,6 +129,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&save)
         .item(&save_as)
+        .item(&recover)
         .item(&export)
         .separator()
         .item(&close)

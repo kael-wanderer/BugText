@@ -15,11 +15,11 @@ mod mcp_server;
 mod menu;
 mod native_windows;
 mod pdf_drafts;
-mod update_feed;
 mod preview;
 mod recovery;
 mod sandbox;
 mod secrets;
+mod update_feed;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -249,6 +249,9 @@ pub fn run() {
             recovery::recovery_write_draft,
             recovery::recovery_clear_draft,
             recovery::recovery_list_drafts,
+            recovery::recovery_discard_draft,
+            recovery::recovery_list_discarded,
+            recovery::recovery_restore_discarded,
             recovery::file_stat,
             recovery::recovery_save_snapshot,
             recovery::recovery_save_snapshot_labeled,

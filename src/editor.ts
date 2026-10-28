@@ -53,6 +53,7 @@ export type EditorHandle = {
   setDocumentKind(id: string, kind: EditorDocumentKind): void;
   applyMarkdownFormat(format: MarkdownFormat): void;
   getText(id: string): string;
+  revision(id: string): number;
   applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
@@ -198,6 +199,8 @@ function languageExtension(kind: EditorDocumentKind): Extension {
   return [markdown({ codeLanguages: languages }), tableKeymap()];
 }
 
+const revisions = new Map<string, number>();
+
 export function createEditor(
   parent: HTMLElement,
   onChange: (id: string, text: string) => void,
@@ -207,6 +210,10 @@ export function createEditor(
   onPasteText: PasteTextHandler = () => null,
 ): EditorHandle {
   const states = new Map<string, EditorState>();
+  const changed = (id: string, text: string): void => {
+    revisions.set(id, (revisions.get(id) ?? 0) + 1);
+    onChange(id, text);
+  };
   let activeId: string | null = null;
   let softWrapMode: SoftWrapMode = "window";
   let wrapColumn = 80;
@@ -270,7 +277,7 @@ export function createEditor(
       },
     }),
     EditorView.updateListener.of((update) => {
-      if (update.docChanged) onChange(id, update.state.doc.toString());
+      if (update.docChanged) changed(id, update.state.doc.toString());
       if (update.docChanged || update.selectionSet) reportCursor(update.state);
     }),
   ];
@@ -352,6 +359,7 @@ export function createEditor(
       });
       view.focus();
     },
+    revision(id) { return revisions.get(id) ?? 0; },
     getText(id) {
       if (id === activeId) return view.state.doc.toString();
       return states.get(id)?.doc.toString() ?? "";
@@ -365,7 +373,7 @@ export function createEditor(
       if (!state) return;
       const updated = agentChangeTransaction(state, changes).state;
       states.set(id, updated);
-      onChange(id, updated.doc.toString());
+      changed(id, updated.doc.toString());
     },
     getSelection() {
       const selection = view.state.selection.main;
@@ -406,7 +414,7 @@ export function createEditor(
       }
       const updated = state.update(spec).state;
       states.set(id, updated);
-      onChange(id, updated.doc.toString());
+      changed(id, updated.doc.toString());
     },
     setText(text) {
       view.dispatch({
@@ -420,12 +428,9 @@ export function createEditor(
       }
       const state = states.get(id);
       if (!state) return;
-      states.set(
-        id,
-        state.update({
-          changes: { from: 0, to: state.doc.length, insert: text },
-        }).state,
-      );
+      const transaction = state.update({ changes: { from: 0, to: state.doc.length, insert: text } });
+      states.set(id, transaction.state);
+      if (transaction.docChanged) changed(id, transaction.state.doc.toString());
     },
     setSoftWrap(on) {
       softWrapMode = on ? "window" : "off";
@@ -491,7 +496,7 @@ export function createEditor(
       }
       const updated = state.update({ changes: change, userEvent: "input.task" }).state;
       states.set(id, updated);
-      onChange(id, updated.doc.toString());
+      changed(id, updated.doc.toString());
       return true;
     },
     tableContext() {

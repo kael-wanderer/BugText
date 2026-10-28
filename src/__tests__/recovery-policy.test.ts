@@ -110,3 +110,16 @@ describe("snapshot policy", () => {
     expect(snapshotsToPrune(entries, now)).toHaveLength(10);
   });
 });
+
+describe("draftState", () => {
+  it("classifies disk and open-buffer states", async () => {
+    const { draftState } = await import("../recovery-policy");
+    const record = draft({ updatedAt: 100, contents: "draft" });
+    expect(draftState(record, { mtimeMs: 50, size: 3 }, "disk", null)).toBe("Newer than file");
+    expect(draftState(record, { mtimeMs: 150, size: 3 }, "disk", null)).toBe("File changed after draft");
+    expect(draftState(record, { mtimeMs: 150, size: 3 }, "draft", null)).toBe("Same as file");
+    expect(draftState(record, null, null, null)).toBe("File missing");
+    expect(draftState({ ...record, path: null }, null, null, null)).toBe("New document");
+    expect(draftState(record, null, null, { dirty: true, text: "other" })).toBe("Already open, unsaved");
+  });
+});
