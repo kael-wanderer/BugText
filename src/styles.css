@@ -3356,3 +3356,12 @@ body.settings-active #outline-panel { visibility: hidden; pointer-events: none; 
 .app-toast button { pointer-events: auto; border: 0; color: var(--accent); background: transparent; font: inherit; cursor: pointer; }
 .recovery-state { color: var(--accent); white-space: nowrap; }
 .recovery-sheet td:nth-child(3) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, monospace); color: var(--muted); }
+
+.search-progress:not([hidden]) { display: flex; align-items: center; gap: 6px; margin: 0 12px 6px; padding: 6px; border: 1px solid var(--border); border-radius: 5px; font-size: 11px; }
+.search-progress span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.search-progress progress { width: 35px; accent-color: var(--accent); }
+.search-progress button { font: inherit; cursor: pointer; }
+.search-note { padding: 0 12px 4px; color: var(--muted); font-size: 11px; }
+.search-note ul { padding-left: 16px; }
+.search-error { color: var(--error, #c45b50); }
+.search-input[aria-invalid="true"] { border-color: var(--error, #c45b50); }

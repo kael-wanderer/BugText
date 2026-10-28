@@ -2583,6 +2583,7 @@ function setSearchActive(on: boolean): void {
   button.setAttribute("aria-pressed", String(on));
   if (on) showExplorerColumn();
   requestWindowMeasure();
+  if (!on) searchPanel.cancel();
   if (on) {
     searchPanel.focus();
     searchPanel.refresh();
@@ -2764,7 +2765,10 @@ subscribe(() => {
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
     aiPanel?.resetWorkspaceContext();
-    void refreshFileList();
+    searchPanel.cancel();
+    void refreshFileList().then(() => {
+      if (getState().folder === s.folder && document.body.classList.contains("search-active")) searchPanel.refresh();
+    });
   }
   ui = {
     ...ui,
