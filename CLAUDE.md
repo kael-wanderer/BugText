@@ -125,6 +125,16 @@ Recover Unsaved Documents… open a per-document review with comparisons; discar
 to a seven-day store and can be brought back. Restores remain unsaved until explicitly
 saved, and closing the review leaves undecided drafts in place.
 
+Templates are `.md` files in one configurable folder (`settings.templates`; default
+`<app config dir>/templates`, seeded once with three starters). An optional first-line
+`<!-- template folder: … name: … -->` comment picks the folder and file name, and
+`{{title}} {{date}} {{time}} {{weekday}} {{year}} {{month}} {{day}} {{cursor}}` are plain
+substitution (`src/templates/placeholders.ts`, `plan.ts`). New from Template (⌥⌘N) and Quick
+Note (⌃⌘N, in-app only) create and append through `templates.rs`, which confines every path
+to the open folder (symlinks included), creates with create-new semantics and numbers
+collisions (" 2", " 3"). Quick Note edits an open tab's buffer in one undo step instead of
+writing behind it. Template names, titles and contents render with `textContent` only.
+
 The Outline sidebar follows the focused window's Markdown tab and shares its heading
 scanner with the command palette. Preview block `data-line` anchors support heading
 jumps, place preservation and optional Sync Scroll between editor and preview; the

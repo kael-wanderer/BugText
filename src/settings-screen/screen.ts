@@ -67,6 +67,13 @@ export type ScreenDeps = AiPageDeps & {
   onOpenSettingsFile: () => void;
   onOpenAISettingsFile: () => void;
   onCheckForUpdates: () => void;
+  /** Template folder helpers; absent in contexts that cannot reach the app. */
+  templates?: {
+    resolveFolder: (custom: string) => Promise<string>;
+    chooseFolder: () => Promise<string | null>;
+    openFolder: () => Promise<void>;
+    newTemplate: () => Promise<void>;
+  };
 } & {
   getActiveTabName(): string | null;
   getAppVersion(): Promise<string>;

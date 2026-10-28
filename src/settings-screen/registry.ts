@@ -45,7 +45,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 /** One-line description under each page title. */
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
-  editing: "How lines wrap, how tables behave and where pasted images go.",
+  editing: "How lines wrap, how tables behave, where pasted images go, and where templates and quick notes live.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -152,6 +152,12 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Pasted image name",
     keywords: "images paste screenshot file name",
   },
+  { id: "templates-folder", page: "editing", label: "Templates folder", keywords: "templates new from template note folder choose reset" },
+  { id: "templates-default-folder", page: "editing", label: "Default folder for new notes", keywords: "templates new note folder location" },
+  { id: "templates-date-format", page: "editing", label: "Date format", keywords: "templates date placeholder year month day" },
+  { id: "quick-note-target", page: "editing", label: "Quick notes go to", keywords: "quick note capture daily journal inbox" },
+  { id: "quick-note-inbox", page: "editing", label: "Inbox file", keywords: "quick note capture inbox" },
+  { id: "templates-manage", page: "editing", label: "Manage templates", keywords: "templates open folder new template" },
   {
     id: "image-drop-mode",
     page: "editing",

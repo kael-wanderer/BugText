@@ -1,6 +1,7 @@
 import { button, caption, clampStep, pageHeader, row, segmented, select, stepper, textInput, toggle } from "./controls";
 import { validImageFolder } from "../image-insert";
 import type { SettingsPage } from "./screen";
+import { templatesRows } from "./templates-section";
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
 
 export type Zone = "explorer" | "main" | "sub";
@@ -112,6 +113,7 @@ export const editingPage: SettingsPage = {
           (dropMode) => setImages(deps, { dropMode }),
         ),
       ),
+      ...templatesRows(deps),
     );
   },
 };

@@ -8,6 +8,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- New from Template (⌥⌘N, File menu, ⌘K and the Explorer context menu): pick a template, type a title, and get a dated, named note in the right folder with the cursor ready. Three starter templates are created on first use.
+- Quick Note (⌃⌘N): add a timestamped line to today's daily note or an inbox file without leaving your document.
+- Templates settings under Settings ▸ Editing: templates folder, default folder, date format, and where quick notes go.
 - Folder search shows text results first, PDF progress and Stop, and notes for limits and skipped files.
 - Review unsaved documents individually after a crash, compare each with its file,
   and restore or discard selected drafts. A launch strip offers Review, Restore all,

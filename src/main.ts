@@ -153,6 +153,7 @@ import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert
 import { createNoteImages } from "./note-images";
 import { showToast } from "./toast";
 import { createTemplateActions } from "./templates/actions";
+import { templatesFolder } from "./templates/library";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
 import { tableFromClipboard } from "./table-paste";
 import { setTableFormatting } from "./table-keys";
@@ -2515,6 +2516,12 @@ const settingsScreen = createSettingsScreen(
     onAISettingsChange: saveAISettingsFromPanel,
     onOpenSettingsFile: openSettings,
     onOpenAISettingsFile: openAISettings,
+    templates: {
+      resolveFolder: templatesFolder,
+      chooseFolder: pickFolder,
+      openFolder: () => templateActions.openTemplatesFolder(),
+      newTemplate: () => templateActions.newTemplate(),
+    },
     onCheckForUpdates: () => void checkForUpdates(),
     getActiveTabName: () => activeMeta()?.name ?? null,
     getAppVersion: async () => {

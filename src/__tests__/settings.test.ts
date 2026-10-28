@@ -180,3 +180,18 @@ describe("table settings", () => {
     expect(parseSettings('{"tables":7}').tables).toEqual({ formatOnEdit: true, pasteAsTable: true });
   });
 });
+
+describe("templates settings", () => {
+  const defaults = { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" };
+
+  it("defaults when missing or malformed", () => {
+    expect(parseSettings("{}").templates).toEqual(defaults);
+    expect(parseSettings('{"templates":7}').templates).toEqual(defaults);
+  });
+
+  it("falls back per field", () => {
+    const parsed = parseSettings('{"templates":{"folder":" /x ","dateFormat":"DD-MM-YYYY","quickTarget":"nope","inboxFile":"","lastUsed":4}}').templates;
+    expect(parsed).toEqual({ ...defaults, folder: "/x", dateFormat: "DD-MM-YYYY" });
+  });
+});
+
