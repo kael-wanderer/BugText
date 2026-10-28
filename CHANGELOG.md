@@ -6,9 +6,15 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- Review unsaved documents individually after a crash, compare each with its file,
+  and restore or discard selected drafts. A launch strip offers Review, Restore all,
+  and Later; discarded drafts can be brought back for seven days or undone from a toast.
+
 ### Fixed
 
-- Saves stay bound to the document and revision that started them, so edits made during a save remain unsaved and recoverable. Switching panes or saving through MCP no longer replaces another tab’s state.
+- Saves stay bound to the document and revision that started them, so edits made during a save remain unsaved and recoverable. Switching panes or saving through MCP no longer replaces another tab’s state. Restoring onto an open tab marks it unsaved, and the recovery strip no longer covers sidebar headers.
 
 ## [0.4.0] - 2026-10-28
 
