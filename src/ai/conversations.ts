@@ -23,8 +23,10 @@ export async function migrateHistory(historyKey: string, legacyHistoryKey?: stri
   const keys = [...new Set([historyKey, legacyHistoryKey].filter((key): key is string => !!key))];
   const key = keys.find(key => storage.getItem(key) !== null);
   if (!key) return null;
-  const parsed: unknown = JSON.parse(storage.getItem(key)!);
-  if (!Array.isArray(parsed)) throw new Error("Invalid earlier chat");
+  let parsed: unknown;
+  try { parsed = JSON.parse(storage.getItem(key)!); } catch { return null; }
+  // Unreadable old history is left in place rather than blocking Chat.
+  if (!Array.isArray(parsed)) return null;
   const messages: ConversationMessage[] = parsed.filter(m => m && ["user", "assistant", "system"].includes(m.role) && typeof m.content === "string").map(m => ({ role: m.role, text: m.content, time: Date.now() }));
   if (!messages.length) return null;
   // A deterministic id makes retrying a successful write with a failed key removal safe.

@@ -411,7 +411,7 @@ export function createAIPanel(
   }
   async function send(): Promise<void> {
     await historyReady;
-    if (migrationFailed) { appendBubble("error", "Could not migrate earlier chat. Please reopen the panel to retry."); return; }
+    if (migrationFailed) { migrationFailed = false; appendBubble("system", "Earlier chat could not be moved yet; it stays in place and is retried next launch."); }
     if (activeRequest) {
       activeRequest.abort();
       return;

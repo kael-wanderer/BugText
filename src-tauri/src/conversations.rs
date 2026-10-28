@@ -103,9 +103,16 @@ fn list(dir: &Path) -> Result<Vec<Entry>, String> {
         {
             continue;
         }
-        safe(&path)?;
-        let json = fs::read_to_string(&path).map_err(|_| "Cannot read conversation")?;
-        entries.push(entry(id, &json)?);
+        // One unreadable or hand-broken file must not hide every other conversation.
+        if safe(&path).is_err() {
+            continue;
+        }
+        let Ok(json) = fs::read_to_string(&path) else {
+            continue;
+        };
+        if let Ok(item) = entry(id, &json) {
+            entries.push(item);
+        }
     }
     entries.sort_by_key(|e| std::cmp::Reverse(e.updated_at));
     Ok(entries)
@@ -245,6 +252,15 @@ mod tests {
         ));
         fs::create_dir_all(&p).unwrap();
         p
+    }
+    #[test]
+    fn list_skips_a_broken_conversation() {
+        let dir = temp();
+        let good = r#"{"id":"good","title":"T","updatedAt":2,"messages":[]}"#;
+        write(&dir, "good", good).unwrap();
+        fs::write(dir.join("bad.json"), "{").unwrap();
+        let ids: Vec<String> = list(&dir).unwrap().into_iter().map(|e| e.id).collect();
+        assert_eq!(ids, vec!["good".to_string()]);
     }
     #[test]
     fn ids_and_canonical_folder_are_stable() {

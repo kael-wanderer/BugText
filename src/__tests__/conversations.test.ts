@@ -12,3 +12,7 @@ it("migrates history to No folder and removes only after successful write", asyn
   const write = vi.fn(async () => {}); const result = await migrateHistory("window", "window", storage, write);
   expect(write).toHaveBeenCalledWith(null, expect.objectContaining({ title: "Earlier chat", messages: [expect.objectContaining({ text: "Old question" })] })); expect(storage.removeItem).toHaveBeenCalledWith("window"); expect(result?.id).toBeTruthy();
 });
+it("leaves unreadable old history in place without failing", async () => {
+  const storage = { getItem: vi.fn(() => "{broken"), removeItem: vi.fn() }; const write = vi.fn(async () => {});
+  expect(await migrateHistory("window", "window", storage, write)).toBeNull(); expect(write).not.toHaveBeenCalled(); expect(storage.removeItem).not.toHaveBeenCalled();
+});
