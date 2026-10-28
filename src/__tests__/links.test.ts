@@ -21,9 +21,9 @@ describe("note links", () => {
     expect(source.slice(link.start, link.end)).toBe("x.md");
   });
   it("generates Unicode anchors and avoids duplicate and suffix collisions", () => {
-    const values = ["Notes", "Notes", "Notes-1", "Héllo **World**!"];
+    const values = ["Notes", "Notes", "Notes-1", "Héllo **World**!", "snake_case Title"];
     expect(headingAnchors(values.map((text, i) => ({ text, line: i + 1, level: 2 }))).map((h) => h.anchor))
-      .toEqual(["notes", "notes-1", "notes-1-1", "héllo-world"]);
+      .toEqual(["notes", "notes-1", "notes-1-1", "héllo-world", "snake_case-title"]);
   });
   it("formats relative targets and wraps spaces and parentheses", () => {
     expect(formatLinkTarget("/root/notes/a.md", "/root/meetings/Retro.md", "actions")).toBe("../meetings/Retro.md#actions");

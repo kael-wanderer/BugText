@@ -6,6 +6,7 @@ mod defaults;
 mod dock_icon;
 mod export;
 mod files;
+mod links;
 mod macos_dock;
 mod mcp_bridge;
 mod mcp_clients;
@@ -251,6 +252,8 @@ pub fn run() {
             assets::copy_note_image,
             assets::copy_note_images,
             files::list_files_recursive,
+            links::scan_note_links,
+            links::scan_note_links_for,
             files::search_in_folder,
             files::search_cancel,
             files::get_settings,

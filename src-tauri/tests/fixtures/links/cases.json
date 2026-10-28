@@ -1,0 +1,70 @@
+[
+  {
+    "name": "inline and references",
+    "source": "# Title\n[a](b.md) [b](<with spaces.md>)\n[id]: ref.md",
+    "links": [
+      {
+        "target": "b.md",
+        "line": 2,
+        "start": 12,
+        "end": 16,
+        "text": "a"
+      },
+      {
+        "target": "with spaces.md",
+        "line": 2,
+        "start": 23,
+        "end": 37,
+        "text": "b"
+      },
+      {
+        "target": "ref.md",
+        "line": 3,
+        "start": 46,
+        "end": 52,
+        "text": "id"
+      }
+    ],
+    "headings": [
+      {
+        "text": "Title",
+        "level": 1,
+        "line": 1
+      }
+    ]
+  },
+  {
+    "name": "code and escaped",
+    "source": "---\nx: [a](x.md)\n---\n```md\n[a](x.md)\n```\n\n    [a](x.md)\n\n`[a](x.md)` ![a](x.md) \\[a](x.md) <!-- [a](x.md) --> [ok](yes.md)",
+    "links": [
+      {
+        "target": "yes.md",
+        "line": 10,
+        "start": 115,
+        "end": 121,
+        "text": "ok"
+      }
+    ],
+    "headings": []
+  },
+  {
+    "name": "unicode and balanced",
+    "source": "😀 [name](a(b).md)\nNotes\n-----",
+    "links": [
+      {
+        "target": "a(b).md",
+        "line": 1,
+        "start": 10,
+        "end": 17,
+        "text": "name"
+      }
+    ],
+    "headings": [
+      {
+        "text": "Notes",
+        "level": 2,
+        "line": 2
+      }
+    ]
+  }
+]

@@ -74,7 +74,7 @@ export function noteLinks(source: string): NoteLink[] {
 export function headingAnchors(headings: OutlineHeading[]): (OutlineHeading & { anchor: string })[] {
   const used = new Set<string>();
   return headings.map((heading) => {
-    const base = plainHeadingText(heading.text).toLowerCase().replace(/[^\p{L}\p{N} -]/gu, "").replace(/ /g, "-");
+    const base = plainHeadingText(heading.text).toLowerCase().replace(/[^\p{L}\p{N} _-]/gu, "").replace(/ /g, "-");
     let anchor = base;
     for (let suffix = 1; used.has(anchor); suffix++) anchor = `${base}-${suffix}`;
     used.add(anchor);

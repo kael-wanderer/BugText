@@ -1,3 +1,4 @@
+import { createLinkIndex } from "./links/index";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -162,6 +163,7 @@ import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex();
+const linkIndex = createLinkIndex();
 
 const windowsHost = document.getElementById("windows")!;
 
@@ -182,6 +184,7 @@ let ui = { ...startupUi, aiVisible: false };
 let outlineKey = "";
 const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus());
 function updateOutline(force = false): void {
+  linkIndex.setFolder(getState().folder);
   const tab = activeMeta();
   const key = `${getState().activeWindowId}:${tab?.id ?? ""}`;
   if (force || key !== outlineKey) {
@@ -268,6 +271,7 @@ const mcpHandler = createMcpHandler({
       await invoke<void>("save_file", { path, contents: text });
       await recordStat(path);
       workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
       aiPanel?.updateWorkspaceFile(path, text);
       await finishBoundSave(binding, path);
     });
@@ -276,6 +280,7 @@ const mcpHandler = createMcpHandler({
   writeDiskAtomic: async (path, text) => {
     await invoke<void>("write_file_atomic", { path, contents: text });
     workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
   },
   exists: async (path) => {
     try { await invoke("file_stat", { path }); return true; } catch { return false; }
@@ -1417,6 +1422,7 @@ const templateActions = createTemplateActions({
   afterDiskWrite: (path) => {
     void invoke<string>("read_file", { path }).then((text) => {
       workspaceIndex.onFileChanged(path, text);
+      linkIndex.onFileChanged(path, text);
       aiPanel?.updateWorkspaceFile(path, text);
     }).catch(() => {});
   },
@@ -1713,6 +1719,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       } catch {
         continue;
       }
+      linkIndex.onFileChanged(tab.path, text);
       if (text === view.editor.getText(tab.id)) continue;
       // The read is async; an edit made meanwhile must not be replaced.
       if (isTabDirty(windowState.id, tab.id)) continue;
