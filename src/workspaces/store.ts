@@ -63,6 +63,25 @@ export async function saveWorkspaces(io: WorkspacesIO, file: WorkspacesFile): Pr
   if (!parseWorkspaces(contents)) throw new Error("Invalid workspaces");
   await io.write(contents); io.broadcast();
 }
+/**
+ * Applies a change to the file as it is on disk now, so one window's auto-save never overwrites
+ * another window's rename, pin or save made since this window last loaded the list.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+export function updateWorkspaces(io: WorkspacesIO, change: (file: WorkspacesFile) => WorkspacesFile): Promise<WorkspacesFile> {
+  const run = queue.then(async () => {
+    const existing = await io.read();
+    const current = existing === null ? { version: 1 as const, workspaces: [], reopen: [] } : parseWorkspaces(existing);
+    if (!current) throw new Error("workspaces.json could not be read");
+    const next = change(structuredClone(current));
+    const contents = JSON.stringify(next, null, 2);
+    if (!parseWorkspaces(contents)) throw new Error("Invalid workspaces");
+    await io.write(contents); io.broadcast();
+    return next;
+  });
+  queue = run.catch(() => {});
+  return run;
+}
 export function workspacesIO(windowLabel: string): WorkspacesIO {
   return {
     read: () => invoke<string | null>("read_workspaces"),

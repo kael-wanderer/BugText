@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { parseWorkspaces, loadWorkspaces, saveWorkspaces, workspacesIO, type WorkspacesFile } from "../workspaces/store";
+import { parseWorkspaces, loadWorkspaces, saveWorkspaces, updateWorkspaces, workspacesIO, type WorkspacesFile } from "../workspaces/store";
 import type { WorkspaceLayout } from "../workspaces/layout";
 import { shouldReload } from "../settings-sync";
 import { invoke } from "@tauri-apps/api/core";
@@ -41,4 +41,21 @@ it("uses fixed commands and the workspaces settings event", async () => {
   await saveWorkspaces(io, file()); expect(invoke).toHaveBeenCalledWith("read_workspaces"); expect(invoke).toHaveBeenCalledWith("write_workspaces", { contents: expect.any(String) });
   expect(emit).toHaveBeenCalledWith("bugtext://settings-changed", { file: "workspaces", from: "main" });
   expect(shouldReload({ file: "workspaces", from: "other" }, "main")).toBe("workspaces"); expect(shouldReload({ file: "workspaces", from: "main" }, "main")).toBeNull();
+});
+it("updates the file as it is on disk, keeping other windows' changes", async () => {
+  let disk = JSON.stringify(file());
+  const io = { read: async () => disk, write: async (text: string) => { disk = text; }, broadcast: vi.fn() };
+  const stale = file();
+  const renamed = file(); renamed.workspaces[0].name = "Renamed elsewhere"; disk = JSON.stringify(renamed);
+  await Promise.all([
+    updateWorkspaces(io, current => { current.workspaces[0].openedAt = 999; return current; }),
+    updateWorkspaces(io, current => { current.workspaces[0].pinned = false; return current; }),
+  ]);
+  const saved = parseWorkspaces(disk)!;
+  expect(stale.workspaces[0].name).toBe("Book");
+  expect(saved.workspaces[0]).toMatchObject({ name: "Renamed elsewhere", openedAt: 999, pinned: false });
+  expect(io.broadcast).toHaveBeenCalledTimes(2);
+  disk = "{";
+  await expect(updateWorkspaces(io, current => current)).rejects.toThrow("could not be read");
+  expect(disk).toBe("{");
 });
