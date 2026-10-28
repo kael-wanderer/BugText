@@ -38,6 +38,7 @@ export type ExplorerActions = {
   onNewFromTemplate?: (directory: string) => void;
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
+  onBeforePathChange?: () => Promise<void>;
   onRefresh?: () => void;
   isShowingHidden?: () => boolean;
   onToggleHidden?: () => void;
@@ -273,6 +274,7 @@ export function startRename(path: string, currentName: string): void {
   promptInline(nameCell, currentName, async (name) => {
     const nextPath = joinPath(parentPath(path), name);
     if (nextPath === path) return;
+    await explorerActions.onBeforePathChange?.();
     await renamePath(path, nextPath);
     if (activePath === path) {
       activePath = nextPath;
@@ -310,6 +312,7 @@ async function moveInto(sourcePath: string, targetDir: string): Promise<void> {
   const nextPath = resolveMove(sourcePath, targetDir);
   if (!nextPath) return;
   const sourceParent = parentPath(sourcePath);
+  await explorerActions.onBeforePathChange?.();
   await renamePath(sourcePath, nextPath);
   if (activePath === sourcePath) {
     activePath = nextPath;

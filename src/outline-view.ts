@@ -2,11 +2,21 @@
 import { glyphs } from "./glyphs";
 import type { OutlineHeading } from "./outline";
 
-export function createOutlineView(host: HTMLElement, jump: (line: number) => void, escape: () => void) {
+export function createOutlineView(host: HTMLElement, jump: (line: number) => void, escape: () => void, onTab: (tab: "outline" | "links") => void = () => {}) {
   const header = document.createElement("div");
   header.className = "explorer-title outline-header";
   const title = document.createElement("span");
-  title.textContent = "OUTLINE";
+  const outlineTab = document.createElement("button"); outlineTab.textContent = "Outline";
+  const linksTab = document.createElement("button"); linksTab.textContent = "Links";
+  title.className = "outline-tabs"; title.append(outlineTab, linksTab);
+  const linksHost = document.createElement("div"); linksHost.className = "links-panel"; linksHost.hidden = true;
+  function selectTab(tab: "outline" | "links") {
+    const links = tab === "links";
+    filter.hidden = links; tree.hidden = links; actions.hidden = links; linksHost.hidden = !links;
+    outlineTab.setAttribute("aria-pressed", String(!links)); linksTab.setAttribute("aria-pressed", String(links));
+    onTab(tab);
+  }
+  outlineTab.onclick = () => selectTab("outline"); linksTab.onclick = () => selectTab("links");
   const iconButton = (label: string, glyph: string): HTMLButtonElement => {
     const button = document.createElement("button");
     button.type = "button";
@@ -28,7 +38,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
   const tree = document.createElement("div");
   tree.className = "outline-tree";
   tree.setAttribute("role", "tree");
-  host.append(header, filter, tree);
+  host.append(header, filter, tree, linksHost);
   const collapsed = new Map<string, Set<number>>();
   let key = "";
   let headings: OutlineHeading[] = [];
@@ -110,6 +120,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
     event.preventDefault();
   });
   return {
+    linksHost, selectTab,
     update(documentKey: string, items: OutlineHeading[], isMarkdown: boolean) {
       key = documentKey; headings = items; markdown = isMarkdown;
       parents = []; children = Array(items.length).fill(false);

@@ -4,12 +4,12 @@ import { headingAnchors, noteLinks, type NoteLink } from "./parse";
 import { resolveLink } from "./resolve";
 
 export type IndexedNote = { path: string; source: string; links: NoteLink[]; headings: OutlineHeading[] };
-export type LinkScan = { notes: IndexedNote[]; skipped: string[] };
+export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string> };
 export type LinkIndex = ReturnType<typeof createLinkIndex>;
 export function parseNote(path: string, source: string): IndexedNote {
   return { path, source, links: noteLinks(source), headings: markdownOutline(source) };
 }
-export function createLinkIndex(scan = (folder: string, paths?: string[]) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths })) {
+export function createLinkIndex(scan = (folder: string, paths?: string[], known?: Record<string, string>) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known })) {
   let folder: string | null = null;
   let generation = 0;
   let ready = false;
@@ -17,6 +17,9 @@ export function createLinkIndex(scan = (folder: string, paths?: string[]) => inv
   let notes = new Map<string, IndexedNote>();
   let pending = new Map<string, string | null>();
   let skipped: string[] = [];
+  let stamps: Record<string, string> = {};
+  let refreshing = false;
+  const versions = new Map<string, number>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const contains = (path: string) => folder !== null && path.startsWith(folder.replace(/\/$/, "") + "/");
@@ -26,7 +29,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[]) => inv
   }
   function setFolder(next: string | null) {
     if (folder === next) return;
-    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; notify();
+    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; refreshing = false; versions.clear(); notify();
   }
   async function ensure(next = folder): Promise<void> {
     setFolder(next);
@@ -36,6 +39,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[]) => inv
       const root = folder;
       const promise = scan(root).then((result) => {
         if (current !== generation) return;
+        stamps = result.stamps ?? {};
         notes = new Map(result.notes.map((note) => [note.path, note])); skipped = result.skipped;
         for (const [path, text] of pending) apply(path, text);
         pending.clear(); ready = true; notify();
@@ -46,6 +50,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[]) => inv
   }
   function onFileChanged(path: string, text: string | null) {
     if (!contains(path)) return;
+    versions.set(path, (versions.get(path) ?? 0) + 1);
     if (building) pending.set(path, text);
     if (ready) { apply(path, text); notify(); }
   }
@@ -60,6 +65,19 @@ export function createLinkIndex(scan = (folder: string, paths?: string[]) => inv
   }
   return {
     ensure, setFolder, onFileChanged, outgoing,
+    async refresh() {
+      if (!folder || !ready || refreshing) return;
+      refreshing = true;
+      const current = generation; const before = new Map(versions);
+      try {
+        const result = await scan(folder, undefined, stamps);
+        if (current !== generation) return;
+        const next = result.stamps ?? {};
+        for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) notes.delete(path);
+        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) notes.set(note.path, note);
+        stamps = next; skipped = result.skipped; notify();
+      } finally { if (current === generation) refreshing = false; }
+    },
     onFileRemoved: (path: string) => onFileChanged(path, null),
     async rescan(paths: string[]) {
       if (!folder || (!ready && !building)) return;
