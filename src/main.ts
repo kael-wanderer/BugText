@@ -482,7 +482,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       syncViewMenu();
       requestWindowMeasure();
       if (themeChanged) renderAll();
-    } else {
+    } else if (file === "agent") {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
       if (!next) return;

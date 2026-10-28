@@ -259,6 +259,8 @@ pub fn run() {
             files::search_cancel,
             files::get_settings,
             files::get_ai_settings,
+            files::read_ai_actions,
+            files::write_ai_actions,
             recovery::recovery_write_draft,
             recovery::recovery_clear_draft,
             recovery::recovery_list_drafts,

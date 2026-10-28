@@ -60,7 +60,7 @@ describe("per-feature engines", () => {
     vi.mocked(streamChat).mockClear();
     const append = vi.fn(() => bubble());
     await runQuickAction(QUICK_ACTIONS[0], {...baseDeps(), getSettings: () => ({...DEFAULT_AI_SETTINGS, uses: {proofread: {engine: {kind: "none"}, model: "", effort: ""}}}), appendBubble: append});
-    expect(append).toHaveBeenCalledWith("system", "Choose an engine for Proofread in Settings ▸ AI ▸ Use for.");
+    expect(append).toHaveBeenCalledWith("system", "Choose an engine for Proofread in Settings ▸ AI ▸ Actions.");
     expect(streamChat).not.toHaveBeenCalled();
   });
 });
@@ -175,5 +175,20 @@ describe("runQuickAction", () => {
     const [base, , binding] = review.mock.calls[0];
     expect(base).toBe("hello world");
     expect(binding).toMatchObject({ from: 0, to: "hello world".length, selection: "" });
+  });
+});
+
+describe("saved action runner", () => {
+  const action = { id: "custom", name: "Extract", instruction: "Extract tasks", result: "answer" as const, input: "selection-or-note" as const, engine: null, panel: true };
+  it("sends only selected input and labels the answer", async () => {
+    const append = vi.fn(() => bubble());
+    await runQuickAction(action, { ...baseDeps(), appendBubble: append });
+    expect(append).toHaveBeenCalledWith("user", "▸ Extract · on selection (1 lines)");
+    expect(streamChat).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.any(Array), expect.any(Function), expect.objectContaining({ folder: null, write: false }));
+  });
+  it("reviews a whole-note edit", async () => {
+    const review = vi.fn();
+    await runQuickAction({ ...action, result: "edit", input: "note" }, { ...baseDeps(), reviewEdit: review });
+    expect(review).toHaveBeenCalledWith("hello world", "REVISED", expect.objectContaining({ from: 0, to: 11 }));
   });
 });
