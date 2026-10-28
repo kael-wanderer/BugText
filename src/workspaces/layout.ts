@@ -61,3 +61,13 @@ export function planRestore(
     missingFiles: [...missingFiles], missingFolder,
   };
 }
+
+export function sessionLayout(ui: UIState): WorkspaceLayout {
+  return {
+    panes: ui.windows.map(pane => ({ files: pane.files.map(file => ({ ...file })), active: pane.activePath, mode: pane.mode })),
+    activePane: ui.activeWindowIndex === 1 && ui.windows.length > 1 ? 1 : 0,
+    splitRatio: ui.splitRatio,
+    sidebar: { visible: ui.explorerVisible, view: ui.sidebarView ?? "explorer", outlineTab: ui.outlineTab ?? "outline", width: ui.explorerWidth },
+    aiVisible: ui.aiVisible,
+  };
+}

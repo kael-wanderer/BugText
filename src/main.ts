@@ -1,3 +1,6 @@
+import { captureLayout, sessionLayout } from "./workspaces/layout";
+import { createPositionTracker } from "./workspaces/positions";
+import { restoreLayout } from "./workspaces/restore";
 import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
 import { runnableActions } from "./ai/actions";
 import { appConfigDir, join } from "@tauri-apps/api/path";
@@ -238,9 +241,23 @@ const cleanReloads = new Set<string>();
 const recoveredDraftIds = new Map<string, string>();
 const AUTO_REFRESH_MS = 3_000;
 
-function persistUiState(): void {
-  if (isPrimaryNativeWindow) saveState(ui);
+let sessionReady = false;
+let persistTimer: number | undefined;
+const readingPositions = createPositionTracker(persistUiState);
+function flushUiState(): void {
+  if (!isPrimaryNativeWindow || !sessionReady) return;
+  for (const view of views.values()) view.captureReadingPosition();
+  const layout = captureLayout(getState(), ui, readingPositions.snapshot());
+  ui.windows = layout.panes.map(pane => ({ files: pane.files, activePath: pane.active, mode: pane.mode }));
+  saveState(ui);
 }
+function persistUiState(): void {
+  if (!isPrimaryNativeWindow || !sessionReady) return;
+  window.clearTimeout(persistTimer);
+  persistTimer = window.setTimeout(flushUiState, 300);
+}
+window.addEventListener("pagehide", flushUiState);
+window.addEventListener("beforeunload", flushUiState);
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -700,6 +717,8 @@ const handlers = {
       renderAll();
     }
   },
+  getReadingPosition: (id: string) => readingPositions.get(id),
+  onReadingPosition: (id: string, position: import("./workspaces/layout").FilePosition) => readingPositions.remember(id, position),
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
@@ -1003,7 +1022,7 @@ function activateTab(windowId: string, tabId: string): void {
   setState({ activeWindowId: windowId });
   patchWindow(windowId, { activeTabId: tabId });
   const v = views.get(windowId)!;
-  v.editor.switchTo(tabId);
+  v.activateDocument(tabId);
   const text = v.editor.getText(tabId);
   const tab = getWindow(windowId)?.tabs.find((item) => item.id === tabId);
   const windowState = getWindow(windowId);
@@ -1018,6 +1037,7 @@ function activateTab(windowId: string, tabId: string): void {
   syncExplorerActivePath();
   renderAll();
   v.focus();
+  void v.restoreReadingPosition();
   void checkActiveForExternalChange(windowId);
 }
 
@@ -2214,13 +2234,14 @@ async function moveTabToWindow(
     tabId,
     source.activeTabId,
   );
+  sourceView.captureReadingPosition();
   sourceView.editor.closeState(tabId);
   patchWindow(sourceId, {
     tabs: source.tabs.filter((candidate) => candidate.id !== tabId),
     activeTabId: sourceNext,
   });
   if (sourceNext) {
-    sourceView.editor.switchTo(sourceNext);
+    sourceView.activateDocument(sourceNext);
     const nextTab = getWindow(sourceId)?.tabs.find(
       (candidate) => candidate.id === sourceNext,
     );
@@ -2228,6 +2249,7 @@ async function moveTabToWindow(
       sourceView.editor.getText(sourceNext),
       nextTab?.path ?? nextTab?.name,
     );
+    void sourceView.restoreReadingPosition();
   } else {
     sourceView.renderPreview("");
   }
@@ -2302,6 +2324,8 @@ function addSplitter(): void {
     const ratio = Math.max(0.2, Math.min(0.8, (e.clientX - rect.left) / rect.width));
     const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
     const sub = windowsHost.querySelector<HTMLElement>('.window[data-window-id="sub"]')!;
+    ui.splitRatio = ratio;
+    persistUiState();
     main.style.flex = `${ratio} 1 0`;
     sub.style.flex = `${1 - ratio} 1 0`;
   };
@@ -2968,7 +2992,7 @@ subscribe(() => {
     explorerVisible: s.explorerVisible,
     explorerWidth: s.explorerWidth,
     windows: s.windows.map((w) => ({
-      openPaths: w.tabs.map((t) => t.path).filter((p): p is string => !!p),
+      files: w.tabs.filter(t => t.path !== null).map(t => ({ path: t.path!, ...readingPositions.get(t.id) })),
       activePath: w.tabs.find((t) => t.id === w.activeTabId)?.path ?? null,
       mode: w.mode,
     })),
@@ -3179,40 +3203,53 @@ function applyZoom(zoom: number): void {
 applyZoom(ui.zoom);
 
 async function restoreWindows(): Promise<void> {
-  const saved = startupUi.windows;
-  if (saved[1]) {
-    setState({ windows: [...getState().windows, { id: "sub", tabs: [], activeTabId: null, mode: saved[1].mode }] });
-    addSplitter();
-    makeView("sub", false);
-    applySettings(currentSettings);
-    setTableFormatting(currentSettings.tables.formatOnEdit);
-  }
-  patchWindow("main", { mode: saved[0]?.mode ?? "split" });
-  for (let i = 0; i < saved.length; i++) {
-    const windowId = i === 0 ? "main" : "sub";
-    for (const path of saved[i].openPaths) {
-      try {
-        if (isPdfFile(path)) {
-          openPdf(windowId, path);
-        } else {
-          const contents = await invoke<string>("read_file", { path });
-          openInWindow(windowId, { path, name: basename(path), text: contents });
-        }
-      } catch {
-        /* vanished */
+  const layout = sessionLayout(startupUi);
+  await restoreLayout(layout, startupUi.folder, {
+    async exists(path, kind) {
+      await invoke(kind === "folder" ? "list_dir" : "file_stat", { path });
+      return true;
+    },
+    async prepare(layout, folder) {
+      if (folder) {
+        try { await openFolder(folder); } catch { setState({ folder: null, tree: null }); }
       }
-    }
-    if (saved[i].activePath) {
-      const found = findTabByPath(getState().windows, saved[i].activePath!);
-      if (found && found.windowId === windowId) {
-        activateTab(windowId, found.tab.id);
+      await refreshFileList();
+      if (layout.panes[1]) {
+        setState({ windows: [...getState().windows, { id: "sub", tabs: [], activeTabId: null, mode: layout.panes[1].mode }] });
+        addSplitter();
+        makeView("sub", false);
+        applySettings(currentSettings);
+        setTableFormatting(currentSettings.tables.formatOnEdit);
+        const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
+        const sub = windowsHost.querySelector<HTMLElement>('.window[data-window-id="sub"]')!;
+        main.style.flex = `${layout.splitRatio} 1 0`;
+        sub.style.flex = `${1 - layout.splitRatio} 1 0`;
       }
-    }
-  }
-  const ai = startupUi.activeWindowIndex === 1 ? "sub" : "main";
-  if (getWindow(ai)) {
-    setState({ activeWindowId: ai });
-  }
+      layout.panes.forEach((pane, index) => patchWindow(index === 0 ? "main" : "sub", { mode: pane.mode }));
+    },
+    async open(index, file) {
+      const windowId = index === 0 ? "main" : "sub";
+      if (isPdfFile(file.path)) openPdf(windowId, file.path);
+      else {
+        const contents = await invoke<string>("read_file", { path: file.path });
+        openInWindow(windowId, { path: file.path, name: basename(file.path), text: contents });
+      }
+      const found = findTabByPath(getState().windows, file.path);
+      if (found) {
+        readingPositions.remember(found.tab.id, file);
+        await views.get(found.windowId)!.restoreReadingPosition();
+      }
+    },
+    async activate(index, path) {
+      const found = path ? findTabByPath(getState().windows, path) : null;
+      if (found && found.windowId === (index === 0 ? "main" : "sub")) {
+        patchWindow(found.windowId, { mode: layout.panes[index].mode });
+        activateTab(found.windowId, found.tab.id);
+        await views.get(found.windowId)!.restoreReadingPosition();
+      }
+    },
+    focus(index) { setState({ activeWindowId: index === 0 ? "main" : "sub" }); },
+  });
 
   const result = isPrimaryNativeWindow ? await getInitialFile() : null;
   if (result) {
@@ -3244,14 +3281,6 @@ async function boot(): Promise<void> {
   }
 
   if (isPrimaryNativeWindow && currentSettings.restoreSession) {
-    if (startupUi.folder) {
-      try {
-        await openFolder(startupUi.folder);
-      } catch {
-        setState({ folder: null, tree: null });
-      }
-    }
-    await refreshFileList();
     await restoreWindows();
   } else {
     const result = isPrimaryNativeWindow ? await getInitialFile() : null;
@@ -3268,6 +3297,8 @@ async function boot(): Promise<void> {
     }
     renderAll();
   }
+  sessionReady = true;
+  persistUiState();
   if (isPrimaryNativeWindow) {
     await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }

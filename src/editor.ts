@@ -70,6 +70,7 @@ export type EditorHandle = {
   insertText(id: string, text: string, at?: number, cursor?: number): void;
   /** Appends text at the end of a document as one undo step, leaving cursor and focus alone. */
   appendText(id: string, text: string): void;
+  cursorOffset(id: string): number;
   /** Puts the cursor at `offset` of a document and scrolls it into view. */
   setCursor(id: string, offset: number): void;
   setText(text: string): void;
@@ -214,6 +215,7 @@ export function createEditor(
   /** Image files pasted into a document; return true to take over the paste. */
   onPasteFiles: (id: string, files: File[]) => boolean = () => false,
   onPasteText: PasteTextHandler = () => null,
+  onBeforeSwitch: (id: string | null) => void = () => {},
 ): EditorHandle {
   const states = new Map<string, EditorState>();
   const changed = (id: string, text: string): void => {
@@ -317,6 +319,7 @@ export function createEditor(
       handle.switchTo(id);
     },
     switchTo(id) {
+      if (id !== activeId) onBeforeSwitch(id);
       if (activeId && states.has(activeId)) {
         states.set(activeId, view.state);
       }
@@ -328,6 +331,7 @@ export function createEditor(
       reportCursor(view.state);
     },
     closeState(id) {
+      if (id === activeId) onBeforeSwitch(null);
       states.delete(id);
       if (activeId === id) {
         activeId = null;
@@ -440,6 +444,7 @@ export function createEditor(
       states.set(id, updated);
       changed(id, updated.doc.toString());
     },
+    cursorOffset(id) { return (id === activeId ? view.state : states.get(id))?.selection.main.head ?? 0; },
     setCursor(id, offset) {
       const state = id === activeId ? view.state : states.get(id);
       if (!state) return;
