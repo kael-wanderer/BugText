@@ -8,13 +8,18 @@ export async function searchPdf(
   relative: string,
   query: string,
   options: SearchOptions,
+  isCurrent: () => boolean = () => true,
 ): Promise<SearchHit[]> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+  let task: ReturnType<typeof pdfjs.getDocument> | undefined;
+  try {
   const bytes = await invoke<number[]>("read_file_bytes", { path });
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+  task = pdfjs.getDocument({ data: new Uint8Array(bytes) });
+  const pdf = await task.promise;
   const hits: SearchHit[] = [];
   for (let page = 1; page <= pdf.numPages && hits.length < 50; page += 1) {
+    if (!isCurrent()) break;
     const content = await (await pdf.getPage(page)).getTextContent();
     const text = content.items
       .map((item) => ("str" in item ? item.str : ""))
@@ -37,4 +42,9 @@ export async function searchPdf(
     });
   }
   return hits;
+  } catch {
+    throw new Error("PDF could not be opened");
+  } finally {
+    await task?.destroy();
+  }
 }

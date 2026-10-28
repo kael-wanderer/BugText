@@ -85,12 +85,15 @@ export type SearchOptions = {
   regex: boolean;
 };
 
+export type SearchResult = { hits: SearchHit[]; files_searched: number; skipped: { relative: string; reason: string }[]; walk_limit: boolean; hit_limit: boolean; cancelled: boolean };
+
 export function searchInFolder(
   folder: string,
   query: string,
   options: SearchOptions,
-): Promise<SearchHit[]> {
-  return invoke<SearchHit[]>("search_in_folder", { folder, query, options });
+  request: number,
+): Promise<SearchResult> {
+  return invoke<SearchResult>("search_in_folder", { folder, query, options, request });
 }
 
 type RawSettingsFile = {

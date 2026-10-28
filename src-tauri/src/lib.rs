@@ -157,6 +157,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(files::SearchRequests::default())
         .manage(ai::AIState::default())
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
@@ -244,6 +245,7 @@ pub fn run() {
             assets::copy_note_images,
             files::list_files_recursive,
             files::search_in_folder,
+            files::search_cancel,
             files::get_settings,
             files::get_ai_settings,
             recovery::recovery_write_draft,

@@ -8,12 +8,18 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Folder search shows text results first, PDF progress and Stop, and notes for limits and skipped files.
 - Review unsaved documents individually after a crash, compare each with its file,
   and restore or discard selected drafts. A launch strip offers Review, Restore all,
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
 
+- Folder search no longer freezes the window or reports an invalid regular expression as no results.
+- AI folder context no longer uses a previous folder or stays unavailable after a failed index build.
+- PDF documents are released after folder search.
+- Folder search no longer lists images and other media as skipped files, says "No results"
+  when nothing matches, and shows the full PDF progress in a narrow sidebar.
 - Saves stay bound to the document and revision that started them, so edits made during a save remain unsaved and recoverable. Switching panes or saving through MCP no longer replaces another tab’s state. Restoring onto an open tab marks it unsaved, and the recovery strip no longer covers sidebar headers.
 - Editing a restored document no longer leaves a second, older draft behind, and the preview
   refreshes after Save As changes the document type.
