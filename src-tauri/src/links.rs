@@ -42,20 +42,29 @@ static LIST: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"^\s*(?:[-*+]|\d{1,9}[.)])(?:\s|$)").unwrap());
 static CLOSED: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r#"^\s*(?:["'][^"']*["']\s*)?\)"#).unwrap());
-fn plain(text: &str) -> String {
-    let mut text = text.to_owned();
-    for (pattern, replacement) in [
+static PLAIN: LazyLock<Vec<(regex::Regex, &'static str)>> = LazyLock::new(|| {
+    [
         (r"\[([^\]]+)\]\([^)]*\)", "$1"),
         (r"`+([^`]*?)`+", "$1"),
         (r"\*\*(.+?)\*\*|~~(.+?)~~", "$1$2"),
         (r"(^|[^\w])__(\S(?:.*?\S)?)__($|[^\w])", "$1$2$3"),
         (r"(^|[^\w])\*(\S(?:.*?\S)?)\*($|[^\w])", "$1$2$3"),
         (r"(^|[^\w])_(\S(?:.*?\S)?)_($|[^\w])", "$1$2$3"),
-    ] {
-        text = regex::Regex::new(pattern)
-            .unwrap()
-            .replace_all(&text, replacement)
-            .into_owned();
+    ]
+    .into_iter()
+    .map(|(pattern, replacement)| (regex::Regex::new(pattern).unwrap(), replacement))
+    .collect()
+});
+static ATX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^ {0,3}(#{1,6})(?:\s+|$)(.*)$").unwrap());
+static ATX_SUFFIX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"\s+#+\s*$").unwrap());
+static SETEXT: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^ {0,3}(=+|-+)\s*$").unwrap());
+fn plain(text: &str) -> String {
+    let mut text = text.to_owned();
+    for (pattern, replacement) in PLAIN.iter() {
+        text = pattern.replace_all(&text, *replacement).into_owned();
     }
     text.trim().to_owned()
 }
@@ -228,21 +237,18 @@ fn parse(source: &str) -> (Vec<Link>, Vec<Heading>) {
         });
         offset += raw.encode_utf16().count() + 1;
     }
-    let atx = regex::Regex::new(r"^ {0,3}(#{1,6})(?:\s+|$)(.*)$").unwrap();
-    let suffix = regex::Regex::new(r"\s+#+\s*$").unwrap();
-    let setext = regex::Regex::new(r"^ {0,3}(=+|-+)\s*$").unwrap();
     let mut i = 0;
     while i < lines.len() {
         if let Some(line) = &visible_lines[i] {
-            if let Some(c) = atx.captures(line) {
+            if let Some(c) = ATX.captures(line) {
                 headings.push(Heading {
-                    text: plain(&suffix.replace(&c[2], "")),
+                    text: plain(&ATX_SUFFIX.replace(&c[2], "")),
                     level: c[1].len(),
                     line: i + 1,
                 });
             } else if !line.trim().is_empty() && i + 1 < lines.len() {
                 if let Some(next) = &visible_lines[i + 1] {
-                    if let Some(c) = setext.captures(next) {
+                    if let Some(c) = SETEXT.captures(next) {
                         headings.push(Heading {
                             text: plain(line),
                             level: if c[1].starts_with('=') { 1 } else { 2 },
@@ -399,6 +405,14 @@ pub fn create_link_note(folder: String, path: String) -> Result<(), String> {
         .canonicalize()
         .map_err(|_| "Folder unavailable")?;
     let target = Path::new(&path);
+    let extension = target
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if extension != "md" && extension != "markdown" {
+        return Err("Not a note".into());
+    }
     let parent = target
         .parent()
         .and_then(|p| p.canonicalize().ok())
