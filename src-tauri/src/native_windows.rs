@@ -1,7 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Mutex,
+};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const WINDOW_PREFIX: &str = "window-";
+static NEXT_WINDOW: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Default)]
 pub struct FocusedWindowState(pub Mutex<Option<String>>);
@@ -30,20 +34,21 @@ pub fn focused_window(app: &AppHandle) -> Option<WebviewWindow> {
 
 pub fn next_window_label(app: &AppHandle) -> String {
     let windows = app.webview_windows();
-    let mut index = 1;
     loop {
+        let index = NEXT_WINDOW.fetch_add(1, Ordering::Relaxed);
         let label = format!("{WINDOW_PREFIX}{index}");
         if !windows.contains_key(&label) {
             return label;
         }
-        index += 1;
     }
 }
 
-pub fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+pub fn create(app: &AppHandle, reserved_label: Option<&str>) -> tauri::Result<WebviewWindow> {
     WebviewWindowBuilder::new(
         app,
-        next_window_label(app),
+        reserved_label
+            .map(str::to_owned)
+            .unwrap_or_else(|| next_window_label(app)),
         WebviewUrl::App("index.html".into()),
     )
     .title("BugText")
@@ -55,7 +60,9 @@ pub fn create(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 
 #[tauri::command]
 pub fn new_window(app: AppHandle) -> Result<(), String> {
-    create(&app).map(|_| ()).map_err(|error| error.to_string())
+    create(&app, None)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 mod conversations;
+mod workspaces;
 mod ai;
 mod assets;
 mod cli_args;
@@ -165,6 +166,7 @@ pub fn run() {
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
+        .manage(workspaces::WorkspaceState::default())
         .manage(preview::PreviewRoots::default())
         .manage(preview::PreviewDocs::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
@@ -179,7 +181,7 @@ pub fn run() {
         .on_menu_event(|app, event| {
             let id = event.id().0.as_str();
             if id == "view.new_window" || id == "file.new_window" {
-                let _ = native_windows::create(app);
+                let _ = native_windows::create(app, None);
                 return;
             }
             if let Some(window) = native_windows::focused_window(app) {
@@ -192,6 +194,9 @@ pub fn run() {
                 native_windows::remember_focus(window.app_handle(), window.label());
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                if let Some(state) = window.app_handle().try_state::<workspaces::WorkspaceState>() {
+                    workspaces::release_window(&state, window.label());
+                }
                 if let Some(state) = window.app_handle().try_state::<mcp_server::McpState>() {
                     mcp_server::drop_window(&state, window.label());
                 }
@@ -289,6 +294,14 @@ pub fn run() {
             window_fullscreen_toggle,
             window_tile,
             native_windows::new_window,
+            workspaces::read_workspaces,
+            workspaces::write_workspaces,
+            workspaces::workspace_claim,
+            workspaces::workspace_release,
+            workspaces::workspace_owner,
+            workspaces::workspace_focus,
+            workspaces::workspace_open_window,
+            workspaces::take_window_workspace,
         ])
         .build(tauri::generate_context!())
         .expect("error while building BugText")

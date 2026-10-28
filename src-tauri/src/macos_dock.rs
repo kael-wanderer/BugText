@@ -18,7 +18,7 @@ mod platform {
         _sender: *mut AnyObject,
     ) {
         if let Some(app) = APP.get() {
-            let _ = crate::native_windows::create(app);
+            let _ = crate::native_windows::create(app, None);
         }
     }
 
