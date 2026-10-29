@@ -1,3 +1,4 @@
+import { parsePresets, type ExportSettings } from "./export/presets";
 import { validImageFolder } from "./image-insert";
 import { DATE_FORMATS, type DateFormat } from "./templates/placeholders";
 import { THEME_CATALOG, isLightTheme, type ConcreteThemeName, type DarkThemeName, type LightThemeName } from "./theme-catalog";
@@ -52,6 +53,7 @@ export type AppIconId = (typeof APP_ICON_IDS)[number];
 export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 
 export type Settings = {
+  export: ExportSettings;
   mcp: { enabled: boolean };
   theme: ThemeName;
   darkTheme: DarkThemeName;
@@ -85,6 +87,7 @@ export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
 const THEMES = THEME_OPTIONS.map((theme) => theme.id);
 
 export const DEFAULT_SETTINGS: Settings = {
+  export: parsePresets(undefined),
   mcp: { enabled: false },
   theme: "dark",
   darkTheme: "dark",
@@ -161,6 +164,7 @@ function defaults(): Settings {
     links: { ...DEFAULT_SETTINGS.links },
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
+    export: parsePresets(undefined),
   };
 }
 
@@ -249,6 +253,7 @@ export function parseSettings(raw: string): Settings {
       : DEFAULT_SETTINGS.workspaceContextK;
 
   return {
+    export: parsePresets(data.export),
     mcp: { enabled: (data.mcp as { enabled?: unknown } | undefined)?.enabled === true },
     theme,
     darkTheme: (() => {
