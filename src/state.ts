@@ -2,6 +2,7 @@ import type { WorkspaceFile } from "./workspaces/layout";
 export type ViewMode = "split" | "editor" | "preview";
 export type UIState = {
   viewMode: ViewMode;
+  activeWorkspaceId?: string | null;
   zoom: number;
   softWrap: boolean;
   folder: string | null;
@@ -70,6 +71,7 @@ export function loadState(): UIState {
     const parsed = JSON.parse(raw);
     const value = { ...freshState(), ...parsed };
     value.windows = migrateSessionWindows(parsed.windows);
+    if (typeof parsed.activeWorkspaceId !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(parsed.activeWorkspaceId)) delete value.activeWorkspaceId;
     value.splitRatio = Number.isFinite(value.splitRatio) ? Math.max(0.2, Math.min(0.8, value.splitRatio)) : 0.5;
     return value;
   } catch {

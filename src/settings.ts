@@ -59,6 +59,7 @@ export type Settings = {
   sidebarLook: "default" | "match" | "tinted";
   interface: ZoneSettings;
   restoreSession: boolean;
+  reopenWorkspaceWindows: boolean;
   updateMode: "manual" | "auto";
   softWrapMode: "off" | "window" | "guide";
   wrapColumn: number;
@@ -91,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarLook: "default",
   interface: { font: "", size: 14 },
   restoreSession: true,
+  reopenWorkspaceWindows: true,
   updateMode: "manual",
   softWrapMode: "window",
   wrapColumn: 80,
@@ -264,6 +266,7 @@ export function parseSettings(raw: string): Settings {
       typeof data.restoreSession === "boolean"
         ? data.restoreSession
         : DEFAULT_SETTINGS.restoreSession,
+    reopenWorkspaceWindows: typeof data.reopenWorkspaceWindows === "boolean" ? data.reopenWorkspaceWindows : DEFAULT_SETTINGS.reopenWorkspaceWindows,
     updateMode,
     softWrapMode,
     wrapColumn,

@@ -30,6 +30,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 
+static QUIT_SAVE_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub fn mcp_bridge_main() -> i32 {
     mcp_bridge::mcp_bridge_main()
 }
@@ -309,6 +311,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building BugText")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+                // Hold the first exit briefly so every window can save its session and workspace.
+                if !QUIT_SAVE_STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    api.prevent_exit();
+                    let _ = app.emit("bugtext://before-quit", ());
+                    let app = app.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(400));
+                        app.exit(0);
+                    });
+                    return;
+                }
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 for url in urls {

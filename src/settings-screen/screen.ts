@@ -65,6 +65,7 @@ export type ScreenDeps = AiPageDeps & {
   onSettingsChange: (settings: Settings) => void;
   onAISettingsChange: (settings: AISettings) => void;
   onOpenSettingsFile: () => void;
+  onManageWorkspaces?: () => void;
   onOpenAISettingsFile: () => void;
   onCheckForUpdates: () => void;
   /** Template folder helpers; absent in contexts that cannot reach the app. */

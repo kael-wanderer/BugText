@@ -1,4 +1,5 @@
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
+import { startupWorkspace, updateReopen } from "./workspaces/session";
 import { createWorkspaceController } from "./workspaces/controller";
 import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
 import { showWorkspaceSwitcher } from "./workspaces/switcher";
@@ -272,6 +273,11 @@ const workspaceController = createWorkspaceController({
   },
   claim: id => invoke<string | null>("workspace_claim", { id }),
   release: () => invoke<void>("workspace_release"),
+  activeChanged: (previous, next) => {
+    // The primary window reopens its workspace through bugtext.ui; secondary windows are listed in "reopen".
+    if (isPrimaryNativeWindow) { ui = { ...ui, activeWorkspaceId: next }; persistUiState(); }
+    else void updateReopen(workspacesIO(nativeWindowLabel), previous, next).catch(() => {});
+  },
   display: name => {
     queueMicrotask(() => void refreshPinnedMenu());
     document.title = name ? `${name} — BugText` : "BugText";
@@ -294,6 +300,15 @@ window.addEventListener("pagehide", flushUiState);
 window.addEventListener("beforeunload", flushUiState);
 // Best effort: the pending auto-save is otherwise lost when the window goes away.
 window.addEventListener("pagehide", () => void workspaceController.flush().catch(() => {}));
+// App quit: Rust holds the exit briefly and asks every window to save its session and workspace.
+void listen("bugtext://before-quit", () => { flushUiState(); void workspaceController.flush().catch(() => {}); });
+// Closing a secondary window by hand (not quitting) means it should not come back at startup.
+if (!isPrimaryNativeWindow) void currentNativeWindow?.onCloseRequested(async () => {
+  const id = workspaceController.activeId();
+  if (!id) return;
+  await workspaceController.flush().catch(() => {});
+  await updateReopen(workspacesIO(nativeWindowLabel), id, null).catch(() => {});
+});
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -2683,6 +2698,7 @@ const settingsScreen = createSettingsScreen(
     },
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
+    onManageWorkspaces: () => { settingsScreen.close(); void showSwitcher(); },
     onOpenSettingsFile: openSettings,
     onOpenAISettingsFile: openAISettings,
     templates: {
@@ -3391,9 +3407,21 @@ async function showSwitcher(): Promise<void> {
   });
 }
 
+/** Startup with Restore last session on: the primary window's workspace, else the plain session; then workspace windows. */
 async function restoreWindows(): Promise<void> {
-  const layout = sessionLayout(startupUi);
-  await restoreLayout(layout, startupUi.folder, layoutRestoreDeps(layout));
+  const file = (await loadWorkspaces(workspacesIO(nativeWindowLabel))).file;
+  const workspace = startupWorkspace(file?.workspaces ?? [], startupUi.activeWorkspaceId ?? null);
+  if (workspace) await switchWorkspace(workspace);
+  else {
+    const layout = sessionLayout(startupUi);
+    await restoreLayout(layout, startupUi.folder, layoutRestoreDeps(layout));
+  }
+  if (file && currentSettings.reopenWorkspaceWindows) {
+    for (const id of file.reopen) {
+      const other = startupWorkspace(file.workspaces, id);
+      if (other && other.id !== workspace?.id) await openWorkspaceWindow(other);
+    }
+  }
 
   const result = isPrimaryNativeWindow ? await getInitialFile() : null;
   if (result) {

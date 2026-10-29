@@ -7,8 +7,15 @@ export function createWorkspaceController(deps: {
   claim(id: string): Promise<string | null>;
   release(): Promise<void>;
   display(name: string | null): void;
+  /** Called whenever this window's active workspace id changes. */
+  activeChanged?(previous: string | null, next: string | null): void;
 }) {
   let active: Workspace | null = null;
+  function setActive(next: Workspace | null): void {
+    const previous = active?.id ?? null;
+    active = next;
+    if (previous !== (next?.id ?? null)) deps.activeChanged?.(previous, next?.id ?? null);
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   // A switch closes and reopens tabs; saving that half-built layout would damage the workspace.
   let paused = false;
@@ -33,7 +40,7 @@ export function createWorkspaceController(deps: {
     if (!active) return;
     try { await flush(); } catch { /* Detaching must remain possible if the file cannot be saved. */ }
     await deps.release();
-    active = null;
+    setActive(null);
     deps.display(null);
   }
   async function save(name: string, pinned: boolean): Promise<void> {
@@ -51,8 +58,9 @@ export function createWorkspaceController(deps: {
         current.workspaces.push({ id, name, pinned, pinOrder: Math.max(0, ...current.workspaces.map(item => item.pinOrder)) + 1, openedAt: Date.now(), ...captured });
         return current;
       });
-      active = file.workspaces.find(item => item.id === id)!;
-      deps.display(active.name);
+      const saved = file.workspaces.find(item => item.id === id)!;
+      setActive(saved);
+      deps.display(saved.name);
     } catch (error) {
       if (previous) await deps.claim(previous.id);
       else await deps.release();
@@ -68,7 +76,7 @@ export function createWorkspaceController(deps: {
       if (workspace) workspace.openedAt = Date.now();
       return current;
     });
-    active = file.workspaces.find(item => item.id === id) ?? null;
+    setActive(file.workspaces.find(item => item.id === id) ?? null);
     if (!active) await deps.release();
     deps.display(active?.name ?? null);
     return null;
@@ -81,7 +89,7 @@ export function createWorkspaceController(deps: {
     if (!active) return;
     const result = await loadWorkspaces(deps.io);
     if (result.file) {
-      active = result.file.workspaces.find(item => item.id === active!.id) ?? null;
+      setActive(result.file.workspaces.find(item => item.id === active!.id) ?? null);
       // Deleted from another window: stop auto-saving into it and free the claim.
       if (!active) { if (timer) clearTimeout(timer); timer = undefined; await deps.release(); }
       deps.display(active?.name ?? null);

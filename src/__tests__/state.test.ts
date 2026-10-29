@@ -11,6 +11,13 @@ describe("state", () => {
     expect(second.windows[0].files).toEqual([]);
   });
 
+  it("keeps a valid active workspace id and drops an invalid one", () => {
+    saveState({ ...freshState(), activeWorkspaceId: "abc-123" });
+    expect(loadState().activeWorkspaceId).toBe("abc-123");
+    saveState({ ...freshState(), activeWorkspaceId: "../x" });
+    expect(loadState()).not.toHaveProperty("activeWorkspaceId");
+  });
+
   it("returns defaults when nothing stored", () => {
     expect(loadState()).toEqual({
       viewMode: "editor",
