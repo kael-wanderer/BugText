@@ -15,6 +15,7 @@ export type KeymapCommand = {
 
 export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "file.new", label: "New File", category: "File", default: "CmdOrCtrl+N", scope: "menu" },
+  { id: "file.new_tab", label: "New Tab", category: "File", default: "CmdOrCtrl+T", scope: "menu" },
   { id: "file.new_window", label: "New Window", category: "File", default: "CmdOrCtrl+Shift+N", scope: "menu" },
   { id: "file.new_from_template", label: "New from Template", category: "File", default: "CmdOrCtrl+Alt+N", scope: "menu" },
   { id: "file.quick_note", label: "Quick Note", category: "File", default: "Ctrl+Cmd+N", scope: "menu" },
