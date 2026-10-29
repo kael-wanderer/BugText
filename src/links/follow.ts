@@ -1,3 +1,4 @@
+import { parsePdfAnchor } from "../pdf-annotations/model";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { headingAnchors, noteLinks } from "./parse";
 import { markdownOutline } from "../outline";
@@ -10,6 +11,7 @@ type Services = {
   context: (id: string) => LinkContext | null;
   open: (path: string, other: boolean) => Promise<void>;
   jump: (line: number) => void;
+  openPdfAt?: (page: number, annotation?: string) => void;
   read: (path: string) => Promise<string>;
   create: (folder: string, path: string) => Promise<void>;
   toast: (text: string, action?: { label: string; run: () => void }) => void;
@@ -28,7 +30,16 @@ export async function followLink(target: string, context: LinkContext, other = f
   const resolved = resolveLink(target, context.path, context.folder);
   if (resolved.kind === "invalid" || !resolved.path) return;
   if (resolved.kind === "web") { await openUrl(resolved.path).catch(() => s.toast("Could not open link")); return; }
-  if (resolved.kind === "file") { await s.open(resolved.path, other).catch(() => s.toast("Could not open file")); return; }
+  if (resolved.kind === "file") {
+    try {
+      await s.open(resolved.path, other);
+      if (/\.pdf$/i.test(resolved.path) && resolved.anchor) {
+        const anchor = parsePdfAnchor(resolved.anchor);
+        if (anchor.page) s.openPdfAt?.(anchor.page, anchor.annotation);
+      }
+    } catch { s.toast("Could not open file"); }
+    return;
+  }
   let text: string;
   try { text = await s.read(resolved.path); }
   catch {

@@ -76,7 +76,11 @@ import { createPalette, type PaletteItem } from "./palette";
 import { openBinaryHistoryPanel, openHistoryPanel } from "./historyview";
 import { markdownOutline } from "./outline";
 import { addRecent, loadRecent, saveRecent } from "./recent";
-import { breadcrumbsPath, joinPath, relativePath } from "./paths";
+import { breadcrumbsPath, joinPath, parentPath, relativePath } from "./paths";
+import { createFromTemplate } from "./templates/library";
+import { movePdfAnnotations } from "./pdf-annotations/move";
+import { relativeDestination } from "./templates/naming";
+import { writeText as writeClipboardText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   isHtmlFile,
   isMarkdownFile,
@@ -752,6 +756,8 @@ const palette = createPalette(() => [
   ...commandItems(),
 ]);
 
+let lastMarkdownFocus: { windowId: string; tabId: string } | null = null;
+
 const handlers = {
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
@@ -772,6 +778,33 @@ const handlers = {
   },
   getReadingPosition: (id: string) => readingPositions.get(id),
   onReadingPosition: (id: string, position: import("./workspaces/layout").FilePosition) => readingPositions.remember(id, position),
+  onMarkdownFocus: (windowId: string, tabId: string) => { lastMarkdownFocus = { windowId, tabId }; },
+  onExportAnnotations: (items: import("./pdf-annotations/model").Annotation[], title: string, path: string) => {
+    const folder = getState().folder;
+    const pdfDir = parentPath(path);
+    const inFolder = folder && (pdfDir === folder || pdfDir.startsWith(`${folder}/`));
+    const target = lastMarkdownFocus;
+    const note = target && tabIn(target.windowId, target.tabId);
+    const noteDir = note?.path && folder && (note.path.startsWith(`${folder}/`)) ? parentPath(note.path) : null;
+    void import("./pdf-annotations/export-sheet").then(({ showAnnotationExport }) => showAnnotationExport({
+      items, title, path, folder: inFolder ? folder : null, newDir: pdfDir, noteDir,
+      initialName: `${basename(path).replace(/\.pdf$/i, "")} — notes.md`,
+      run: async (destination, name, content) => {
+        if (destination === "copy") { await writeClipboardText(content); return; }
+        if (destination === "insert") {
+          if (!target || !noteDir || !tabIn(target.windowId, target.tabId)) throw new Error("The note is no longer open.");
+          const editor = views.get(target.windowId)?.editor;
+          if (!editor) throw new Error("The note is no longer open.");
+          const at = editor.cursorOffset(target.tabId); editor.applyChanges(target.tabId, [{ from: at, to: at, insert: content }]); return;
+        }
+        if (!folder || !inFolder) throw new Error("Open the PDF inside a folder to create a note.");
+        const plan = relativeDestination(relativePath(folder, pdfDir), name.replace(/\.md$/i, ""));
+        if ("error" in plan) throw new Error(plan.error);
+        const created = await createFromTemplate({ folder, relativeDir: plan.dir, stem: plan.stem, contents: content });
+        await doOpenPath(created);
+      },
+    })).catch((error) => showToast(`Could not export annotations: ${String(error)}`));
+  },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
@@ -2044,6 +2077,7 @@ function openHelp(): void {
 let renameNotes: IndexedNote[] = [];
 function handleExplorerPathChange(from: string, to: string | null): void {
   const folder = getState().folder;
+  if (to) void movePdfAnnotations(from, to).catch(() => showToast("Could not move PDF annotations"));
   const plans = to && folder && currentSettings.links.onRename === "ask" ? planRename(renameNotes, from, to, folder) : [];
   renameNotes = [];
   for (const note of linkIndex.notes()) {
@@ -2602,6 +2636,7 @@ async function openInSub(path: string): Promise<void> {
     activateTab(found.windowId, found.tab.id);
     return;
   }
+  if (isPdfFile(path)) { openPdf("sub", path); return; }
   const contents = await invoke<string>("read_file", { path });
   openInWindow("sub", { path, name: basename(path), text: contents });
 }
@@ -3031,6 +3066,7 @@ configureLinks({
   },
   open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
   jump: (line) => activeView().jumpToLine(line),
+  openPdfAt: (page, annotation) => activeView().openPdfPage(page, annotation),
   read: async (path) => {
     const found = findTabByPath(getState().windows, path);
     return found ? editorForTab(found.tab.id).getText(found.tab.id) : invoke<string>("read_file", { path });
@@ -3283,6 +3319,15 @@ const appKeyActions: Record<string, () => void> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest("input, textarea, select, [contenteditable=true]")) {
+    for (const [id, command] of [["pdf.copy_quote", "copy"], ["pdf.annotations", "panel"]] as const) {
+      const accel = resolvedAccel(id);
+      if (accel && matchAccelerator(e, accel) && activeView().annotationCommand(command)) {
+        e.preventDefault(); e.stopImmediatePropagation(); return;
+      }
+    }
+  }
   if (
     e.key.toLowerCase() === "f" &&
     (e.metaKey || e.ctrlKey) &&

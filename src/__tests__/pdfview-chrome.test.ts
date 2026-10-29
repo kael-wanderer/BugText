@@ -2,6 +2,13 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { installTestDom } from "./setup";
 
 const calls = vi.hoisted(() => ({ saved: [] as { path: string; bytes: number[] }[], sameFile: false }));
+vi.mock("../pdf-annotations/controller", () => ({ createAnnotationController: () => ({ destroy: () => {}, edit: () => {}, copy: () => {} }) }));
+vi.mock("../pdf-annotations/store", () => ({
+  AnnotationStore: { load: vi.fn(async (path: string, digest: string, pages: number) => ({
+    document: { path, digest, pages, annotations: [] }, changed: false,
+    keepDigest: vi.fn(), destroy: vi.fn(),
+  })) },
+}));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command: string, args: { path: string; bytes?: number[] }) => {
     if (command === "pdf_draft_read") return null;
@@ -20,7 +27,7 @@ vi.mock("../files", () => ({ pickExportPath: vi.fn(async () => "/out/copy.pdf"),
 vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?url", () => ({ default: "worker.js" }));
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: {},
-  getDocument: () => ({ promise: Promise.resolve({ numPages: 0 }), destroy: vi.fn() }),
+  getDocument: () => ({ promise: Promise.resolve({ numPages: 0, getMetadata: async () => ({ info: {} }) }), destroy: vi.fn() }),
 }));
 
 import { PDF_EDIT_EVENT, PDF_FIND_EVENT, PDF_SAVE_AS_EVENT, PDF_ZOOM_EVENT, renderPdf } from "../pdfview";

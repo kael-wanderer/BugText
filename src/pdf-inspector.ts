@@ -5,6 +5,7 @@
 // and focus.
 
 export type PdfInspectorPage =
+  | "annotations"
   | "properties"
   | "replace"
   | "review"

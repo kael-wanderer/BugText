@@ -6,9 +6,10 @@ import type { PdfFitMode } from "./pdf-navigation";
 export type PdfEditTool = "select" | "text" | "cover" | "replace" | "image";
 
 /** Right-hand inspector pages a toolbar control opens. */
-export type PdfPanel = "replace" | "review" | "proof" | "ocr" | "ocr-review" | "support";
+export type PdfPanel = "annotations" | "replace" | "review" | "proof" | "ocr" | "ocr-review" | "support";
 
 export type PdfToolbarCommand =
+  | "annotations"
   | "pages"
   | "page-prev"
   | "page-next"
@@ -80,6 +81,7 @@ const FITS: Fit[] = ["full", "compact", "narrow"];
 // 16px line icons; each shape is [tag, attributes].
 type Shape = [string, Record<string, string>];
 const ICONS: Record<string, Shape[]> = {
+  annotations: [["path", { d: "M3 3h10v10H3zM5 6h6M5 9h4" }]],
   pages: [
     ["rect", { x: "2.5", y: "2.5", width: "4", height: "5", rx: ".8" }],
     ["rect", { x: "2.5", y: "9", width: "4", height: "4.5", rx: ".8" }],
@@ -318,6 +320,7 @@ export function createPdfToolbar(
 
   // Read row.
   const pagesButton = button("pages", "Pages", "pages", { title: "Pages", secondary: true });
+  const annotationsButton = button("annotations", "Annotations", "annotations", { title: "Annotations (⇧⌘A)", secondary: true });
   const findButton = button("find", "Find", "find", { title: "Find in PDF (⌘F)", secondary: true });
   findButton.classList.add("pdf-tb-wide-only");
   const status = el("span", "pdf-tb-status");
@@ -449,7 +452,7 @@ export function createPdfToolbar(
   readRow.dataset.fit = "full";
   readRow.setAttribute("role", "toolbar");
   readRow.setAttribute("aria-label", "PDF");
-  readRow.append(pagesButton, pageGroup, zoomGroup, findButton, status, editButton, saveMenu, moreMenu);
+  readRow.append(pagesButton, pageGroup, zoomGroup, findButton, status, annotationsButton, editButton, saveMenu, moreMenu);
 
   // Edit row.
   const toolButtons = new Map<PdfEditTool, HTMLButtonElement>();
@@ -597,6 +600,8 @@ export function createPdfToolbar(
     snapItem.element.setAttribute("aria-checked", String(state.snap));
     snapItem.element.classList.toggle("checked", state.snap);
     setDisabled(reviewButton, state.saving || state.pending === 0);
+    annotationsButton.classList.toggle("active", state.openPanel === "annotations");
+    annotationsButton.setAttribute("aria-pressed", String(state.openPanel === "annotations"));
     reviewButton.classList.toggle("active", state.openPanel === "review");
     reviewButton.setAttribute("aria-expanded", String(state.openPanel === "review"));
     reviewBadge.hidden = state.pending === 0;

@@ -24,11 +24,15 @@ import { glyphs } from "./glyphs";
 import { renderMarkdown } from "./preview";
 import { enhancePreview } from "./render-extras";
 import { getWindow, getState } from "./store";
+import { rewriteLastQuote } from "./pdf-annotations/quote";
+import { parentPath } from "./paths";
 import type { ViewMode } from "./state";
 import type { MarkdownFormat } from "./markdown-format";
 import { THEME_OPTIONS, type ThemeName } from "./settings";
 import {
   PDF_FIND_EVENT,
+  PDF_ANNOTATIONS_EVENT,
+  PDF_COPY_QUOTE_EVENT,
   PDF_ZOOM_EVENT,
   PDF_EDIT_EVENT,
   PDF_SAVE_AS_EVENT,
@@ -58,6 +62,8 @@ export type WindowHandlers = {
   onToggleSub: () => void;
   onFocusWindow: (windowId: string) => void;
   onNavigation: (windowId: string) => void;
+  onMarkdownFocus?: (windowId: string, tabId: string) => void;
+  onExportAnnotations?: (items: import("./pdf-annotations/model").Annotation[], title: string, path: string) => void;
   getReadingPosition?: (tabId: string) => FilePosition | undefined;
   onReadingPosition?: (tabId: string, position: FilePosition) => void;
   syncScrollEnabled: () => boolean;
@@ -92,7 +98,8 @@ export type WindowView = {
   focus: () => void;
   destroy: () => void;
   setLineNumbersFlag: (on: boolean) => void;
-  openPdfPage: (page: number) => void;
+  openPdfPage: (page: number, annotation?: string) => void;
+  annotationCommand: (command: "panel" | "copy") => boolean;
   savePdf: () => boolean;
   savePdfAs: () => boolean;
   /** Toggles Edit PDF when a PDF is open; false otherwise. */
@@ -215,6 +222,7 @@ export function createWindowView(
   let pdfFit: PdfFitMode | null = "auto";
   let previewText = "";
   let previewPathOrName: string | null = null;
+  let pendingAnnotation: string | undefined;
   let pdfTargetPage: number | undefined;
   // Scroll position to return to when the open PDF reloads from disk.
   let pdfReloadScroll: { top: number; left: number } | null = null;
@@ -301,7 +309,7 @@ export function createWindowView(
     focusedPane = "preview";
     h.onNavigation(windowId);
   });
-  editorPane.addEventListener("focusin", () => { focusedPane = "editor"; h.onNavigation(windowId); });
+  editorPane.addEventListener("focusin", () => { focusedPane = "editor"; const tab = getWindow(windowId)?.tabs.find((t) => t.id === getWindow(windowId)?.activeTabId); if (tab && isMarkdownFile(tab.path ?? tab.name)) h.onMarkdownFocus?.(windowId, tab.id); h.onNavigation(windowId); });
   previewPane.addEventListener("focusin", () => { focusedPane = "preview"; h.onNavigation(windowId); });
 
   root.querySelectorAll<HTMLElement>("[data-mode]").forEach((btn) =>
@@ -352,6 +360,12 @@ export function createWindowView(
       restoringPosition = true;
       positionGeneration += 1;
       displayedTabId = tabId;
+    },
+    (tabId, text) => {
+      const tab = getWindow(windowId)?.tabs.find((entry) => entry.id === tabId);
+      const folder = getState().folder;
+      if (!tab?.path || !folder || !isMarkdownFile(tab.path) || !(tab.path === folder || tab.path.startsWith(`${folder}/`))) return null;
+      return rewriteLastQuote(text, parentPath(tab.path));
     },
   );
   function captureReadingPosition(): void {
@@ -590,7 +604,10 @@ export function createWindowView(
       ? capturePreviewPlace(previewPane) : null;
     const lineCount = text.split("\n").length;
     const placeLine = place ? shiftedLine(place.line, lineCount - previewLineCount, cursorLine) : 0;
-    if (documentId !== previewDocumentId) pdfTargetPage = documentId ? h.getReadingPosition?.(documentId)?.page : undefined;
+    if (documentId !== previewDocumentId) {
+      pendingAnnotation = undefined;
+      pdfTargetPage = documentId ? h.getReadingPosition?.(documentId)?.page : undefined;
+    }
     previewDocumentId = documentId;
     previewLineCount = lineCount;
     placeObserver?.disconnect();
@@ -621,6 +638,8 @@ export function createWindowView(
       wsWords.textContent = "PDF";
       void renderPdf(previewPane, pathOrName!, {
         initialPage: pdfTargetPage,
+        folder: getState().folder,
+        onExportAnnotations: h.onExportAnnotations,
         onEditDirtyChange: (dirty) => {
           if (pdfTabId) h.onPdfEditDirtyChange(windowId, pdfTabId, dirty);
         },
@@ -641,6 +660,7 @@ export function createWindowView(
             return;
           }
           pdfFind = handle;
+          if (pendingAnnotation) { handle.flashAnnotation(pendingAnnotation); pendingAnnotation = undefined; }
           const position = applyPdfPosition({ page: pdfTargetPage }, handle.pageCount(), handle.goToPage);
           if (pdfTabId) h.onReadingPosition?.(pdfTabId, position);
           if (pdfFit) applyPdfFit(pdfFit);
@@ -1010,9 +1030,17 @@ export function createWindowView(
     setLineNumbersFlag: (on: boolean) => {
       lineNums = on;
     },
-    openPdfPage: (page: number) => {
-      pdfTargetPage = page;
-      if (pdfFind) pdfTargetPage = applyPdfPosition({ page }, pdfFind.pageCount(), pdfFind.goToPage).page;
+    openPdfPage: (page: number, annotation?: string) => {
+      pdfTargetPage = page; pendingAnnotation = annotation;
+      if (pdfFind) {
+        pdfTargetPage = applyPdfPosition({ page }, pdfFind.pageCount(), pdfFind.goToPage).page;
+        if (annotation) { pdfFind.flashAnnotation(annotation); pendingAnnotation = undefined; }
+      }
+    },
+    annotationCommand: (command) => {
+      if (!isPdfFile(previewPathOrName) || !pdfFind) return false;
+      previewPane.dispatchEvent(new Event(command === "panel" ? PDF_ANNOTATIONS_EVENT : PDF_COPY_QUOTE_EVENT));
+      return true;
     },
     savePdf: () => {
       if (!isPdfFile(previewPathOrName)) return false;
