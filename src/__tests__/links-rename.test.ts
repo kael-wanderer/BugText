@@ -64,4 +64,17 @@ describe("rename links", () => {
     await panel.show(true);
     expect(host.textContent).toContain("Linked from · 1"); expect(host.textContent).toContain("Broken · Note not found"); expect(host.querySelector("img")).toBeNull();
   });
+  it("jumps to an outgoing link on click and follows it on ⌘-click", async () => {
+    const index = createLinkIndex(async () => ({ notes: [parseNote("/r/b.md", "x\n[paper](p.pdf#page=2)")], skipped: [] }));
+    await index.ensure(folder);
+    const host = document.createElement("div");
+    const jump = vi.fn(); const follow = vi.fn();
+    const panel = createLinksPanel(host, index, () => ({ path: "/r/b.md", text: "x\n[paper](p.pdf#page=2)" }), vi.fn(), jump, follow);
+    await panel.show(true);
+    const row = [...host.querySelectorAll<HTMLButtonElement>(".link-panel-row")].find((r) => r.textContent?.includes("paper"))!;
+    row.click();
+    expect(jump).toHaveBeenCalledWith(2); expect(follow).not.toHaveBeenCalled();
+    row.dispatchEvent(new MouseEvent("click", { metaKey: true, bubbles: true }));
+    expect(follow).toHaveBeenCalledWith("p.pdf#page=2"); expect(jump).toHaveBeenCalledTimes(1);
+  });
 });

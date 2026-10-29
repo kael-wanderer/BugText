@@ -1,6 +1,6 @@
 import type { LinkIndex } from "./index";
 import { node } from "./insert-picker";
-export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: () => { path: string; text: string } | null, open: (path: string, line: number) => void, jump: (line: number) => void) {
+export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: () => { path: string; text: string } | null, open: (path: string, line: number) => void, jump: (line: number) => void, follow?: (target: string) => void) {
   let active = false;
   function render() {
     if (!active) return;
@@ -32,7 +32,8 @@ export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: (
       const row = node("button", undefined, "link-panel-row"); row.classList.toggle("broken", Boolean(link.broken));
       row.append(node("strong", link.text), node("small", link.target));
       if (link.broken) row.append(node("span", `Broken · ${link.broken}`));
-      row.onclick = () => jump(link.line); host.append(row);
+      if (follow) row.title = "Click to show in note · ⌘-click to open";
+      row.onclick = (e) => { if ((e.metaKey || e.ctrlKey) && follow) follow(link.target); else jump(link.line); }; host.append(row);
     }
     if (index.skipped.length) host.append(node("p", `Skipped ${index.skipped.length} note${index.skipped.length === 1 ? "" : "s"} (unreadable or over 2 MB).`, "link-panel-note"));
   }

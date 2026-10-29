@@ -18,7 +18,7 @@ import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
-import { configureLinks, followEditorLink } from "./links/follow";
+import { configureLinks, followEditorLink, followLink } from "./links/follow";
 import { createLinkIndex } from "./links/index";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
@@ -211,7 +211,11 @@ const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
   return tab && views.has(getState().activeWindowId) && isMarkdownFile(tab.path ?? tab.name)
     ? { path: tab.path ?? `${getState().folder}/untitled.md`, text: activeView().editor.getText(tab.id) } : null;
-}, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line));
+}, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line), (target) => {
+  const tab = activeMeta();
+  const context = tab && linkContext(tab.id);
+  if (context) void followLink(target, context);
+});
 function updateOutline(force = false): void {
   linkIndex.setFolder(getState().folder);
   const tab = activeMeta();
@@ -3058,12 +3062,13 @@ configureLinkCompletion({
   },
   enabled: () => currentSettings.links.complete,
 });
+function linkContext(id: string) {
+  const found = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
+  return found && isMarkdownFile(found.path ?? found.name) ? { path: found.path ?? `${getState().folder}/untitled.md`, text: editorForTab(id).getText(id), folder: getState().folder } : null;
+}
 configureLinks({
   index: linkIndex,
-  context: (id) => {
-    const found = getState().windows.flatMap((w) => w.tabs).find((t) => t.id === id);
-    return found && isMarkdownFile(found.path ?? found.name) ? { path: found.path ?? `${getState().folder}/untitled.md`, text: editorForTab(id).getText(id), folder: getState().folder } : null;
-  },
+  context: linkContext,
   open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
   jump: (line) => activeView().jumpToLine(line),
   openPdfAt: (page, annotation) => activeView().openPdfPage(page, annotation),

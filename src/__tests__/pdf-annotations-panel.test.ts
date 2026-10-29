@@ -11,7 +11,8 @@ describe("annotations panel", () => {
     expect([...panel.element.querySelectorAll("h4")].map((h) => h.textContent)).toEqual(["Page 1", "Page 2"]);
     expect(panel.element.querySelector("img")).toBeNull(); expect(panel.element.textContent).toContain("<img src=x onerror=alert(1)>");
     panel.element.querySelector<HTMLButtonElement>(".pdf-annotations-entry")!.click(); expect(open).toHaveBeenCalledWith(items[1]);
-    [...panel.element.querySelectorAll("button")].find((b) => b.textContent === "Copy Quote")!.click(); expect(copy).toHaveBeenCalledWith(items[1]);
+    const more = panel.element.querySelector("details")!; more.open = true;
+    [...more.querySelectorAll<HTMLButtonElement>(".pdf-annotations-menu button")].find((b) => b.textContent === "Copy Quote")!.click(); expect(copy).toHaveBeenCalledWith(items[1]); expect(more.open).toBe(false);
     const filter = panel.element.querySelector("input[placeholder]") as HTMLInputElement; filter.value = "quote 2"; filter.dispatchEvent(new Event("input"));
     expect(panel.element.querySelectorAll(".pdf-annotations-row")).toHaveLength(1);
     [...panel.element.querySelectorAll("button")].find((b) => b.textContent === "Select all")!.click();

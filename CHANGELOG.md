@@ -36,6 +36,14 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 - App shortcuts with Option, such as Replace in Folder (⌥⌘F) and AI: New chat (⌥⌘J), now work on macOS, and the Shortcuts page records them as the key pressed instead of the Option character.
 - Replace in Folder's result lists files relative to the folder, and Undo replace reports "Restored N files" (and any files it could not restore) instead of "Replaced 0 matches in 0 files".
+- PDF Comment closes the selection bar and opens the comment box below the selected text, instead of leaving the bar on screen and covering the text.
+- The Annotations panel's color filters show their colors instead of empty boxes.
+- A PDF highlight that crosses a page break covers only the selected lines instead of both whole pages.
+- The Annotations panel's row menu opens as a small popover instead of squeezing the quote into a narrow column.
+- The status bar shows a PDF's full page count ("Page 1 of 3") while its pages are still loading, instead of the number loaded so far.
+- ⌘-click on a link in the Links panel's "In this note" list opens its target, the same as ⌘-click in the editor; a plain click still shows the link in the note.
+- Renaming a PDF in the Explorer files its annotations under the new name; they were stored under the name with a trailing slash, so the renamed PDF could not find them by path.
+- Text on rotated PDF pages can be selected where it appears, so highlights land on the text instead of an invisible unrotated copy of the page.
 - Export presets with a title from the first heading no longer number sections "0.1, 0.2": once the `#` title moves to the title block, `##` sections become the top level.
 - AI edits (Proofread, Rewrite and Edit actions) no longer insert the model's leading blank lines or join words at the end of a selection: the reply keeps the original text's surrounding whitespace.
 - Saved AI action replies now show the model and time under the reply, like Chat, so an action's engine override is visible.

@@ -162,7 +162,12 @@ fn move_at(dir: &Path, from: &str, to: &str) -> Result<(), String> {
         let Ok(suffix) = old.strip_prefix(from) else {
             continue;
         };
-        let new_path = Path::new(to).join(suffix).to_string_lossy().into_owned();
+        // Joining an empty suffix (the PDF itself moved) would add a trailing slash.
+        let new_path = if suffix.as_os_str().is_empty() {
+            to.to_string()
+        } else {
+            Path::new(to).join(suffix).to_string_lossy().into_owned()
+        };
         let target = dir.join(filename(&new_path));
         if target.exists() {
             return Err("collision".into());
@@ -261,6 +266,7 @@ mod tests {
         assert!(read_at(&dir, path).unwrap().is_some());
         move_at(&dir, path, "/a/new.pdf").unwrap();
         assert!(read_at(&dir, path).unwrap().is_none());
+        assert!(read_at(&dir, "/a/new.pdf").unwrap().is_some());
         move_at(&dir, "/a", "/b").unwrap();
         assert!(read_at(&dir, "/b/new.pdf").unwrap().is_some());
         fs::write(

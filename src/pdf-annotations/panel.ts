@@ -34,9 +34,9 @@ export function createAnnotationsPanel(doc: Document, options: { list(): Annotat
       const date = doc.createElement("small"); date.textContent = formatAnnotationDate(first.updated); date.title = first.updated;
       body.append(quote, comment, date); body.addEventListener("click", () => options.open(first)); body.addEventListener("dblclick", () => options.edit(first));
       const more = doc.createElement("details"); const summary = doc.createElement("summary"); summary.textContent = "⋯"; summary.setAttribute("aria-label", "Annotation actions");
-      const expand = doc.createElement("button"); expand.type = "button"; expand.textContent = "Expand quote"; expand.addEventListener("click", () => { quote.classList.toggle("expanded"); expand.textContent = quote.classList.contains("expanded") ? "Collapse quote" : "Expand quote"; });
-      const copy = doc.createElement("button"); copy.type = "button"; copy.textContent = "Copy Quote"; copy.addEventListener("click", () => options.copy(first));
-      more.append(summary, expand, copy); row.append(check, body, more); list.append(row);
+      const expand = doc.createElement("button"); expand.type = "button"; expand.textContent = "Expand quote"; expand.addEventListener("click", () => { more.open = false; quote.classList.toggle("expanded"); expand.textContent = quote.classList.contains("expanded") ? "Collapse quote" : "Expand quote"; });
+      const copy = doc.createElement("button"); copy.type = "button"; copy.textContent = "Copy Quote"; copy.addEventListener("click", () => { more.open = false; options.copy(first); });
+      const menu = doc.createElement("div"); menu.className = "pdf-annotations-menu"; menu.append(expand, copy); more.append(summary, menu); row.append(check, body, more); list.append(row);
     }
   }
   filter.addEventListener("input", refresh);

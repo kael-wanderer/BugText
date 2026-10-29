@@ -8,12 +8,27 @@ import { newId, normalizeQuote, type Annotation, type AnnotationColor } from "./
 import type { AnnotationStore } from "./store";
 import type { AnnotationLayer } from "./layer";
 
+/** Client rects of the selected text only: a range's own rects also include the boxes of elements it fully contains. */
+function textRects(range: Range, root: Node): DOMRect[] {
+  const rects: DOMRect[] = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!range.intersectsNode(node)) continue;
+    const part = document.createRange(); part.selectNodeContents(node);
+    if (node === range.startContainer) part.setStart(node, range.startOffset);
+    if (node === range.endContainer) part.setEnd(node, range.endOffset);
+    rects.push(...Array.from(part.getClientRects()).filter((r) => r.width > 0 && r.height > 0));
+  }
+  return rects;
+}
+
 type Page = { element: HTMLElement; box: { page: number; width: number; height: number } };
 export function createAnnotationController(host: HTMLElement, store: AnnotationStore, pages: Page[], layers: AnnotationLayer[], enabled: () => boolean, path: string, baseDir: string, title: string): { edit(item: Annotation): void; copy(): void; destroy(): void } {
   let selected: string | null = null;
   let pending: { page: number; rects: Annotation["rects"]; quote: string }[] = [];
   let box: ReturnType<typeof createCommentBox> | null = null;
   let color: AnnotationColor = "yellow";
+  let anchor = new DOMRect();
   try { const saved = localStorage.getItem("bugtext.annotColor"); if (["yellow", "green", "blue", "pink"].includes(saved ?? "")) color = saved as AnnotationColor; } catch { /* unavailable */ }
   const report = (error: unknown): void => showToast(`Annotation: ${String(error)}`);
   const select = (id: string | null): void => { selected = id; layers.forEach((layer) => layer.select(id)); };
@@ -28,14 +43,14 @@ export function createAnnotationController(host: HTMLElement, store: AnnotationS
     const existing = current();
     if (existing && !pending.length) {
       await store.update(existing.id, { color, updated: new Date().toISOString() });
-      if (openComment) comment(existing, bar.element.getBoundingClientRect());
+      if (openComment) { bar.hide(); comment(existing, anchor); }
       return;
     }
     if (!pending.length) { showToast("Select text to highlight. This page has no text — run OCR first."); return; }
     const group = pending.length > 1 ? newId() : null; const now = new Date().toISOString();
     const items: Annotation[] = pending.map((part) => ({ ...part, id: newId(), group, color, comment: "", created: now, updated: now }));
     await store.add(items); pending = []; select(items[0].id); window.getSelection()?.removeAllRanges();
-    if (openComment) comment(items[0], bar.element.getBoundingClientRect()); else bar.hide();
+    bar.hide(); if (openComment) comment(items[0], anchor);
   };
   const remove = async (): Promise<void> => {
     const item = current(); if (!item) return;
@@ -56,24 +71,24 @@ export function createAnnotationController(host: HTMLElement, store: AnnotationS
   const onSelection = (): void => {
     if (!enabled()) { bar.hide(); return; }
     const selection = window.getSelection(); if (!selection || selection.isCollapsed || !selection.rangeCount) return;
-    const range = selection.getRangeAt(0); const allRects = Array.from(range.getClientRects());
-    const parts: typeof pending = [];
+    const range = selection.getRangeAt(0);
+    const parts: typeof pending = []; const shown: DOMRect[] = [];
     for (const page of pages) {
       const textLayer = page.element.querySelector(".pdf-text-layer");
       if (!textLayer || !range.intersectsNode(textLayer)) continue;
       const bounds = page.element.getBoundingClientRect();
-      const rects = allRects.filter((r) => r.width > 0 && r.height > 0 && r.left < bounds.right && r.right > bounds.left && r.top < bounds.bottom && r.bottom > bounds.top);
-      if (!rects.length) continue;
       const sub = range.cloneRange(); const nodeRange = document.createRange(); nodeRange.selectNodeContents(textLayer);
       if (sub.compareBoundaryPoints(Range.START_TO_START, nodeRange) < 0) sub.setStart(nodeRange.startContainer, nodeRange.startOffset);
       if (sub.compareBoundaryPoints(Range.END_TO_END, nodeRange) > 0) sub.setEnd(nodeRange.endContainer, nodeRange.endOffset);
+      const rects = textRects(sub, textLayer); if (!rects.length) continue;
+      shown.push(...rects);
       const scale = bounds.width / page.box.width || 1;
       const pageRects = pdfSelectionClientRectsToPageRects(page.box, bounds, rects, scale, 0);
       const quote = normalizeQuote(sub.toString());
       if (pageRects.length && quote) parts.push({ page: page.box.page, quote, rects: pageRects.slice(0, 200).map((r) => [r.x, r.y, r.width, r.height]) });
     }
     if (!parts.length) return;
-    pending = parts; select(null); bar.show(allRects[0], false);
+    pending = parts; select(null); anchor = shown[shown.length - 1]; bar.show(shown[0], false);
   };
   const onMouseUp = (event: MouseEvent): void => {
     if (!enabled()) return;
@@ -82,7 +97,7 @@ export function createAnnotationController(host: HTMLElement, store: AnnotationS
     const bounds = page.element.getBoundingClientRect(); const scale = bounds.width / page.box.width || 1;
     const x = (event.clientX - bounds.left) / scale, y = (event.clientY - bounds.top) / scale;
     const item = store.document.annotations.find((a) => a.page === page.box.page && a.rects.some(([left, top, width, height]) => x >= left && x <= left + width && y >= top && y <= top + height));
-    if (item) { pending = []; select(item.id); bar.show(new DOMRect(event.clientX, event.clientY, 1, 1), true); }
+    if (item) { pending = []; select(item.id); anchor = new DOMRect(event.clientX, event.clientY, 1, 1); bar.show(anchor, true); }
     else { select(null); bar.hide(); }
   };
   const onKey = (event: KeyboardEvent): void => {

@@ -1796,7 +1796,7 @@ body.search-active #search-panel {
   border-radius: 6px;
 }
 
-.pdf-inspector button:hover:not(:disabled) {
+.pdf-inspector button:hover:not(:disabled, .pdf-annot-dot) {
   color: var(--text-strong);
   background: var(--selection);
 }
@@ -2052,7 +2052,15 @@ body.search-active #search-panel {
   --min-font-size: 1;
   --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
+  /* pdf.js sizes the layer to the unrotated page with these rounding steps. */
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
 }
+
+/* The text layer is laid out unrotated; turn it to match a rotated page. */
+.pdf-text-layer[data-main-rotation="90"] { transform: rotate(90deg) translateY(-100%); }
+.pdf-text-layer[data-main-rotation="180"] { transform: rotate(180deg) translate(-100%, -100%); }
+.pdf-text-layer[data-main-rotation="270"] { transform: rotate(270deg) translateX(-100%); }
 
 .pdf-text-layer :is(span, br) {
   position: absolute;
@@ -3514,11 +3522,12 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .pdf-annot-bar[hidden] { display: none; }
 .pdf-annot-bar button { cursor: pointer; }
 .pdf-annot-dot { width: 18px; height: 18px; border: 1px solid #0004; border-radius: 50%; }
-.pdf-annot-dot-yellow { background: #f2c200; } .pdf-annot-dot-green { background: #3fb565; }
-.pdf-annot-dot-blue { background: #4a8cf0; } .pdf-annot-dot-pink { background: #ec5aa0; }
+.pdf-annot-dot.pdf-annot-dot-yellow { background: #f2c200; } .pdf-annot-dot.pdf-annot-dot-green { background: #3fb565; }
+.pdf-annot-dot.pdf-annot-dot-blue { background: #4a8cf0; } .pdf-annot-dot.pdf-annot-dot-pink { background: #ec5aa0; }
 .pdf-annot-comment textarea { width: 260px; min-height: 80px; resize: vertical; }
 .pdf-annotations-panel { display: grid; gap: 10px; }
 .pdf-annotations-colors { display: flex; gap: 7px; }
+.pdf-annotations-colors .pdf-annot-dot { min-height: 0; padding: 0; border-radius: 50%; }
 .pdf-annotations-colors [aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
 .pdf-annotations-row { display: flex; align-items: flex-start; gap: 7px; padding: 8px; border-left: 3px solid #f2c200; border-bottom: 1px solid var(--border-soft); }
 .pdf-annotations-green { border-left-color: #3fb565; } .pdf-annotations-blue { border-left-color: #4a8cf0; } .pdf-annotations-pink { border-left-color: #ec5aa0; }
@@ -3532,3 +3541,5 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .pdf-annot-comment-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 11px; }
 .pdf-annotations-quote.expanded { display: block; }
 .pdf-annotations-row summary { cursor: pointer; }
+.pdf-annotations-row details { position: relative; flex: none; }
+.pdf-annotations-menu { position: absolute; right: 0; top: 100%; z-index: 5; display: grid; gap: 4px; padding: 6px; white-space: nowrap; background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: 6px; box-shadow: 0 3px 12px #0004; }

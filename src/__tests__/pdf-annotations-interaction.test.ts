@@ -42,4 +42,38 @@ describe("annotation controls", () => {
     expect(mocks.confirm).toHaveBeenCalledWith("Delete both parts?", expect.anything()); expect(store.remove).toHaveBeenCalledWith(["abc123", "def456"]);
     const action = mocks.toast.mock.calls[mocks.toast.mock.calls.length - 1]?.[2] as unknown as { run(): void }; action.run(); expect(store.restore).toHaveBeenCalledWith([item, second]); controller.destroy();
   });
+  it("hides the selection bar and opens the comment box below the highlight", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const page = document.createElement("div"); page.innerHTML = '<div class="pdf-text-layer">hello</div>'; host.append(page);
+    vi.spyOn(page, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 100, 100));
+    const store = { document: { annotations: [{ ...item, group: null }] }, update: vi.fn(async () => {}) } as unknown as AnnotationStore;
+    const controller = createAnnotationController(host, store, [{ element: page, box: { page: 1, width: 100, height: 100 } }], [{ select: vi.fn() } as never], () => true, "/a.pdf", "/", "");
+    page.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: 15, clientY: 25 }));
+    const bar = document.querySelector<HTMLElement>(".pdf-annot-bar")!; expect(bar.hidden).toBe(false);
+    Array.from(bar.querySelectorAll("button")).find((b) => b.textContent === "Comment")!.click(); await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(bar.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>("textarea")?.closest<HTMLElement>("body > *")?.style.top).toBe("34px");
+    controller.destroy();
+  });
+  it("highlights only the selected text, not the boxes of elements inside the selection", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const page = document.createElement("div"); page.innerHTML = '<div class="pdf-text-layer"><span>hello</span><div class="end"></div></div>'; host.append(page);
+    vi.spyOn(page, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 100, 100));
+    const original = Range.prototype.getClientRects;
+    Range.prototype.getClientRects = function (this: Range) {
+      const rect = this.startContainer.nodeType === Node.TEXT_NODE ? new DOMRect(10, 20, 30, 10) : new DOMRect(0, 0, 100, 100);
+      return Object.assign([rect], { item: () => rect }) as unknown as DOMRectList;
+    };
+    try {
+      const store = { document: { annotations: [] }, add: vi.fn(async () => {}) } as unknown as AnnotationStore;
+      const controller = createAnnotationController(host, store, [{ element: page, box: { page: 1, width: 100, height: 100 } }], [{ select: vi.fn() } as never], () => true, "/a.pdf", "/", "");
+      const range = document.createRange(); range.selectNodeContents(page.querySelector(".pdf-text-layer")!);
+      window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+      page.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+      host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "h" })); await Promise.resolve();
+      const added = (store.add as unknown as { mock: { calls: Annotation[][][] } }).mock.calls[0][0];
+      expect(added[0].rects).toEqual([[10, 20, 30, 10]]);
+      controller.destroy();
+    } finally { Range.prototype.getClientRects = original; }
+  });
 });

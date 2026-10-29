@@ -2269,7 +2269,7 @@ export async function renderPdf(
     currentPage = page;
     syncToolbar();
     if (!ocrBusy) inspector.refresh("ocr");
-    options?.onPageChange?.(page, pages.length);
+    options?.onPageChange?.(page, document.numPages);
   };
   const goToPage = (page: number): void => {
     const view = pages[page - 1];
