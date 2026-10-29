@@ -121,7 +121,8 @@ export function createSearchPanel(
         ln.textContent = hit.page ? `p${hit.page}` : String(hit.line);
         const snippet = document.createElement("span");
         snippet.className = "search-snippet";
-        const highlighted = firstSearchMatch(hit.snippet, query, options) ?? {
+        const inlineQuery = replaceOpen && options.regex ? query.replace(/\(\?P</g, "(?<") : query;
+        const highlighted = firstSearchMatch(hit.snippet, inlineQuery, options) ?? {
           start: hit.match_start,
           end: hit.match_end,
         };
@@ -134,7 +135,7 @@ export function createSearchPanel(
         snippet.append(before, mark);
         if (replaceOpen) {
           const inserted = document.createElement("ins");
-          const expression = searchExpression(query, options);
+          const expression = searchExpression(inlineQuery, options);
           if (options.regex && expression) {
             const match = expression.exec(hit.snippet);
             inserted.textContent = match ? replacement.value.replace(/\$\$|\$\{([^}]+)\}|\$([A-Za-z_0-9]+)/g, (whole, braced: string, bare: string) => {
@@ -161,8 +162,8 @@ export function createSearchPanel(
     const folder = deps.getFolder();
     const query = input.value.trim();
     state = new SearchRun(); progress.hidden = true; results.replaceChildren(); notes.replaceChildren(); input.removeAttribute("aria-invalid");
-    if (!folder) { status.textContent = "Open a folder to search its files."; return; }
-    if (query.length < (replaceOpen ? 1 : 2)) { status.textContent = query ? "Type at least 2 characters." : ""; return; }
+    if (!folder) { groupValid = false; updateButton(); status.textContent = "Open a folder to search its files."; return; }
+    if (query.length < (replaceOpen ? 1 : 2)) { groupValid = false; updateButton(); status.textContent = query ? "Type at least 2 characters." : ""; return; }
     groupValid = false; groupError.textContent = ""; message = "";
     state.phase = "text"; render(query);
     if (replaceOpen) {
@@ -236,6 +237,7 @@ export function createSearchPanel(
     });
   });
 
+  updateButton();
   return {
     focus: () => {
       input.focus();

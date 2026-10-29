@@ -13,6 +13,16 @@ export function showReplaceResult(changed: { path: string; matches: number }[], 
   const close = document.createElement("button"); close.textContent = "Done"; close.onclick = () => scrim.remove();
   if (changed.length) { const button = document.createElement("button"); button.textContent = "Undo replace"; button.onclick = () => { scrim.remove(); undo(); }; foot.append(button); }
   foot.append(close); sheet.append(foot);
-  scrim.onkeydown = e => { e.stopPropagation(); if (e.key === "Escape") scrim.remove(); }; scrim.append(sheet); document.body.append(scrim); close.focus();
+  scrim.onkeydown = e => {
+    e.stopPropagation();
+    if (e.key === "Escape") scrim.remove();
+    if (e.key === "Tab") {
+      const buttons = Array.from(sheet.querySelectorAll<HTMLButtonElement>("button:not([disabled])"));
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      if (buttons.length && ((e.shiftKey && index <= 0) || (!e.shiftKey && (index < 0 || index === buttons.length - 1)))) {
+        e.preventDefault(); buttons[e.shiftKey ? buttons.length - 1 : 0].focus();
+      }
+    }
+  }; scrim.append(sheet); document.body.append(scrim); close.focus();
   return () => scrim.remove();
 }

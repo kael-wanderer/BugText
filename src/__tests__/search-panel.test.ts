@@ -46,6 +46,7 @@ describe("replace in search", () => {
     mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("docs/a.md")) : Promise.resolve());
     const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => ["a.pdf", "docs/a.md"], onOpenHit: () => {} });
     const query = host.querySelector<HTMLInputElement>(".search-input")!, replacement = host.querySelector<HTMLInputElement>(".search-replacement")!;
+    expect(host.querySelector<HTMLButtonElement>(".search-preview-replace")!.disabled).toBe(true);
     query.value = "hello"; replacement.value = "world"; host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush();
     expect(host.querySelector<HTMLElement>(".search-replace-fields")!.hidden).toBe(false); expect(host.querySelector("del")?.textContent).toBe("hello"); expect(host.querySelector("ins")?.textContent).toBe("world"); expect(mocks.pdf).not.toHaveBeenCalled(); expect(host.textContent).toContain("Replace searches text files only.");
     const exclude = host.querySelector<HTMLInputElement>(".search-exclude")!; exclude.value = "*.md"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); expect(host.querySelector(".search-hit")).toBeNull();
@@ -55,6 +56,7 @@ describe("replace in search", () => {
     const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
     const query = host.querySelector<HTMLInputElement>(".search-input")!, replacement = host.querySelector<HTMLInputElement>(".search-replacement")!;
     query.value = "(hello)"; replacement.value = "$1!"; host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush(); host.querySelector<HTMLButtonElement>('[data-option="regex"]')!.click(); await flush(); await flush(); expect(host.querySelector("ins")?.textContent).toBe("hello!");
+    query.value = "(?P<word>hello)"; replacement.value = "${word}!"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush(); expect(host.querySelector("ins")?.textContent).toBe("hello!");
     replacement.value = "$4"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); expect(host.textContent).toContain("Group 4 is not in the pattern."); expect(host.querySelector<HTMLButtonElement>(".search-preview-replace")!.disabled).toBe(true);
   });
 });
