@@ -2,6 +2,7 @@ import { BUILT_IN_PRESETS, presetsFor, validPresetName, type ExportPreset } from
 import type { ExportDiagnostics } from "../export/export-sheet";
 import { button, caption, group, pageHeader, row } from "./controls";
 import type { SettingsPage } from "./screen";
+import { showToast } from "../toast";
 
 let selectedId = "standard";
 export function selectExportPreset(id: string): void { selectedId = id; }
@@ -10,7 +11,6 @@ export const exportPage: SettingsPage = {
   id: "export",
   render(host, deps) {
     let diagnostics: ExportDiagnostics | null = null;
-    let deleted: ExportPreset | null = null;
     let naming: "new" | "duplicate" | "rename" | null = null;
     const save = (presets: ExportPreset[]) => { const settings = deps.getSettings(); deps.onSettingsChange({ ...settings, export: { ...settings.export, presets } }); };
     const draw = () => {
@@ -31,10 +31,11 @@ export const exportPage: SettingsPage = {
       host.append(row("export-preset", "Preset", null, picker));
       const duplicate = button("Duplicate", () => { naming = "duplicate"; draw(); });
       const rename = button("Rename", () => { naming = "rename"; draw(); }); rename.disabled = !!selected.builtIn;
-      const remove = button("Delete", () => { deleted = selected; save(settings.presets.filter(p => p.id !== selected.id)); selectedId = "standard"; draw(); }); remove.disabled = !!selected.builtIn;
+      // The app toast outlives this page, which re-renders after every settings save.
+      const remove = button("Delete", () => { const deleted = selected; save(settings.presets.filter(p => p.id !== deleted.id)); selectedId = "standard"; draw();
+        showToast(`Deleted "${deleted.name}"`, 6000, { label: "Undo", run: () => { save([...deps.getSettings().export.presets, deleted]); selectedId = deleted.id; draw(); } }); }); remove.disabled = !!selected.builtIn;
       const reset = button("Reset", () => { save(settings.presets.filter(p => p.id !== selected.id)); draw(); }); reset.disabled = !selected.builtIn || selected.id === "standard" || !settings.presets.some(p => p.id === selected.id);
       host.append(group(button("New", () => { naming = "new"; draw(); }), duplicate, rename, remove, reset));
-      if (deleted) { const toast = document.createElement("div"); toast.setAttribute("role", "status"); toast.append(document.createTextNode(`Deleted "${deleted.name}" · `), button("Undo", () => { if (deleted) { const current = deps.getSettings().export; save([...current.presets, deleted]); selectedId = deleted.id; deleted = null; draw(); } })); host.append(toast); }
       if (naming) {
         const input = document.createElement("input"); input.setAttribute("aria-label", "Preset name"); input.maxLength = 40; input.value = naming === "rename" ? selected.name : naming === "duplicate" ? `${selected.name} copy` : "New preset";
         const error = document.createElement("p"); error.setAttribute("role", "alert");

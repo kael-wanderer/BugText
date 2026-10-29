@@ -16,7 +16,11 @@ it("creates, renames, duplicates, deletes and restores a preset", async () => {
   click("Rename"); const name = host.querySelector<HTMLInputElement>('[aria-label="Preset name"]')!; name.value = "Report"; click("Save name"); expect(host.querySelector('[role="alert"]')!.textContent).toContain("unique"); name.value = "Mine"; click("Save name");
   expect(settings.export.presets[0].name).toBe("Mine");
   click("Duplicate"); click("Save name"); expect(settings.export.presets).toHaveLength(2);
-  click("Delete"); expect(settings.export.presets).toHaveLength(1); expect(host.textContent).toContain('Deleted "Mine copy"'); click("Undo"); expect(settings.export.presets).toHaveLength(2);
+  click("Delete"); expect(settings.export.presets).toHaveLength(1);
+  // The settings screen re-renders the page after a save; the Undo toast must survive that.
+  exportPage.render(host, deps); await Promise.resolve();
+  const toast = document.querySelector('.app-toast')!; expect(toast.textContent).toContain('Deleted "Mine copy"');
+  toast.querySelector("button")!.click(); expect(settings.export.presets).toHaveLength(2);
   const picker = host.querySelector<HTMLSelectElement>('[aria-label="Export preset"]')!; picker.value = "handout"; picker.dispatchEvent(new Event("change"));
   const margin = host.querySelector<HTMLInputElement>('[aria-label="Margins"]')!; margin.value = "30"; margin.dispatchEvent(new Event("change"));
   expect(settings.export.presets.find(p => p.id === "handout")?.page.marginMm).toBe(30);
