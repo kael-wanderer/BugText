@@ -31,7 +31,7 @@ import {
   type GuardDeps,
 } from "./agent-run-guard";
 import {
-  CLI_LABELS,
+  engineLabel,
   engineKey,
   engineOptions,
   modelOptions,
@@ -575,7 +575,7 @@ export function createAIPanel(
         built.messages,
         (chunk) => {
           reply += chunk;
-          if (replyElement) replyElement.textContent = reply;
+          if (replyElement) replyElement.textContent = reply.trimStart();
           messagesElement.scrollTop = messagesElement.scrollHeight;
         },
         {
@@ -602,20 +602,7 @@ export function createAIPanel(
           { role: "user", content: prompt },
           { role: "assistant", content: reply },
         );
-        const connection =
-          row.engine.kind === "api"
-            ? settings.connections.find(
-                (c) =>
-                  c.id ===
-                  (row.engine.kind === "api" ? row.engine.connectionId : ""),
-              )
-            : null;
-        const model =
-          row.model ||
-          connection?.textModel ||
-          (row.engine.kind === "cli"
-            ? CLI_LABELS[row.engine.tool]
-            : "Default model");
+        const model = engineLabel(row, settings);
         try {
           const value = await switcher.finish(conversationRun, [
             { role: "user", text: prompt, time: started },
@@ -628,7 +615,7 @@ export function createAIPanel(
         const meta = element(
           "div",
           "ai-reply-meta",
-          `${workingDir ? `Searched ${deps.getFileList().filter((file) => /\.(md|markdown|txt)$/i.test(file.path)).length} notes · ` : ""}${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
+          `${workingDir && sentChips.search ? `Searched ${deps.getFileList().filter((file) => /\.(md|markdown|txt)$/i.test(file.path)).length} notes · ` : ""}${model} · ${((Date.now() - started) / 1000).toFixed(1)}s`,
         );
         for (const path of sources)
           meta.append(
@@ -702,17 +689,21 @@ export function createAIPanel(
     async runAction(action, actionDeps) {
       await historyReady;
       if (remotelyLocked || activeRequest) return;
-      if (action.result === "edit") { let sent: ContextSent | undefined; await runQuickAction(action, { ...actionDeps, onContext: context => { sent = context; } }); const disclosure = renderContextSent(sent, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure); return; }
+      let done: { model: string; seconds: number } | undefined;
+      const onReplyDone = (meta: { model: string; seconds: number }) => { done = meta; };
+      const appendMeta = () => { if (done) messagesElement.append(element("div", "ai-reply-meta", `${done.model} · ${done.seconds.toFixed(1)}s`)); };
+      if (action.result === "edit") { let sent: ContextSent | undefined; await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { sent = context; } }); appendMeta(); const disclosure = renderContextSent(sent, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure); return; }
       const run = await switcher.begin(action.name, structuredClone(chipState));
       if (!run) return;
       const request = actionDeps.makeAbort(); activeRequest = request;
       let actionContext: ContextSent | undefined;
       const bubbles: { role: string; node: { textContent: string | null } }[] = [];
       try {
-        await runQuickAction(action, { ...actionDeps, onContext: context => { actionContext = context; }, makeAbort: () => request,
+        await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { actionContext = context; }, makeAbort: () => request,
           appendBubble(role, text) { const node = actionDeps.appendBubble(role, text); bubbles.push({ role, node }); return node; },
         });
-        const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now(), ...(b.role === "assistant" ? { context: actionContext } : {}) }));
+        const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now(), ...(b.role === "assistant" ? { context: actionContext, ...(done ? { engine: done.model } : {}) } : {}) }));
+        appendMeta();
         const disclosure = renderContextSent(actionContext, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure);
         if (messages.some(m => m.role === "assistant")) {
           const value = await switcher.finish(run, messages);

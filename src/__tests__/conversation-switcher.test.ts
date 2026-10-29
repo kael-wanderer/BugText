@@ -36,7 +36,7 @@ it("renames inline and deletes with Undo", async () => {
   const x = setup(); await x.ui.init(null); x.open(); const row = x.host.querySelector<HTMLElement>(".ai-conversation-item")!; x.click("Rename", row); const input = row.querySelector("input")!; input.value = "<b>Renamed</b>"; x.click("Save", row);
   await vi.waitFor(() => expect(x.host.textContent).toContain("<b>Renamed</b>")); expect(x.host.querySelector("b")).toBeNull();
   x.click("Delete", x.host.querySelector<HTMLElement>(".ai-conversation-item")!);
-  await vi.waitFor(() => expect(document.body.textContent).toContain("Deleted ·")); const undo = [...document.querySelectorAll("button")].find(b => b.textContent === "Undo")!; undo.click();
+  await vi.waitFor(() => expect(document.querySelector(".app-toast")?.textContent).toMatch(/^Deleted ".+" Undo$/)); expect(document.querySelector(".app-toast b")).toBeNull(); const undo = [...document.querySelectorAll("button")].find(b => b.textContent === "Undo")!; undo.click();
   await vi.waitFor(() => expect(x.store.restore).toHaveBeenCalledWith("/notes", "a")); expect(x.emitted.some(e => e.kind === "delete")).toBe(true);
 });
 it("saves to the captured folder and loads a different folder list", async () => {

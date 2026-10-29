@@ -33,6 +33,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ### Fixed
 
 - Export presets with a title from the first heading no longer number sections "0.1, 0.2": once the `#` title moves to the title block, `##` sections become the top level.
+- AI edits (Proofread, Rewrite and Edit actions) no longer insert the model's leading blank lines or join words at the end of a selection: the reply keeps the original text's surrounding whitespace.
+- Saved AI action replies now show the model and time under the reply, like Chat, so an action's engine override is visible.
+- AI replies no longer start with a blank gap when the model opens with empty lines.
+- Chat replies no longer say "Searched N notes" when Folder search is off.
+- Settings ▸ AI ▸ Actions: action rows keep their name, summary and buttons aligned; the summary shows the connection name instead of an internal id; and the Delete toast names the action.
+- Deleting a conversation shows its title in the Undo toast.
 - Deleting an export preset in Settings ▸ Export now shows the "Deleted … · Undo" toast; it previously vanished as soon as the page refreshed after the save.
 - The new AI settings pages load on demand to keep the startup bundle below the existing chunk-warning limit.
 - Action reorder moves a row down by one correctly, and saving ai-actions.json from a document tab applies the actions immediately.

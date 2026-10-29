@@ -3,6 +3,7 @@ import { parseActions } from "../ai/actions-store";
 import { QUICK_ACTIONS } from "../ai/quick-actions";
 import { engineKey, engineOptions, effortLevels, modelOptions } from "../ai/engines";
 import type { ScreenDeps } from "./screen";
+import type { Engine } from "../ai/aisettings";
 import { button, caption, row, toggle, select, group } from "./controls";
 export type ActionsPageDeps = {
   getFile(): ActionsFile;
@@ -23,6 +24,10 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     try { await api!.save({ ...api!.getFile(), actions }); draw(); }
     catch (e) { notice.textContent = e instanceof Error ? e.message : "Could not save actions"; }
   }
+  function engineName(engine: Engine): string {
+    const key = engineKey(engine);
+    return engineOptions(deps.getAISettings(), deps.getClis(), engine).find(o => o.value === key)?.label ?? key;
+  }
   function fresh(name = "", instruction = "", result: SavedAction["result"] = "edit"): SavedAction {
     return { id: crypto.randomUUID(), name, instruction, result, input: "selection-or-note", engine: null, panel: true };
   }
@@ -35,12 +40,14 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     if (api!.hasError()) { const warning = document.createElement("p"); warning.textContent = "ai-actions.json could not be read. Built-in actions still work; your file was not changed."; page.append(warning, button("Open file", api!.openFile)); }
     const actions = api!.getFile().actions;
     for (const a of actions) {
-      const item = row("my-actions", a.name, `${a.result === "edit" ? "Edit" : "Answer"} · ${a.input === "note" ? "whole note" : "selection, else whole note"} · ${a.engine ? engineKey(a.engine.engine) : "Same as Chat"}${a.panel ? " · in panel" : ""}`, group(
+      const item = row("my-actions", a.name, `${a.result === "edit" ? "Edit" : "Answer"} · ${a.input === "note" ? "whole note" : "selection, else whole note"} · ${a.engine ? engineName(a.engine.engine) : "Same as Chat"}${a.panel ? " · in panel" : ""}`, group(
         button("Edit", () => { draft = structuredClone(a); draw(); }),
         button("Duplicate", () => { draft = { ...structuredClone(a), id: crypto.randomUUID(), name: `${a.name.slice(0, 50)} copy` }; draw(); }),
         button("Delete", () => { deleted = { action: a, index: actions.indexOf(a) }; void persist(actions.filter(x => x.id !== a.id)); }),
       ));
-      const grip = document.createElement("span"); grip.textContent = "⋮⋮"; grip.setAttribute("aria-hidden", "true"); item.prepend(grip);
+      const grip = document.createElement("span"); grip.textContent = "⋮⋮"; grip.setAttribute("aria-hidden", "true"); grip.className = "st-action-grip";
+      // Inside the label: the row is a two-column grid, and a third child pushes the buttons out of line.
+      item.querySelector(".st-row-label")!.prepend(grip);
       item.draggable = true; item.setAttribute("aria-label", `Reorder ${a.name}`);
       item.addEventListener("dragstart", () => { dragged = a.id; });
       item.addEventListener("dragover", e => e.preventDefault());
@@ -54,7 +61,7 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     page.append(button("＋ New action", () => { draft = fresh(); draw(); }));
     if (draft) form(draft);
     notice.replaceChildren();
-    if (deleted) notice.append(document.createTextNode("Deleted · "), button("Undo", () => { const next = [...api!.getFile().actions]; next.splice(deleted!.index, 0, deleted!.action); deleted = null; void persist(next); }));
+    if (deleted) notice.append(document.createTextNode(`Deleted "${deleted.action.name}" · `), button("Undo", () => { const next = [...api!.getFile().actions]; next.splice(deleted!.index, 0, deleted!.action); deleted = null; void persist(next); }));
     page.append(notice);
   }
   function form(a: SavedAction): void {

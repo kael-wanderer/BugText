@@ -23,7 +23,7 @@ describe("Actions settings", () => {
   });
   it("deletes and restores with Undo", async () => {
     const ui = setup({ version: 1, actions: [action("one", "One")] }); ui.click("Delete");
-    await vi.waitFor(() => expect(ui.host.textContent).toContain("Deleted")); ui.click("Undo");
+    await vi.waitFor(() => expect(ui.host.textContent).toContain("Deleted \"One\" · ")); ui.click("Undo");
     await vi.waitFor(() => expect(ui.file().actions).toHaveLength(1));
   });
   it("reorders on drag and drop", async () => {

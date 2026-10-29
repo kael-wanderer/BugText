@@ -68,7 +68,7 @@ export function createConversationSwitcher(host: HTMLElement, deps: {
           const input = document.createElement("input"); input.value = item.title; input.setAttribute("aria-label", "Conversation title");
           const save = async () => { const title = input.value.trim(); if (!title) return; try { const value = await store.read(groupFolder, item.id); value.title = title; await persistConversation(groupFolder, value); await notify("write", item.id, groupFolder); if (folder === groupFolder && active?.id === item.id) active = value; await refresh(); } catch { deps.error("Could not rename conversation."); } };
           row.replaceChildren(input, btn("Save", () => { void save(); }), btn("Cancel", draw)); input.addEventListener("keydown", e => { if (e.key === "Enter") void save(); if (e.key === "Escape") draw(); }); input.focus();
-        }), btn("Delete", () => { void remove(groupFolder, item.id); })); menu.append(row);
+        }), btn("Delete", () => { void remove(groupFolder, item.id, item.title); })); menu.append(row);
       }
     }
     group(workspaceFolder ? `${workspaceFolder.split(/[\\/]/).pop()} · this folder` : "No folder", entries, workspaceFolder);
@@ -92,13 +92,13 @@ export function createConversationSwitcher(host: HTMLElement, deps: {
     if (streaming || deps.busy?.()) return;
     generation++; folder = deps.folder(); active = null; open = false; deps.load(null); await refresh();
   }
-  async function remove(group: string | null, id: string): Promise<void> {
+  async function remove(group: string | null, id: string, title: string): Promise<void> {
     if (streaming || deps.busy?.() || locked(id, group)) return;
     try {
       await store.delete(group, id); await notify("delete", id, group);
       if (folder === group && active?.id === id) { active = null; deps.load(null); }
       await refresh();
-      showToast("Deleted ·", 7000, { label: "Undo", run: () => { void store.restore(group, id).then(async () => { await notify("write", id, group); await refresh(); }).catch(() => deps.error("Could not restore conversation.")); } });
+      showToast(`Deleted "${title}"`, 7000, { label: "Undo", run: () => { void store.restore(group, id).then(async () => { await notify("write", id, group); await refresh(); }).catch(() => deps.error("Could not restore conversation.")); } });
     } catch { deps.error("Could not delete conversation."); }
   }
   async function reload(): Promise<void> {

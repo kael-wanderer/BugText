@@ -3,6 +3,7 @@ import {
   QUICK_ACTIONS,
   actionScope,
   enabledQuickActions,
+  matchEdges,
   runQuickAction,
 } from "../ai/quick-actions";
 import { streamChat } from "../ai/client";
@@ -40,6 +41,14 @@ describe("actionScope", () => {
       text: "whole doc",
       whole: true,
     });
+  });
+});
+
+describe("matchEdges", () => {
+  it("drops the reply's padding and keeps the selection's surrounding whitespace", () => {
+    expect(matchEdges("Wir haben. Anna ", "\n\nWe have. Anna")).toBe("We have. Anna ");
+    expect(matchEdges("# Notes\n\nText\n", "\n# Notes\n\nText")).toBe("# Notes\n\nText\n");
+    expect(matchEdges("  indented", "indented  \n")).toBe("  indented");
   });
 });
 
@@ -185,6 +194,14 @@ describe("saved action runner", () => {
     await runQuickAction(action, { ...baseDeps(), appendBubble: append });
     expect(append).toHaveBeenCalledWith("user", "▸ Extract · on selection (1 line)");
     expect(streamChat).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.any(Array), expect.any(Function), expect.objectContaining({ folder: null, write: false }));
+  });
+  it("hides the reply's leading blank lines and reports the model that answered", async () => {
+    vi.mocked(streamChat).mockImplementationOnce(async (_row, _settings, _messages, onChunk) => { onChunk("\n\n- Ben: draft"); });
+    const node = bubble(); const done = vi.fn();
+    const override = { ...action, engine: { engine: { kind: "cli" as const, tool: "codex" as const }, model: "gpt-x", effort: "" } };
+    await runQuickAction(override, { ...baseDeps(), appendBubble: (role: string) => role === "assistant" ? node : bubble(), onReplyDone: done });
+    expect(node.textContent).toBe("- Ben: draft");
+    expect(done).toHaveBeenCalledWith(expect.objectContaining({ model: "gpt-x" }));
   });
   it("reviews a whole-note edit", async () => {
     const review = vi.fn();

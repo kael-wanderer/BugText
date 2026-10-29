@@ -258,8 +258,9 @@ it("persists an Answer action in the active named conversation", async () => {
   });
   expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ messages: expect.arrayContaining([
     expect.objectContaining({ role: "user", text: "▸ Extract · on note" }),
-    expect.objectContaining({ role: "assistant", text: "reply" }),
+    expect.objectContaining({ role: "assistant", text: "reply", engine: expect.any(String) }),
   ]) }));
+  expect(root.querySelector(".ai-reply-meta")?.textContent).toMatch(/ · \d+\.\ds$/);
 });
 
 it("refuses excluded attachments and hides them from @ before reading", async () => {
@@ -285,6 +286,7 @@ it("sends prompt only with both chips off and persists chips and Context sent", 
   const messages = vi.mocked(streamChat).mock.calls[0][2]; expect(JSON.stringify(messages.filter(m => m.role === "user"))).not.toContain("<document>"); expect(deps.workspaceIndex.query).not.toHaveBeenCalled();
   await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ contextChips: { note: false, search: false, files: [] }, messages: expect.arrayContaining([expect.objectContaining({ role: "assistant", context: expect.objectContaining({ excerpts: [], files: [] }) })]) })));
   expect(root.textContent).toContain("Context sent");
+  await vi.waitFor(() => expect(root.querySelector(".ai-reply-meta")).not.toBeNull()); expect(root.querySelector(".ai-reply-meta")!.textContent).not.toContain("Searched");
 });
 it("locks the excluded open note and omits its document block", async () => {
   deps.getSettings().context.exclude = ["private/**"];

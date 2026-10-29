@@ -21,6 +21,15 @@ export const CLI_LABELS: Record<CliTool, string> = {
   pi: "Pi",
 };
 
+/** The model name shown under a reply: the row's model, else the connection's or tool's default. */
+export function engineLabel(row: UseRow, settings: AISettings): string {
+  const engine = row.engine;
+  if (row.model) return row.model;
+  if (engine.kind === "api") return settings.connections.find(c => c.id === engine.connectionId)?.textModel || "Default model";
+  if (engine.kind === "cli") return CLI_LABELS[engine.tool];
+  return "Default model";
+}
+
 export const ENGINE_BADGE: Record<CliTool | "api", { letter: string; cls: string }> = {
   claude: { letter: "C", cls: "claude" },
   codex: { letter: "X", cls: "codex" },

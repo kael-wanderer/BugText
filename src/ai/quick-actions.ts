@@ -1,7 +1,7 @@
 import type { ContextSent } from "./context-sent";
 import { isContextExcluded, exclusionMessage } from "./context-exclude";
 import type { AISettings, FeatureId } from "./aisettings";
-import { type CliInfo } from "./engines";
+import { engineLabel, type CliInfo } from "./engines";
 import { actionEngine, type RunnableAction } from "./actions";
 import { hashText } from "../hash";
 import { buildMessages } from "./conversation";
@@ -61,6 +61,13 @@ export function actionScope(
     : { text: docText, whole: true };
 }
 
+/** Models pad or strip surrounding whitespace; keep the original's so a replaced selection joins its neighbours. */
+export function matchEdges(base: string, reply: string): string {
+  const lead = base.match(/^\s*/)![0];
+  const trail = base.trimStart() ? base.match(/\s*$/)![0] : "";
+  return lead + reply.trim() + trail;
+}
+
 export function enabledQuickActions(settings: AISettings): typeof QUICK_ACTIONS {
   return QUICK_ACTIONS.filter(action => settings.enabled[action.feature]);
 }
@@ -71,6 +78,8 @@ export type BubbleHandle = { textContent: string | null };
 export type QuickActionDeps = {
   notify?: (text: string) => void;
   onContext?: (context: ContextSent) => void;
+  /** Called after a reply finishes, with the model that wrote it. */
+  onReplyDone?: (meta: { model: string; seconds: number }) => void;
   getSettings: () => AISettings;
   getClis: () => CliInfo[];
   getDoc: () => {
@@ -143,6 +152,7 @@ export async function runQuickAction(
   }
   const bubble = deps.appendBubble("assistant", "");
   let reply = "";
+  const started = Date.now();
   const abort = deps.makeAbort();
   try {
     await streamChat(
@@ -151,7 +161,7 @@ export async function runQuickAction(
       built.messages,
       (chunk) => {
         reply += chunk;
-        bubble.textContent = reply;
+        bubble.textContent = reply.trimStart();
       },
       { write: false, folder: null, signal: abort.signal },
     );
@@ -169,6 +179,7 @@ export async function runQuickAction(
     return;
   }
 
+  if (reply.trim()) deps.onReplyDone?.({ model: engineLabel(row, settings), seconds: (Date.now() - started) / 1000 });
   if (normalized.result === "edit") {
     const binding: EditBinding = {
       windowId: doc.windowId,
@@ -179,6 +190,6 @@ export async function runQuickAction(
       to: scope.whole ? doc.text.length : doc.to,
     };
     const base = scope.whole ? doc.text : doc.selection;
-    deps.reviewEdit(base, reply, binding);
+    deps.reviewEdit(base, matchEdges(base, reply), binding);
   }
 }
