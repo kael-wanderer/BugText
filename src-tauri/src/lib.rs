@@ -27,6 +27,7 @@ mod recovery;
 mod sandbox;
 mod secrets;
 mod templates;
+mod workflow_store;
 mod update_feed;
 
 use std::collections::{HashMap, HashSet};
@@ -176,6 +177,7 @@ pub fn run() {
         .manage(pinned_workspaces::PinnedState::default())
         .manage(preview::PreviewRoots::default())
         .manage(preview::PreviewDocs::default())
+        .manage(workflow_store::WorkflowStoreState::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
             preview::respond(ctx.app_handle(), request)
         })
@@ -210,6 +212,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            workflow_store::read_workflow_store,
+            workflow_store::write_workflow_store,
             update_feed::update_feed_fetch,
             app_build,
             mcp_server::mcp_set_enabled,

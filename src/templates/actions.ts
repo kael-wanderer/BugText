@@ -12,6 +12,7 @@ import { showQuickNote } from "./quick-note-popover";
 
 export type TemplateHost = {
   host: () => HTMLElement;
+  newTypedNote?: () => void;
   getFolder: () => string | null;
   getTemplates: () => TemplateSettings;
   setLastUsed: (name: string) => void;
@@ -87,6 +88,7 @@ export function createTemplateActions(host: TemplateHost): TemplateActions {
       onUsed: host.setLastUsed,
       openTemplatesFolder: () => void openTemplatesFolder(),
       newTemplate: () => void newTemplate(),
+      onNoteTypes: host.newTypedNote,
     });
   };
 

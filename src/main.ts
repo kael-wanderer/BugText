@@ -124,6 +124,7 @@ import { paneForTab } from "./mcp/pane-for-tab";
 import { refreshAgentNotices, showAgentNotice } from "./mcp/notice";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
+import type { SavedViewStore } from "./saved-views/store";
 import {
   checkExternalChange,
   clearDraft,
@@ -219,9 +220,13 @@ const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
 });
 // The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
 let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
+let savedViews: SavedViewStore | undefined;
 function loadFilterPanel(): Promise<{ show(on: boolean): Promise<void> }> {
-  filterPanel ??= import("./filter/panel").then(({ createFilterPanel }) =>
-    createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }));
+  filterPanel ??= Promise.all([import("./filter/panel"), import("./saved-views/store")]).then(([{ createFilterPanel }, { createSavedViewStore }]) => {
+    savedViews ??= createSavedViewStore();
+    void savedViews.reload();
+    return createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }, { savedViews });
+  });
   return filterPanel;
 }
 function updateOutline(force = false): void {
@@ -669,6 +674,11 @@ function commandItems(): PaletteItem[] {
   const recent = loadRecent();
   return [
     command("new", "New File", newDoc),
+    command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
+    command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
+    command("edit.extract_note", "Extract Selection to Note", () => withOrganize((actions) => actions.extractSelection())),
+    command("edit.show_tasks", "Tasks in Folder", () => withOrganize((actions) => actions.showTasks())),
+    command("view.live_preview", "Toggle Live Preview", toggleLivePreview),
     command("ai.new_chat", "AI: New chat", newAIChat),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
     command("quickNote", "Quick Note…", () => templateActions.quickNote()),
@@ -771,6 +781,7 @@ const palette = createPalette(() => [
 let lastMarkdownFocus: { windowId: string; tabId: string } | null = null;
 
 const handlers = {
+  livePreviewEnabled: () => livePreviewOn,
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
   onTabContextMenu: (
@@ -1093,6 +1104,52 @@ function requestWindowMeasure(): void {
 
 function activeView(): WindowView {
   return views.get(getState().activeWindowId)!;
+}
+
+type OrganizeActions = ReturnType<typeof import("./notes/actions").createOrganizeActions>;
+let organizeActions: OrganizeActions | undefined;
+// Loaded on first use so the organize code (extract, tasks, note types) stays out of the startup bundle.
+function withOrganize(run: (actions: OrganizeActions) => void): void {
+  if (organizeActions) { run(organizeActions); return; }
+  void import("./notes/actions").then(({ createOrganizeActions }) => {
+    organizeActions ??= createOrganizeActions({
+      host: () => document.getElementById("app")!,
+      getFolder: () => getState().folder,
+      getSource: () => {
+        const tab = activeMeta();
+        if (!tab?.path || !isMarkdownFile(tab.path)) return null;
+        const editor = activeView().editor;
+        const selection = editor.getSelection();
+        return { tabId: tab.id, path: tab.path, text: editor.getText(tab.id), revision: editor.revision(tab.id), from: selection.from, to: selection.to };
+      },
+      apply: (source, change) => {
+        const editor = activeView().editor;
+        if (editor.revision(source.tabId) !== source.revision) return false;
+        editor.applyChanges(source.tabId, [change]);
+        return true;
+      },
+      index: linkIndex,
+      openPath: async (path) => { await doOpenPath(path); },
+      // Only tabs open in the active window can be edited in place; others report that the note must be opened first.
+      openForEdit: async (path) => {
+        const tab = activeWindow().tabs.find((candidate) => candidate.path === path);
+        if (!tab) return null;
+        const editor = activeView().editor;
+        return { tabId: tab.id, path, text: editor.getText(tab.id), revision: editor.revision(tab.id), from: 0, to: 0 };
+      },
+      refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
+      afterDiskWrite,
+      getTemplates: () => currentSettings.templates,
+    });
+    run(organizeActions!);
+  });
+}
+
+let livePreviewOn = false;
+function toggleLivePreview(): void {
+  livePreviewOn = !livePreviewOn;
+  for (const view of views.values()) view.setLivePreviewFlag(livePreviewOn);
+  showToast(livePreviewOn ? "Live preview on for Markdown notes." : "Live preview off.");
 }
 
 function insertNoteLink(): void {
@@ -1551,6 +1608,14 @@ function openPdf(windowId: string, path: string): void {
   });
 }
 
+function afterDiskWrite(path: string): void {
+  void invoke<string>("read_file", { path }).then((text) => {
+    workspaceIndex.onFileChanged(path, text);
+    linkIndex.onFileChanged(path, text);
+    aiPanel?.updateWorkspaceFile(path, text);
+  }).catch(() => {});
+}
+
 const templateActions = createTemplateActions({
   host: () => document.getElementById("app")!,
   getFolder: () => getState().folder,
@@ -1585,13 +1650,7 @@ const templateActions = createTemplateActions({
     return found ? { tabId: found.tab.id, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
   },
   appendToTab: (tabId, text) => editorForTab(tabId).appendText(tabId, text),
-  afterDiskWrite: (path) => {
-    void invoke<string>("read_file", { path }).then((text) => {
-      workspaceIndex.onFileChanged(path, text);
-      linkIndex.onFileChanged(path, text);
-      aiPanel?.updateWorkspaceFile(path, text);
-    }).catch(() => {});
-  },
+  afterDiskWrite,
 });
 
 function newDoc(): void {

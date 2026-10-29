@@ -80,3 +80,16 @@ describe("editor tasks and tables", () => {
     expect(view.state.doc.toString()).toBe("plain");
   });
 });
+
+it("live preview toggles without changing source, revisions or undo", () => {
+  const { editor, view, onChange } = setup("**hello**\nend", 12);
+  const before = editor.revision("note");
+  editor.setLivePreview(true); editor.setLivePreview(false);
+  expect(editor.getText("note")).toBe("**hello**\nend");
+  expect(editor.revision("note")).toBe(before); expect(onChange).not.toHaveBeenCalled();
+  editor.setLivePreview(true);
+  editor.replaceRange(2, 7, "world"); undo(view);
+  expect(editor.getText("note")).toBe("**hello**\nend");
+  editor.setDocumentKind("note", "plain");
+  expect(view.dom.querySelector(".cm-live-strong")).toBeNull();
+});
