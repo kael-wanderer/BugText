@@ -84,6 +84,8 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Restore last session",
     keywords: "reopen folder tabs split startup",
   },
+  { id: "reopen-workspace-windows", page: "general", label: "Reopen workspace windows", keywords: "session startup secondary windows" },
+  { id: "manage-workspaces", page: "general", label: "Manage workspaces", keywords: "session switch workspaces" },
   {
     id: "update-mode",
     page: "general",

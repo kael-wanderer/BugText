@@ -1,3 +1,5 @@
+import type { FilePosition } from "./workspaces/layout";
+import { applyTextPosition, applyPdfPosition, captureTextPosition } from "./workspaces/positions";
 import { bindPreviewLinks } from "./links/follow";
 import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from "./scroll-sync";
 import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
@@ -32,7 +34,6 @@ import {
   PDF_SAVE_AS_EVENT,
   PDF_SAVE_EVENT,
   renderPdf,
-  scrollPdfToPage,
   type PdfFindHandle,
 } from "./pdfview";
 import type { PdfFitMode } from "./pdf-navigation";
@@ -57,6 +58,8 @@ export type WindowHandlers = {
   onToggleSub: () => void;
   onFocusWindow: (windowId: string) => void;
   onNavigation: (windowId: string) => void;
+  getReadingPosition?: (tabId: string) => FilePosition | undefined;
+  onReadingPosition?: (tabId: string, position: FilePosition) => void;
   syncScrollEnabled: () => boolean;
   onDocChange: (windowId: string, tabId: string, text: string) => void;
   onPdfEditDirtyChange: (windowId: string, tabId: string, dirty: boolean) => void;
@@ -77,6 +80,9 @@ export type WindowView = {
   id: string;
   editor: EditorHandle;
   render: () => void;
+  activateDocument: (tabId: string) => void;
+  captureReadingPosition: () => void;
+  restoreReadingPosition: () => Promise<void>;
   renderPreview: (text: string, pathOrName?: string | null) => void;
   jumpToLine: (line: number) => void;
   navigationLine: () => number;
@@ -197,6 +203,9 @@ export function createWindowView(
   let lineNums = true;
   let focusedPane: "editor" | "preview" = "editor";
   let cursorLine = 1;
+  let displayedTabId: string | null = null;
+  let restoringPosition = false;
+  let positionGeneration = 0;
   let previewDocumentId: string | null = null;
   let previewLineCount = 0;
   let placeObserver: ResizeObserver | null = null;
@@ -333,11 +342,57 @@ export function createWindowView(
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
       cursorLine = line;
+      captureReadingPosition();
       h.onNavigation(windowId);
     },
     (tabId, files) => h.onPasteImages(windowId, tabId, files),
     (tabId, html, text, inCode) => h.onPasteText(windowId, tabId, html, text, inCode),
+    tabId => {
+      captureReadingPosition();
+      restoringPosition = true;
+      positionGeneration += 1;
+      displayedTabId = tabId;
+    },
   );
+  function captureReadingPosition(): void {
+    if (!displayedTabId || restoringPosition || isPdfFile(previewPathOrName)) return;
+    h.onReadingPosition?.(displayedTabId, captureTextPosition({
+      cursor: () => editor.cursorOffset(displayedTabId!),
+      topLine: () => lastMode === "preview" && isMarkdownFile(previewPathOrName)
+        ? offsetToLine(previewPane.scrollTop, anchors()) : editor.visibleTopLine(),
+    }));
+  }
+  function activateDocument(tabId: string): void {
+    editor.switchTo(tabId);
+  }
+  async function restoreReadingPosition(): Promise<void> {
+    const tabId = displayedTabId;
+    const generation = ++positionGeneration;
+    const position = tabId ? h.getReadingPosition?.(tabId) : undefined;
+    if (isPdfFile(previewPathOrName)) {
+      restoringPosition = false;
+      if (position?.page !== undefined) {
+        pdfTargetPage = position.page;
+        if (pdfFind) h.onReadingPosition?.(tabId!, applyPdfPosition(position, pdfFind.pageCount(), pdfFind.goToPage));
+      }
+      return;
+    }
+    // Wait for the tab's layout before scrolling; caret reveal must finish first.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    if (generation !== positionGeneration || !tabId) return;
+    applyTextPosition(position ?? {}, {
+      cursor: () => editor.cursorOffset(tabId), topLine: () => editor.visibleTopLine(),
+      text: () => editor.getText(tabId), setCursor: offset => editor.setCursor(tabId, offset),
+      scrollLineToTop: line => {
+        editor.scrollLineToTop(line, false);
+        if (getWindow(windowId)?.mode !== "editor") previewPane.scrollTop = lineToOffset(line, anchors());
+      },
+    });
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    if (generation !== positionGeneration) return;
+    restoringPosition = false;
+    captureReadingPosition();
+  }
   const unbindLinks = bindPreviewLinks(previewPane, () => {
     const w = getWindow(windowId);
     const tab = w?.tabs.find((t) => t.id === w.activeTabId);
@@ -385,13 +440,14 @@ export function createWindowView(
     h.onNavigation(windowId);
   }
   editor.onScroll(() => {
+    captureReadingPosition();
     if (!h.syncScrollEnabled() || getWindow(windowId)?.mode !== "split" || !guard.drive("editor")) return;
     guard.ignore("preview");
     previewPane.scrollTop = lineToOffset(editor.visibleTopLine(), anchors());
   });
   let navigationFrame = 0;
   previewPane.addEventListener("scroll", () => {
-    if (!navigationFrame) navigationFrame = requestAnimationFrame(() => { navigationFrame = 0; h.onNavigation(windowId); });
+    if (!navigationFrame) navigationFrame = requestAnimationFrame(() => { navigationFrame = 0; captureReadingPosition(); h.onNavigation(windowId); });
     if (!h.syncScrollEnabled() || getWindow(windowId)?.mode !== "split" || !guard.drive("preview")) return;
     guard.ignore("editor");
     editor.scrollLineToTop(offsetToLine(previewPane.scrollTop, anchors()), false);
@@ -534,6 +590,7 @@ export function createWindowView(
       ? capturePreviewPlace(previewPane) : null;
     const lineCount = text.split("\n").length;
     const placeLine = place ? shiftedLine(place.line, lineCount - previewLineCount, cursorLine) : 0;
+    if (documentId !== previewDocumentId) pdfTargetPage = documentId ? h.getReadingPosition?.(documentId)?.page : undefined;
     previewDocumentId = documentId;
     previewLineCount = lineCount;
     placeObserver?.disconnect();
@@ -568,6 +625,8 @@ export function createWindowView(
           if (pdfTabId) h.onPdfEditDirtyChange(windowId, pdfTabId, dirty);
         },
         onPageChange: (page, count) => {
+          if (token !== previewRenderToken) return;
+          if (pdfFind && pdfTabId) { pdfTargetPage = page; h.onReadingPosition?.(pdfTabId, { page }); }
           wsWords.textContent = count ? `Page ${page} of ${count}` : "PDF";
         },
         onReloadRequest: () => {
@@ -582,6 +641,8 @@ export function createWindowView(
             return;
           }
           pdfFind = handle;
+          const position = applyPdfPosition({ page: pdfTargetPage }, handle.pageCount(), handle.goToPage);
+          if (pdfTabId) h.onReadingPosition?.(pdfTabId, position);
           if (pdfFit) applyPdfFit(pdfFit);
           else setPreviewZoom(previewZoom);
           if (restoreScroll) {
@@ -910,6 +971,9 @@ export function createWindowView(
 
   return {
     id: windowId,
+    activateDocument,
+    captureReadingPosition,
+    restoreReadingPosition,
     editor,
     render,
     renderPreview,
@@ -935,6 +999,8 @@ export function createWindowView(
       editor.focus();
     },
     destroy: () => {
+      captureReadingPosition();
+      positionGeneration += 1;
       unbindLinks();
       previewRenderToken += 1;
       previewResizeObserver.disconnect();
@@ -946,14 +1012,7 @@ export function createWindowView(
     },
     openPdfPage: (page: number) => {
       pdfTargetPage = page;
-      let attempts = 0;
-      const scrollWhenReady = (): void => {
-        attempts += 1;
-        if (!scrollPdfToPage(previewPane, page) && attempts < 40) {
-          window.setTimeout(scrollWhenReady, 100);
-        }
-      };
-      scrollWhenReady();
+      if (pdfFind) pdfTargetPage = applyPdfPosition({ page }, pdfFind.pageCount(), pdfFind.goToPage).page;
     },
     savePdf: () => {
       if (!isPdfFile(previewPathOrName)) return false;

@@ -1,0 +1,99 @@
+import { loadWorkspaces, updateWorkspaces, type Workspace, type WorkspacesIO } from "./store";
+import type { WorkspaceLayout } from "./layout";
+
+export function createWorkspaceController(deps: {
+  io: WorkspacesIO;
+  capture(): { folder: string | null; layout: WorkspaceLayout };
+  claim(id: string): Promise<string | null>;
+  release(): Promise<void>;
+  display(name: string | null): void;
+  /** Called whenever this window's active workspace id changes. */
+  activeChanged?(previous: string | null, next: string | null): void;
+}) {
+  let active: Workspace | null = null;
+  function setActive(next: Workspace | null): void {
+    const previous = active?.id ?? null;
+    active = next;
+    if (previous !== (next?.id ?? null)) deps.activeChanged?.(previous, next?.id ?? null);
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // A switch closes and reopens tabs; saving that half-built layout would damage the workspace.
+  let paused = false;
+  async function flush(): Promise<void> {
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    const id = active?.id;
+    if (!id) return;
+    const captured = deps.capture();
+    await updateWorkspaces(deps.io, file => {
+      const workspace = file.workspaces.find(item => item.id === id);
+      if (workspace) Object.assign(workspace, captured);
+      return file;
+    });
+  }
+  function changed(): void {
+    if (!active || paused) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { void flush().catch(() => {}); }, 1000);
+  }
+  async function close(): Promise<void> {
+    if (!active) return;
+    try { await flush(); } catch { /* Detaching must remain possible if the file cannot be saved. */ }
+    await deps.release();
+    setActive(null);
+    deps.display(null);
+  }
+  async function save(name: string, pinned: boolean): Promise<void> {
+    name = name.trim();
+    if (!name || name.length > 60) throw new Error("Name must be 1–60 characters");
+    await flush();
+    const previous = active;
+    const id = crypto.randomUUID();
+    const captured = deps.capture();
+    const owner = await deps.claim(id);
+    if (owner) throw new Error("Workspace is already open");
+    try {
+      const file = await updateWorkspaces(deps.io, current => {
+        if (current.workspaces.some(item => item.name.trim().toLowerCase() === name.toLowerCase())) throw new Error(`A workspace named "${name}" already exists.`);
+        current.workspaces.push({ id, name, pinned, pinOrder: Math.max(0, ...current.workspaces.map(item => item.pinOrder)) + 1, openedAt: Date.now(), ...captured });
+        return current;
+      });
+      const saved = file.workspaces.find(item => item.id === id)!;
+      setActive(saved);
+      deps.display(saved.name);
+    } catch (error) {
+      if (previous) await deps.claim(previous.id);
+      else await deps.release();
+      throw error;
+    }
+  }
+  /** Makes a saved workspace this window's active one. Returns the label of the window that already has it, if any. */
+  async function adopt(id: string): Promise<string | null> {
+    const owner = await deps.claim(id);
+    if (owner) return owner;
+    const file = await updateWorkspaces(deps.io, current => {
+      const workspace = current.workspaces.find(item => item.id === id);
+      if (workspace) workspace.openedAt = Date.now();
+      return current;
+    });
+    setActive(file.workspaces.find(item => item.id === id) ?? null);
+    if (!active) await deps.release();
+    deps.display(active?.name ?? null);
+    return null;
+  }
+  function pause(value: boolean): void {
+    paused = value;
+    if (value && timer) { clearTimeout(timer); timer = undefined; }
+  }
+  async function reload(): Promise<void> {
+    if (!active) return;
+    const result = await loadWorkspaces(deps.io);
+    if (result.file) {
+      setActive(result.file.workspaces.find(item => item.id === active!.id) ?? null);
+      // Deleted from another window: stop auto-saving into it and free the claim.
+      if (!active) { if (timer) clearTimeout(timer); timer = undefined; await deps.release(); }
+      deps.display(active?.name ?? null);
+    }
+  }
+  return { save, close, changed, flush, reload, adopt, pause, activeId: () => active?.id ?? null };
+}

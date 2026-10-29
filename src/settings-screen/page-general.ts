@@ -49,7 +49,7 @@ export const generalPage: SettingsPage = {
       fontRow("main", "main-font", "Editor Font"),
       sizeRow("sub", "sub-text-size", "Sub Editor Font Size", "Second panel editor and reading view when split is open."),
       fontRow("sub", "sub-font", "Sub Editor Font"),
-      caption("Startup"),
+      caption("Session"),
       row(
         "restore-session",
         "Restore last session",
@@ -58,6 +58,9 @@ export const generalPage: SettingsPage = {
           deps.onSettingsChange({ ...deps.getSettings(), restoreSession: checked }),
         ),
       ),
+      row("reopen-workspace-windows", "Reopen workspace windows", "Reopen secondary workspace windows at startup.",
+        toggle("Reopen workspace windows", settings.reopenWorkspaceWindows, checked => deps.onSettingsChange({ ...deps.getSettings(), reopenWorkspaceWindows: checked }))),
+      row("manage-workspaces", "Manage workspaces", null, button("Manage workspaces…", () => deps.onManageWorkspaces?.())),
       caption("Updates"),
       row(
         "update-mode",

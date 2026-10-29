@@ -108,6 +108,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let save_as = MenuItemBuilder::with_id("file.save_as", "Save As…")
         .accelerator("CmdOrCtrl+Shift+S")
         .build(app)?;
+    let switch_workspace = MenuItemBuilder::with_id("file.switch_workspace", "Switch Workspace…")
+        .accelerator("Ctrl+Cmd+O")
+        .build(app)?;
+    let save_workspace = MenuItemBuilder::with_id("file.save_workspace", "Save Workspace As…").build(app)?;
+    let close_workspace = MenuItemBuilder::with_id("file.close_workspace", "Close Workspace").build(app)?;
+    let workspaces = SubmenuBuilder::with_id(app, "workspaces", "Workspaces")
+        .items(&[&switch_workspace, &save_workspace, &close_workspace])
+        .build()?;
     let recover = MenuItemBuilder::with_id("file.recover", "Recover Unsaved Documents…").build(app)?;
     let close = MenuItemBuilder::with_id("file.close", "Close Tab")
         .accelerator("CmdOrCtrl+W")
@@ -135,6 +143,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&open)
         .item(&open_folder)
+        .item(&workspaces)
         .separator()
         .item(&save)
         .item(&save_as)

@@ -1,6 +1,8 @@
+import type { WorkspaceFile } from "./workspaces/layout";
 export type ViewMode = "split" | "editor" | "preview";
 export type UIState = {
   viewMode: ViewMode;
+  activeWorkspaceId?: string | null;
   zoom: number;
   softWrap: boolean;
   folder: string | null;
@@ -10,7 +12,8 @@ export type UIState = {
   explorerWidth: number;
   aiVisible: boolean;
   aiWidth: number;
-  windows: { openPaths: string[]; activePath: string | null; mode: ViewMode }[];
+  windows: { files: WorkspaceFile[]; activePath: string | null; mode: ViewMode }[];
+  splitRatio: number;
   activeWindowIndex: number;
   lineNumbers: boolean;
 };
@@ -27,7 +30,8 @@ const DEFAULTS: UIState = {
   explorerWidth: 240,
   aiVisible: false,
   aiWidth: 320,
-  windows: [{ openPaths: [], activePath: null, mode: "editor" }],
+  windows: [{ files: [], activePath: null, mode: "editor" }],
+  splitRatio: 0.5,
   activeWindowIndex: 0,
   lineNumbers: true,
 };
@@ -37,16 +41,39 @@ export function freshState(): UIState {
     ...DEFAULTS,
     windows: DEFAULTS.windows.map((window) => ({
       ...window,
-      openPaths: [...window.openPaths],
+      files: window.files.map(file => ({ ...file })),
     })),
   };
+}
+
+export function migrateSessionWindows(raw: unknown): UIState["windows"] {
+  if (!Array.isArray(raw) || !raw.length) return freshState().windows;
+  return raw.slice(0, 2).map(pane => {
+    const value = pane && typeof pane === "object" ? pane : {};
+    const source = Array.isArray(value.files) ? value.files :
+      Array.isArray(value.openPaths) ? value.openPaths.map((path: unknown) => ({ path })) : [];
+    const files: WorkspaceFile[] = source.filter((file: unknown) => file && typeof file === "object" &&
+      typeof (file as WorkspaceFile).path === "string").map((file: WorkspaceFile) => ({
+        path: file.path,
+        ...(Number.isSafeInteger(file.cursor) && file.cursor! >= 0 ? { cursor: file.cursor } : {}),
+        ...(Number.isSafeInteger(file.topLine) && file.topLine! >= 1 ? { topLine: file.topLine } : {}),
+        ...(Number.isSafeInteger(file.page) && file.page! >= 1 ? { page: file.page } : {}),
+      }));
+    return { files, activePath: typeof value.activePath === "string" ? value.activePath : null,
+      mode: ["editor", "split", "preview"].includes(value.mode) ? value.mode : "editor" };
+  });
 }
 
 export function loadState(): UIState {
   try {
     const raw = localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (!raw) return freshState();
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const value = { ...freshState(), ...parsed };
+    value.windows = migrateSessionWindows(parsed.windows);
+    if (typeof parsed.activeWorkspaceId !== "string" || !/^[A-Za-z0-9-]{1,64}$/.test(parsed.activeWorkspaceId)) delete value.activeWorkspaceId;
+    value.splitRatio = Number.isFinite(value.splitRatio) ? Math.max(0.2, Math.min(0.8, value.splitRatio)) : 0.5;
+    return value;
   } catch {
     return freshState();
   }

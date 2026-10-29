@@ -1,6 +1,17 @@
+import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
+import { startupWorkspace, updateReopen } from "./workspaces/session";
+import { createWorkspaceController } from "./workspaces/controller";
+import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
+import { showWorkspaceSwitcher } from "./workspaces/switcher";
+import { showUnsavedWorkspaceSheet } from "./workspaces/unsaved-sheet";
+import { missingStrip } from "./workspaces/missing-strip";
+import { loadWorkspaces, workspacesIO, type Workspace } from "./workspaces/store";
+import { captureLayout, sessionLayout, type WorkspaceLayout } from "./workspaces/layout";
+import { createPositionTracker } from "./workspaces/positions";
+import { restoreLayout } from "./workspaces/restore";
 import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
 import { runnableActions } from "./ai/actions";
-import { appConfigDir, join } from "@tauri-apps/api/path";
+import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
@@ -238,9 +249,66 @@ const cleanReloads = new Set<string>();
 const recoveredDraftIds = new Map<string, string>();
 const AUTO_REFRESH_MS = 3_000;
 
-function persistUiState(): void {
-  if (isPrimaryNativeWindow) saveState(ui);
+let sessionReady = false;
+let persistTimer: number | undefined;
+const readingPositions = createPositionTracker(persistUiState);
+function flushUiState(): void {
+  if (!isPrimaryNativeWindow || !sessionReady) return;
+  for (const view of views.values()) view.captureReadingPosition();
+  const layout = captureLayout(getState(), ui, readingPositions.snapshot());
+  ui.windows = layout.panes.map(pane => ({ files: pane.files, activePath: pane.active, mode: pane.mode }));
+  saveState(ui);
 }
+function persistUiState(): void {
+  workspaceController.changed();
+  if (!isPrimaryNativeWindow || !sessionReady) return;
+  window.clearTimeout(persistTimer);
+  persistTimer = window.setTimeout(flushUiState, 300);
+}
+const workspaceController = createWorkspaceController({
+  io: workspacesIO(nativeWindowLabel),
+  capture: () => {
+    for (const view of views.values()) view.captureReadingPosition();
+    return { folder: getState().folder, layout: captureLayout(getState(), ui, readingPositions.snapshot()) };
+  },
+  claim: id => invoke<string | null>("workspace_claim", { id }),
+  release: () => invoke<void>("workspace_release"),
+  activeChanged: (previous, next) => {
+    // The primary window reopens its workspace through bugtext.ui; secondary windows are listed in "reopen".
+    if (isPrimaryNativeWindow) { ui = { ...ui, activeWorkspaceId: next }; persistUiState(); }
+    else void updateReopen(workspacesIO(nativeWindowLabel), previous, next).catch(() => {});
+  },
+  display: name => {
+    queueMicrotask(() => void refreshPinnedMenu());
+    document.title = name ? `${name} — BugText` : "BugText";
+    void currentNativeWindow?.setTitle(document.title).catch(() => {});
+    const header = document.querySelector<HTMLElement>("#explorer");
+    if (!header) return;
+    let element = header.querySelector<HTMLElement>(".workspace-name");
+    if (!name) { element?.remove(); return; }
+    if (!element) { element = document.createElement("div"); element.className = "workspace-name"; header.insertBefore(element, header.querySelector(".explorer-header")); }
+    element.textContent = name;
+  },
+});
+async function refreshPinnedMenu(): Promise<void> {
+  await syncPinnedWorkspaces(workspacesIO(nativeWindowLabel), workspaceController.activeId(),
+    (items, checkedId) => invoke("set_pinned_workspaces", { items, checkedId })).catch(() => {});
+}
+window.addEventListener("focus", () => void refreshPinnedMenu());
+function saveWorkspace(): void { showSaveWorkspaceSheet(getState().folder, workspaceController.save); }
+window.addEventListener("pagehide", flushUiState);
+window.addEventListener("beforeunload", flushUiState);
+// Best effort: the pending auto-save is otherwise lost when the window goes away.
+window.addEventListener("pagehide", () => void workspaceController.flush().catch(() => {}));
+// App quit: Rust holds the exit briefly and asks every window to save its session and workspace.
+void listen("bugtext://before-quit", () => { flushUiState(); void workspaceController.flush().catch(() => {}); });
+// Closing a secondary window by hand (not quitting) means it should not come back at startup.
+if (!isPrimaryNativeWindow) void currentNativeWindow?.onCloseRequested(async () => {
+  const id = workspaceController.activeId();
+  if (!id) return;
+  await workspaceController.flush().catch(() => {});
+  await updateReopen(workspacesIO(nativeWindowLabel), id, null).catch(() => {});
+});
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -513,7 +581,8 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
 
 void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
   const file = shouldReload(event.payload, nativeWindowLabel);
-  if (file) void reloadSettingsFromDisk(file);
+  if (file === "workspaces") void workspaceController.reload().then(refreshPinnedMenu);
+  else if (file) void reloadSettingsFromDisk(file);
 });
 
 function syncMcpEnabled(): void {
@@ -604,6 +673,9 @@ function commandItems(): PaletteItem[] {
     }),
     command("save", "Save", () => void doSave(false)),
     command("saveAs", "Save As…", () => void doSave(true)),
+    command("file.switch_workspace", "Switch Workspace…", () => void showSwitcher()),
+    command("file.save_workspace", "Save Workspace As…", saveWorkspace),
+    command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
     command("close", "Close Tab", () => {
       const windowState = activeWindow();
@@ -700,6 +772,8 @@ const handlers = {
       renderAll();
     }
   },
+  getReadingPosition: (id: string) => readingPositions.get(id),
+  onReadingPosition: (id: string, position: import("./workspaces/layout").FilePosition) => readingPositions.remember(id, position),
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
@@ -1003,7 +1077,7 @@ function activateTab(windowId: string, tabId: string): void {
   setState({ activeWindowId: windowId });
   patchWindow(windowId, { activeTabId: tabId });
   const v = views.get(windowId)!;
-  v.editor.switchTo(tabId);
+  v.activateDocument(tabId);
   const text = v.editor.getText(tabId);
   const tab = getWindow(windowId)?.tabs.find((item) => item.id === tabId);
   const windowState = getWindow(windowId);
@@ -1018,6 +1092,7 @@ function activateTab(windowId: string, tabId: string): void {
   syncExplorerActivePath();
   renderAll();
   v.focus();
+  void v.restoreReadingPosition();
   void checkActiveForExternalChange(windowId);
 }
 
@@ -1592,6 +1667,10 @@ async function doSave(saveAs = false): Promise<boolean> {
     if (target === actionsPath) {
       await reloadActions();
       broadcastSettingsChange("ai-actions");
+    }
+    if (workspacesPath && target === workspacesPath) {
+      broadcastSettingsChange("workspaces");
+      await workspaceController.reload();
     }
     await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
@@ -2214,13 +2293,14 @@ async function moveTabToWindow(
     tabId,
     source.activeTabId,
   );
+  sourceView.captureReadingPosition();
   sourceView.editor.closeState(tabId);
   patchWindow(sourceId, {
     tabs: source.tabs.filter((candidate) => candidate.id !== tabId),
     activeTabId: sourceNext,
   });
   if (sourceNext) {
-    sourceView.editor.switchTo(sourceNext);
+    sourceView.activateDocument(sourceNext);
     const nextTab = getWindow(sourceId)?.tabs.find(
       (candidate) => candidate.id === sourceNext,
     );
@@ -2228,6 +2308,7 @@ async function moveTabToWindow(
       sourceView.editor.getText(sourceNext),
       nextTab?.path ?? nextTab?.name,
     );
+    void sourceView.restoreReadingPosition();
   } else {
     sourceView.renderPreview("");
   }
@@ -2302,6 +2383,8 @@ function addSplitter(): void {
     const ratio = Math.max(0.2, Math.min(0.8, (e.clientX - rect.left) / rect.width));
     const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
     const sub = windowsHost.querySelector<HTMLElement>('.window[data-window-id="sub"]')!;
+    ui.splitRatio = ratio;
+    persistUiState();
     main.style.flex = `${ratio} 1 0`;
     sub.style.flex = `${1 - ratio} 1 0`;
   };
@@ -2615,6 +2698,7 @@ const settingsScreen = createSettingsScreen(
     },
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
+    onManageWorkspaces: () => { settingsScreen.close(); void showSwitcher(); },
     onOpenSettingsFile: openSettings,
     onOpenAISettingsFile: openAISettings,
     templates: {
@@ -2968,7 +3052,7 @@ subscribe(() => {
     explorerVisible: s.explorerVisible,
     explorerWidth: s.explorerWidth,
     windows: s.windows.map((w) => ({
-      openPaths: w.tabs.map((t) => t.path).filter((p): p is string => !!p),
+      files: w.tabs.filter(t => t.path !== null).map(t => ({ path: t.path!, ...readingPositions.get(t.id) })),
       activePath: w.tabs.find((t) => t.id === w.activeTabId)?.path ?? null,
       mode: w.mode,
     })),
@@ -2997,6 +3081,14 @@ window.setInterval(() => {
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;
   const id = event.payload;
+  if (id.startsWith("workspace.open:")) {
+    const workspaceId = id.slice("workspace.open:".length);
+    void loadWorkspaces(workspacesIO(nativeWindowLabel)).then(result => {
+      const workspace = result.file?.workspaces.find(item => item.id === workspaceId);
+      if (workspace) void switchWorkspace(workspace);
+    });
+    return;
+  }
   if (id.startsWith("view.wrap.")) {
     return setWrapMode(id.slice("view.wrap.".length) as SoftWrapMode);
   }
@@ -3038,6 +3130,12 @@ listenScoped<string>("menu", (event) => {
       return void doSave(false);
     case "file.save_as":
       return void doSave(true);
+    case "file.switch_workspace":
+      return void showSwitcher();
+    case "file.save_workspace":
+      return saveWorkspace();
+    case "file.close_workspace":
+      return void workspaceController.close();
     case "file.recover":
       return openRecoveryReview();
     case "file.close": {
@@ -3178,40 +3276,151 @@ function applyZoom(zoom: number): void {
 }
 applyZoom(ui.zoom);
 
+/** The normal open paths that restoreLayout drives, shared by the last-session restore and workspaces. */
+function layoutRestoreDeps(layout: WorkspaceLayout): Parameters<typeof restoreLayout>[2] {
+  return {
+    async exists(path, kind) {
+      await invoke(kind === "folder" ? "list_dir" : "file_stat", { path });
+      return true;
+    },
+    async prepare(layout, folder) {
+      if (folder) {
+        try { await openFolder(folder); } catch { setState({ folder: null, tree: null }); }
+      } else if (getState().folder) setState({ folder: null, tree: null });
+      await refreshFileList();
+      if (layout.panes[1]) {
+        setState({ windows: [...getState().windows, { id: "sub", tabs: [], activeTabId: null, mode: layout.panes[1].mode }] });
+        addSplitter();
+        makeView("sub", false);
+        applySettings(currentSettings);
+        setTableFormatting(currentSettings.tables.formatOnEdit);
+        const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
+        const sub = windowsHost.querySelector<HTMLElement>('.window[data-window-id="sub"]')!;
+        main.style.flex = `${layout.splitRatio} 1 0`;
+        sub.style.flex = `${1 - layout.splitRatio} 1 0`;
+      }
+      layout.panes.forEach((pane, index) => patchWindow(index === 0 ? "main" : "sub", { mode: pane.mode }));
+    },
+    async open(index, file) {
+      const windowId = index === 0 ? "main" : "sub";
+      if (isPdfFile(file.path)) openPdf(windowId, file.path);
+      else {
+        const contents = await invoke<string>("read_file", { path: file.path });
+        openInWindow(windowId, { path: file.path, name: basename(file.path), text: contents });
+      }
+      const found = findTabByPath(getState().windows, file.path);
+      if (found) {
+        readingPositions.remember(found.tab.id, file);
+        await views.get(found.windowId)!.restoreReadingPosition();
+      }
+    },
+    async activate(index, path) {
+      const found = path ? findTabByPath(getState().windows, path) : null;
+      if (found && found.windowId === (index === 0 ? "main" : "sub")) {
+        patchWindow(found.windowId, { mode: layout.panes[index].mode });
+        activateTab(found.windowId, found.tab.id);
+        await views.get(found.windowId)!.restoreReadingPosition();
+      }
+    },
+    focus(index) { setState({ activeWindowId: index === 0 ? "main" : "sub" }); },
+  };
+}
+
+/** Saves every dirty tab through the normal save flow; false when one is cancelled or cannot be saved here. */
+async function saveAllForSwitch(): Promise<boolean> {
+  for (const w of getState().windows) {
+    for (const tab of w.tabs.filter(t => t.dirty)) {
+      if (isPdfFile(tab.path ?? tab.name)) return false; // PDF edits save asynchronously; the user saves them first.
+      activateTab(w.id, tab.id);
+      if (!(await doSave(false))) return false;
+    }
+  }
+  return !getState().windows.some(w => w.tabs.some(t => t.dirty));
+}
+
+async function switchWorkspace(workspace: Workspace): Promise<void> {
+  if (workspace.id === workspaceController.activeId()) return;
+  const owner = await invoke<string | null>("workspace_owner", { id: workspace.id }).catch(() => null);
+  if (owner && owner !== nativeWindowLabel) { await invoke("workspace_focus", { label: owner }).catch(() => {}); return; }
+  const dirty = getState().windows.flatMap(w => w.tabs).filter(t => t.dirty);
+  if (dirty.length) {
+    const choice = await showUnsavedWorkspaceSheet(dirty.map(t => t.name));
+    if (choice === "window") return openWorkspaceWindow(workspace);
+    if (choice !== "save") return;
+    if (!(await saveAllForSwitch())) return;
+  }
+  await workspaceController.flush().catch(() => {});
+  workspaceController.pause(true);
+  try {
+    if (getState().windows.length > 1) await toggleSub();
+    const main = mainWindow();
+    if (main.tabs.length) await closeTabs("main", main.tabs.map(t => t.id));
+    if (getState().windows.some(w => w.tabs.length)) return; // a close was refused; leave everything open
+    const held = await workspaceController.adopt(workspace.id);
+    if (held) { await invoke("workspace_focus", { label: held }).catch(() => {}); return; }
+    document.querySelector(".workspace-missing-strip")?.remove();
+    const { sidebar } = workspace.layout;
+    ui = { ...ui, sidebarView: sidebar.view === "outline" ? "outline" : "explorer", outlineTab: sidebar.outlineTab === "links" ? "links" : "outline" };
+    setState({ explorerVisible: sidebar.visible, explorerWidth: sidebar.width });
+    document.body.classList.toggle("explorer-hidden", !sidebar.visible);
+    document.documentElement.style.setProperty("--explorer-w", `${sidebar.width}px`);
+    applySidebarView();
+    setAIVisible(workspace.layout.aiVisible);
+    const plan = await restoreLayout(workspace.layout, workspace.folder, layoutRestoreDeps(workspace.layout));
+    if (plan.missingFiles.length || plan.missingFolder) {
+      windowsHost.before(missingStrip(workspacesIO(nativeWindowLabel), workspace.id, plan.missingFiles, plan.missingFolder ? workspace.folder : null));
+    }
+    requestWindowMeasure();
+  } finally {
+    workspaceController.pause(false);
+    workspaceController.changed();
+  }
+}
+
+/** Opens the workspace in a new native window, or focuses the window that already has it. */
+async function openWorkspaceWindow(workspace: Workspace): Promise<void> {
+  await invoke("workspace_open_window", { id: workspace.id }).catch(() => {});
+}
+
+/** A window created by workspace_open_window opens the workspace it was made for. */
+async function openPendingWorkspace(): Promise<void> {
+  const id = await invoke<string | null>("take_window_workspace").catch(() => null);
+  if (!id) return;
+  const workspace = (await loadWorkspaces(workspacesIO(nativeWindowLabel))).file?.workspaces.find(item => item.id === id);
+  if (workspace) await switchWorkspace(workspace);
+  else await invoke("workspace_release").catch(() => {});
+}
+
+let workspacesPath = "";
+async function showSwitcher(): Promise<void> {
+  if (!workspacesPath) workspacesPath = await join(await appConfigDir(), "workspaces.json");
+  await showWorkspaceSwitcher({
+    io: workspacesIO(nativeWindowLabel),
+    recent: loadRecent().folders,
+    home: await homeDir().catch(() => null),
+    open: workspace => void switchWorkspace(workspace),
+    openInNewWindow: workspace => void openWorkspaceWindow(workspace),
+    openFolder: folder => void openFolder(folder).then(() => refreshFileList()),
+    saveFolder: folder => void openFolder(folder).then(() => refreshFileList()).then(saveWorkspace),
+    openFile: () => void doOpenPath(workspacesPath),
+    changed: () => void workspaceController.reload().then(refreshPinnedMenu),
+  });
+}
+
+/** Startup with Restore last session on: the primary window's workspace, else the plain session; then workspace windows. */
 async function restoreWindows(): Promise<void> {
-  const saved = startupUi.windows;
-  if (saved[1]) {
-    setState({ windows: [...getState().windows, { id: "sub", tabs: [], activeTabId: null, mode: saved[1].mode }] });
-    addSplitter();
-    makeView("sub", false);
-    applySettings(currentSettings);
-    setTableFormatting(currentSettings.tables.formatOnEdit);
+  const file = (await loadWorkspaces(workspacesIO(nativeWindowLabel))).file;
+  const workspace = startupWorkspace(file?.workspaces ?? [], startupUi.activeWorkspaceId ?? null);
+  if (workspace) await switchWorkspace(workspace);
+  else {
+    const layout = sessionLayout(startupUi);
+    await restoreLayout(layout, startupUi.folder, layoutRestoreDeps(layout));
   }
-  patchWindow("main", { mode: saved[0]?.mode ?? "split" });
-  for (let i = 0; i < saved.length; i++) {
-    const windowId = i === 0 ? "main" : "sub";
-    for (const path of saved[i].openPaths) {
-      try {
-        if (isPdfFile(path)) {
-          openPdf(windowId, path);
-        } else {
-          const contents = await invoke<string>("read_file", { path });
-          openInWindow(windowId, { path, name: basename(path), text: contents });
-        }
-      } catch {
-        /* vanished */
-      }
+  if (file && currentSettings.reopenWorkspaceWindows) {
+    for (const id of file.reopen) {
+      const other = startupWorkspace(file.workspaces, id);
+      if (other && other.id !== workspace?.id) await openWorkspaceWindow(other);
     }
-    if (saved[i].activePath) {
-      const found = findTabByPath(getState().windows, saved[i].activePath!);
-      if (found && found.windowId === windowId) {
-        activateTab(windowId, found.tab.id);
-      }
-    }
-  }
-  const ai = startupUi.activeWindowIndex === 1 ? "sub" : "main";
-  if (getWindow(ai)) {
-    setState({ activeWindowId: ai });
   }
 
   const result = isPrimaryNativeWindow ? await getInitialFile() : null;
@@ -3227,6 +3436,7 @@ async function restoreWindows(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
+  await refreshPinnedMenu();
   await loadSettings();
   await refreshMcpStatus();
   reportWindow();
@@ -3244,14 +3454,6 @@ async function boot(): Promise<void> {
   }
 
   if (isPrimaryNativeWindow && currentSettings.restoreSession) {
-    if (startupUi.folder) {
-      try {
-        await openFolder(startupUi.folder);
-      } catch {
-        setState({ folder: null, tree: null });
-      }
-    }
-    await refreshFileList();
     await restoreWindows();
   } else {
     const result = isPrimaryNativeWindow ? await getInitialFile() : null;
@@ -3268,6 +3470,9 @@ async function boot(): Promise<void> {
     }
     renderAll();
   }
+  sessionReady = true;
+  persistUiState();
+  if (!isPrimaryNativeWindow) await openPendingWorkspace();
   if (isPrimaryNativeWindow) {
     await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }

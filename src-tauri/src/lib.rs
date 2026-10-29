@@ -1,4 +1,6 @@
 mod conversations;
+mod workspaces;
+mod pinned_workspaces;
 mod ai;
 mod assets;
 mod cli_args;
@@ -27,6 +29,8 @@ mod update_feed;
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
+
+static QUIT_SAVE_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 pub fn mcp_bridge_main() -> i32 {
     mcp_bridge::mcp_bridge_main()
@@ -165,6 +169,8 @@ pub fn run() {
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
+        .manage(workspaces::WorkspaceState::default())
+        .manage(pinned_workspaces::PinnedState::default())
         .manage(preview::PreviewRoots::default())
         .manage(preview::PreviewDocs::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
@@ -179,7 +185,7 @@ pub fn run() {
         .on_menu_event(|app, event| {
             let id = event.id().0.as_str();
             if id == "view.new_window" || id == "file.new_window" {
-                let _ = native_windows::create(app);
+                let _ = native_windows::create(app, None);
                 return;
             }
             if let Some(window) = native_windows::focused_window(app) {
@@ -192,6 +198,9 @@ pub fn run() {
                 native_windows::remember_focus(window.app_handle(), window.label());
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                if let Some(state) = window.app_handle().try_state::<workspaces::WorkspaceState>() {
+                    workspaces::release_window(&state, window.label());
+                }
                 if let Some(state) = window.app_handle().try_state::<mcp_server::McpState>() {
                     mcp_server::drop_window(&state, window.label());
                 }
@@ -289,10 +298,32 @@ pub fn run() {
             window_fullscreen_toggle,
             window_tile,
             native_windows::new_window,
+            pinned_workspaces::set_pinned_workspaces,
+            workspaces::read_workspaces,
+            workspaces::write_workspaces,
+            workspaces::workspace_claim,
+            workspaces::workspace_release,
+            workspaces::workspace_owner,
+            workspaces::workspace_focus,
+            workspaces::workspace_open_window,
+            workspaces::take_window_workspace,
         ])
         .build(tauri::generate_context!())
         .expect("error while building BugText")
         .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = &event {
+                // Hold the first exit briefly so every window can save its session and workspace.
+                if !QUIT_SAVE_STARTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    api.prevent_exit();
+                    let _ = app.emit("bugtext://before-quit", ());
+                    let app = app.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(400));
+                        app.exit(0);
+                    });
+                    return;
+                }
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Opened { urls } = event {
                 for url in urls {

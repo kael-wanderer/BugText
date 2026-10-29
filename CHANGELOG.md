@@ -8,6 +8,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Named workspaces: Save Workspace As, automatic layout updates, and Close Workspace; Switch Workspace (⌃⌘O) groups Pinned, Workspaces and Recent folders. ⌘Enter or Open in New Window opens a separate window, with one window per workspace.
+- A missing-files strip for workspace references, and pinned workspaces in File ▸ Workspaces and the Dock menu.
+- Last-session restore of cursor, top line and PDF page; Reopen workspace windows and Manage workspaces in Settings ▸ General ▸ Session.
 - My actions in Settings ▸ AI ▸ Actions: save Edit or Answer prompts, choose their input and engine, and run them from ⌘K, the editor AI menu or the panel bar. Actions send only their input without folder access.
 - Named conversations per folder and a No folder group, with New chat (⌥⌘J), rename, Delete with Undo, cross-window updates, 400-message retention, seven-day trash and migration of earlier chat history.
 - Context chips saved per conversation and a Context sent disclosure showing the note or selection, retained excerpts, files and trimming for each reply.

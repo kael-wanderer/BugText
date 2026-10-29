@@ -80,6 +80,8 @@ import { manualBinarySnapshot } from "./recovery";
 import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
+  goToPage(page: number): void;
+  pageCount(): number;
   setQuery: (query: string) => number;
   move: (delta: number) => { count: number; active: number };
   clear: () => void;
@@ -2778,6 +2780,8 @@ export async function renderPdf(
     host.scrollTop += after.top + fraction * after.height - top;
   };
   return {
+    goToPage,
+    pageCount: () => pages.length,
     fitZoom,
     keepAnchor,
     setZoomState: (zoom, fit) => {
