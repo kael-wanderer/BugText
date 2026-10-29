@@ -100,6 +100,7 @@ export type WindowView = {
   focus: () => void;
   destroy: () => void;
   setLineNumbersFlag: (on: boolean) => void;
+  setLivePreviewFlag: (on: boolean) => void;
   openPdfPage: (page: number, annotation?: string) => void;
   annotationCommand: (command: "panel" | "copy") => boolean;
   savePdf: () => boolean;
@@ -1095,6 +1096,7 @@ export function createWindowView(
     setLineNumbersFlag: (on: boolean) => {
       lineNums = on;
     },
+    setLivePreviewFlag: (on: boolean) => editor.setLivePreview(on),
     openPdfPage: (page: number, annotation?: string) => {
       pdfTargetPage = page; pendingAnnotation = annotation;
       if (pdfFind) {

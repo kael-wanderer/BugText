@@ -33,6 +33,8 @@ describe("organize workflow UI", () => {
  it("shows a reviewed missing-fields apply and sends one source transaction", async () => {
   const { host, deps, actions } = setup("---\nstatus: active # keep\n---\n# Project\n"); await actions.applyNoteType(); await flush();
   button(host, "Apply missing fields").click(); await flush();
-  expect(deps.apply).toHaveBeenCalledOnce(); const change = vi.mocked(deps.apply).mock.calls[0][1]; expect(change.insert).toContain("status: active # keep"); expect(change.insert).toContain("# Project\n");
+  expect(deps.apply).toHaveBeenCalledOnce(); const change = vi.mocked(deps.apply).mock.calls[0][1];
+  const source = "---\nstatus: active # keep\n---\n# Project\n"; const applied = source.slice(0, change.from) + change.insert + source.slice(change.to);
+  expect(applied).toContain("status: active # keep\n"); expect(applied.endsWith("# Project\n")).toBe(true); expect(change.from).toBeGreaterThan(0);
  });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { planExtraction, extractionReplacement, type SourceBinding } from "../notes/extract-plan";
 import { inboxTaskChange, inboxTasks, noteTasks } from "../task-inbox/model";
-import { applyPreset, DEFAULT_NOTE_TYPES, presetValues, validNoteType } from "../note-types/model";
+import { applyPreset, DEFAULT_NOTE_TYPES, presetValues, singleChange, validNoteType } from "../note-types/model";
 import type { IndexedNote } from "../links/index";
 const binding = (text: string, from = 0, to = text.length): SourceBinding => ({ tabId: "a", revision: 2, path: "/notes/sub/source.md", text, from, to });
 const note = (source: string): IndexedNote => ({ path: "/notes/a.md", source, headings: [], links: [], tags: ["project/a"], properties: null });
@@ -50,5 +50,26 @@ describe("note type presets", () => {
   it("refuses malformed YAML and unfinished frontmatter", () => {
     expect(() => applyPreset("---\na: [\n---\nBody", { tags: [] })).toThrow();
     expect(() => applyPreset("---\na: unfinished", { tags: [] })).toThrow();
+  });
+});
+
+describe("note type apply keeps the rest of the note", () => {
+  it("adds missing fields without touching comments, key order or body", () => {
+    const before = "---\n# keep this comment\ntitle: Alpha\nzeta: 1\n---\nBody line one\nBody line two\n";
+    const { text, added } = applyPreset(before, { status: "draft" }, true);
+    expect(added).toEqual(["status"]);
+    expect(text).toContain("# keep this comment\ntitle: Alpha\nzeta: 1\n");
+    expect(text.endsWith("---\nBody line one\nBody line two\n")).toBe(true);
+  });
+  it("replaces only the changed span", () => {
+    const before = "---\ntitle: Alpha\n---\nBody\n";
+    const after = "---\ntitle: Alpha\nstatus: draft\n---\nBody\n";
+    const change = singleChange(before, after);
+    expect(change.from).toBeGreaterThan(0);
+    expect(change.to).toBeLessThanOrEqual(before.indexOf("---\nBody"));
+    expect(before.slice(0, change.from) + change.insert + before.slice(change.to)).toBe(after);
+  });
+  it("returns an empty change when nothing differs", () => {
+    expect(singleChange("same", "same")).toEqual({ from: 4, to: 4, insert: "" });
   });
 });

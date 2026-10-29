@@ -37,3 +37,11 @@ export function defaultTypeBody(id: string): string {
   if (id === "project") return "# {{title}}\n\n## Goal\n\n## Next steps\n\n- [ ] \n\n## References\n";
   return "# {{title}}\n\n## Summary\n\n## Quotes\n\n## Questions\n";
 }
+/** Smallest single replacement that turns `before` into `after`, so only the changed span is touched. */
+export function singleChange(before: string, after: string): { from: number; to: number; insert: string } {
+  let from = 0; const shortest = Math.min(before.length, after.length);
+  while (from < shortest && before[from] === after[from]) from++;
+  let to = before.length, end = after.length;
+  while (to > from && end > from && before[to - 1] === after[end - 1]) { to--; end--; }
+  return { from, to, insert: after.slice(from, end) };
+}

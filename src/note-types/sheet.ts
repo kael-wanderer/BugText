@@ -1,7 +1,7 @@
 import type { OrganizeHost } from "../notes/actions";
 import { organizeSheet, node, field, action } from "../notes/sheet";
 import { createWorkflowStore } from "../saved-views/store";
-import { DEFAULT_NOTE_TYPES, validNoteType, presetValues, applyPreset, defaultTypeBody, type NoteType, type PresetField } from "./model";
+import { DEFAULT_NOTE_TYPES, validNoteType, presetValues, applyPreset, defaultTypeBody, singleChange, type NoteType, type PresetField } from "./model";
 import { listTemplates, readTemplate, createFromTemplate, type TemplateInfo } from "../templates/library";
 import { planNote } from "../templates/plan";
 import { manualSnapshot } from "../recovery";
@@ -75,7 +75,7 @@ export async function showNoteTypeSheet(host: OrganizeHost, apply: boolean) {
       if (apply) {
         await manualSnapshot(binding!.path!, binding!.text, "Before applying note type", true);
         if (sheet.closed) return;
-        if (!host.apply(binding!, { from: 0, to: binding!.text.length, insert: result.text })) throw new Error("The source changed. Reopen Apply note type to review the current note.");
+        if (!host.apply(binding!, singleChange(binding!.text, result.text))) throw new Error("The source changed. Reopen Apply note type to review the current note.");
       } else {
         if (!folderAtOpen || !("destination" in result)) throw new Error("Open a folder before creating a typed note.");
         const path = await createFromTemplate({ folder: folderAtOpen, relativeDir: result.destination.dir, stem: result.destination.stem, contents: result.text });
