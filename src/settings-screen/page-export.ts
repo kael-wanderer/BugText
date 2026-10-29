@@ -48,7 +48,9 @@ export const exportPage: SettingsPage = {
         host.append(group(input, saveName, button("Cancel", () => { naming = null; draw(); })), error); input.focus(); input.select();
       }
       const disabled = selected.id === "standard";
-      const update = (patch: Partial<ExportPreset>) => { if (disabled) return; selected = { ...selected, ...patch }; save([...deps.getSettings().export.presets.filter(p => p.id !== selected.id), selected]); if (selected.builtIn && selected.id !== "standard") reset.disabled = false; };
+      const update = (patch: Partial<ExportPreset>) => { if (disabled) return; selected = { ...selected, ...patch }; const stored = deps.getSettings().export.presets;
+        // Edit in place so a user preset keeps its position in the list.
+        save(stored.some(p => p.id === selected.id) ? stored.map(p => p.id === selected.id ? selected : p) : [...stored, selected]); if (selected.builtIn && selected.id !== "standard") reset.disabled = false; };
       const choose = (label: string, value: string, values: [string, string][], change: (v: string) => void) => {
         const el = document.createElement("select"); el.setAttribute("aria-label", label); el.disabled = disabled;
         for (const [v, text] of values) { const option = document.createElement("option"); option.value = v; option.textContent = text; el.append(option); }
@@ -67,7 +69,7 @@ export const exportPage: SettingsPage = {
         row("export-font-size", "Font size", "pt", number("Font size", selected.type.sizePt, 9, 16, v => update({ type: { ...selected.type, sizePt: v } }))),
         row("export-line-spacing", "Line spacing", null, choose("Line spacing", String(selected.type.lineSpacing), [["1","1.0"],["1.15","1.15"],["1.5","1.5"]], v => update({ type: { ...selected.type, lineSpacing: Number(v) as 1 | 1.15 | 1.5 } }))));
       host.append(caption("Title · PDF and Word"), row("export-title", "Title block", null, choose("Title block", selected.title.mode, [["none","None"],["first-heading","First heading"],["file-name","File name"]], v => update({ title: { ...selected.title, mode: v as ExportPreset["title"]["mode"] } }))));
-      const author = document.createElement("input"); author.setAttribute("aria-label", "Author"); author.maxLength = 80; author.value = selected.title.author; author.disabled = disabled; author.oninput = () => update({ title: { ...selected.title, author: author.value } });
+      const author = document.createElement("input"); author.setAttribute("aria-label", "Author"); author.maxLength = 80; author.value = selected.title.author; author.disabled = disabled; author.onchange = () => update({ title: { ...selected.title, author: author.value } });
       host.append(row("export-author", "Author", null, author), row("export-date", "Date", null, choose("Date", selected.title.date, [["none","None"],["export","Export date"]], v => update({ title: { ...selected.title, date: v as ExportPreset["title"]["date"] } }))));
       const checkBox = (label: string, value: boolean, change: (v: boolean) => void) => { const el = document.createElement("input"); el.type = "checkbox"; el.setAttribute("aria-label", label); el.checked = value; el.disabled = disabled; el.onchange = () => change(el.checked); return el; };
       host.append(caption("Contents · PDF and Word"), row("export-toc", "Table of contents", null, checkBox("Table of contents", selected.contents.toc, v => update({ contents: { ...selected.contents, toc: v } }))),

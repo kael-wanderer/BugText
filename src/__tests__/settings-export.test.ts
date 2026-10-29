@@ -25,3 +25,17 @@ it("creates, renames, duplicates, deletes and restores a preset", async () => {
   expect(searchSettings("margins").some(hit => hit.page === "export" && hit.id === "export-margins")).toBe(true);
   host.remove();
 });
+
+it("edits a user preset in place so the list order stays the same", async () => {
+  let settings = parseSettings(JSON.stringify({ export: { presets: [] } }));
+  const handout = (await import("../export/presets")).BUILT_IN_PRESETS[1];
+  const { builtIn: _b, ...base } = handout;
+  settings = { ...settings, export: { ...settings.export, presets: [{ ...base, id: "a", name: "A" }, { ...base, id: "b", name: "B" }] } };
+  const host = document.createElement("div"); document.body.append(host); selectExportPreset("a");
+  const deps = { getSettings: () => settings, onSettingsChange: (next: Settings) => { settings = next; }, exportTools: { diagnostics: vi.fn(async () => ({ pandoc: { found: true, version: "p", path: "/p" }, typst: { found: true, version: "t", path: "/t" }, fonts: [] })), copy: vi.fn() } } as unknown as ScreenDeps;
+  exportPage.render(host, deps); await Promise.resolve();
+  const margin = host.querySelector<HTMLInputElement>('[aria-label="Margins"]')!; margin.value = "33"; margin.dispatchEvent(new Event("change"));
+  expect(settings.export.presets.map(p => p.id)).toEqual(["a", "b"]);
+  expect(settings.export.presets[0].page.marginMm).toBe(33);
+  host.remove();
+});
