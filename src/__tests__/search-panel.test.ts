@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), pdf: vi.fn() }));

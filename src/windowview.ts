@@ -1,4 +1,3 @@
-import { createPropertiesCard } from "./properties/card";
 import type { FilePosition } from "./workspaces/layout";
 import { applyTextPosition, applyPdfPosition, captureTextPosition } from "./workspaces/positions";
 import { bindPreviewLinks } from "./links/follow";
@@ -349,24 +348,29 @@ export function createWindowView(
   let cardTimer: ReturnType<typeof setTimeout> | undefined;
   let cardTab: string | null = null;
   let cardMarkdown = false;
-  const card = createPropertiesCard(root.querySelector<HTMLElement>(".properties-card")!, () => {
-    const w = getWindow(windowId);
-    const tab = w?.tabs.find(t => t.id === w.activeTabId);
-    return tab && isMarkdownFile(tab.path ?? tab.name) ? editor.getText(tab.id) : null;
-  }, () => { editor.gotoLine(1); }, (source, edit) => {
-    const w = getWindow(windowId);
-    const tab = w?.tabs.find(t => t.id === w.activeTabId);
-    if (!tab || !isMarkdownFile(tab.path ?? tab.name) || editor.getText(tab.id) !== source) return false;
-    editor.applyPropertyEdit(tab.id, edit);
-    clearTimeout(cardTimer);
-    return true;
+  // The card loads with the YAML code it needs, so that code stays out of the startup bundle.
+  let card: { render(): void; reset(): void } | null = null;
+  void import("./properties/card").then(({ createPropertiesCard }) => {
+    card = createPropertiesCard(root.querySelector<HTMLElement>(".properties-card")!, () => {
+      const w = getWindow(windowId);
+      const tab = w?.tabs.find(t => t.id === w.activeTabId);
+      return tab && isMarkdownFile(tab.path ?? tab.name) ? editor.getText(tab.id) : null;
+    }, () => { editor.gotoLine(1); }, (source, edit) => {
+      const w = getWindow(windowId);
+      const tab = w?.tabs.find(t => t.id === w.activeTabId);
+      if (!tab || !isMarkdownFile(tab.path ?? tab.name) || editor.getText(tab.id) !== source) return false;
+      editor.applyPropertyEdit(tab.id, edit);
+      clearTimeout(cardTimer);
+      return true;
+    });
+    card.render();
   });
   const editor = createEditor(
     editorSurface,
     (tabId, text) => {
       h.onDocChange(windowId, tabId, text);
       if (getWindow(windowId)?.activeTabId === tabId) {
-        clearTimeout(cardTimer); cardTimer = setTimeout(() => card.render(), 150);
+        clearTimeout(cardTimer); cardTimer = setTimeout(() => card?.render(), 150);
       }
     },
     ({ line, column }) => {
@@ -516,7 +520,7 @@ export function createWindowView(
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
-      cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card.reset();
+      cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card?.reset();
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);

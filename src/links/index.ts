@@ -2,17 +2,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { markdownOutline, type OutlineHeading } from "../outline";
 import { headingAnchors, noteLinks, type NoteLink } from "./parse";
 import { resolveLink } from "./resolve";
-import { readProperties } from "../properties/parse";
+import { loadProperties, propertiesModule } from "../properties/loader";
 import { bodyTags, frontMatterTags, tagKey } from "../properties/tags";
 
 export type IndexedNote = { path: string; source: string; links: NoteLink[]; headings: OutlineHeading[]; tags: string[]; properties: Record<string, unknown> | null; propertyError?: { line: number; message: string } };
 export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string> };
 export type LinkIndex = ReturnType<typeof createLinkIndex>;
+// Properties need the lazily loaded parser: await loadProperties() before calling this (ensure() does).
 export function parseNote(path: string, source: string): IndexedNote {
   return withProperties({ path, source, links: noteLinks(source), headings: markdownOutline(source) });
 }
 function withProperties(note: Pick<IndexedNote, "path" | "source" | "links" | "headings">): IndexedNote {
-  const result = readProperties(note.source);
+  const result = propertiesModule()?.readProperties(note.source) ?? null;
   const properties = result?.ok ? result.props : null;
   const seen = new Set<string>();
   const tags = [...frontMatterTags(properties), ...bodyTags(note.source)].filter((tag) => {
@@ -56,6 +57,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   }
   async function ensure(next = folder): Promise<void> {
     setFolder(next);
+    if (!propertiesModule()) await loadProperties();
     if (!folder || ready) return;
     if (!building) {
       const current = generation;
@@ -78,7 +80,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     if (ready) { apply(path, text); notify(); }
   }
   function outgoing(path: string, source?: string) {
-    const note = source === undefined ? notes.get(path) : parseNote(path, source);
+    const note = source === undefined ? notes.get(path) : { path, source, links: noteLinks(source), headings: markdownOutline(source) };
     return (note?.links ?? []).map((link) => {
       const resolved = resolveLink(link.target, path, folder);
       const target = resolved.path === path && note ? note : notes.get(resolved.path ?? "");

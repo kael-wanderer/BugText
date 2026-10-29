@@ -1,5 +1,5 @@
-import { propertyKind, readProperties } from "./parse";
-import { removeProperty, setProperty, type PropertyEdit } from "./edit";
+import { loadProperties, propertiesModule } from "./loader";
+import type { PropertyEdit } from "./edit";
 
 type Apply = (source: string, edit: PropertyEdit) => boolean;
 
@@ -7,6 +7,12 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
   let sourceShown = false;
   let addingProperties = false;
   function render(): void {
+    const mod = propertiesModule();
+    if (!mod) {
+      void loadProperties().then(render);
+      return;
+    }
+    const { propertyKind, readProperties, removeProperty, setProperty } = mod;
     host.replaceChildren();
     const source = show();
     const result = source === null ? null : readProperties(source);

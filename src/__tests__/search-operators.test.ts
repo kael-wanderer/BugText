@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 import { expect, it } from "vitest";
 import { parseNote } from "../links/index";
 import { operatorFilter, parseSearchOperators } from "../search-operators";

@@ -1,4 +1,3 @@
-import { createFilterPanel } from "./filter/panel";
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
 import { startupWorkspace, updateReopen } from "./workspaces/session";
 import { createWorkspaceController } from "./workspaces/controller";
@@ -207,7 +206,7 @@ let outlineKey = "";
 const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus(), (tab) => {
   ui = { ...ui, outlineTab: tab }; persistUiState();
   void linksPanel.show(tab === "links");
-  void filterPanel.show(tab === "filter");
+  if (tab === "filter" || filterPanel) void loadFilterPanel().then((panel) => panel.show(tab === "filter"));
 });
 const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
@@ -218,7 +217,13 @@ const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const context = tab && linkContext(tab.id);
   if (context) void followLink(target, context);
 });
-const filterPanel = createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); });
+// The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
+let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
+function loadFilterPanel(): Promise<{ show(on: boolean): Promise<void> }> {
+  filterPanel ??= import("./filter/panel").then(({ createFilterPanel }) =>
+    createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }));
+  return filterPanel;
+}
 function updateOutline(force = false): void {
   linkIndex.setFolder(getState().folder);
   const tab = activeMeta();

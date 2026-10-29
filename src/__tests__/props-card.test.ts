@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installTestDom } from "./setup";
 import { createPropertiesCard } from "../properties/card";

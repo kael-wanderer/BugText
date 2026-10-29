@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 import { describe, expect, it } from "vitest";
 import fixtures from "../../src-tauri/tests/fixtures/links/cases.json";
 import { createLinkIndex, parseNote, type LinkScan } from "../links/index";

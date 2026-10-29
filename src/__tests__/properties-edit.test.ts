@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { undo } from "@codemirror/commands";
