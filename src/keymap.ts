@@ -21,6 +21,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "file.quick_note", label: "Quick Note", category: "File", default: "Ctrl+Cmd+N", scope: "menu" },
   { id: "file.new_typed_note", label: "New Typed Note", category: "File", default: "", scope: "menu" },
   { id: "file.apply_note_type", label: "Apply Note Type", category: "File", default: "", scope: "menu" },
+  { id: "file.daily_note", label: "Open Daily Note", category: "File", default: "CmdOrCtrl+Alt+D", scope: "menu" },
   { id: "file.open", label: "Open File", category: "File", default: "CmdOrCtrl+O", scope: "menu" },
   { id: "file.open_folder", label: "Open Folder", category: "File", default: "CmdOrCtrl+Shift+O", scope: "menu" },
   { id: "file.save", label: "Save", category: "File", default: "CmdOrCtrl+S", scope: "menu" },
