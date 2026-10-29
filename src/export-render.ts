@@ -90,6 +90,7 @@ export async function buildExportHtml(
   markdown: string,
   options: {
     rasterizeSvg: boolean;
+    firstHeading?: (title: string) => void;
     svgAsImage?: boolean;
     inlineImages?: { notePath: string; read: (path: string) => Promise<Uint8Array> };
   },
@@ -103,6 +104,11 @@ export async function buildExportHtml(
     width: "800px",
   });
   host.innerHTML = renderMarkdown(markdown);
+  if (options.firstHeading) {
+    const heading = Array.from(host.children).find((child) => /^H[1-6]$/.test(child.tagName));
+    options.firstHeading(heading?.textContent?.trim() ?? "");
+    heading?.remove();
+  }
   staticTaskMarks(host);
   document.body.appendChild(host);
   try {
