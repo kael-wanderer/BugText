@@ -1,6 +1,8 @@
 import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
+import { createTableSurface } from "./table-view/surface";
+import { matchingNotes } from "./table-view/model";
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
 import { startupWorkspace, updateReopen } from "./workspaces/session";
 import { createWorkspaceController } from "./workspaces/controller";
@@ -229,7 +231,7 @@ function loadFilterPanel(): Promise<{ show(on: boolean): Promise<void> }> {
   filterPanel ??= Promise.all([import("./filter/panel"), import("./saved-views/store")]).then(([{ createFilterPanel }, { createSavedViewStore }]) => {
     savedViews ??= createSavedViewStore();
     void savedViews.reload();
-    return createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }, { savedViews });
+    return createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }, { savedViews, openTable: () => { void showTableView(); }, onFilterChange: model => { if (JSON.stringify(currentTableFilter) !== JSON.stringify(model)) { currentTableFilter = model; queueMicrotask(renderAll); } } });
   });
   return filterPanel;
 }
@@ -700,6 +702,7 @@ function commandItems(): PaletteItem[] {
 
   const recent = loadRecent();
   return [
+    command("show_table_view", "Show Table View", () => { void showTableView(); }),
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
     command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
@@ -821,6 +824,7 @@ const handlers = {
     void doOpenPath(path, wid, newTab, linkIndex.folder);
   },
   onGraphFolder: () => { void pickFolder().then(folder => { if (folder) void openFolder(folder); }); },
+  renderTable: renderTableSurface,
   livePreviewEnabled: () => livePreviewOn,
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
@@ -1136,10 +1140,41 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   return v;
 }
 
+const tableSurfaces = new Map<HTMLElement, ReturnType<typeof createTableSurface>>();
+async function showTableView(): Promise<void> {
+  settingsScreen.close();
+  const w = activeWindow();
+  const existing = w.tabs.find(tab => tab.tableView);
+  if (existing) activateTab(w.id, existing.id);
+  else {
+    const id = nextId();
+    views.get(w.id)!.editor.openState(id, "");
+    patchWindow(w.id, { tabs: [...w.tabs, { id, path: null, name: `Table: ${basename(getState().folder ?? "No folder")}`, dirty: false, tableView: true }], activeTabId: id });
+    renderAll();
+  }
+  await loadFilterPanel();
+  try { await linkIndex.ensure(); renderAll(); } catch { showToast("Could not index notes."); }
+}
+function renderTableSurface(host: HTMLElement): void {
+  let surface = tableSurfaces.get(host);
+  if (!surface) { surface = createTableSurface(host, path => { void doOpenPath(path).then(() => activeView().jumpToLine(1)); }); tableSurfaces.set(host, surface); }
+  const filter = filterPanelModel();
+  surface.update(matchingNotes(linkIndex.notes(), filter), getState().folder);
+}
+function filterPanelModel() {
+  return currentTableFilter ?? { tags: [], rows: [], folder: null, mode: "all" as const };
+}
+let currentTableFilter: import("./properties/filter-query").FilterModel | null = null;
+linkIndex.subscribe(() => renderAll());
+
 function renderAll(): void {
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
   refreshStatusBar();
+  for (const w of getState().windows) {
+    const name = `Table: ${basename(getState().folder ?? "No folder")}`;
+    if (w.tabs.some(tab => tab.tableView && tab.name !== name)) patchWindow(w.id, { tabs: w.tabs.map(tab => tab.tableView ? { ...tab, name } : tab) });
+  }
   for (const v of views.values()) v.render();
   if (views.has(getState().activeWindowId)) { updateOutline(); aiPanel?.resize(); }
   document.getElementById("windows")!.classList.toggle("has-sub", getState().windows.length > 1);
@@ -1808,7 +1843,7 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
 
 async function doSave(saveAs = false): Promise<boolean> {
   const t = activeMeta();
-  if (!t) return false;
+  if (!t || t.tableView) return false;
   const view = activeView();
   if (isPdfFile(t.path ?? t.name)) {
     if (saveAs) {

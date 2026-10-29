@@ -57,6 +57,7 @@ export type WindowHandlers = {
   onGraphOpen?: (windowId: string, path: string, newTab: boolean) => void;
   onGraphFolder?: () => void;
   onGraphNew?: () => void;
+  renderTable?: (host: HTMLElement) => void;
   livePreviewEnabled?: () => boolean;
   onStatusChange?: () => void;
   onWordCount?: (tabId: string, count: number) => void;
@@ -573,12 +574,15 @@ export function createWindowView(
       });
     });
 
+  const tableHost = document.createElement("div"); tableHost.className = "table-view"; tableHost.hidden = true; root.append(tableHost);
   function render(): void {
     const w = getWindow(windowId);
     if (!w) return;
     editor.setLivePreview(h.livePreviewEnabled?.() ?? false);
     queueMicrotask(refreshContextAction);
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
+    tableHost.hidden = !active?.tableView;
+    if (active?.tableView) h.renderTable?.(tableHost);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
@@ -1119,6 +1123,7 @@ export function createWindowView(
     },
     requestMeasure: () => editor.requestMeasure(),
     focus: () => {
+      if (!tableHost.hidden) { tableHost.querySelector<HTMLElement>("tbody tr")?.focus(); return; }
       focusedPane = "editor";
       editor.focus();
     },
