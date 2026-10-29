@@ -3558,3 +3558,14 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .properties-card input:not([type="checkbox"]) { max-width: 200px; min-width: 0; padding: 3px 6px; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
 .properties-chip button { padding: 0 0 0 5px; }
 .properties-error[hidden] { display: none; }
+
+.filter-panel { overflow: auto; min-height: 0; }
+.filter-controls { padding: 8px; display: grid; gap: 6px; border-bottom: 1px solid var(--border); }
+.filter-controls input, .filter-controls select { min-width: 0; width: 100%; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; padding: 4px; font: inherit; }
+.filter-controls button, .filter-results button { color: var(--text); background: transparent; border: 0; cursor: pointer; font: inherit; }
+.filter-chips, .filter-result-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.filter-tags { max-height: 150px; overflow: auto; }
+.filter-tag { display: block; width: 100%; text-align: left; padding: 4px; }
+.filter-tag:hover { background: var(--bg-elev); }
+.filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 4px; }
+.filter-results { padding: 8px; }

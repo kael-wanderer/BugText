@@ -4,7 +4,9 @@ import {
   type SearchOptions,
 } from "./filesys";
 import { invoke } from "@tauri-apps/api/core";
-import { SearchRun } from "./search-run";
+import { SearchRun, searchOperatorFiles } from "./search-run";
+import { hasOperators, hasMetadataOperators, parseSearchOperators, pathMatches } from "./search-operators";
+import type { LinkIndex } from "./links/index";
 import { searchPdf } from "./pdf-search";
 import { firstSearchMatch, searchExpression } from "./search-match";
 import { filterByGlobs, type ReplacePreview } from "./replace/plan";
@@ -19,6 +21,7 @@ export type SearchPanel = {
 export type SearchPanelDeps = {
   getFolder: () => string | null;
   getFiles: () => string[];
+  index?: LinkIndex;
   previewReplace?: (query: string, replacement: string, options: SearchOptions, files: string[]) => Promise<ReplacePreview>;
   onReplacePreview?: (preview: ReplacePreview, query: string, replacement: string, options: SearchOptions) => void;
   onOpenHit: (path: string, line: number, page?: number) => void;
@@ -165,7 +168,10 @@ export function createSearchPanel(
     if (!folder) { groupValid = false; updateButton(); status.textContent = "Open a folder to search its files."; return; }
     if (query.length < (replaceOpen ? 1 : 2)) { groupValid = false; updateButton(); status.textContent = query ? "Type at least 2 characters." : ""; return; }
     groupValid = false; groupError.textContent = ""; message = "";
-    state.phase = "text"; render(query);
+    const ops = parseSearchOperators(query);
+    const useOperators = !replaceOpen && hasOperators(ops) && !!deps.index;
+    const textQuery = useOperators ? ops.text : query;
+    state.phase = "text"; render(textQuery);
     if (replaceOpen) {
       try { await invoke("replace_check_groups", { query, options: { ...options }, replacement: replacement.value }); if (current !== token) return; groupValid = true; }
       catch (error) { if (current !== token) return; groupError.textContent = String(error); }
@@ -173,17 +179,19 @@ export function createSearchPanel(
     await cancellation;
     if (current !== token) return;
     try {
-      const result = await searchInFolder(folder, query, options, current);
+      if (useOperators) await deps.index!.ensure(folder);
+      if (current !== token) return;
+      const result = useOperators ? await searchOperatorFiles(folder, deps.getFiles(), deps.index!, ops, options, () => current === token) : await searchInFolder(folder, query, options, current);
       if (current !== token || result.cancelled) return;
       state.text(result);
     } catch (error) {
       if (current !== token) return;
-      if (options.regex) { state.phase = "error"; state.error = String(error).split(/\r?\n/)[0]; render(query); }
+      if (options.regex) { state.phase = "error"; state.error = String(error).split(/\r?\n/)[0]; render(textQuery); }
       else status.textContent = "Search failed.";
       return;
     }
-    const pdfs = (replaceOpen ? [] : deps.getFiles()).filter((path) => path.toLowerCase().endsWith(".pdf"));
-    state.pdfTotal = pdfs.length; state.phase = "pdf"; render(query);
+    const pdfs = (replaceOpen || (useOperators && (!ops.text || hasMetadataOperators(ops))) ? [] : deps.getFiles()).filter((path) => path.toLowerCase().endsWith(".pdf") && (!useOperators || pathMatches(path, ops.path)));
+    state.pdfTotal = pdfs.length; state.phase = "pdf"; render(textQuery);
     for (const relative of pdfs) {
       if (current !== token || state.hitLimit) break;
       progress.hidden = false; progress.replaceChildren();
@@ -195,12 +203,12 @@ export function createSearchPanel(
       progress.append(spinner, label, meter, stop);
       const separator = folder.includes("\\") ? "\\" : "/";
       const path = `${folder.replace(/[\\/]$/, "")}${separator}${relative}`;
-      try { const hits = await searchPdf(path, relative, query, options, () => current === token); if (current !== token) return; state.add(hits); }
+      try { const hits = await searchPdf(path, relative, textQuery, options, () => current === token); if (current !== token) return; state.add(hits); }
       catch { if (current !== token) return; state.pdfFailures++; state.skipped.push({ relative, reason: "pdf" }); }
-      state.pdfDone++; render(query);
+      state.pdfDone++; render(textQuery);
     }
     if (current !== token) return;
-    state.phase = "done"; progress.hidden = true; render(query);
+    state.phase = "done"; progress.hidden = true; render(textQuery);
   }
 
   toggle.addEventListener("click", () => { setReplaceOpen(!replaceOpen); void run(); });

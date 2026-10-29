@@ -152,7 +152,8 @@ whether to ask on rename.
 
 Markdown properties appear above the editor and edit only the active note’s YAML
 frontmatter through the normal dirty and undo path. Invalid YAML is read-only;
-frontmatter and inline tags share the per-window link index.
+frontmatter and inline tags share the per-window link index. The Filter sidebar and
+folder search operators query that index for tags, properties, dates and paths.
 
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
