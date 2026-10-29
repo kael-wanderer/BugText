@@ -2,6 +2,12 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { installTestDom } from "./setup";
 
 const calls = vi.hoisted(() => ({ saved: [] as { path: string; bytes: number[] }[], sameFile: false }));
+vi.mock("../pdf-annotations/store", () => ({
+  AnnotationStore: { load: vi.fn(async (path: string, digest: string, pages: number) => ({
+    document: { path, digest, pages, annotations: [] }, changed: false,
+    keepDigest: vi.fn(), destroy: vi.fn(),
+  })) },
+}));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command: string, args: { path: string; bytes?: number[] }) => {
     if (command === "pdf_draft_read") return null;

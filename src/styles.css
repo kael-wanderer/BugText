@@ -3498,3 +3498,15 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .search-preview-replace { cursor: pointer; }
 .search-snippet del { color: var(--error, #c45b50); }
 .search-snippet ins { color: var(--accent); text-decoration: none; }
+
+.pdf-annot-layer { position: absolute; inset: 0; pointer-events: none; }
+.pdf-annot-rect { position: absolute; pointer-events: auto; mix-blend-mode: multiply; }
+.pdf-annot-yellow { background: rgba(255, 220, 45, .38); }
+.pdf-annot-green { background: rgba(87, 205, 119, .38); }
+.pdf-annot-blue { background: rgba(86, 166, 245, .38); }
+.pdf-annot-pink { background: rgba(247, 113, 167, .38); }
+.pdf-annot-rect.selected { outline: 1px solid currentColor; }
+.pdf-annot-rect.flash { outline: 3px solid #ed9e00; }
+.pdf-annot-marker { position: absolute; right: -12px; color: #b77a00; font-size: 10px; }
+.pdf-annotation-notice { display: flex; gap: 12px; align-items: center; padding: 6px 12px; background: var(--bg-elev); color: var(--text); }
+.pdf-annotation-notice[hidden] { display: none; }

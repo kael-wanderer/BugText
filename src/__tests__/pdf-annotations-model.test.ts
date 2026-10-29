@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuote, sortAnnotations, filterAnnotations, parsePdfAnchor, quoteMarkdown, exportMarkdown, rewriteQuoteLinks, type Annotation } from "./model";
+import { normalizeQuote, sortAnnotations, filterAnnotations, parsePdfAnchor, quoteMarkdown, exportMarkdown, rewriteQuoteLinks, type Annotation } from "../pdf-annotations/model";
 const a = (page: number, id = "abc123"): Annotation => ({ id, group: null, page, rects: [[2, 3, 4, 5]], quote: "Some text", color: "yellow", comment: "A thought", created: "", updated: "" });
 describe("PDF annotation model", () => {
   it("normalizes and caps quotes", () => {

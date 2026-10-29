@@ -6,6 +6,12 @@ const destroyDocument = vi.fn();
 const pdfPages = vi.hoisted(() => ({ count: 1 }));
 // Drafts the app would keep in its config folder, by PDF path.
 const drafts = vi.hoisted(() => new Map<string, string>());
+vi.mock("../pdf-annotations/store", () => ({
+  AnnotationStore: { load: vi.fn(async (path: string, digest: string, pages: number) => ({
+    document: { path, digest, pages, annotations: [] }, changed: false,
+    keepDigest: vi.fn(), destroy: vi.fn(),
+  })) },
+}));
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (command: string, args: { path: string; contents?: string | null }) => {
     if (command === "pdf_draft_read") return drafts.get(args.path) ?? null;

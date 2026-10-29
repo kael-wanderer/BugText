@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
+import { AnnotationStore } from "./pdf-annotations/store";
+import { createAnnotationLayer, type AnnotationLayer } from "./pdf-annotations/layer";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
@@ -601,6 +603,14 @@ export async function renderPdf(
     data: new Uint8Array(bytes),
   });
   const document = await loadingTask.promise;
+  const annotationLayers: AnnotationLayer[] = [];
+  let annotationNotice: HTMLElement | null = null;
+  let annotationStore: AnnotationStore;
+  const refreshAnnotations = (): void => {
+    annotationLayers.forEach((layer) => layer.render(annotationStore.document.annotations));
+    if (annotationNotice) annotationNotice.hidden = !annotationStore.changed;
+  };
+  annotationStore = await AnnotationStore.load(path, sourceDigest, document.numPages, refreshAnnotations);
   // Drafts are keyed by path; one made on different bytes may no longer line up.
   let editDocument: PdfEditDocument = await loadDraft(path);
   if (pdfDraftIsStale(editDocument, sourceDigest)) {
@@ -620,6 +630,7 @@ export async function renderPdf(
   editDocument = { ...editDocument, sourceDigest };
   void storeDraft(path, editDocument);
   if (options?.isCurrent && !options.isCurrent()) {
+    annotationStore.destroy();
     void loadingTask.destroy();
     throw new PdfRenderSuperseded();
   }
@@ -839,6 +850,16 @@ export async function renderPdf(
     },
   });
   host.append(toolbar.element, inspector.element, container);
+  annotationNotice = window.document.createElement("div");
+  annotationNotice.className = "pdf-annotation-notice";
+  const noticeText = window.document.createElement("span");
+  noticeText.textContent = "This PDF changed since it was annotated. Highlights may be out of place.";
+  const keepButton = window.document.createElement("button");
+  keepButton.type = "button"; keepButton.textContent = "Keep";
+  keepButton.addEventListener("click", () => { void annotationStore.keepDigest().catch((error) => setStatus(String(error), { sticky: true })); });
+  annotationNotice.append(noticeText, keepButton);
+  annotationNotice.hidden = !annotationStore.changed;
+  toolbar.element.append(annotationNotice);
   // Side panels sit just below the toolbar, whose height changes with Edit; the
   // inspector fills the rest of the pane and docks or floats by its width.
   const measureHost = (): void => {
@@ -2553,6 +2574,8 @@ export async function renderPdf(
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     // Stop drawing once another document owns the pane; nothing else frees this one.
     if (options?.isCurrent && !options.isCurrent()) {
+      annotationStore.destroy();
+      annotationLayers.forEach((layer) => layer.destroy());
       void loadingTask.destroy();
       throw new PdfRenderSuperseded();
     }
@@ -2642,6 +2665,10 @@ export async function renderPdf(
           textContent.items as PdfTextContentItemLike[],
         ),
       );
+      const annotationLayer = createAnnotationLayer(window.document, pageNumber, RENDER_SCALE);
+      annotationLayer.render(annotationStore.document.annotations);
+      annotationLayers.push(annotationLayer);
+      pageElement.appendChild(annotationLayer.element);
       const textLayer = window.document.createElement("div");
       textLayer.className = "pdf-text-layer";
       textLayer.style.setProperty("--total-scale-factor", String(viewport.scale));
@@ -2821,6 +2848,9 @@ export async function renderPdf(
     checkDisk,
     destroy: () => {
       destroyed = true;
+      annotationStore.destroy();
+      annotationLayers.forEach((layer) => layer.destroy());
+      annotationNotice?.remove();
       clear();
       toolbarSize?.disconnect();
       toolbar.destroy();
