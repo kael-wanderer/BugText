@@ -3484,7 +3484,12 @@ async function showSwitcher(): Promise<void> {
     open: workspace => void switchWorkspace(workspace),
     openInNewWindow: workspace => void openWorkspaceWindow(workspace),
     openFolder: folder => void openFolder(folder).then(() => refreshFileList()),
-    saveFolder: folder => void openFolder(folder).then(() => refreshFileList()).then(saveWorkspace),
+    // Nothing changes until Save: opening the folder first would auto-save it into this window's current workspace.
+    saveFolder: folder => showSaveWorkspaceSheet(folder, async (name, pinned) => {
+      await workspaceController.close();
+      await openFolder(folder); await refreshFileList();
+      await workspaceController.save(name, pinned);
+    }),
     openFile: () => void doOpenPath(workspacesPath),
     changed: () => void workspaceController.reload().then(refreshPinnedMenu),
   });

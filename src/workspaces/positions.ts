@@ -8,7 +8,8 @@ export type TextPositionView = {
   setCursor(offset: number): void; scrollLineToTop(line: number): void;
 };
 export function captureTextPosition(view: Pick<TextPositionView, "cursor" | "topLine">): FilePosition {
-  return { cursor: view.cursor(), topLine: view.topLine() };
+  // The preview reports an interpolated line; stored positions must be whole lines.
+  return { cursor: view.cursor(), topLine: clamp(Math.floor(view.topLine()), 1, Number.MAX_SAFE_INTEGER) };
 }
 export function applyTextPosition(position: FilePosition, view: TextPositionView): FilePosition {
   const text = view.text();

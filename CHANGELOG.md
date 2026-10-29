@@ -44,6 +44,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - ⌘-click on a link in the Links panel's "In this note" list opens its target, the same as ⌘-click in the editor; a plain click still shows the link in the note.
 - Renaming a PDF in the Explorer files its annotations under the new name; they were stored under the name with a trailing slash, so the renamed PDF could not find them by path.
 - Text on rotated PDF pages can be selected where it appears, so highlights land on the text instead of an invisible unrotated copy of the page.
+- The window title bar shows the active workspace name ("Blog — BugText"); the app lacked permission to set it, so it always read "BugText".
+- Scrolling a Markdown note in Read mode no longer stops a workspace from saving: the reading position was stored as a fractional line, which the workspace file refused, so tabs, layout and positions stopped updating until the note left Read mode.
+- "Save as workspace" on a recent folder no longer changes the folder of the window's current workspace: the folder now opens only after Save, so Cancel leaves the window and its workspace as they were.
+- The Switch Workspace sheet closes with Escape after Pin, Delete or Undo was clicked, a second ⌃⌘O focuses the open sheet instead of stacking another, and the Delete message names the workspace.
 - Export presets with a title from the first heading no longer number sections "0.1, 0.2": once the `#` title moves to the title block, `##` sections become the top level.
 - AI edits (Proofread, Rewrite and Edit actions) no longer insert the model's leading blank lines or join words at the end of a selection: the reply keeps the original text's surrounding whitespace.
 - Saved AI action replies now show the model and time under the reply, like Chat, so an action's engine override is visible.

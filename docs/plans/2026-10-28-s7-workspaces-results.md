@@ -18,3 +18,31 @@ The automated tests below cover components of the acceptance scenarios. Native c
 Additional native check: press ⌘Q with pending workspace changes and verify the app still quits promptly after the 400 ms save hold.
 
 The production build emits the existing 800 kB chunk warning: the main chunk is 820.30 kB, compared with 802.64 kB and the same warning at baseline `57774e9`. No additional chunk crosses the warning threshold.
+
+## Native checks (2026-10-29, debug build on the second display)
+
+Run with a separate identifier (`com.kael.bugtext.s7test`) so the installed app's settings and session were untouched.
+
+| # | Result | Notes |
+|---|---|---|
+| 1 | Pass | Folder, 4 Main tabs in order, active tab, Editor mode, Sub with its tab in Read mode and the split all return. |
+| 2 | Pass after fix | Editor: cursor and top line return; PDF returns to page 12. Read mode: scrolling a Markdown note saved a fractional top line, which the store refused, so the whole workspace stopped saving. Now stored as a whole line; Read view returns to the same paragraph. |
+| 3 | Pass | Pin, Unpin, Rename, Delete, Undo. `<img src=x onerror=alert(1)>blog` shows as text in the switcher, Explorer header and title. Delete message now names the workspace. |
+| 4 | Pass | Unsaved sheet lists the dirty tab; Cancel keeps everything; Open in New Window opens the workspace in a second window and leaves the first unchanged. |
+| 5 | Pass | Choosing a workspace open in the other window brings that window to the front. |
+| 6 | Pass | Strip "1 file in this workspace could not be found", Show lists the path, Remove from workspace updates the file; the strip does not return. |
+| 7 | Pass | Primary (Blog) and secondary (book, later s3-notes) windows return after relaunch with their workspaces. |
+| 8 | Pass | Without a workspace, relaunch restores cursor (Ln 195), Read-view position and PDF page 12. |
+| 9 | Pass | Broken file: switcher shows "workspaces.json could not be read" with Open file; Save is refused and the file is unchanged (same checksum). |
+| 10 | Pass | Pin and rename in one window update the other window's switcher and Explorer header without a reload. |
+| 11 | Pass after fix | Recent folders that are a workspace's folder are hidden. "Save as workspace" opened the folder before the sheet, so the window's active workspace (book) auto-saved the new folder even after Cancel. Now the folder opens only after Save. |
+| 12 | Partly | File ▸ Workspaces lists the pinned workspace and choosing it focuses its window. Dock menu not checked: the Dock stays on the main display (covered by `pinned_workspaces.rs`). |
+| Quit | Pass | Quit right after a tab change saves the change; the process exits about 0.3 s after Quit. |
+
+Also fixed: the native title bar always read "BugText" (`setTitle` needed `core:window:allow-set-title`); Escape did nothing after a row button in the switcher took focus; a second ⌃⌘O stacked another switcher.
+
+Left as is:
+- Activating a PDF tab sets the pane to Read mode, so Markdown tabs opened afterwards in that pane show Read (pre-existing since June, not workspace code).
+- Switching workspace closes a tab whose old Recovery draft was left undecided and discards that draft with an Undo toast (existing close flow).
+- "Save as workspace" on a recent folder keeps the window's current tabs, so the new workspace includes files from the previous folder.
+- New windows open on the main display; the switcher has no arrow-key selection (Enter opens the first match); Save sheet buttons are full-width bars.

@@ -18,6 +18,11 @@ describe("workspace reading positions", () => {
     expect(applyTextPosition(position, view)).toEqual({ cursor: 5, topLine: 2 });
     expect(captureTextPosition(view)).toEqual(position);
   });
+  it("stores the preview's interpolated top line as a whole line", () => {
+    expect(captureTextPosition({ cursor: () => 0, topLine: () => 95.4 })).toEqual({ cursor: 0, topLine: 95 });
+    expect(captureTextPosition({ cursor: () => 0, topLine: () => 0.6 })).toEqual({ cursor: 0, topLine: 1 });
+    expect(captureTextPosition({ cursor: () => 0, topLine: () => NaN })).toEqual({ cursor: 0, topLine: 1 });
+  });
   it("clamps cursor, top line and PDF page to the current document", () => {
     const view = textView("short\nnote");
     expect(applyTextPosition({ cursor: 999, topLine: 999 }, view)).toEqual({ cursor: 10, topLine: 2 });

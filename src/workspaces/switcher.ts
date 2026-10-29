@@ -6,6 +6,9 @@ export async function showWorkspaceSwitcher(deps: {
   /** This window's copy of the list may be stale: the broadcast skips the sender. */
   changed(): void;
 }): Promise<void> {
+  // A second ⌃⌘O focuses the open switcher instead of stacking another one.
+  const open = document.querySelector<HTMLInputElement>(".workspace-switcher > input");
+  if (open) { open.focus(); return; }
   const overlay = document.createElement("div"); overlay.className = "workspace-sheet-overlay";
   const sheet = document.createElement("div"); sheet.className = "workspace-sheet workspace-switcher"; sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-label", "Switch Workspace");
   const input = document.createElement("input"); input.placeholder = "Switch to a workspace or folder…"; input.setAttribute("aria-label", "Filter workspaces");
@@ -13,7 +16,10 @@ export async function showWorkspaceSwitcher(deps: {
   sheet.append(input, content, toast); overlay.append(sheet); document.body.append(overlay);
   const shorten = (path: string | null) => path ? (deps.home && (path === deps.home || path.startsWith(`${deps.home}/`)) ? `~${path.slice(deps.home.length)}` : path) : "No folder";
   const button = (label: string, action: () => void) => { const node = document.createElement("button"); node.type = "button"; node.textContent = label; node.onclick = action; return node; };
-  const close = () => overlay.remove();
+  // Escape closes from anywhere in the sheet, including after a row button took focus.
+  const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); close(); } };
+  const close = () => { document.removeEventListener("keydown", onKey); overlay.remove(); };
+  document.addEventListener("keydown", onKey);
   let entries: Array<{ select(): void; newWindow?(): void }> = [];
   async function render(): Promise<void> {
     const result = await loadWorkspaces(deps.io); content.replaceChildren(); entries = [];
@@ -45,7 +51,7 @@ export async function showWorkspaceSwitcher(deps: {
               .catch(() => { toast.textContent = "Names must be 1–60 characters and not already used."; });
           };
         }),
-        button("Delete", () => { void updateWorkspaces(deps.io, file => { file.workspaces = file.workspaces.filter(w => w.id !== workspace.id); file.reopen = file.reopen.filter(id => id !== workspace.id); return file; }).then(() => { deps.changed(); toast.replaceChildren(document.createTextNode("Deleted · "), button("Undo", () => { void updateWorkspaces(deps.io, file => { file.workspaces.push(workspace); return file; }).then(() => { toast.replaceChildren(); deps.changed(); return render(); }).catch(() => { toast.textContent = "Could not undo deletion"; }); })); return render(); }).catch(() => { toast.textContent = "workspaces.json could not be updated"; }); }));
+        button("Delete", () => { void updateWorkspaces(deps.io, file => { file.workspaces = file.workspaces.filter(w => w.id !== workspace.id); file.reopen = file.reopen.filter(id => id !== workspace.id); return file; }).then(() => { deps.changed(); toast.replaceChildren(document.createTextNode(`Deleted "${workspace.name}" · `), button("Undo", () => { void updateWorkspaces(deps.io, file => { file.workspaces.push(workspace); return file; }).then(() => { toast.replaceChildren(); deps.changed(); return render(); }).catch(() => { toast.textContent = "Could not undo deletion"; }); })); return render(); }).catch(() => { toast.textContent = "workspaces.json could not be updated"; }); }));
       row.append(title, detail, actions); return row;
     }
     const visible = workspaces.filter(w => matching(`${w.name} ${w.folder ?? ""}`));
@@ -56,6 +62,6 @@ export async function showWorkspaceSwitcher(deps: {
       row.append(button(path.split(/[\\/]/).filter(Boolean).pop() ?? path, select)); const detail = document.createElement("small"); detail.textContent = shorten(path); row.append(detail, button("Save as workspace", () => { close(); deps.saveFolder(path); })); return row;
     }));
   }
-  input.oninput = () => { void render(); }; input.onkeydown = event => { if (event.key === "Escape") close(); else if (event.key === "Enter" && entries[0]) { event.preventDefault(); if (!event.metaKey) entries[0].select(); else entries[0].newWindow?.(); } };
+  input.oninput = () => { void render(); }; input.onkeydown = event => { if (event.key === "Enter" && entries[0]) { event.preventDefault(); if (!event.metaKey) entries[0].select(); else entries[0].newWindow?.(); } };
   await render(); input.focus();
 }

@@ -54,12 +54,30 @@ describe("workspace switcher", () => {
     expect(names()).toEqual(["<img src=x onerror=alert(1)>"]);
   });
 
+  it("closes on Escape after a row button took focus, but Escape in rename only cancels the rename", async () => {
+    const f = fixture([workspace("a", "Blog")]);
+    await showWorkspaceSwitcher(f.deps);
+    [...document.querySelectorAll("button")].find(b => b.textContent === "Rename")!.click();
+    press(document.querySelector('input[aria-label="Workspace name"]')!, "Escape");
+    expect(document.querySelector(".workspace-switcher")).not.toBeNull();
+    [...document.querySelectorAll("button")].find(b => b.textContent === "Pin")!.click(); await tick();
+    press(document.body, "Escape");
+    expect(document.querySelector(".workspace-switcher")).toBeNull();
+  });
+  it("focuses the open switcher instead of opening a second one", async () => {
+    const f = fixture([workspace("a", "Blog")]);
+    await showWorkspaceSwitcher(f.deps); (document.activeElement as HTMLElement).blur();
+    await showWorkspaceSwitcher(f.deps);
+    expect(document.querySelectorAll(".workspace-switcher")).toHaveLength(1);
+    expect(document.activeElement).toBe(document.querySelector(".workspace-switcher > input"));
+  });
   it("deletes with Undo and tells the window the list changed", async () => {
     const f = fixture([workspace("a", "Blog"), workspace("b", "Book")]);
     await showWorkspaceSwitcher(f.deps);
     [...document.querySelectorAll("button")].filter(b => b.textContent === "Delete")[0].click(); await tick();
     expect(f.file().workspaces.map((w: Workspace) => w.id)).toEqual(["b"]);
     expect(names()).toEqual(["Book"]);
+    expect(document.body.textContent).toContain('Deleted "Blog" · ');
     [...document.querySelectorAll("button")].find(b => b.textContent === "Undo")!.click(); await tick();
     expect(f.file().workspaces.map((w: Workspace) => w.id).sort()).toEqual(["a", "b"]);
     expect(f.deps.changed).toHaveBeenCalledTimes(2);
