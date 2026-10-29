@@ -3410,6 +3410,7 @@ const appKeyActions: Record<string, () => void> = {
   "palette.open": () => palette.open(),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
+  "file.daily_note": () => void openDailyNote(),
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
   "ai.new_chat": newAIChat,

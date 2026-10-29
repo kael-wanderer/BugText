@@ -101,7 +101,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let new_typed_note = MenuItemBuilder::with_id("file.new_typed_note", "New Typed Note…").build(app)?;
     let apply_note_type = MenuItemBuilder::with_id("file.apply_note_type", "Apply Note Type…").build(app)?;
-    let daily_note = MenuItemBuilder::with_id("file.daily_note", "Open Daily Note").accelerator("CmdOrCtrl+Alt+D").build(app)?;
+    let daily_note = MenuItemBuilder::with_id("file.daily_note", "Open Daily Note").build(app)?;
     let open = MenuItemBuilder::with_id("file.open", "Open File…")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
