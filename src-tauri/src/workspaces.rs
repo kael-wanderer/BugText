@@ -44,7 +44,7 @@ impl Registry {
 #[derive(Default)]
 pub struct WorkspaceState(pub Mutex<Registry>);
 
-fn valid_id(id: &str) -> Result<(), String> {
+pub(crate) fn valid_id(id: &str) -> Result<(), String> {
     if id.is_empty() || id.len() > 64 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
     {
         return Err("Invalid workspace id".into());

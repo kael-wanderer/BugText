@@ -1,3 +1,4 @@
+import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
 import { createWorkspaceController } from "./workspaces/controller";
 import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
 import { showWorkspaceSwitcher } from "./workspaces/switcher";
@@ -272,6 +273,7 @@ const workspaceController = createWorkspaceController({
   claim: id => invoke<string | null>("workspace_claim", { id }),
   release: () => invoke<void>("workspace_release"),
   display: name => {
+    queueMicrotask(() => void refreshPinnedMenu());
     document.title = name ? `${name} — BugText` : "BugText";
     void currentNativeWindow?.setTitle(document.title).catch(() => {});
     const header = document.querySelector<HTMLElement>("#explorer");
@@ -282,6 +284,11 @@ const workspaceController = createWorkspaceController({
     element.textContent = name;
   },
 });
+async function refreshPinnedMenu(): Promise<void> {
+  await syncPinnedWorkspaces(workspacesIO(nativeWindowLabel), workspaceController.activeId(),
+    (items, checkedId) => invoke("set_pinned_workspaces", { items, checkedId })).catch(() => {});
+}
+window.addEventListener("focus", () => void refreshPinnedMenu());
 function saveWorkspace(): void { showSaveWorkspaceSheet(getState().folder, workspaceController.save); }
 window.addEventListener("pagehide", flushUiState);
 window.addEventListener("beforeunload", flushUiState);
@@ -559,7 +566,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
 
 void listen<unknown>(SETTINGS_CHANGED_EVENT, (event) => {
   const file = shouldReload(event.payload, nativeWindowLabel);
-  if (file === "workspaces") void workspaceController.reload();
+  if (file === "workspaces") void workspaceController.reload().then(refreshPinnedMenu);
   else if (file) void reloadSettingsFromDisk(file);
 });
 
@@ -3058,6 +3065,14 @@ window.setInterval(() => {
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;
   const id = event.payload;
+  if (id.startsWith("workspace.open:")) {
+    const workspaceId = id.slice("workspace.open:".length);
+    void loadWorkspaces(workspacesIO(nativeWindowLabel)).then(result => {
+      const workspace = result.file?.workspaces.find(item => item.id === workspaceId);
+      if (workspace) void switchWorkspace(workspace);
+    });
+    return;
+  }
   if (id.startsWith("view.wrap.")) {
     return setWrapMode(id.slice("view.wrap.".length) as SoftWrapMode);
   }
@@ -3372,7 +3387,7 @@ async function showSwitcher(): Promise<void> {
     openFolder: folder => void openFolder(folder).then(() => refreshFileList()),
     saveFolder: folder => void openFolder(folder).then(() => refreshFileList()).then(saveWorkspace),
     openFile: () => void doOpenPath(workspacesPath),
-    changed: () => void workspaceController.reload(),
+    changed: () => void workspaceController.reload().then(refreshPinnedMenu),
   });
 }
 
@@ -3393,6 +3408,7 @@ async function restoreWindows(): Promise<void> {
 }
 
 async function boot(): Promise<void> {
+  await refreshPinnedMenu();
   await loadSettings();
   await refreshMcpStatus();
   reportWindow();

@@ -1,5 +1,6 @@
 mod conversations;
 mod workspaces;
+mod pinned_workspaces;
 mod ai;
 mod assets;
 mod cli_args;
@@ -167,6 +168,7 @@ pub fn run() {
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
         .manage(workspaces::WorkspaceState::default())
+        .manage(pinned_workspaces::PinnedState::default())
         .manage(preview::PreviewRoots::default())
         .manage(preview::PreviewDocs::default())
         .register_uri_scheme_protocol("preview", |ctx, request| {
@@ -294,6 +296,7 @@ pub fn run() {
             window_fullscreen_toggle,
             window_tile,
             native_windows::new_window,
+            pinned_workspaces::set_pinned_workspaces,
             workspaces::read_workspaces,
             workspaces::write_workspaces,
             workspaces::workspace_claim,

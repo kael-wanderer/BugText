@@ -7,10 +7,34 @@ mod platform {
     use objc2_app_kit::{NSApplication, NSMenu, NSMenuItem};
     use objc2_foundation::{MainThreadMarker, NSString};
     use std::ffi::c_char;
-    use std::sync::OnceLock;
-    use tauri::AppHandle;
+    use std::sync::{Mutex, OnceLock};
+    use tauri::{AppHandle, Manager};
 
     static APP: OnceLock<AppHandle> = OnceLock::new();
+    static DOCK_IDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    unsafe extern "C-unwind" fn open_workspace_action(
+        _delegate: *mut AnyObject,
+        _command: Sel,
+        sender: *mut NSMenuItem,
+    ) {
+        let Some(app) = APP.get().cloned() else {
+            return;
+        };
+        let Some(sender) = (unsafe { sender.as_ref() }) else {
+            return;
+        };
+        let id = DOCK_IDS
+            .lock()
+            .ok()
+            .and_then(|ids| ids.get(sender.tag() as usize).cloned());
+        if let Some(id) = id {
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<crate::workspaces::WorkspaceState>();
+                let _ = crate::workspaces::workspace_open_window(app.clone(), state, id).await;
+            });
+        }
+    }
 
     unsafe extern "C-unwind" fn new_window_action(
         _delegate: *mut AnyObject,
@@ -30,6 +54,37 @@ mod platform {
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
         let title = NSString::from_str("BugText");
         let menu = NSMenu::initWithTitle(NSMenu::alloc(mtm), &title);
+        if let Some(app) = APP.get() {
+            let items = app
+                .state::<crate::pinned_workspaces::PinnedState>()
+                .0
+                .lock()
+                .map(|items| items.clone())
+                .unwrap_or_default();
+            if let Ok(mut ids) = DOCK_IDS.lock() {
+                *ids = items.iter().map(|item| item.id.clone()).collect();
+            }
+            for (index, workspace) in items.iter().enumerate() {
+                let name = NSString::from_str(&workspace.name);
+                let empty = NSString::from_str("");
+                let item = unsafe {
+                    NSMenuItem::initWithTitle_action_keyEquivalent(
+                        NSMenuItem::alloc(mtm),
+                        &name,
+                        Some(sel!(bugtextOpenWorkspace:)),
+                        &empty,
+                    )
+                };
+                item.setTag(index as isize);
+                unsafe {
+                    item.setTarget(delegate.as_ref());
+                }
+                menu.addItem(&item);
+            }
+            if !items.is_empty() {
+                menu.addItem(&NSMenuItem::separatorItem(mtm));
+            }
+        }
         let item_title = NSString::from_str("New Window");
         let empty = NSString::from_str("");
         let item = unsafe {
@@ -72,6 +127,15 @@ mod platform {
                     Imp,
                 >(dock_menu),
                 dock_types,
+            );
+            class_addMethod(
+                class_ptr,
+                sel!(bugtextOpenWorkspace:),
+                std::mem::transmute::<
+                    unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut NSMenuItem),
+                    Imp,
+                >(open_workspace_action),
+                action_types,
             );
             class_addMethod(
                 class_ptr,
