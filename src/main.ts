@@ -109,6 +109,7 @@ import {
   resolveAccelerator,
 } from "./keymap";
 import { createSettingsScreen } from "./settings-screen/screen";
+import { rememberLast } from "./export/presets";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
 import { appendMcpActivity, type McpPageDeps } from "./settings-screen/page-ai-mcp";
@@ -1949,7 +1950,6 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
   try {
     const { showExportSheet } = await import("./export/export-sheet");
     const { missingImages, exportTitle, exportDate, fontAvailable } = await import("./export/checks");
-    const { rememberLast } = await import("./export/presets");
     const text = activeView().editor.getText(tab.id);
     const missing = await missingImages(text, tab.path, path => invoke("file_stat", { path }));
     const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
