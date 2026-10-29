@@ -97,6 +97,7 @@ fn sync_view_menu(
     explorer_size: u32,
     automatic_updates: bool,
     sync_scroll: bool,
+    show_status_bar: bool,
 ) {
     let set = |id: String, on: bool| {
         if let Some(item) = menu::find_check_item(&app, &id) {
@@ -120,6 +121,7 @@ fn sync_view_menu(
     }
     set("help.automatic_updates".into(), automatic_updates);
     set("view.sync_scroll".into(), sync_scroll);
+    set("view.status_bar".into(), show_status_bar);
 }
 
 #[tauri::command]

@@ -1,3 +1,4 @@
+import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
@@ -341,6 +342,26 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 }
 
 const views = new Map<string, WindowView>();
+const statusWordCounts = new Map<string, number>();
+const statusBar = createStatusBar(document.getElementById("app")!, () => {
+  if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
+  activeView().editor.openGoToLine();
+});
+
+function refreshStatusBar(): void {
+  const windowState = getWindow(getState().activeWindowId);
+  const tab = windowState?.tabs.find(item => item.id === windowState.activeTabId);
+  const editor = windowState ? views.get(windowState.id)?.editor : undefined;
+  statusBar.update({
+    enabled: currentSettings.showStatusBar,
+    pathOrName: tab && editor ? tab.path ?? tab.name : null,
+    cursor: editor?.cursorPosition() ?? { line: 1, column: 1 },
+    selection: editor?.getSelection().text ?? "",
+    words: tab ? statusWordCounts.get(tab.id) ?? 0 : 0,
+    dirty: tab?.dirty ?? false,
+    recovered: tab ? recoveredDraftIds.has(tab.id) : false,
+  });
+}
 
 function editorForTab(id: string): WindowView["editor"] {
   const paneId = paneForTab(getState().windows, id);
@@ -480,6 +501,7 @@ async function loadSettings(): Promise<void> {
     currentSettings = parseSettings("{}");
   }
   applySettings(currentSettings);
+  refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
   applySoftWrap();
@@ -579,6 +601,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
       applySettings(currentSettings);
+      refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
@@ -647,6 +670,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   currentSettings = settings;
   applySettings(currentSettings);
+  refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
   applySoftWrap();
@@ -841,6 +865,8 @@ const handlers = {
     })).catch((error) => showToast(`Could not export annotations: ${String(error)}`));
   },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
+  onStatusChange: refreshStatusBar,
+  onWordCount: (tabId: string, count: number) => { statusWordCounts.set(tabId, count); refreshStatusBar(); },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
   onPdfEditDirtyChange: (wid: string, tid: string, dirty: boolean) =>
@@ -1102,6 +1128,9 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 }
 
 function renderAll(): void {
+  const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
+  for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
+  refreshStatusBar();
   for (const v of views.values()) v.render();
   if (views.has(getState().activeWindowId)) { updateOutline(); aiPanel?.resize(); }
   document.getElementById("windows")!.classList.toggle("has-sub", getState().windows.length > 1);
@@ -1375,7 +1404,7 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
       replacedDraftId: recoveredDraftIds.get(tabId),
     });
   }
-  if (windowId === getState().activeWindowId && tabId === w.activeTabId) {
+  if (tabId === w.activeTabId) {
     schedulePreview(windowId, tabId, text);
   }
 }
@@ -1829,6 +1858,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
       applySettings(currentSettings);
+      refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
       applySoftWrap();
@@ -2369,11 +2399,13 @@ function syncViewMenu(): void {
     explorerSize: currentSettings.explorer.size,
     automaticUpdates: currentSettings.updateMode === "auto",
     syncScroll: currentSettings.syncScroll,
+    showStatusBar: currentSettings.showStatusBar,
   });
 }
 
 function persistCurrentSettings(): void {
   applySettings(currentSettings);
+  refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   requestWindowMeasure();
   syncViewMenu();
@@ -2450,6 +2482,7 @@ function ensureSubWindow(): void {
   addSplitter();
   makeView("sub", false);
   applySettings(currentSettings);
+  refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   renderAll();
   requestWindowMeasure();
@@ -3259,6 +3292,7 @@ function scheduleWindowReport(): void {
 }
 
 subscribe(() => {
+  refreshStatusBar();
   const s = getState();
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
@@ -3415,6 +3449,9 @@ listenScoped<string>("menu", (event) => {
       return toggleLivePreview();
     case "edit.paste_plain":
       return void pastePlainText();
+    case "view.status_bar":
+      currentSettings = { ...currentSettings, showStatusBar: !currentSettings.showStatusBar };
+      return persistCurrentSettings();
     case "view.sync_scroll":
       currentSettings = { ...currentSettings, syncScroll: !currentSettings.syncScroll };
       return persistCurrentSettings();
@@ -3555,6 +3592,7 @@ function layoutRestoreDeps(layout: WorkspaceLayout): Parameters<typeof restoreLa
         addSplitter();
         makeView("sub", false);
         applySettings(currentSettings);
+        refreshStatusBar();
         setTableFormatting(currentSettings.tables.formatOnEdit);
         const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
         const sub = windowsHost.querySelector<HTMLElement>('.window[data-window-id="sub"]')!;

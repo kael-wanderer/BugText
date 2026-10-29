@@ -69,6 +69,7 @@ export type Settings = {
   /** Dot-named files and folders in the Explorer tree; presentation only. */
   showHiddenFiles: boolean;
   syncScroll: boolean;
+  showStatusBar: boolean;
   main: ZoneSettings;
   sub: ZoneSettings;
   keymap: Record<string, string>;
@@ -102,6 +103,7 @@ export const DEFAULT_SETTINGS: Settings = {
   explorer: { font: "", size: 13 },
   showHiddenFiles: true,
   syncScroll: false,
+  showStatusBar: true,
   main: { font: "", size: 15 },
   sub: { font: "", size: 15 },
   keymap: {},
@@ -276,6 +278,7 @@ export function parseSettings(raw: string): Settings {
     softWrapMode,
     wrapColumn,
     syncScroll: data.syncScroll === true,
+    showStatusBar: data.showStatusBar !== false,
     explorer: parseZone(data.explorer, DEFAULT_SETTINGS.explorer),
     // Missing means an older file: keep showing everything, as before the setting.
     showHiddenFiles:

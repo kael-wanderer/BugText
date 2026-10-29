@@ -8,6 +8,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to toggle reading time; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
+
 - Folder-scoped bookmarks capture the current note and line, with a keyboard-accessible list and safe Missing states. Add Bookmark (⌥⌘B), Show Bookmarks (⇧⌥⌘B), and per-window Go Back / Go Forward (⌃⌘Left / Right) are available from the palette and native menus; note navigation retains up to 100 entries.
 
 - Open Daily Note (⌥⌘D) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.

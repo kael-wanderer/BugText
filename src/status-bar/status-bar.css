@@ -1,0 +1,27 @@
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-editor);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.status-bar button {
+  flex-shrink: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.status-bar button:focus-visible { outline: 2px solid var(--accent); }
+.status-bar-save { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.status-bar-save::before { content: ""; width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #4f9d69; }
+.status-bar-save.pending::before { background: var(--accent); }

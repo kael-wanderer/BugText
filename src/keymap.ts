@@ -58,6 +58,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "view.filter_panel", label: "Filter", category: "View", default: "CmdOrCtrl+Alt+Shift+F", scope: "menu" },
   { id: "view.links_panel", label: "Links", category: "View", default: "CmdOrCtrl+Alt+Shift+O", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
+  { id: "view.status_bar", label: "Show Status Bar", category: "View", default: "", scope: "menu" },
   { id: "view.sync_scroll", label: "Sync Scroll", category: "View", default: "", scope: "menu" },
   { id: "view.toggle_preview", label: "Show/Hide Preview", category: "View", default: "CmdOrCtrl+P", scope: "menu" },
   { id: "view.reading", label: "Reading View", category: "View", default: "CmdOrCtrl+E", scope: "menu" },

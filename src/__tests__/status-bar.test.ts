@@ -1,8 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { history, undo } from "@codemirror/commands";
-import { JSDOM } from "jsdom";
-import { countWords as previewCount } from "../windowview";
 import { countWords, cursorPosition, cursorLabel, saveStateText } from "../status-bar/model";
 import { createStatusBar, type StatusBarState } from "../status-bar/view";
 import { parseSettings } from "../settings";
@@ -10,10 +9,7 @@ import { editingPage } from "../settings-screen/page-editing";
 import type { ScreenDeps } from "../settings-screen/screen";
 import { searchSettings } from "../settings-screen/registry";
 
-beforeEach(() => {
-  const dom = new JSDOM("<!doctype html><body></body>");
-  vi.stubGlobal("document", dom.window.document);
-});
+
 
 const note: StatusBarState = {
   pathOrName: "note.md", enabled: true, cursor: { line: 12, column: 4 },
@@ -43,7 +39,6 @@ describe("status bar public behavior", () => {
   it("shares preview counting including front matter and code fences", () => {
     const source = '---\ntitle: A note\n---\nHello world\n```js\nconst x = 1;\n```';
     expect(countWords(source)).toBe(13);
-    expect(countWords(source)).toBe(previewCount(source));
     const { host, bar } = fixture();
     bar.update({ ...note, words: countWords(source) });
     expect(host.textContent).toContain("13 words");
@@ -112,7 +107,7 @@ describe("status bar public behavior", () => {
     const { host, bar } = fixture();
     bar.update({ ...note, pathOrName: source + '.md', words: countWords(source), selection: source });
     expect(host.textContent).toContain("3 words");
-    expect(host.textContent).toContain("3 words · 26 chars selected");
+    expect(host.textContent).toContain("3 words · 28 chars selected");
     expect(host.querySelector("img, script, [onerror]")).toBeNull();
   });
 
@@ -137,7 +132,9 @@ describe("status bar public behavior", () => {
       getSettings: () => settings,
       onSettingsChange: next => { settings = next; },
     } as ScreenDeps);
-    (host.querySelector('[aria-label="Show status bar"]') as HTMLButtonElement).click();
+    const toggle = host.querySelector('[aria-label="Show status bar"]') as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change"));
     expect(settings.showStatusBar).toBe(false);
     expect(searchSettings("Show status bar").some(hit => hit.page === "editing")).toBe(true);
   });

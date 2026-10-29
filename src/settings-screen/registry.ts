@@ -136,6 +136,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   },
   { id: "links-complete", page: "editing", label: "Suggest notes while typing links", keywords: "links completion notes markdown" },
   { id: "links-on-rename", page: "editing", label: "When renaming or moving notes", keywords: "links rename move backlinks ask never" },
+  { id: "show-status-bar", page: "editing", label: "Show status bar", keywords: "cursor words reading time save" },
   { id: "sync-scroll", page: "editing", label: "Sync scroll", keywords: "navigation preview editor" },
   {
     id: "soft-wrap",

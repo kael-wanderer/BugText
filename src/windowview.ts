@@ -1,3 +1,4 @@
+import { countWords } from "./status-bar/model";
 import type { FilePosition } from "./workspaces/layout";
 import { applyTextPosition, applyPdfPosition, captureTextPosition } from "./workspaces/positions";
 import { bindPreviewLinks } from "./links/follow";
@@ -50,6 +51,8 @@ import {
 
 export type WindowHandlers = {
   livePreviewEnabled?: () => boolean;
+  onStatusChange?: () => void;
+  onWordCount?: (tabId: string, count: number) => void;
   onKeepTab?: (windowId: string, tabId: string) => void;
   onActivateTab: (windowId: string, tabId: string) => void;
   onCloseTab: (windowId: string, tabId: string) => void;
@@ -112,9 +115,7 @@ export type WindowView = {
   openFind: () => boolean;
 };
 
-export function countWords(text: string): number {
-  return text.trim() ? text.trim().split(/\s+/).length : 0;
-}
+export { countWords } from "./status-bar/model";
 
 export function createWindowView(
   host: HTMLElement,
@@ -399,6 +400,7 @@ export function createWindowView(
     },
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
+      h.onStatusChange?.();
       cursorLine = line;
       queueMicrotask(refreshContextAction);
       captureReadingPosition();
@@ -665,6 +667,9 @@ export function createWindowView(
     pathOrName: string | null = null,
   ): void {
     const documentId = getWindow(windowId)?.activeTabId ?? null;
+    const count = countWords(text);
+    wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
+    if (documentId) h.onWordCount?.(documentId, count);
     const place = documentId && documentId === previewDocumentId && getWindow(windowId)?.mode !== "editor"
       ? capturePreviewPlace(previewPane) : null;
     const lineCount = text.split("\n").length;
@@ -760,8 +765,6 @@ export function createWindowView(
         article.innerHTML = renderMarkdown(`\`\`\`sql\n${text}\n\`\`\``);
         previewPane.appendChild(article);
       }
-      const count = countWords(text);
-      wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
       return;
     }
     if (isHtmlFile(pathOrName)) {
@@ -847,8 +850,6 @@ export function createWindowView(
       void enhancePreview(previewPane).then(restoreIfUnmoved);
       h.onNavigation(windowId);
     }
-    const count = countWords(text);
-    wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
   }
 
   function updateZoomLabel(): void {
