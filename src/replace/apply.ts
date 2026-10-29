@@ -50,6 +50,8 @@ export async function undoReplace(records: UndoRecord[], deps: ReplaceDeps) {
         open.apply([{ from: 0, to: record.after.length, insert: record.before }]);
       } else {
         if (record.open || await deps.read(record.path) !== record.after || deps.findOpen(record.path) || !deps.folderStillOpen()) throw new Error();
+        await deps.snapshot(record.path, record.after, "Before undo replace");
+        if (!deps.folderStillOpen() || await deps.read(record.path) !== record.after || deps.findOpen(record.path)) throw new Error();
         await deps.write(record.path, record.before, record.after);
       }
       undone.push(record.path);
