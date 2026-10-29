@@ -1,3 +1,4 @@
+use crate::export_presets::{preset_args, ExportMeta, ExportPreset};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -19,14 +20,11 @@ fn find_bin(name: &str, known_paths: &[&str]) -> Option<PathBuf> {
             return Some(path);
         }
     }
-    Command::new(name)
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .ok()
-        .filter(|status| status.success())
-        .map(|_| PathBuf::from(name))
+    std::env::var_os("PATH").and_then(|paths| {
+        std::env::split_paths(&paths)
+            .map(|dir| dir.join(name))
+            .find(|path| path.is_file())
+    })
 }
 
 fn find_pandoc() -> Option<PathBuf> {
@@ -117,7 +115,13 @@ fn resource_args(resource_dir: Option<String>) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn export_pdf_html(html: String, out: String, resource_dir: Option<String>) -> Result<(), String> {
+pub fn export_pdf_html(
+    html: String,
+    out: String,
+    resource_dir: Option<String>,
+    preset: Option<ExportPreset>,
+    meta: Option<ExportMeta>,
+) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let typst = find_typst().ok_or(TYPST_MISSING)?;
     let media = std::env::temp_dir().join("bugtext-export-media");
@@ -137,11 +141,24 @@ pub fn export_pdf_html(html: String, out: String, resource_dir: Option<String>) 
         "-o".into(),
         out,
     ]);
-    run_pandoc(&pandoc, &html, &args)
+    run_with_preset(
+        &pandoc,
+        &html,
+        &mut args,
+        "pdf",
+        preset.as_ref(),
+        meta.as_ref(),
+    )
 }
 
 #[tauri::command]
-pub fn export_docx_html(html: String, out: String, resource_dir: Option<String>) -> Result<(), String> {
+pub fn export_docx_html(
+    html: String,
+    out: String,
+    resource_dir: Option<String>,
+    preset: Option<ExportPreset>,
+    meta: Option<ExportMeta>,
+) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let media = std::env::temp_dir().join("bugtext-export-media");
     let mut args = resource_args(resource_dir);
@@ -153,7 +170,14 @@ pub fn export_docx_html(html: String, out: String, resource_dir: Option<String>)
         "-o".into(),
         out,
     ]);
-    run_pandoc(&pandoc, &html, &args)
+    run_with_preset(
+        &pandoc,
+        &html,
+        &mut args,
+        "docx",
+        preset.as_ref(),
+        meta.as_ref(),
+    )
 }
 
 #[tauri::command]
@@ -167,4 +191,131 @@ pub fn export_html(markdown: String, out: String) -> Result<(), String> {
         out,
     ];
     run_pandoc(&pandoc, &markdown, &args)
+}
+
+fn run_with_preset(
+    pandoc: &PathBuf,
+    html: &str,
+    args: &mut Vec<String>,
+    format: &str,
+    preset: Option<&ExportPreset>,
+    meta: Option<&ExportMeta>,
+) -> Result<(), String> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let path = std::env::temp_dir().join(format!(
+        "bugtext-export-{}-{}.yaml",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let extra = preset_args(format, preset, meta, &path)?;
+    if format == "pdf" {
+        if let Some(p) = preset {
+            use std::io::Write as _;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .map_err(|e| e.to_string())?;
+            if let Err(e) = write!(
+                file,
+                "margin:\n  x: {}mm\n  y: {}mm\n",
+                p.page.margin_mm, p.page.margin_mm
+            ) {
+                let _ = std::fs::remove_file(&path);
+                return Err(e.to_string());
+            }
+        }
+    }
+    args.extend(extra);
+    let result = run_pandoc(pandoc, html, args);
+    let _ = std::fs::remove_file(path);
+    result
+}
+
+#[derive(serde::Serialize)]
+pub struct ToolDiagnostic {
+    found: bool,
+    version: String,
+    path: String,
+}
+#[derive(serde::Serialize)]
+pub struct ExportDiagnostics {
+    pandoc: ToolDiagnostic,
+    typst: ToolDiagnostic,
+    fonts: Vec<String>,
+}
+
+fn tool_output(path: &std::path::Path, arg: &str) -> Option<String> {
+    use std::io::Read;
+    use std::time::{Duration, Instant};
+    let mut child = Command::new(path)
+        .arg(arg)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = stdout.read_to_end(&mut bytes);
+        bytes
+    });
+    let start = Instant::now();
+    let success = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status.success(),
+            Ok(None) if start.elapsed() < Duration::from_secs(5) => {
+                std::thread::sleep(Duration::from_millis(20))
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break false;
+            }
+        }
+    };
+    let bytes = reader.join().ok()?;
+    if success {
+        String::from_utf8(bytes).ok()
+    } else {
+        None
+    }
+}
+fn diagnose(path: Option<&PathBuf>) -> ToolDiagnostic {
+    let output = path.and_then(|p| tool_output(p, "--version"));
+    ToolDiagnostic {
+        found: output.is_some(),
+        version: output
+            .and_then(|s| s.lines().next().map(str::to_owned))
+            .unwrap_or_default(),
+        path: path
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+    }
+}
+#[tauri::command]
+pub fn export_diagnostics(refresh: bool) -> ExportDiagnostics {
+    use std::sync::{Mutex, OnceLock};
+    static FONTS: OnceLock<Mutex<Option<Vec<String>>>> = OnceLock::new();
+    let pandoc = find_pandoc();
+    let typst = find_typst();
+    let mut cache = FONTS
+        .get_or_init(|| Mutex::new(None))
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if refresh || cache.is_none() {
+        *cache = Some(
+            typst
+                .as_ref()
+                .and_then(|p| tool_output(p, "fonts"))
+                .map(|s| s.lines().map(str::to_owned).collect())
+                .unwrap_or_default(),
+        );
+    }
+    ExportDiagnostics {
+        pandoc: diagnose(pandoc.as_ref()),
+        typst: diagnose(typst.as_ref()),
+        fonts: cache.clone().unwrap_or_default(),
+    }
 }

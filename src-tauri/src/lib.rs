@@ -1,3 +1,4 @@
+mod export_presets;
 mod conversations;
 mod workspaces;
 mod pinned_workspaces;
@@ -226,6 +227,7 @@ pub fn run() {
             ai::ai_cancel,
             export::export_pdf,
             export::export_tools,
+            export::export_diagnostics,
             export::export_docx,
             export::export_pdf_html,
             export::export_docx_html,
