@@ -21,6 +21,7 @@ mod mcp_server;
 mod menu;
 mod native_windows;
 mod pdf_drafts;
+mod pdf_annotations;
 mod preview;
 mod recovery;
 mod sandbox;
@@ -220,6 +221,11 @@ pub fn run() {
             mcp_clients::mcp_unregister,
             files::ai_models_cache_read,
             files::ai_models_cache_write,
+            pdf_annotations::pdf_annotations_read,
+            pdf_annotations::pdf_annotations_write,
+            pdf_annotations::pdf_annotations_move,
+            pdf_annotations::pdf_annotations_find_by_digest,
+            pdf_annotations::pdf_annotations_forget,
             pdf_drafts::pdf_draft_read,
             pdf_drafts::pdf_draft_write,
             ai::ai_run,
