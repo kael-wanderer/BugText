@@ -14,6 +14,10 @@ export type KeymapCommand = {
 };
 
 export const KEYMAP_COMMANDS: KeymapCommand[] = [
+  { id: "file.add_bookmark", label: "Add Bookmark", category: "File", default: "CmdOrCtrl+Alt+B", scope: "app" },
+  { id: "file.show_bookmarks", label: "Show Bookmarks", category: "File", default: "CmdOrCtrl+Alt+Shift+B", scope: "app" },
+  { id: "go.back", label: "Go Back", category: "Go", default: "Ctrl+Cmd+ArrowLeft", scope: "app" },
+  { id: "go.forward", label: "Go Forward", category: "Go", default: "Ctrl+Cmd+ArrowRight", scope: "app" },
   { id: "file.new", label: "New File", category: "File", default: "CmdOrCtrl+N", scope: "menu" },
   { id: "file.new_tab", label: "New Tab", category: "File", default: "CmdOrCtrl+T", scope: "menu" },
   { id: "file.new_window", label: "New Window", category: "File", default: "CmdOrCtrl+Shift+N", scope: "menu" },

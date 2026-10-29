@@ -141,6 +141,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&export_document)
         .item(&export_image)
         .build()?;
+    // App-scoped shortcuts are dispatched by the webview, including Option letters.
+    let add_bookmark = MenuItemBuilder::with_id("file.add_bookmark", "Add Bookmark").build(app)?;
+    let show_bookmarks = MenuItemBuilder::with_id("file.show_bookmarks", "Show Bookmarks").build(app)?;
+    let go_back = MenuItemBuilder::with_id("go.back", "Go Back").build(app)?;
+    let go_forward = MenuItemBuilder::with_id("go.forward", "Go Forward").build(app)?;
+    let go_menu = SubmenuBuilder::new(app, "Go")
+        .items(&[&go_back, &go_forward])
+        .build()?;
     let file_menu = SubmenuBuilder::new(app, "File")
         .item(&new)
         .item(&new_tab)
@@ -158,6 +166,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&save)
         .item(&save_as)
         .item(&recover)
+        .item(&add_bookmark)
+        .item(&show_bookmarks)
         .item(&export)
         .separator()
         .item(&close)
@@ -346,6 +356,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &file_menu,
             &edit_menu,
             &view_menu,
+            &go_menu,
             &window_menu,
             &help_menu,
         ])
