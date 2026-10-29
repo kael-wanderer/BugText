@@ -12,13 +12,13 @@ function workspace(id: string, name: string, extra: Partial<Workspace> = {}): Wo
 function fixture(workspaces: Workspace[], recent: string[] = []) {
   let contents: string | null = JSON.stringify({ version: 1, workspaces, reopen: [] });
   const io: WorkspacesIO = { read: async () => contents, write: async value => { contents = value; }, broadcast: () => {} };
-  const deps = { io, recent, home: "/Users/me", open: vi.fn(), openFolder: vi.fn(), saveFolder: vi.fn(), openFile: vi.fn(), changed: vi.fn() };
+  const deps = { io, recent, home: "/Users/me", open: vi.fn(), openInNewWindow: vi.fn(), openFolder: vi.fn(), saveFolder: vi.fn(), openFile: vi.fn(), changed: vi.fn() };
   return { deps, io, file: () => JSON.parse(contents!), set: (value: string) => { contents = value; } };
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 const headings = () => [...document.querySelectorAll("h3")].map(h => h.textContent);
 const names = () => [...document.querySelectorAll(".workspace-switch-row > button:first-child")].map(b => b.textContent);
-const press = (target: Element, key: string) => target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+const press = (target: Element, key: string, metaKey = false) => target.dispatchEvent(new KeyboardEvent("keydown", { key, metaKey, bubbles: true }));
 afterEach(() => document.body.replaceChildren());
 
 describe("workspace switcher", () => {
@@ -36,6 +36,15 @@ describe("workspace switcher", () => {
     expect(names()).toEqual(["Book"]);
     press(input, "Enter");
     expect(f.deps.open).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+  });
+
+  it("⌘Enter opens the first match in a new window instead of switching", async () => {
+    const f = fixture([workspace("a", "Blog", { openedAt: 1 })]);
+    await showWorkspaceSwitcher(f.deps);
+    press(document.querySelector('input[aria-label="Filter workspaces"]')!, "Enter", true);
+    expect(f.deps.openInNewWindow).toHaveBeenCalledWith(expect.objectContaining({ id: "a" }));
+    expect(f.deps.open).not.toHaveBeenCalled();
+    expect(document.querySelector(".workspace-switcher")).toBeNull();
   });
 
   it("shows HTML-like names as text", async () => {
@@ -95,5 +104,10 @@ describe("unsaved sheet", () => {
     const second = showUnsavedWorkspaceSheet(["a.md"]);
     press(document.querySelector(".workspace-sheet")!, "Escape");
     await expect(second).resolves.toBe("cancel");
+  });
+  it("Open in New Window resolves window", async () => {
+    const choice = showUnsavedWorkspaceSheet(["a.md"]);
+    [...document.querySelectorAll("button")].find(b => b.textContent === "Open in New Window")!.click();
+    await expect(choice).resolves.toBe("window");
   });
 });

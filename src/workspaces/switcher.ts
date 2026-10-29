@@ -2,7 +2,7 @@ import { loadWorkspaces, updateWorkspaces, type Workspace, type WorkspacesIO } f
 
 export async function showWorkspaceSwitcher(deps: {
   io: WorkspacesIO; recent: string[]; home: string | null;
-  open(workspace: Workspace): void; openFolder(path: string): void; saveFolder(path: string): void; openFile(): void;
+  open(workspace: Workspace): void; openInNewWindow(workspace: Workspace): void; openFolder(path: string): void; saveFolder(path: string): void; openFile(): void;
   /** This window's copy of the list may be stale: the broadcast skips the sender. */
   changed(): void;
 }): Promise<void> {
@@ -14,7 +14,7 @@ export async function showWorkspaceSwitcher(deps: {
   const shorten = (path: string | null) => path ? (deps.home && (path === deps.home || path.startsWith(`${deps.home}/`)) ? `~${path.slice(deps.home.length)}` : path) : "No folder";
   const button = (label: string, action: () => void) => { const node = document.createElement("button"); node.type = "button"; node.textContent = label; node.onclick = action; return node; };
   const close = () => overlay.remove();
-  let entries: Array<() => void> = [];
+  let entries: Array<{ select(): void; newWindow?(): void }> = [];
   async function render(): Promise<void> {
     const result = await loadWorkspaces(deps.io); content.replaceChildren(); entries = [];
     if (!result.file) { const error = document.createElement("p"); error.textContent = "workspaces.json could not be read"; content.append(error, button("Open file", () => { close(); deps.openFile(); })); return; }
@@ -23,7 +23,7 @@ export async function showWorkspaceSwitcher(deps: {
     function group(name: string, rows: HTMLElement[]) { if (!rows.length) return; const heading = document.createElement("h3"); heading.textContent = name; content.append(heading, ...rows); }
     function workspaceRow(workspace: Workspace): HTMLElement {
       const row = document.createElement("div"); row.className = "workspace-switch-row";
-      const select = () => { close(); deps.open(workspace); }; entries.push(select);
+      const select = () => { close(); deps.open(workspace); }; entries.push({ select, newWindow: () => { close(); deps.openInNewWindow(workspace); } });
       const title = button(workspace.name, select); title.className = "workspace-switch-name";
       const detail = document.createElement("small"); const count = workspace.layout.panes.reduce((n, pane) => n + pane.files.length, 0);
       const hours = Math.floor(Math.max(0, Date.now() - workspace.openedAt) / 3600000); const ago = hours < 1 ? "now" : hours < 24 ? `${hours} h ago` : `${Math.floor(hours / 24)} ${hours < 48 ? "day" : "days"} ago`;
@@ -52,10 +52,10 @@ export async function showWorkspaceSwitcher(deps: {
     group("Pinned", visible.filter(w => w.pinned).sort((a, b) => a.pinOrder - b.pinOrder).map(workspaceRow));
     group("Workspaces", visible.filter(w => !w.pinned).sort((a, b) => b.openedAt - a.openedAt).map(workspaceRow));
     group("Recent folders", deps.recent.filter(path => !workspaces.some(w => w.folder === path) && matching(path)).map(path => {
-      const row = document.createElement("div"); row.className = "workspace-switch-row"; const select = () => { close(); deps.openFolder(path); }; entries.push(select);
+      const row = document.createElement("div"); row.className = "workspace-switch-row"; const select = () => { close(); deps.openFolder(path); }; entries.push({ select });
       row.append(button(path.split(/[\\/]/).filter(Boolean).pop() ?? path, select)); const detail = document.createElement("small"); detail.textContent = shorten(path); row.append(detail, button("Save as workspace", () => { close(); deps.saveFolder(path); })); return row;
     }));
   }
-  input.oninput = () => { void render(); }; input.onkeydown = event => { if (event.key === "Escape") close(); else if (event.key === "Enter" && !event.metaKey && entries[0]) { event.preventDefault(); entries[0](); } };
+  input.oninput = () => { void render(); }; input.onkeydown = event => { if (event.key === "Escape") close(); else if (event.key === "Enter" && entries[0]) { event.preventDefault(); if (!event.metaKey) entries[0].select(); else entries[0].newWindow?.(); } };
   await render(); input.focus();
 }

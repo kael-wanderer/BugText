@@ -3,7 +3,7 @@ import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
 import { showWorkspaceSwitcher } from "./workspaces/switcher";
 import { showUnsavedWorkspaceSheet } from "./workspaces/unsaved-sheet";
 import { missingStrip } from "./workspaces/missing-strip";
-import { workspacesIO, type Workspace } from "./workspaces/store";
+import { loadWorkspaces, workspacesIO, type Workspace } from "./workspaces/store";
 import { captureLayout, sessionLayout, type WorkspaceLayout } from "./workspaces/layout";
 import { createPositionTracker } from "./workspaces/positions";
 import { restoreLayout } from "./workspaces/restore";
@@ -3313,7 +3313,9 @@ async function switchWorkspace(workspace: Workspace): Promise<void> {
   if (owner && owner !== nativeWindowLabel) { await invoke("workspace_focus", { label: owner }).catch(() => {}); return; }
   const dirty = getState().windows.flatMap(w => w.tabs).filter(t => t.dirty);
   if (dirty.length) {
-    if (await showUnsavedWorkspaceSheet(dirty.map(t => t.name)) !== "save") return;
+    const choice = await showUnsavedWorkspaceSheet(dirty.map(t => t.name));
+    if (choice === "window") return openWorkspaceWindow(workspace);
+    if (choice !== "save") return;
     if (!(await saveAllForSwitch())) return;
   }
   await workspaceController.flush().catch(() => {});
@@ -3344,6 +3346,20 @@ async function switchWorkspace(workspace: Workspace): Promise<void> {
   }
 }
 
+/** Opens the workspace in a new native window, or focuses the window that already has it. */
+async function openWorkspaceWindow(workspace: Workspace): Promise<void> {
+  await invoke("workspace_open_window", { id: workspace.id }).catch(() => {});
+}
+
+/** A window created by workspace_open_window opens the workspace it was made for. */
+async function openPendingWorkspace(): Promise<void> {
+  const id = await invoke<string | null>("take_window_workspace").catch(() => null);
+  if (!id) return;
+  const workspace = (await loadWorkspaces(workspacesIO(nativeWindowLabel))).file?.workspaces.find(item => item.id === id);
+  if (workspace) await switchWorkspace(workspace);
+  else await invoke("workspace_release").catch(() => {});
+}
+
 let workspacesPath = "";
 async function showSwitcher(): Promise<void> {
   if (!workspacesPath) workspacesPath = await join(await appConfigDir(), "workspaces.json");
@@ -3352,6 +3368,7 @@ async function showSwitcher(): Promise<void> {
     recent: loadRecent().folders,
     home: await homeDir().catch(() => null),
     open: workspace => void switchWorkspace(workspace),
+    openInNewWindow: workspace => void openWorkspaceWindow(workspace),
     openFolder: folder => void openFolder(folder).then(() => refreshFileList()),
     saveFolder: folder => void openFolder(folder).then(() => refreshFileList()).then(saveWorkspace),
     openFile: () => void doOpenPath(workspacesPath),
@@ -3411,6 +3428,7 @@ async function boot(): Promise<void> {
   }
   sessionReady = true;
   persistUiState();
+  if (!isPrimaryNativeWindow) await openPendingWorkspace();
   if (isPrimaryNativeWindow) {
     await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }
