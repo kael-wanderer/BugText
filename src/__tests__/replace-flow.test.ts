@@ -11,7 +11,7 @@ it("routes live buffers and atomic writes through the replace flow and invalidat
   const write = vi.fn(async (path: string, contents: string, expected: string) => { await invoke("write_file_atomic", { path, contents, expected, folder: "/root" }); });
   const flow = createReplaceFlow({ folder: () => "/root", tabs: () => [{ path: "/root/open.md", text, dirty: true }], invoke,
     writer: () => ({ findOpen: p => p.endsWith("open.md") ? { text, apply: changes => { text = changes.reduceRight((s, c) => s.slice(0, c.from) + c.insert + s.slice(c.to), text); } } : null, read: async () => "cat", snapshot, write, folderStillOpen: () => true }),
-    review: async () => [[true], [true]], result: (_changed, _failures, undo) => { oldUndo = undo; return invalidate; }, refresh });
+    review: async () => [[true], [true]], result: (_changed, _failures, undo) => { oldUndo = undo; return invalidate; }, undoResult: vi.fn(), refresh });
   const options = { caseSensitive: true, wholeWord: false, regex: false };
   const data = await flow.preview("cat", "dog", options, ["open.md", "closed.md"]);
   expect(invoke).toHaveBeenCalledWith("replace_preview", expect.objectContaining({ request: expect.objectContaining({ overrides: { "open.md": "cat" } }) }));

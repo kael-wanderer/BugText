@@ -9,7 +9,8 @@ type FlowDeps = {
   invoke: <T>(command: string, args: Record<string, unknown>) => Promise<T>;
   writer: (folder: string) => ReplaceDeps;
   review: (preview: ReplacePreview, query: string, replacement: string, options: string, tag: (relative: string) => string | null) => Promise<ReplaceSelection | null>;
-  result: (changed: { path: string; matches: number }[], failures: Failure[], undo: () => void) => () => void;
+  result: (changed: { path: string; matches: number }[], failures: Failure[], undo: () => void, root: string) => () => void;
+  undoResult: (undone: string[], notUndone: Failure[], root: string) => void;
   refresh: () => void;
 };
 export function createReplaceFlow(deps: FlowDeps) {
@@ -41,8 +42,8 @@ export function createReplaceFlow(deps: FlowDeps) {
       invalidate = deps.result(result.changed, result.notChanged, () => {
         if (current !== generation) return;
         ++generation; invalidate = undefined;
-        void undoReplace(result.undo, writer).then(outcome => { deps.refresh(); if (outcome.notUndone.length) deps.result([], outcome.notUndone, () => {}); });
-      });
+        void undoReplace(result.undo, writer).then(outcome => { deps.refresh(); deps.undoResult(outcome.undone, outcome.notUndone, root); });
+      }, root);
     },
   };
 }
