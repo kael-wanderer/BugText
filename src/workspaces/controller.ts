@@ -10,6 +10,8 @@ export function createWorkspaceController(deps: {
 }) {
   let active: Workspace | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // A switch closes and reopens tabs; saving that half-built layout would damage the workspace.
+  let paused = false;
   async function flush(): Promise<void> {
     if (timer) clearTimeout(timer);
     timer = undefined;
@@ -23,7 +25,7 @@ export function createWorkspaceController(deps: {
     });
   }
   function changed(): void {
-    if (!active) return;
+    if (!active || paused) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => { void flush().catch(() => {}); }, 1000);
   }
@@ -57,6 +59,24 @@ export function createWorkspaceController(deps: {
       throw error;
     }
   }
+  /** Makes a saved workspace this window's active one. Returns the label of the window that already has it, if any. */
+  async function adopt(id: string): Promise<string | null> {
+    const owner = await deps.claim(id);
+    if (owner) return owner;
+    const file = await updateWorkspaces(deps.io, current => {
+      const workspace = current.workspaces.find(item => item.id === id);
+      if (workspace) workspace.openedAt = Date.now();
+      return current;
+    });
+    active = file.workspaces.find(item => item.id === id) ?? null;
+    if (!active) await deps.release();
+    deps.display(active?.name ?? null);
+    return null;
+  }
+  function pause(value: boolean): void {
+    paused = value;
+    if (value && timer) { clearTimeout(timer); timer = undefined; }
+  }
   async function reload(): Promise<void> {
     if (!active) return;
     const result = await loadWorkspaces(deps.io);
@@ -67,5 +87,5 @@ export function createWorkspaceController(deps: {
       deps.display(active?.name ?? null);
     }
   }
-  return { save, close, changed, flush, reload };
+  return { save, close, changed, flush, reload, adopt, pause, activeId: () => active?.id ?? null };
 }

@@ -1,12 +1,15 @@
 import { createWorkspaceController } from "./workspaces/controller";
 import { showSaveWorkspaceSheet } from "./workspaces/save-sheet";
-import { workspacesIO } from "./workspaces/store";
-import { captureLayout, sessionLayout } from "./workspaces/layout";
+import { showWorkspaceSwitcher } from "./workspaces/switcher";
+import { showUnsavedWorkspaceSheet } from "./workspaces/unsaved-sheet";
+import { missingStrip } from "./workspaces/missing-strip";
+import { workspacesIO, type Workspace } from "./workspaces/store";
+import { captureLayout, sessionLayout, type WorkspaceLayout } from "./workspaces/layout";
 import { createPositionTracker } from "./workspaces/positions";
 import { restoreLayout } from "./workspaces/restore";
 import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
 import { runnableActions } from "./ai/actions";
-import { appConfigDir, join } from "@tauri-apps/api/path";
+import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
@@ -648,6 +651,7 @@ function commandItems(): PaletteItem[] {
     }),
     command("save", "Save", () => void doSave(false)),
     command("saveAs", "Save As…", () => void doSave(true)),
+    command("file.switch_workspace", "Switch Workspace…", () => void showSwitcher()),
     command("file.save_workspace", "Save Workspace As…", saveWorkspace),
     command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
@@ -1641,6 +1645,10 @@ async function doSave(saveAs = false): Promise<boolean> {
     if (target === actionsPath) {
       await reloadActions();
       broadcastSettingsChange("ai-actions");
+    }
+    if (workspacesPath && target === workspacesPath) {
+      broadcastSettingsChange("workspaces");
+      await workspaceController.reload();
     }
     await finishBoundSave(binding, saveTarget);
     syncExplorerActivePath();
@@ -3091,6 +3099,8 @@ listenScoped<string>("menu", (event) => {
       return void doSave(false);
     case "file.save_as":
       return void doSave(true);
+    case "file.switch_workspace":
+      return void showSwitcher();
     case "file.save_workspace":
       return saveWorkspace();
     case "file.close_workspace":
@@ -3235,9 +3245,9 @@ function applyZoom(zoom: number): void {
 }
 applyZoom(ui.zoom);
 
-async function restoreWindows(): Promise<void> {
-  const layout = sessionLayout(startupUi);
-  await restoreLayout(layout, startupUi.folder, {
+/** The normal open paths that restoreLayout drives, shared by the last-session restore and workspaces. */
+function layoutRestoreDeps(layout: WorkspaceLayout): Parameters<typeof restoreLayout>[2] {
+  return {
     async exists(path, kind) {
       await invoke(kind === "folder" ? "list_dir" : "file_stat", { path });
       return true;
@@ -3245,7 +3255,7 @@ async function restoreWindows(): Promise<void> {
     async prepare(layout, folder) {
       if (folder) {
         try { await openFolder(folder); } catch { setState({ folder: null, tree: null }); }
-      }
+      } else if (getState().folder) setState({ folder: null, tree: null });
       await refreshFileList();
       if (layout.panes[1]) {
         setState({ windows: [...getState().windows, { id: "sub", tabs: [], activeTabId: null, mode: layout.panes[1].mode }] });
@@ -3282,7 +3292,76 @@ async function restoreWindows(): Promise<void> {
       }
     },
     focus(index) { setState({ activeWindowId: index === 0 ? "main" : "sub" }); },
+  };
+}
+
+/** Saves every dirty tab through the normal save flow; false when one is cancelled or cannot be saved here. */
+async function saveAllForSwitch(): Promise<boolean> {
+  for (const w of getState().windows) {
+    for (const tab of w.tabs.filter(t => t.dirty)) {
+      if (isPdfFile(tab.path ?? tab.name)) return false; // PDF edits save asynchronously; the user saves them first.
+      activateTab(w.id, tab.id);
+      if (!(await doSave(false))) return false;
+    }
+  }
+  return !getState().windows.some(w => w.tabs.some(t => t.dirty));
+}
+
+async function switchWorkspace(workspace: Workspace): Promise<void> {
+  if (workspace.id === workspaceController.activeId()) return;
+  const owner = await invoke<string | null>("workspace_owner", { id: workspace.id }).catch(() => null);
+  if (owner && owner !== nativeWindowLabel) { await invoke("workspace_focus", { label: owner }).catch(() => {}); return; }
+  const dirty = getState().windows.flatMap(w => w.tabs).filter(t => t.dirty);
+  if (dirty.length) {
+    if (await showUnsavedWorkspaceSheet(dirty.map(t => t.name)) !== "save") return;
+    if (!(await saveAllForSwitch())) return;
+  }
+  await workspaceController.flush().catch(() => {});
+  workspaceController.pause(true);
+  try {
+    if (getState().windows.length > 1) await toggleSub();
+    const main = mainWindow();
+    if (main.tabs.length) await closeTabs("main", main.tabs.map(t => t.id));
+    if (getState().windows.some(w => w.tabs.length)) return; // a close was refused; leave everything open
+    const held = await workspaceController.adopt(workspace.id);
+    if (held) { await invoke("workspace_focus", { label: held }).catch(() => {}); return; }
+    document.querySelector(".workspace-missing-strip")?.remove();
+    const { sidebar } = workspace.layout;
+    ui = { ...ui, sidebarView: sidebar.view === "outline" ? "outline" : "explorer", outlineTab: sidebar.outlineTab === "links" ? "links" : "outline" };
+    setState({ explorerVisible: sidebar.visible, explorerWidth: sidebar.width });
+    document.body.classList.toggle("explorer-hidden", !sidebar.visible);
+    document.documentElement.style.setProperty("--explorer-w", `${sidebar.width}px`);
+    applySidebarView();
+    setAIVisible(workspace.layout.aiVisible);
+    const plan = await restoreLayout(workspace.layout, workspace.folder, layoutRestoreDeps(workspace.layout));
+    if (plan.missingFiles.length || plan.missingFolder) {
+      windowsHost.before(missingStrip(workspacesIO(nativeWindowLabel), workspace.id, plan.missingFiles, plan.missingFolder ? workspace.folder : null));
+    }
+    requestWindowMeasure();
+  } finally {
+    workspaceController.pause(false);
+    workspaceController.changed();
+  }
+}
+
+let workspacesPath = "";
+async function showSwitcher(): Promise<void> {
+  if (!workspacesPath) workspacesPath = await join(await appConfigDir(), "workspaces.json");
+  await showWorkspaceSwitcher({
+    io: workspacesIO(nativeWindowLabel),
+    recent: loadRecent().folders,
+    home: await homeDir().catch(() => null),
+    open: workspace => void switchWorkspace(workspace),
+    openFolder: folder => void openFolder(folder).then(() => refreshFileList()),
+    saveFolder: folder => void openFolder(folder).then(() => refreshFileList()).then(saveWorkspace),
+    openFile: () => void doOpenPath(workspacesPath),
+    changed: () => void workspaceController.reload(),
   });
+}
+
+async function restoreWindows(): Promise<void> {
+  const layout = sessionLayout(startupUi);
+  await restoreLayout(layout, startupUi.folder, layoutRestoreDeps(layout));
 
   const result = isPrimaryNativeWindow ? await getInitialFile() : null;
   if (result) {

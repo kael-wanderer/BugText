@@ -22,6 +22,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "file.open_folder", label: "Open Folder", category: "File", default: "CmdOrCtrl+Shift+O", scope: "menu" },
   { id: "file.save", label: "Save", category: "File", default: "CmdOrCtrl+S", scope: "menu" },
   { id: "file.save_as", label: "Save As", category: "File", default: "CmdOrCtrl+Shift+S", scope: "menu" },
+  { id: "file.switch_workspace", label: "Switch Workspace", category: "File", default: "Ctrl+Cmd+O", scope: "menu" },
   { id: "file.save_workspace", label: "Save Workspace As", category: "File", default: "", scope: "menu" },
   { id: "file.close_workspace", label: "Close Workspace", category: "File", default: "", scope: "menu" },
   { id: "file.recover", label: "Recover unsaved documents", category: "File", default: "", scope: "menu" },

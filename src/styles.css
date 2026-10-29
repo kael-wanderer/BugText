@@ -3469,3 +3469,14 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .workspace-sheet label { display: grid; gap: 6px; }
 .workspace-sheet label:has(input[type="checkbox"]) { display: block; }
 .workspace-sheet p:empty { display: none; }
+.workspace-switcher { width: min(560px, 90vw); max-height: 70vh; overflow: auto; align-content: start; gap: 6px; }
+.workspace-switcher > input { font: inherit; padding: 7px 10px; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 6px; }
+.workspace-switcher h3 { margin: 8px 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.workspace-switch-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+.workspace-switch-row:hover { background: var(--bg-elev); }
+.workspace-switch-row > button:first-child, .workspace-switch-name { justify-self: start; background: none; border: 0; padding: 0; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.workspace-switch-row small { grid-column: 1; color: var(--muted); overflow-wrap: anywhere; }
+.workspace-switch-row > div, .workspace-switch-row > button:last-child:not(:first-child) { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 4px; }
+.workspace-switch-row button:not(:first-child), .workspace-switch-row > div button { font: inherit; font-size: 11px; color: var(--muted); background: transparent; border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; cursor: pointer; }
+.workspace-missing-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg-elev); color: var(--text); border-bottom: 1px solid var(--border); font-size: 12px; }
+.workspace-missing-strip > div { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }
