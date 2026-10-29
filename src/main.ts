@@ -3255,6 +3255,10 @@ listenScoped<string>("menu", (event) => {
       return templateActions.newFromTemplate();
     case "file.quick_note":
       return templateActions.quickNote();
+    case "file.new_typed_note":
+      return withOrganize((actions) => void actions.newTypedNote());
+    case "file.apply_note_type":
+      return withOrganize((actions) => void actions.applyNoteType());
     case "file.open":
       return void doOpen();
     case "file.open_folder":
@@ -3314,6 +3318,12 @@ listenScoped<string>("menu", (event) => {
     }
     case "edit.toggle_task":
       return void activeView().editor.toggleTasks();
+    case "edit.extract_note":
+      return withOrganize((actions) => actions.extractSelection());
+    case "edit.show_tasks":
+      return withOrganize((actions) => actions.showTasks());
+    case "view.live_preview":
+      return toggleLivePreview();
     case "edit.paste_plain":
       return void pastePlainText();
     case "view.sync_scroll":
