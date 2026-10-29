@@ -217,6 +217,12 @@ Export is document-aware: Markdown/plain documents offer rendered PDF/DOCX plus
 PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
+Export presets and last-used choices live in `settings.json` under `export`; Settings ▸
+Export manages presets and tool diagnostics. A sheet checks Pandoc, Typst, fonts and
+missing local images before the save dialog. Rust validates preset values again and
+passes title, author and date as Pandoc `-M` metadata, never raw Typst. Standard sends
+no preset or metadata and retains the existing arguments. Tool diagnostics report paths
+and versions and cache Typst fonts until Check again.
 
 The webview runs under a strict CSP (`tauri.conf.json`). Rendered Markdown is
 sanitized (`src/sanitize.ts`) before it reaches `innerHTML`. HTML file previews load

@@ -109,9 +109,6 @@ import {
   resolveAccelerator,
 } from "./keymap";
 import { createSettingsScreen } from "./settings-screen/screen";
-import { generalPage } from "./settings-screen/page-general";
-import { editingPage } from "./settings-screen/page-editing";
-import { exportPage, selectExportPreset } from "./settings-screen/page-export";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
 import { appendMcpActivity, type McpPageDeps } from "./settings-screen/page-ai-mcp";
@@ -120,7 +117,6 @@ import { createWorkspaceIndex } from "./ai/workspace-index";
 import { createMcpHandler, type McpRequest } from "./mcp/handler";
 import { paneForTab } from "./mcp/pane-for-tab";
 import { refreshAgentNotices, showAgentNotice } from "./mcp/notice";
-import { themePage } from "./settings-screen/page-theme";
 import { getVersion } from "@tauri-apps/api/app";
 import { createSearchPanel } from "./search";
 import {
@@ -1959,7 +1955,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
       diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText });
     if (!choice) return;
-    if (choice.action === "edit") { selectExportPreset(choice.preset.id); settingsScreen.open("export"); return; }
+    if (choice.action === "edit") { const { selectExportPreset } = await import("./settings-screen/page-export"); selectExportPreset(choice.preset.id); settingsScreen.open("export"); return; }
     const out = await pickExportPath(kind);
     if (!out) return;
     const preset = choice.preset;
@@ -2722,7 +2718,7 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [generalPage, editingPage, exportPage, themePage, shortcutsPage, aiPage],
+  [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
 );
 onSettingsSynced = () => settingsScreen.refresh();
 void listenScoped<typeof mcpStatus>("bugtext://mcp-status", ({ payload }) => {
