@@ -94,6 +94,8 @@ connection presets, model discovery and text-model tests. UI key badges use
 `has_secret`; key inputs are never prefilled. Connection addresses require HTTPS,
 except loopback HTTP. Changing an address clears its key and cached models.
 
+Named workspaces are stored in the fixed `<app config dir>/workspaces.json` managed by Rust; every change uses `updateWorkspaces`, which re-reads the file before writing. A native window registry tracks claims, owners and pending workspace windows. Last-session and workspace restores share `restoreLayout`; the `reopen` list tracks secondary workspace windows. On quit, `bugtext://before-quit` requests pending saves and the native shell holds exit for 400 ms.
+
 The MCP bridge runs as `--mcp` on stdio and forwards tool calls over a private
 Unix socket to the running app. Rust confines every path to reported open folders,
 routes requests to the owning native window, and answers file listings; webviews
