@@ -3,6 +3,12 @@ import { describe, it, expect } from "vitest";
 import { renderMarkdown } from "../preview";
 
 describe("renderMarkdown", () => {
+  it("hides frontmatter and keeps block line numbers", () => {
+    const html = renderMarkdown("---\ntitle: Retro\ntags: [ retro ]\n---\n\n# Head\n");
+    expect(html).not.toContain("title: Retro");
+    expect(html).toContain('<h1 data-line="6" data-anchor="head">');
+  });
+
   it("renders headings", () => {
     expect(renderMarkdown("# Hi")).toContain('<h1 data-line="1" data-anchor="hi">Hi</h1>');
   });
