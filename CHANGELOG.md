@@ -40,6 +40,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Saved view "Update selected" saves the current filter under the selected view's own name, even when the View name field is empty. The "Enter a view name." message now appears beside the save buttons instead of below the list.
 - The command palette input no longer capitalizes the first letter of the query (typing `alpha` showed `Alpha`), and no longer applies autocorrect.
 - The Markdown preview no longer shows a note's YAML frontmatter as text; the properties card above the editor shows it instead.
 - Opening Settings ▸ AI or Local CLI no longer asks for the macOS login password again each time you come back. Each saved key is read from the keychain once per app run.
