@@ -6,7 +6,7 @@ import { KEYMAP_COMMANDS } from "../keymap";
 export type AiSubPage = "use-for" | "context" | "actions" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
-  "general" | "editing" | "theme" | "shortcuts" | "ai";
+  "general" | "editing" | "export" | "theme" | "shortcuts" | "ai";
 
 export const SETTINGS_PAGES: ReadonlyArray<{
   id: SettingsPageId;
@@ -25,6 +25,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
     keywords:
       "wrap wrapping column soft lines",
   },
+  { id: "export", label: "Export", keywords: "presets tools pandoc typst pdf word" },
   {
     id: "theme",
     label: "Themes",
@@ -46,6 +47,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
 export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
   editing: "How lines wrap, how links and tables behave, where pasted images go, and where templates and quick notes live.",
+  export: "Tools and presets for PDF and Word export.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -66,6 +68,21 @@ export function shortcutEntryId(commandId: string): string {
 }
 
 export const SETTING_ENTRIES: SettingEntry[] = [
+  { id: "export-preset", page: "export", label: "Export preset", keywords: "presets" },
+  { id: "export-page-size", page: "export", label: "Page size", keywords: "paper pdf" },
+  { id: "export-margins", page: "export", label: "Margins", keywords: "page pdf mm" },
+  { id: "export-page-numbers", page: "export", label: "Page numbers", keywords: "export preset" },
+  { id: "export-font", page: "export", label: "Body font", keywords: "export preset" },
+  { id: "export-font-size", page: "export", label: "Font size", keywords: "export preset" },
+  { id: "export-line-spacing", page: "export", label: "Line spacing", keywords: "export preset" },
+  { id: "export-title", page: "export", label: "Title block", keywords: "export preset" },
+  { id: "export-author", page: "export", label: "Author", keywords: "export preset" },
+  { id: "export-date", page: "export", label: "Date", keywords: "export preset" },
+  { id: "export-toc", page: "export", label: "Table of contents", keywords: "export preset" },
+  { id: "export-depth", page: "export", label: "Contents depth", keywords: "export preset" },
+  { id: "export-numbered", page: "export", label: "Numbered sections", keywords: "export preset" },
+  { id: "export-pandoc", page: "export", label: "Pandoc", keywords: "export tool install" },
+  { id: "export-typst", page: "export", label: "Typst", keywords: "export tool install" },
   { id: "interface-size", page: "general", label: "App Font Size", keywords: "interface text size scale toolbar tabs pdf chrome" },
   { id: "interface-font", page: "general", label: "App Font", keywords: "interface font family typeface custom" },
   { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },
