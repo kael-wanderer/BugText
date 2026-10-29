@@ -111,6 +111,7 @@ import {
 import { createSettingsScreen } from "./settings-screen/screen";
 import { generalPage } from "./settings-screen/page-general";
 import { editingPage } from "./settings-screen/page-editing";
+import { exportPage, selectExportPreset } from "./settings-screen/page-export";
 import { shortcutsPage } from "./settings-screen/page-shortcuts";
 import { aiPage } from "./settings-screen/page-ai";
 import { appendMcpActivity, type McpPageDeps } from "./settings-screen/page-ai-mcp";
@@ -1958,7 +1959,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
       diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText });
     if (!choice) return;
-    if (choice.action === "edit") { settingsScreen.open(); return; }
+    if (choice.action === "edit") { selectExportPreset(choice.preset.id); settingsScreen.open("export"); return; }
     const out = await pickExportPath(kind);
     if (!out) return;
     const preset = choice.preset;
@@ -2690,6 +2691,7 @@ const settingsScreen = createSettingsScreen(
     rescan: rescanClis,
     getModelsCache: () => modelsCache,
     mcp: mcpPageDeps,
+    exportTools: { diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText },
     actions: {
       getFile: () => currentActions,
       hasError: () => actionsError,
@@ -2720,7 +2722,7 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [generalPage, editingPage, themePage, shortcutsPage, aiPage],
+  [generalPage, editingPage, exportPage, themePage, shortcutsPage, aiPage],
 );
 onSettingsSynced = () => settingsScreen.refresh();
 void listenScoped<typeof mcpStatus>("bugtext://mcp-status", ({ payload }) => {

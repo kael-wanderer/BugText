@@ -76,6 +76,7 @@ export type ScreenDeps = AiPageDeps & {
     newTemplate: () => Promise<void>;
   };
 } & {
+  exportTools?: { diagnostics(refresh: boolean): Promise<import("../export/export-sheet").ExportDiagnostics>; copy(text: string): Promise<void> };
   getActiveTabName(): string | null;
   getAppVersion(): Promise<string>;
   setDockIcon(id: AppIconId): Promise<void>;
@@ -99,6 +100,7 @@ export type SettingsScreen = {
 
 // Static SVG markup only (no user data).
 const PAGE_ICONS: Record<SettingsPageId, string> = {
+  export: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg>',
   general:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
   editing:

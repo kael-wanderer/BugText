@@ -11,6 +11,7 @@ describe("settings registry", () => {
     expect(SETTINGS_PAGES.map((p) => p.id)).toEqual([
       "general",
       "editing",
+      "export",
       "theme",
       "shortcuts",
       "ai",
