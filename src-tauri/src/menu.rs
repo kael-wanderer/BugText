@@ -99,6 +99,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let quick_note = MenuItemBuilder::with_id("file.quick_note", "Quick Note…")
         .accelerator("Ctrl+Cmd+N")
         .build(app)?;
+    let new_typed_note = MenuItemBuilder::with_id("file.new_typed_note", "New Typed Note…").build(app)?;
+    let apply_note_type = MenuItemBuilder::with_id("file.apply_note_type", "Apply Note Type…").build(app)?;
     let open = MenuItemBuilder::with_id("file.open", "Open File…")
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
@@ -144,6 +146,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&new_window)
         .item(&new_from_template)
         .item(&quick_note)
+        .item(&new_typed_note)
+        .item(&apply_note_type)
         .separator()
         .item(&open)
         .item(&open_folder)
@@ -165,6 +169,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let toggle_task = MenuItemBuilder::with_id("edit.toggle_task", "Toggle Task")
         .accelerator("CmdOrCtrl+Shift+X")
         .build(app)?;
+    let extract_note = MenuItemBuilder::with_id("edit.extract_note", "Extract Selection to Note…").build(app)?;
+    let show_tasks = MenuItemBuilder::with_id("edit.show_tasks", "Tasks in Folder…").build(app)?;
     let table_item = |id: &str, label: &str| MenuItemBuilder::with_id(id, label).build(app);
     let align_menu = SubmenuBuilder::new(app, "Align Column")
         .item(&table_item("table.align_left", "Align Column Left")?)
@@ -203,6 +209,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .select_all()
         .separator()
         .item(&toggle_task)
+        .item(&extract_note)
+        .item(&show_tasks)
         .item(&table_menu)
         .build()?;
 
@@ -221,6 +229,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let toggle_lines =
         MenuItemBuilder::with_id("view.toggle_lines", "Show/Hide Line Numbers").build(app)?;
+    let live_preview = MenuItemBuilder::with_id("view.live_preview", "Live Preview").build(app)?;
     let keymap = MenuItemBuilder::with_id("view.keymap", "Keyboard Shortcuts…").build(app)?;
 
     let wrap_off = CheckMenuItemBuilder::with_id("view.wrap.off", "Off").build(app)?;
@@ -287,6 +296,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&sync_scroll)
         .item(&toggle_preview)
         .item(&reading)
+        .item(&live_preview)
         .item(&toggle_lines)
         .item(&wrap_menu)
         .separator()
