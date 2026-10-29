@@ -244,6 +244,11 @@ below the release chunk-warning threshold.
 PDF OCR runs fully offline; its tesseract runtime lives under `public/vendor/`.
 Rebuild steps: see the `vendored-assets` skill.
 
+PDF annotations are stored in the config directory with revision checks and digest
+re-matching after external moves. Highlights draw beneath the text layer. Copy Quote
+rewrites links when pasted into a Markdown note, `#page` links return to the PDF, and
+the annotations panel exports Markdown to a note or the clipboard.
+
 Update checks read `https://kael.io.vn/projects/bugtext/latest.json`
 (`{version, release_url}`), fetched in Rust (`update_feed.rs`, the host sends no
 CORS headers). A newer semantic version offers to open the `https` release page in

@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
-import { AnnotationStore } from "./pdf-annotations/store";
-import { createAnnotationLayer, type AnnotationLayer } from "./pdf-annotations/layer";
+import type { AnnotationStore } from "./pdf-annotations/store";
+import type { AnnotationLayer } from "./pdf-annotations/layer";
 import type { Annotation } from "./pdf-annotations/model";
-import { createAnnotationsPanel } from "./pdf-annotations/panel";
+import type { createAnnotationsPanel as createPanelType } from "./pdf-annotations/panel";
 import { copyQuote } from "./pdf-annotations/quote";
-import { createAnnotationController } from "./pdf-annotations/controller";
+
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
@@ -612,6 +612,10 @@ export async function renderPdf(
     data: new Uint8Array(bytes),
   });
   const document = await loadingTask.promise;
+  const [{ AnnotationStore }, { createAnnotationLayer }, { createAnnotationController }, { createAnnotationsPanel }] = await Promise.all([
+    import("./pdf-annotations/store"), import("./pdf-annotations/layer"),
+    import("./pdf-annotations/controller"), import("./pdf-annotations/panel"),
+  ]);
   const metadata = await document.getMetadata().catch(() => null);
   const pdfTitle = (metadata?.info as { Title?: unknown } | undefined)?.Title;
   const annotationTitle = typeof pdfTitle === "string" ? pdfTitle : "";
@@ -619,7 +623,7 @@ export async function renderPdf(
   const annotationLayers: AnnotationLayer[] = [];
   let annotationNotice: HTMLElement | null = null;
   let annotationStore: AnnotationStore;
-  let annotationPanel: ReturnType<typeof createAnnotationsPanel> | null = null;
+  let annotationPanel: ReturnType<typeof createPanelType> | null = null;
   const refreshAnnotations = (): void => {
     annotationPanel?.refresh();
     annotationLayers.forEach((layer) => layer.render(annotationStore.document.annotations));
