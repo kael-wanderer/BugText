@@ -8,7 +8,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
-- A read-only properties card above Markdown notes shows frontmatter values and parse errors.
+- A properties card above Markdown notes shows and edits frontmatter values, with parse errors shown safely. Tags are indexed from frontmatter and inline `#tag` text.
 
 - PDF highlights and comments, an annotations panel, linked Copy Quote and Markdown export to notes or the clipboard.
 - Replace in Folder (⌥⌘F) previews selected text changes, supports include/exclude globs and regex groups, and offers Recovery-backed undo.

@@ -12,7 +12,7 @@ describe("properties card", () => {
     expect(host.querySelectorAll(".properties-chip")).toHaveLength(2);
     expect(host.textContent).toContain("<img src=x onerror=alert(1)>");
     expect(host.querySelector("img")).toBeNull();
-    host.querySelector("button")!.click(); expect(host.hidden).toBe(true); expect(showSource).toHaveBeenCalledOnce();
+    host.querySelector("button")!.click(); expect(host.textContent).toContain("Show properties"); expect(showSource).toHaveBeenCalledOnce();
   });
   it("shows errors and hides without frontmatter", () => {
     const host = document.createElement("div"); let source = "---\nx: [\n---\n";
@@ -21,4 +21,18 @@ describe("properties card", () => {
     expect(host.querySelectorAll(".properties-row")).toHaveLength(0);
     source = "plain"; card.render(); expect(host.hidden).toBe(true);
   });
+});
+
+it("removes a chip through one bound edit and refuses invalid YAML", () => {
+  let source = "---\ntags: [one, two]\n---\nbody";
+  const host = document.createElement("div"); const apply = vi.fn((current, edit) => {
+    expect(current).toBe(source); source = source.slice(0, edit.from) + edit.insert + source.slice(edit.to); return true;
+  });
+  const card = createPropertiesCard(host, () => source, vi.fn(), apply); card.render();
+  const chip = host.querySelector(".properties-chip")!;
+  chip.querySelector("button")!.click();
+  expect(apply).toHaveBeenCalledOnce(); expect(source).toContain("tags: [ two ]");
+  source = "---\nx: [\n---\n"; card.render();
+  expect(host.querySelectorAll("input")).toHaveLength(0);
+  expect(apply).toHaveBeenCalledOnce();
 });

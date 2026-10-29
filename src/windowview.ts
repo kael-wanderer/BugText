@@ -348,11 +348,19 @@ export function createWindowView(
 
   let cardTimer: ReturnType<typeof setTimeout> | undefined;
   let cardTab: string | null = null;
+  let cardMarkdown = false;
   const card = createPropertiesCard(root.querySelector<HTMLElement>(".properties-card")!, () => {
     const w = getWindow(windowId);
     const tab = w?.tabs.find(t => t.id === w.activeTabId);
     return tab && isMarkdownFile(tab.path ?? tab.name) ? editor.getText(tab.id) : null;
-  }, () => { editor.gotoLine(1); });
+  }, () => { editor.gotoLine(1); }, (source, edit) => {
+    const w = getWindow(windowId);
+    const tab = w?.tabs.find(t => t.id === w.activeTabId);
+    if (!tab || !isMarkdownFile(tab.path ?? tab.name) || editor.getText(tab.id) !== source) return false;
+    editor.applyPropertyEdit(tab.id, edit);
+    clearTimeout(cardTimer);
+    return true;
+  });
   const editor = createEditor(
     editorSurface,
     (tabId, text) => {
@@ -506,8 +514,9 @@ export function createWindowView(
     if (!w) return;
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     const activeName = active?.path ?? active?.name;
-    if (cardTab !== (active?.id ?? null)) {
-      cardTab = active?.id ?? null; clearTimeout(cardTimer); card.reset();
+    const markdownCard = !!active && isMarkdownFile(activeName);
+    if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
+      cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card.reset();
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);

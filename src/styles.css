@@ -3554,3 +3554,7 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .properties-chip { border-radius: 4px; background: var(--bg-elev); padding: 2px 6px; }
 .properties-empty { color: var(--muted); }
 .properties-error { margin: 10px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); }
+.properties-header > div { display: flex; align-items: center; gap: 8px; }
+.properties-card input:not([type="checkbox"]) { max-width: 200px; min-width: 0; padding: 3px 6px; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; font: inherit; }
+.properties-chip button { padding: 0 0 0 5px; }
+.properties-error[hidden] { display: none; }

@@ -150,6 +150,10 @@ receive one undoable edit; closed notes are compared with the scan, snapshotted 
 and written atomically inside the open folder. Settings ▸ Editing controls suggestions and
 whether to ask on rename.
 
+Markdown properties appear above the editor and edit only the active note’s YAML
+frontmatter through the normal dirty and undo path. Invalid YAML is read-only;
+frontmatter and inline tags share the per-window link index.
+
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
 sanitizing (`preview-tasks.ts`, never `<input>`) and toggle only the source marker
