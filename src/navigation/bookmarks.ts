@@ -1,12 +1,12 @@
 import { createWorkflowStore } from "../saved-views/store";
 import { headingAnchors } from "../links/parse";
 import { markdownOutline } from "../outline";
-export type BookmarkDestination = { kind: "note"; path: string; anchor?: string; heading?: string } | { kind: "search"; query: string } | { kind: "view"; viewId: string };
+export type BookmarkDestination = { kind: "note"; path: string; line?: number; anchor?: string; heading?: string } | { kind: "search"; query: string } | { kind: "view"; viewId: string };
 export type Bookmark = { id: string; label: string; folder: string; destination: BookmarkDestination };
 export function validBookmark(value: unknown): value is Bookmark {
   const b = value as Bookmark; if (!b || typeof b.id !== "string" || !b.id || typeof b.label !== "string" || !b.label.trim() || b.label.length > 120 || typeof b.folder !== "string" || !b.folder || !b.destination) return false;
   const d = b.destination;
-  return d.kind === "note" ? typeof d.path === "string" && !!d.path && !d.path.startsWith("/") && !d.path.split("/").includes("..") && (!d.anchor || typeof d.anchor === "string") : d.kind === "search" ? typeof d.query === "string" : d.kind === "view" && typeof d.viewId === "string";
+  return d.kind === "note" ? typeof d.path === "string" && !!d.path && !d.path.startsWith("/") && !/[\\:]/.test(d.path) && !d.path.split("/").includes("..") && (d.line === undefined || (Number.isSafeInteger(d.line) && d.line > 0)) && (!d.anchor || typeof d.anchor === "string") : d.kind === "search" ? typeof d.query === "string" : d.kind === "view" && typeof d.viewId === "string";
 }
 export function resolveBookmarkHeading(source: string, destination: Extract<BookmarkDestination, {kind:"note"}>) {
   const headings = headingAnchors(markdownOutline(source));

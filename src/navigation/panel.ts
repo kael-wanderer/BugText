@@ -1,9 +1,11 @@
+import "./panel.css";
 import type { Bookmark, BookmarkStore } from "./bookmarks";
-export function createBookmarkPanel(host: HTMLElement, deps: { store: BookmarkStore; getFolder: () => string | null; open: (bookmark: Bookmark) => Promise<void> | void; current?: () => Bookmark | null }) {
-  let message = "";
+export function createBookmarkPanel(host: HTMLElement, deps: { store: BookmarkStore; getFolder: () => string | null; open: (bookmark: Bookmark) => Promise<void> | void; current?: () => Bookmark | null; available?: (bookmark: Bookmark) => Promise<boolean> }) {
+  let message = "", generation = 0;
   const button = (text: string, fn: () => void) => { const b = document.createElement("button"); b.type = "button"; b.textContent = text; b.addEventListener("click", fn); return b; };
-  async function change(fn: (items: Bookmark[]) => Bookmark[]) { try { await deps.store.update(fn); message = ""; } catch (e) { message = String(e); } render(); }
+  async function change(fn: (items: Bookmark[]) => Bookmark[]) { try { await deps.store.update(fn); message = ""; } catch { message = "Could not save bookmarks."; } render(); }
   function render() {
+    const token = ++generation;
     host.replaceChildren(); const heading = document.createElement("h3"); heading.textContent = "Bookmarks"; host.append(heading);
     if (deps.current) host.append(button("Bookmark current note", () => { const b = deps.current!(); if (b) void change(items => [...items, b]); }));
     const folder = deps.getFolder();
@@ -11,7 +13,16 @@ export function createBookmarkPanel(host: HTMLElement, deps: { store: BookmarkSt
     const items = deps.store.items.filter(b => b.folder === folder);
     for (const b of items) {
       const row = document.createElement("div"); row.className = "bookmark-row";
-      row.append(button(b.label, () => { Promise.resolve(deps.open(b)).catch(e => { message = String(e); render(); }); }));
+      row.append(button(b.label, () => { void (async () => { try { await deps.open(b); } catch { message = "Could not open bookmark."; render(); } })(); }));
+      if (b.destination.kind === "note") {
+        const detail = document.createElement("small");
+        detail.textContent = `${b.destination.path} · line ${b.destination.line ?? 1}`;
+        const status = document.createElement("span"); status.setAttribute("role", "status");
+        row.append(detail, status);
+        if (deps.available) void deps.available(b).catch(() => false).then(available => {
+          if (token === generation) status.textContent = available ? "" : "Missing";
+        });
+      }
       const name = document.createElement("input"); name.value = b.label; name.setAttribute("aria-label", `Rename ${b.label}`); name.maxLength = 120;
       row.append(name, button("Rename", () => { if (name.value.trim()) void change(all => all.map(v => v.id === b.id ? { ...v, label: name.value.trim() } : v)); }));
       for (const [label, offset] of [["↑", -1], ["↓", 1]] as const) { const move = button(label, () => void change(all => { const i = all.findIndex(v => v.id === b.id); const target = items[items.indexOf(b) + offset]; const j = all.findIndex(v => v.id === target?.id); if (i >= 0 && j >= 0) [all[i], all[j]] = [all[j], all[i]]; return all; })); move.setAttribute("aria-label", `Move ${b.label} ${offset < 0 ? "up" : "down"}`); move.disabled = !items[items.indexOf(b) + offset]; row.append(move); }
@@ -22,8 +33,8 @@ export function createBookmarkPanel(host: HTMLElement, deps: { store: BookmarkSt
       row.append(button("Remove", () => void change(all => all.filter(v => v.id !== b.id)))); host.append(row);
     }
     if (!items.length) host.append(document.createTextNode("Bookmark a note, heading or search to return to it quickly."));
-    if (message || deps.store.error) { const status = document.createElement("p"); status.setAttribute("role", "status"); status.textContent = message || deps.store.error; host.append(status); }
+    if (message || deps.store.error) { const status = document.createElement("p"); status.setAttribute("role", "status"); status.textContent = message || "Could not load bookmarks."; host.append(status); }
   }
   const unsubscribe = deps.store.subscribe(render); render(); void deps.store.reload();
-  return { render, dispose: unsubscribe };
+  return { render, dispose: () => { generation++; unsubscribe(); } };
 }
