@@ -41,3 +41,13 @@ describe("link index", () => {
     expect(index.outgoing("/b/a.md", "[bad](missing.md)")[0].broken).toBe("Note not found");
   });
 });
+
+it("indexes properties and tags while retaining links on invalid YAML", () => {
+  const note = parseNote("/r/a.md", "---\ntags: [One]\nstatus: draft\n---\n#one #two");
+  expect(note.tags).toEqual(["One", "two"]);
+  expect(note.properties).toEqual({ tags: ["One"], status: "draft" });
+  const invalid = parseNote("/r/b.md", "---\nx: [\n---\n# Heading\n[link](a.md)");
+  expect(invalid.propertyError).toBeDefined();
+  expect(invalid.links).toHaveLength(1);
+  expect(invalid.headings).toHaveLength(1);
+});
