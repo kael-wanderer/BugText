@@ -28,3 +28,22 @@ The Settings page uses a preset dropdown instead of the mockup's side list.
 | 12 | `creates, renames, duplicates, deletes and restores a preset` checks the search result. | Search for margins and confirm it opens and reveals the Export row. |
 
 The Pandoc integration test skips when Pandoc is absent. Unit tests do not replace the native export and interaction checks above.
+
+## Native checks (2026-10-29, debug build on the second display)
+
+| # | Result |
+|---|---|
+| 1 | Pass after fix `2b2a19c`: A4, about 25 mm margins, title from the first heading (not repeated), export date, two-level contents, "1 Summary / 1.1 Revenue / 2 Risks", "1 / 1" page numbers. Before the fix, sections were numbered "0.1". |
+| 2 | Not run natively; covered by the Rust Standard-arguments test. |
+| 3 | Pass: DOCX has title, date, TOC field and numbered headings; sheet shows the PDF-only note. |
+| 4 | Pass: last preset per format remembered; Enter opens the save dialog. |
+| 5 | Not run natively (would mean renaming the system Typst); covered by `requires Typst for PDF but not Word`. |
+| 6 | Pass: "Inter Missing is not installed for Typst. Typst will use its default font."; the PDF exported with Libertinus Serif. |
+| 7 | Pass: "1 image could not be found"; Show lists `assets/diagram-v2.png`. |
+| 8 | Pass after fix `a8d275d`: New, Duplicate, Rename (duplicate name refused), Delete + Undo, Handout margins 20 → 30 then Reset. Before the fix the Undo toast vanished at once because the page re-renders after each save. |
+| 9 | Pass: `<img src=x onerror=alert(1)>` name shows as text in the sheet and Settings. |
+| 10 | Pass: a hand-edited preset with margin 99 is dropped; the other preset remains. |
+| 11 | Pass: Typst markup in the title prints literally. |
+| 12 | Pass: search "margins" shows one match and opens Export at Margins. |
+
+Polish notes (not fixed): tool rows show raw version strings ("typst 0.15.1 (unknown commit)"); Export… uses system blue; disabled buttons in Settings ▸ Export look enabled; the save dialog suggests "Untitled.pdf" rather than the note name (existing behaviour).

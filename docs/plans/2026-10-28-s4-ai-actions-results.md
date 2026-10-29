@@ -103,3 +103,23 @@ Paths below cover S4 and all review fixes relative to `1f5c2c6`, including Phase
 - `src/settings-sync.ts` — Changed: Recognizes action-file changes.
 - `src/styles.css` — Changed: Token-based action, switcher, chip and disclosure styles.
 - `docs/plans/2026-10-28-s4-ai-actions-results.md` — Added: this final commit/check/acceptance report.
+
+## Native checks (2026-10-29, debug build on the second display, omlx · Qwen3.8 / Qwen3.6)
+
+| # | Result |
+|---|---|
+| 1 | Pass after fix `05a767b`: ⌘K "AI: Translate to English" on a selection opens a diff for that selection only; Apply is one undo. Before the fix the reply's leading blank lines were inserted and a trailing space was lost ("Annakümmert"). |
+| 2 | Pass: "▸ Extract action items · on note" then the streamed answer, saved in the conversation. |
+| 3 | Pass after fix `05a767b`: an override (omlx · Qwen3.6) shows that model under the reply; Same as Chat follows a later Chat model change. Action replies previously had no meta line. |
+| 4 | Pass: actions appear in ⌘K, right-click ▸ AI and the panel bar (five, then More); rename and delete + Undo in window A update window B's panel and ⌘K. |
+| 5 | Pass: malformed ai-actions.json shows "could not be read", built-ins run, file hash unchanged. |
+| 6 | Pass: rename, delete (named toast after fix) + Undo; list persists across a real quit and relaunch; a no-folder window shows only its own list. |
+| 7 | Pass: two windows on one folder; B shows "Updated in another window" while A streams, then reloads with A's reply. |
+| 8 | Seen: earlier history appears as "Earlier chat" under No folder. |
+| 9 | Pass after fix `05a767b`: Folder search off sends no excerpts (meta no longer claims "Searched"); on again returns roadmap.md excerpts. |
+| 10 | Spot check: with `private/**` excluded, retrieval no longer returns private/a.md. |
+| 11 | Covered by tests (HTML names render as text). |
+
+Also fixed in `05a767b`: action rows misaligned (grip was a third grid child), summary showed "api:omlx" instead of the connection name, Delete toasts without a name.
+
+Polish notes (not fixed): the right-click AI submenu opens on hover only and its items are missing from the accessibility tree; "Searched N notes" counts excluded notes; local connection errors read "Could not reach …" even for a rejected key (401); chat replies show raw Markdown (`**bold**`); a secondary window's folder is lost on a dev reload only.
