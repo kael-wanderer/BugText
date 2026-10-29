@@ -86,6 +86,15 @@ export async function inlineLocalImages(
   }
 }
 
+function promoteHeadings(root: HTMLElement): void {
+  for (const heading of Array.from(root.querySelectorAll("h2, h3, h4, h5, h6"))) {
+    const promoted = document.createElement(`h${Number(heading.tagName[1]) - 1}`);
+    for (const attribute of Array.from(heading.attributes)) promoted.setAttribute(attribute.name, attribute.value);
+    promoted.append(...Array.from(heading.childNodes));
+    heading.replaceWith(promoted);
+  }
+}
+
 export async function buildExportHtml(
   markdown: string,
   options: {
@@ -108,6 +117,9 @@ export async function buildExportHtml(
     const heading = Array.from(host.children).find((child) => /^H[1-6]$/.test(child.tagName));
     options.firstHeading(heading?.textContent?.trim() ?? "");
     heading?.remove();
+    // A "# Title" note with "##" sections: once the title moves to the title block, the sections
+    // become the top level, so numbering reads "1 Summary" rather than "0.1 Summary".
+    if (heading?.tagName === "H1" && !host.querySelector("h1")) promoteHeadings(host);
   }
   staticTaskMarks(host);
   document.body.appendChild(host);

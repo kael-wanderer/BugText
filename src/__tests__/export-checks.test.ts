@@ -9,6 +9,12 @@ it("moves only the first top-level heading into the title", async () => {
   const html = await buildExportHtml("# First\n\n# Second", { rasterizeSvg: false, firstHeading: value => { title = value; } });
   expect(title).toBe("First"); expect(html).not.toContain(">First</h1>"); expect(html).toContain(">Second</h1>");
 });
+it("promotes ## sections once the # title moves to the title block", async () => {
+  let title = "";
+  const html = await buildExportHtml("# Q3\n\n## Summary\n\n### Revenue", { rasterizeSvg: false, firstHeading: value => { title = value; } });
+  expect(title).toBe("Q3");
+  expect(html).toMatch(/<h1[^>]*>Summary<\/h1>/); expect(html).toMatch(/<h2[^>]*>Revenue<\/h2>/);
+});
 it("leaves a document without a heading intact", async () => {
   let title = "x";
   const html = await buildExportHtml("Hello", { rasterizeSvg: false, firstHeading: value => { title = value; } });

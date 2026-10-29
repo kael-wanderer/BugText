@@ -32,6 +32,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Export presets with a title from the first heading no longer number sections "0.1, 0.2": once the `#` title moves to the title block, `##` sections become the top level.
 - The new AI settings pages load on demand to keep the startup bundle below the existing chunk-warning limit.
 - Action reorder moves a row down by one correctly, and saving ai-actions.json from a document tab applies the actions immediately.
 - Built-in action engine hints point to Use for, and selection labels use the correct singular or plural line count.
