@@ -1,4 +1,3 @@
-import { livePreviewExtension } from "./editor-live-preview/extension";
 import { applyPropertyEdit } from "./properties/write";
 import type { PropertyEdit } from "./properties/edit";
 import { linkCompletion } from "./links/complete";
@@ -234,6 +233,9 @@ export function createEditor(
   let wrapColumn = 80;
   let lineNums = true;
   let livePreview = false;
+  // Loaded on first use so the live-preview code stays out of the startup bundle.
+  let livePreviewModule: typeof import("./editor-live-preview/extension") | null = null;
+  const livePreviewExt = (): Extension => (livePreviewModule ? livePreviewModule.livePreviewExtension() : []);
   const live = new Compartment();
   const kinds = new Map<string, EditorDocumentKind>();
 
@@ -261,7 +263,7 @@ export function createEditor(
     kind: EditorDocumentKind = "markdown",
   ): Extension[] => [
     gutter.of(lineNums ? lineNumbers() : []),
-    live.of(livePreview && kind === "markdown" ? livePreviewExtension() : []),
+    live.of(livePreview && kind === "markdown" ? livePreviewExt() : []),
     history(),
     drawSelection(),
     highlightActiveLine(),
@@ -323,7 +325,7 @@ export function createEditor(
       effects: [
         wrap.reconfigure(wrapExtension()),
         gutter.reconfigure(lineNums ? lineNumbers() : []),
-        live.reconfigure(livePreview && activeId && kinds.get(activeId) === "markdown" ? livePreviewExtension() : []),
+        live.reconfigure(livePreview && activeId && kinds.get(activeId) === "markdown" ? livePreviewExt() : []),
       ],
     });
   };
@@ -363,7 +365,7 @@ export function createEditor(
       kinds.set(id, kind);
       if (id === activeId) {
         view.dispatch({
-          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExtension() : [])],
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : [])],
         });
         return;
       }
@@ -372,7 +374,7 @@ export function createEditor(
       states.set(
         id,
         state.update({
-          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExtension() : [])],
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : [])],
         }).state,
       );
     },
@@ -505,6 +507,9 @@ export function createEditor(
     setLivePreview(on) {
       if (livePreview === on) return;
       livePreview = on; reapplyToggles();
+      if (on && !livePreviewModule) {
+        void import("./editor-live-preview/extension").then((mod) => { livePreviewModule = mod; reapplyToggles(); });
+      }
     },
     setLineNumbers(on) {
       lineNums = on;
