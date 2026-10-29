@@ -78,6 +78,7 @@ import { markdownOutline } from "./outline";
 import { addRecent, loadRecent, saveRecent } from "./recent";
 import { breadcrumbsPath, joinPath, parentPath, relativePath } from "./paths";
 import { createFromTemplate } from "./templates/library";
+import { dailyNotePlan } from "./notes/daily";
 import { movePdfAnnotations } from "./pdf-annotations/move";
 import { relativeDestination } from "./templates/naming";
 import { writeText as writeClipboardText } from "@tauri-apps/plugin-clipboard-manager";
@@ -1364,6 +1365,22 @@ function syncExplorerActivePath(): void {
 async function showOpenError(error: unknown): Promise<void> {
   const text = error instanceof Error ? error.message : String(error);
   await message(text, { title: "Open file", kind: "error" });
+}
+
+/** Opens today's daily note, creating it from the starter text on first use. */
+async function openDailyNote(): Promise<void> {
+  const folder = getState().folder;
+  if (!folder) { showToast("Open a folder to use the daily note."); return; }
+  const plan = dailyNotePlan(folder, new Date());
+  try {
+    await invoke("file_stat", { path: plan.path });
+  } catch {
+    // Missing (or unreadable): create it. createFromTemplate never overwrites, so a stray file is numbered, not lost.
+    const created = await createFromTemplate({ folder, relativeDir: plan.dir, stem: plan.stem, contents: plan.contents });
+    await doOpenPath(created);
+    return;
+  }
+  await doOpenPath(plan.path);
 }
 
 async function doOpenPath(
@@ -3255,6 +3272,8 @@ listenScoped<string>("menu", (event) => {
       return templateActions.newFromTemplate();
     case "file.quick_note":
       return templateActions.quickNote();
+    case "file.daily_note":
+      return void openDailyNote();
     case "file.new_typed_note":
       return withOrganize((actions) => void actions.newTypedNote());
     case "file.apply_note_type":
@@ -3391,6 +3410,7 @@ const appKeyActions: Record<string, () => void> = {
   "palette.open": () => palette.open(),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
+  "file.daily_note": () => void openDailyNote(),
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
   "ai.new_chat": newAIChat,

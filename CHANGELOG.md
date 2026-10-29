@@ -8,6 +8,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Open Daily Note (⌥⌘D) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.
+
 - New Tab (⌘T) creates an untitled document, the same as New File (⌘N).
 
 - Filter sidebar (⇧⌥⌘F) and folder search operators for tags, properties, paths and dates.
