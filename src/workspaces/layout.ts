@@ -8,7 +8,7 @@ export type WorkspaceLayout = {
   panes: WorkspacePane[];
   activePane: number;
   splitRatio: number;
-  sidebar: { visible: boolean; view: "explorer" | "outline"; outlineTab: "outline" | "links"; width: number; [key: string]: unknown };
+  sidebar: { visible: boolean; view: "explorer" | "outline"; outlineTab: "outline" | "links" | "filter"; width: number; [key: string]: unknown };
   aiVisible: boolean;
   [key: string]: unknown;
 };

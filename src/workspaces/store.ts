@@ -18,7 +18,7 @@ function validLayout(value: unknown): value is WorkspaceLayout {
       typeof value.aiVisible !== "boolean" || !record(value.sidebar)) return false;
   const sidebar = value.sidebar;
   if (typeof sidebar.visible !== "boolean" || (sidebar.view !== "explorer" && sidebar.view !== "outline") ||
-      (sidebar.outlineTab !== "outline" && sidebar.outlineTab !== "links") || typeof sidebar.width !== "number" || !Number.isFinite(sidebar.width) || sidebar.width <= 0) return false;
+      (sidebar.outlineTab !== "outline" && sidebar.outlineTab !== "links" && sidebar.outlineTab !== "filter") || typeof sidebar.width !== "number" || !Number.isFinite(sidebar.width) || sidebar.width <= 0) return false;
   return value.panes.every(pane => {
     if (!record(pane) || !Array.isArray(pane.files) || (pane.mode !== "editor" && pane.mode !== "split" && pane.mode !== "preview")) return false;
     const paths = new Set<string>();

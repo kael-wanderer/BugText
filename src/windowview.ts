@@ -158,6 +158,7 @@ export function createWindowView(
           <button type="button" data-format="table" title="Insert table" aria-label="Insert table">▦</button>
           <button type="button" data-format="rule" title="Horizontal rule" aria-label="Horizontal rule">—</button>
         </div>
+        <div class="properties-card" hidden></div>
         <div class="editor-surface"></div>
       </div>
       <div class="seam"></div>
@@ -344,9 +345,34 @@ export function createWindowView(
     document.addEventListener("mouseup", onUp);
   });
 
+  let cardTimer: ReturnType<typeof setTimeout> | undefined;
+  let cardTab: string | null = null;
+  let cardMarkdown = false;
+  // The card loads with the YAML code it needs, so that code stays out of the startup bundle.
+  let card: { render(): void; reset(): void } | null = null;
+  void import("./properties/card").then(({ createPropertiesCard }) => {
+    card = createPropertiesCard(root.querySelector<HTMLElement>(".properties-card")!, () => {
+      const w = getWindow(windowId);
+      const tab = w?.tabs.find(t => t.id === w.activeTabId);
+      return tab && isMarkdownFile(tab.path ?? tab.name) ? editor.getText(tab.id) : null;
+    }, () => { editor.gotoLine(1); }, (source, edit) => {
+      const w = getWindow(windowId);
+      const tab = w?.tabs.find(t => t.id === w.activeTabId);
+      if (!tab || !isMarkdownFile(tab.path ?? tab.name) || editor.getText(tab.id) !== source) return false;
+      editor.applyPropertyEdit(tab.id, edit);
+      clearTimeout(cardTimer);
+      return true;
+    });
+    card.render();
+  });
   const editor = createEditor(
     editorSurface,
-    (tabId, text) => h.onDocChange(windowId, tabId, text),
+    (tabId, text) => {
+      h.onDocChange(windowId, tabId, text);
+      if (getWindow(windowId)?.activeTabId === tabId) {
+        clearTimeout(cardTimer); cardTimer = setTimeout(() => card?.render(), 150);
+      }
+    },
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
       cursorLine = line;
@@ -492,6 +518,10 @@ export function createWindowView(
     if (!w) return;
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     const activeName = active?.path ?? active?.name;
+    const markdownCard = !!active && isMarkdownFile(activeName);
+    if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
+      cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card?.reset();
+    }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
     const language = fileLanguageInfo(activeName);
@@ -1020,6 +1050,7 @@ export function createWindowView(
     },
     destroy: () => {
       captureReadingPosition();
+      clearTimeout(cardTimer);
       positionGeneration += 1;
       unbindLinks();
       previewRenderToken += 1;

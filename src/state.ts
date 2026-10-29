@@ -7,7 +7,7 @@ export type UIState = {
   softWrap: boolean;
   folder: string | null;
   explorerVisible: boolean;
-  outlineTab?: "outline" | "links";
+  outlineTab?: "outline" | "links" | "filter";
   sidebarView?: "explorer" | "outline";
   explorerWidth: number;
   aiVisible: boolean;

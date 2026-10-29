@@ -1,3 +1,5 @@
+import { loadProperties } from "../properties/loader";
+await loadProperties();
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), pdf: vi.fn() }));
@@ -59,4 +61,17 @@ describe("replace in search", () => {
     query.value = "(?P<word>hello)"; replacement.value = "${word}!"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush(); expect(host.querySelector("ins")?.textContent).toBe("hello!");
     replacement.value = "$4"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); expect(host.textContent).toContain("Group 4 is not in the pattern."); expect(host.querySelector<HTMLButtonElement>(".search-preview-replace")!.disabled).toBe(true);
   });
+});
+
+it("preselects files for operator-only and combined searches", async () => {
+  const { createLinkIndex, parseNote } = await import("../links/index");
+  const notes = [parseNote("/a/a.md", "#work\naction here"), parseNote("/a/b.md", "#other\naction there")];
+  const index = createLinkIndex(async () => ({ notes, skipped: [] }));
+  mocks.invoke.mockResolvedValue(undefined);
+  const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => ["a.md", "b.md"], index, onOpenHit: () => {} });
+  const input = host.querySelector<HTMLInputElement>(".search-input")!;
+  input.value = "tag:work action"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
+  expect(host.textContent).toContain("a.md"); expect(host.textContent).not.toContain("b.md");
+  input.value = "tag:work"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
+  expect(host.textContent).toContain("a.md"); expect(host.textContent).not.toContain("b.md");
 });

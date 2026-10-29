@@ -1,3 +1,5 @@
+import { applyPropertyEdit } from "./properties/write";
+import type { PropertyEdit } from "./properties/edit";
 import { linkCompletion } from "./links/complete";
 import { followEditorLink } from "./links/follow";
 import { defaultKeymap, history, historyKeymap, indentWithTab, insertBlankLine } from "@codemirror/commands";
@@ -56,6 +58,7 @@ export type EditorHandle = {
   applyMarkdownFormat(format: MarkdownFormat): void;
   getText(id: string): string;
   revision(id: string): number;
+  applyPropertyEdit(id: string, edit: PropertyEdit): void;
   applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
@@ -451,6 +454,7 @@ export function createEditor(
       states.set(id, updated);
       changed(id, updated.doc.toString());
     },
+    applyPropertyEdit(id, edit) { if (id === activeId) applyPropertyEdit(view, edit); },
     cursorOffset(id) { return (id === activeId ? view.state : states.get(id))?.selection.main.head ?? 0; },
     setCursor(id, offset) {
       const state = id === activeId ? view.state : states.get(id);

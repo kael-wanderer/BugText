@@ -2,21 +2,24 @@
 import { glyphs } from "./glyphs";
 import type { OutlineHeading } from "./outline";
 
-export function createOutlineView(host: HTMLElement, jump: (line: number) => void, escape: () => void, onTab: (tab: "outline" | "links") => void = () => {}) {
+export function createOutlineView(host: HTMLElement, jump: (line: number) => void, escape: () => void, onTab: (tab: "outline" | "links" | "filter") => void = () => {}) {
   const header = document.createElement("div");
   header.className = "explorer-title outline-header";
   const title = document.createElement("span");
   const outlineTab = document.createElement("button"); outlineTab.textContent = "Outline";
   const linksTab = document.createElement("button"); linksTab.textContent = "Links";
-  title.className = "outline-tabs"; title.append(outlineTab, linksTab);
+  const filterTab = document.createElement("button"); filterTab.textContent = "Filter";
+  title.className = "outline-tabs"; title.append(outlineTab, linksTab, filterTab);
   const linksHost = document.createElement("div"); linksHost.className = "links-panel"; linksHost.hidden = true;
-  function selectTab(tab: "outline" | "links") {
+  const filterHost = document.createElement("div"); filterHost.className = "filter-panel"; filterHost.hidden = true;
+  function selectTab(tab: "outline" | "links" | "filter") {
     const links = tab === "links";
-    filter.hidden = links; tree.hidden = links; actions.hidden = links; linksHost.hidden = !links;
-    outlineTab.setAttribute("aria-pressed", String(!links)); linksTab.setAttribute("aria-pressed", String(links));
+    const filtering = tab === "filter";
+    filter.hidden = links || filtering; tree.hidden = links || filtering; actions.hidden = links || filtering; linksHost.hidden = !links; filterHost.hidden = !filtering;
+    outlineTab.setAttribute("aria-pressed", String(tab === "outline")); linksTab.setAttribute("aria-pressed", String(links)); filterTab.setAttribute("aria-pressed", String(filtering));
     onTab(tab);
   }
-  outlineTab.onclick = () => selectTab("outline"); linksTab.onclick = () => selectTab("links");
+  outlineTab.onclick = () => selectTab("outline"); linksTab.onclick = () => selectTab("links"); filterTab.onclick = () => selectTab("filter");
   const iconButton = (label: string, glyph: string): HTMLButtonElement => {
     const button = document.createElement("button");
     button.type = "button";
@@ -38,7 +41,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
   const tree = document.createElement("div");
   tree.className = "outline-tree";
   tree.setAttribute("role", "tree");
-  host.append(header, filter, tree, linksHost);
+  host.append(header, filter, tree, linksHost, filterHost);
   const collapsed = new Map<string, Set<number>>();
   let key = "";
   let headings: OutlineHeading[] = [];
@@ -120,7 +123,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
     event.preventDefault();
   });
   return {
-    linksHost, selectTab,
+    linksHost, filterHost, selectTab,
     update(documentKey: string, items: OutlineHeading[], isMarkdown: boolean) {
       key = documentKey; headings = items; markdown = isMarkdown;
       parents = []; children = Array(items.length).fill(false);

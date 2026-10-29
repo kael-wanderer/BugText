@@ -206,6 +206,7 @@ let outlineKey = "";
 const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus(), (tab) => {
   ui = { ...ui, outlineTab: tab }; persistUiState();
   void linksPanel.show(tab === "links");
+  if (tab === "filter" || filterPanel) void loadFilterPanel().then((panel) => panel.show(tab === "filter"));
 });
 const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
@@ -216,6 +217,13 @@ const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const context = tab && linkContext(tab.id);
   if (context) void followLink(target, context);
 });
+// The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
+let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
+function loadFilterPanel(): Promise<{ show(on: boolean): Promise<void> }> {
+  filterPanel ??= import("./filter/panel").then(({ createFilterPanel }) =>
+    createFilterPanel(outlineView.filterHost, linkIndex, path => { void doOpenPath(path); }));
+  return filterPanel;
+}
 function updateOutline(force = false): void {
   linkIndex.setFolder(getState().folder);
   const tab = activeMeta();
@@ -2868,6 +2876,7 @@ function getReplaceFlow() {
 const searchPanel = createSearchPanel(document.getElementById("search-panel")!, {
   getFolder: () => getState().folder,
   getFiles: () => fileList,
+  index: linkIndex,
   previewReplace: async (query, replacement, options, files) => (await getReplaceFlow()).preview(query, replacement, options, files),
   onReplacePreview: (preview, query, replacement, options) => { void getReplaceFlow().then(flow => flow.show(preview, query, replacement, options)); },
   onOpenHit: (path, line, page) => {
@@ -3088,7 +3097,7 @@ for (const v of views.values()) {
   v.editor.setLineNumbers(ui.lineNumbers);
 }
 renderAll();
-outlineView.selectTab(ui.outlineTab === "links" ? "links" : "outline");
+outlineView.selectTab(ui.outlineTab === "links" || ui.outlineTab === "filter" ? ui.outlineTab : "outline");
 
 let reportTimer: number | undefined;
 function reportWindow(): void {
@@ -3223,6 +3232,12 @@ listenScoped<string>("menu", (event) => {
       return void runNativeExport("img-png");
     case "export.image.svg":
       return void runNativeExport("img-svg");
+    case "view.filter_panel":
+      settingsScreen.close();
+      if (document.body.classList.contains("search-active")) setSearchActive(false);
+      ui = { ...ui, sidebarView: "outline", outlineTab: "filter" };
+      showExplorerColumn(); applySidebarView(); outlineView.selectTab("filter"); updateOutline(true);
+      return;
     case "view.links_panel":
       settingsScreen.close();
       if (document.body.classList.contains("search-active")) setSearchActive(false);
@@ -3443,11 +3458,12 @@ async function switchWorkspace(workspace: Workspace): Promise<void> {
     if (held) { await invoke("workspace_focus", { label: held }).catch(() => {}); return; }
     document.querySelector(".workspace-missing-strip")?.remove();
     const { sidebar } = workspace.layout;
-    ui = { ...ui, sidebarView: sidebar.view === "outline" ? "outline" : "explorer", outlineTab: sidebar.outlineTab === "links" ? "links" : "outline" };
+    ui = { ...ui, sidebarView: sidebar.view === "outline" ? "outline" : "explorer", outlineTab: sidebar.outlineTab === "links" || sidebar.outlineTab === "filter" ? sidebar.outlineTab : "outline" };
     setState({ explorerVisible: sidebar.visible, explorerWidth: sidebar.width });
     document.body.classList.toggle("explorer-hidden", !sidebar.visible);
     document.documentElement.style.setProperty("--explorer-w", `${sidebar.width}px`);
     applySidebarView();
+    outlineView.selectTab(ui.outlineTab ?? "outline");
     setAIVisible(workspace.layout.aiVisible);
     const plan = await restoreLayout(workspace.layout, workspace.folder, layoutRestoreDeps(workspace.layout));
     if (plan.missingFiles.length || plan.missingFolder) {
