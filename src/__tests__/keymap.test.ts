@@ -115,3 +115,31 @@ describe("app.settings command", () => {
     expect(KEYMAP_COMMANDS.find((c) => c.id === "app.settings")?.default).toBe("CmdOrCtrl+,");
   });
 });
+
+describe("bookmark and navigation shortcuts", () => {
+  it("keeps all new shortcuts app-scoped, customizable and collision-free", () => {
+    const ids = ["file.add_bookmark", "file.show_bookmarks", "go.back", "go.forward"];
+    for (const id of ids) {
+      const command = KEYMAP_COMMANDS.find(c => c.id === id)!;
+      expect(command.scope).toBe("app");
+      expect(menuAccelerators({})[id]).toBeUndefined();
+      expect(resolveAccelerator(command, { [id]: "CmdOrCtrl+9" })).toBe("CmdOrCtrl+9");
+    }
+    expect(conflictingIds({}).size).toBe(0);
+  });
+  it("matches the physical B key with Option-modified characters", () => {
+    for (const shift of [false, true]) {
+      const id = shift ? "file.show_bookmarks" : "file.add_bookmark";
+      const command = KEYMAP_COMMANDS.find(c => c.id === id)!;
+      expect(matchAccelerator(key({ key: shift ? "ı" : "∫", code: "KeyB", metaKey: true, altKey: true, shiftKey: shift }), command.default)).toBe(true);
+      expect(matchAccelerator(key({ key: "b", code: "KeyB", metaKey: true }), command.default)).toBe(false);
+    }
+  });
+  it("matches Back/Forward with Control+Command and the corresponding arrow", () => {
+    for (const [id, arrow] of [["go.back", "ArrowLeft"], ["go.forward", "ArrowRight"]]) {
+      const command = KEYMAP_COMMANDS.find(c => c.id === id)!;
+      expect(matchAccelerator(key({ key: arrow, metaKey: true, ctrlKey: true }), command.default)).toBe(true);
+      expect(matchAccelerator(key({ key: arrow, metaKey: true }), command.default)).toBe(false);
+    }
+  });
+});

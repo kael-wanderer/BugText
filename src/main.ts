@@ -1,3 +1,5 @@
+import { createBookmarkActions } from "./navigation/actions";
+import { createNavigationController } from "./navigation/controller";
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
 import { startupWorkspace, updateReopen } from "./workspaces/session";
 import { createWorkspaceController } from "./workspaces/controller";
@@ -722,6 +724,10 @@ function commandItems(): PaletteItem[] {
     }),
     command("settings", "Settings", () => settingsScreen.open()),
     command("settingsJson", "Open settings.json", openSettings),
+    command("file.add_bookmark", "Add Bookmark", () => void bookmarkActions.add()),
+    command("file.show_bookmarks", "Show Bookmarks", () => bookmarkActions.show()),
+    command("go.back", "Go Back", () => travelHistory("back")),
+    command("go.forward", "Go Forward", () => travelHistory("forward")),
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
@@ -796,6 +802,11 @@ const handlers = {
   onToggleSub: () => toggleSub(),
   onFocusWindow: (wid: string) => {
     if (getState().activeWindowId !== wid) {
+      const tab = getWindow(wid)?.tabs.find(tab => tab.id === getWindow(wid)?.activeTabId);
+      if (tab?.path && !isPdfFile(tab.path)) {
+        const editor = views.get(wid)!.editor;
+        navigation.visit({ path: tab.path, line: editor.getText(tab.id).slice(0, editor.cursorOffset(tab.id)).split("\n").length });
+      }
       setState({ activeWindowId: wid });
       renderAll();
     }
@@ -846,6 +857,11 @@ const handlers = {
   getTheme: () => currentSettings.theme,
   onEditorContextMenu: (wid: string, x: number, y: number) => {
     if (getState().activeWindowId !== wid) {
+      const tab = getWindow(wid)?.tabs.find(tab => tab.id === getWindow(wid)?.activeTabId);
+      if (tab?.path && !isPdfFile(tab.path)) {
+        const editor = views.get(wid)!.editor;
+        navigation.visit({ path: tab.path, line: editor.getText(tab.id).slice(0, editor.cursorOffset(tab.id)).split("\n").length });
+      }
       setState({ activeWindowId: wid });
       renderAll();
     }
@@ -1107,6 +1123,50 @@ function activeView(): WindowView {
   return views.get(getState().activeWindowId)!;
 }
 
+const navigation = createNavigationController({
+  position: path => {
+    const found = findTabByPath(getState().windows, path);
+    if (!found) return null;
+    const editor = views.get(found.windowId)!.editor;
+    const offset = editor.cursorOffset(found.tab.id);
+    return { path, line: editor.getText(found.tab.id).slice(0, offset).split("\n").length };
+  },
+  open: async (location, isCurrent) => {
+    const text = await invoke<string>("read_file", { path: location.path });
+    if (!isCurrent()) return false;
+    await openNavigationNote(location.path, text, location.line ?? 1, false);
+    return true;
+  },
+});
+const bookmarkActions = createBookmarkActions({
+  host: () => document.getElementById("app")!,
+  folder: () => getState().folder,
+  current: () => {
+    const tab = activeMeta();
+    if (!tab?.path || isPdfFile(tab.path)) return null;
+    const editor = activeView().editor;
+    return { path: tab.path, name: tab.name, line: editor.getText(tab.id).slice(0, editor.cursorOffset(tab.id)).split("\n").length };
+  },
+  exists: async path => { await invoke("file_stat", { path }); },
+  read: path => invoke<string>("read_file", { path }),
+  open: (path, text, line) => openNavigationNote(path, text, line, true),
+  toast: text => showToast(text),
+});
+
+async function openNavigationNote(path: string, text: string, line: number, record: boolean): Promise<void> {
+  openInWindow(getState().activeWindowId, { path, name: basename(path), text }, record);
+  const view = activeView();
+  await view.restoreReadingPosition();
+  // Do not move another document if the user changed tabs while restoring.
+  if (activeMeta()?.path === path) view.jumpToLine(line);
+}
+
+function travelHistory(direction: "back" | "forward"): void {
+  void navigation.travel(direction).then(opened => {
+    if (!opened && navigation.history.target(direction)) showToast("Could not open history note.");
+  });
+}
+
 type OrganizeActions = ReturnType<typeof import("./notes/actions").createOrganizeActions>;
 let organizeActions: OrganizeActions | undefined;
 // Loaded on first use so the organize code (extract, tasks, note types) stays out of the startup bundle.
@@ -1174,7 +1234,12 @@ function activeMeta(): TabMeta | undefined {
   return w.tabs.find((t) => t.id === w.activeTabId);
 }
 
-function activateTab(windowId: string, tabId: string): void {
+function activateTab(windowId: string, tabId: string, recordNavigation = true): void {
+  const target = getWindow(windowId)?.tabs.find(tab => tab.id === tabId);
+  if (recordNavigation && target?.path && !isPdfFile(target.path)) {
+    const editor = views.get(windowId)!.editor;
+    navigation.visit({ path: target.path, line: editor.getText(tabId).slice(0, editor.cursorOffset(tabId)).split("\n").length });
+  }
   setState({ activeWindowId: windowId });
   patchWindow(windowId, { activeTabId: tabId });
   const v = views.get(windowId)!;
@@ -1197,13 +1262,13 @@ function activateTab(windowId: string, tabId: string): void {
   void checkActiveForExternalChange(windowId);
 }
 
-function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }): void {
+function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true): void {
   // Every document-opening path ends here: leave settings so the tab is visible.
   settingsScreen.close();
   if (opts.path) {
     const found = findTabByPath(getState().windows, opts.path);
     if (found) {
-      activateTab(found.windowId, found.tab.id);
+      activateTab(found.windowId, found.tab.id, recordNavigation);
       return;
     }
   }
@@ -1221,7 +1286,7 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
       editorKind(opts.path ?? opts.name),
     );
   if (opts.path) void recordStat(opts.path);
-  activateTab(windowId, id);
+  activateTab(windowId, id, recordNavigation);
 }
 
 async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean> {
@@ -3197,6 +3262,7 @@ subscribe(() => {
   const s = getState();
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
+    bookmarkActions.refresh();
     linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
     searchPanel.cancel();
@@ -3265,6 +3331,10 @@ listenScoped<string>("menu", (event) => {
     return setMenuTheme(id.slice("view.theme.".length));
   }
   switch (id) {
+    case "file.add_bookmark": return void bookmarkActions.add();
+    case "file.show_bookmarks": return bookmarkActions.show();
+    case "go.back": return travelHistory("back");
+    case "go.forward": return travelHistory("forward");
     case "file.new":
     case "file.new_tab":
       return newDoc();
@@ -3407,6 +3477,10 @@ async function pastePlainText(): Promise<void> {
 // menu's accelerator (which consumes the keystroke first on macOS); these are the
 // JS-only / fallback handlers, all keyed off the resolved keymap so rebinding works.
 const appKeyActions: Record<string, () => void> = {
+  "file.add_bookmark": () => void bookmarkActions.add(),
+  "file.show_bookmarks": () => bookmarkActions.show(),
+  "go.back": () => travelHistory("back"),
+  "go.forward": () => travelHistory("forward"),
   "palette.open": () => palette.open(),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
