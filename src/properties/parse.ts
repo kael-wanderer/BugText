@@ -1,17 +1,10 @@
 import { isMap, parseDocument } from "yaml";
+import { findFrontMatter, type FrontMatter } from "./frontmatter";
 
-export type FrontMatter = { start: number; end: number; block: string };
+export { findFrontMatter, type FrontMatter };
+
 export type PropertyKind = "text" | "list" | "date" | "number" | "checkbox";
 export type ReadResult = { ok: true; props: Record<string, unknown> } | { ok: false; error: string; line: number };
-
-export function findFrontMatter(source: string): FrontMatter | null {
-  const first = /^---[ \t]*\r?\n/.exec(source);
-  if (!first) return null;
-  const rest = source.slice(first[0].length);
-  const closing = /^(?:---|\.\.\.)[ \t]*\r?(?:\n|$)/m.exec(rest);
-  if (!closing) return null;
-  return { start: 0, end: first[0].length + closing.index + closing[0].length, block: rest.slice(0, closing.index) };
-}
 
 export function propertyKind(value: unknown): PropertyKind {
   if (Array.isArray(value)) return "list";

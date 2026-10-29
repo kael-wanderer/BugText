@@ -5,6 +5,7 @@ import hljs from "highlight.js/lib/common";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { sanitizeHtml } from "./sanitize";
+import { findFrontMatter } from "./properties/frontmatter";
 
 const md = new MarkdownIt({
   html: true,
@@ -103,5 +104,8 @@ export function findMathSpans(
 }
 
 export function renderMarkdown(src: string): string {
-  return sanitizeHtml(md.render(src));
+  const front = findFrontMatter(src);
+  // The properties card shows frontmatter; blank it here but keep its newlines so data-line anchors stay true.
+  const body = front ? "\n".repeat(src.slice(0, front.end).split("\n").length - 1) + src.slice(front.end) : src;
+  return sanitizeHtml(md.render(body));
 }
