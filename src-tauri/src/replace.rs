@@ -35,23 +35,39 @@ pub struct ReplaceMatch {
 pub fn replace_check_groups(query: String, options: SearchOptions, replacement: String) -> Result<(), String> {
     if !options.regex { return Ok(()); }
     let pattern = search_pattern(&query, &options)?;
-    let mut chars = replacement.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '$' { continue; }
-        if chars.peek() == Some(&'$') { chars.next(); continue; }
-        let mut group = String::new();
-        if chars.peek() == Some(&'{') {
-            chars.next();
-            for ch in chars.by_ref() { if ch == '}' { break; } group.push(ch); }
-        } else {
-            while chars.peek().is_some_and(|c| c.is_ascii_digit()) { group.push(chars.next().unwrap()); }
-        }
-        if group.is_empty() { continue; }
+    for group in group_refs(&replacement) {
         let valid = if let Ok(n) = group.parse::<usize>() { n < pattern.captures_len() }
             else { pattern.capture_names().flatten().any(|name| name == group) };
         if !valid { return Err(format!("Group {group} is not in the pattern.")); }
     }
     Ok(())
+}
+
+/// Group references the way `Captures::expand` reads them: `$$` is a literal `$`, `${…}` takes
+/// everything up to `}`, and a bare `$` takes the longest run of `[_0-9A-Za-z]` (so `$1a` is the
+/// group named "1a", not group 1). A `$` with neither is literal.
+fn group_refs(replacement: &str) -> Vec<&str> {
+    let bytes = replacement.as_bytes();
+    let mut refs = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'$' { i += 1; continue; }
+        if bytes.get(i + 1) == Some(&b'$') { i += 2; continue; }
+        if bytes.get(i + 1) == Some(&b'{') {
+            if let Some(close) = replacement[i + 2..].find('}') {
+                refs.push(&replacement[i + 2..i + 2 + close]);
+                i += close + 3;
+                continue;
+            }
+            i += 1;
+            continue;
+        }
+        let end = replacement[i + 1..].find(|c: char| !(c == '_' || c.is_ascii_alphanumeric()))
+            .map_or(bytes.len(), |n| i + 1 + n);
+        if end > i + 1 { refs.push(&replacement[i + 1..end]); }
+        i = end.max(i + 1);
+    }
+    refs
 }
 
 fn preview(request: &ReplaceRequest, current: impl Fn() -> bool) -> Result<ReplacePreview, String> {
@@ -169,8 +185,22 @@ mod tests {
         for q in ["x*", "^"] { r.query = q.into(); assert_eq!(preview(&r, || true).err().unwrap(), "empty_match"); }
         r.query = "one\\ntwo".into(); assert_eq!(preview(&r, || true).unwrap().multiline, 1);
         r.query = "one".into(); r.files = vec!["../x".into(), "/tmp/x".into()];
-        #[cfg(unix)] { std::os::unix::fs::symlink(std::env::temp_dir(), dir.join("outside")).unwrap(); r.files.push("outside/x".into()); }
-        let result = preview(&r, || true).unwrap(); assert!(result.skipped.iter().all(|s| s.reason == "outside" || s.reason == "unreadable"));
-        fs::remove_dir_all(dir).unwrap();
+        let elsewhere = folder("elsewhere"); fs::write(elsewhere.join("x.md"), "one").unwrap();
+        #[cfg(unix)] { std::os::unix::fs::symlink(&elsewhere, dir.join("outside")).unwrap(); r.files.push("outside/x.md".into()); }
+        let result = preview(&r, || true).unwrap();
+        assert!(result.files.is_empty());
+        assert_eq!(result.skipped.len(), r.files.len());
+        assert!(result.skipped.iter().all(|s| s.reason == "outside"));
+        fs::remove_dir_all(dir).unwrap(); fs::remove_dir_all(elsewhere).unwrap();
+    }
+    #[test]
+    fn group_check_reads_names_like_expand() {
+        let options = || SearchOptions { case_sensitive: true, whole_word: false, regex: true };
+        let check = |q: &str, r: &str| replace_check_groups(q.into(), options(), r.into());
+        assert!(check("(?P<word>a)(b)", "$1 ${2} $word ${word} $$5 $ ${").is_ok());
+        assert_eq!(check("(a)", "$1a").unwrap_err(), "Group 1a is not in the pattern.");
+        assert_eq!(check("(a)", "$foo").unwrap_err(), "Group foo is not in the pattern.");
+        assert_eq!(check("(a)", "${2}").unwrap_err(), "Group 2 is not in the pattern.");
+        assert!(replace_check_groups("$9".into(), SearchOptions { case_sensitive: true, whole_word: false, regex: false }, "$9".into()).is_ok());
     }
 }
