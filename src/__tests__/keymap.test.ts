@@ -12,6 +12,7 @@ import {
 function key(init: Partial<KeyboardEvent> & { key: string }): KeyboardEvent {
   return {
     key: init.key,
+    code: init.code ?? "",
     metaKey: init.metaKey ?? false,
     ctrlKey: init.ctrlKey ?? false,
     altKey: init.altKey ?? false,
@@ -20,6 +21,14 @@ function key(init: Partial<KeyboardEvent> & { key: string }): KeyboardEvent {
 }
 
 describe("matchAccelerator", () => {
+  it("matches Option shortcuts by physical key, since macOS changes the character", () => {
+    expect(matchAccelerator(key({ key: "ƒ", code: "KeyF", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+F")).toBe(true);
+    expect(matchAccelerator(key({ key: "∆", code: "KeyJ", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+J")).toBe(true);
+    expect(matchAccelerator(key({ key: "¡", code: "Digit1", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+1")).toBe(true);
+    expect(matchAccelerator(key({ key: "ƒ", code: "KeyF", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+G")).toBe(false);
+    expect(acceleratorFromEvent(key({ key: "ƒ", code: "KeyF", metaKey: true, altKey: true }))).toBe("CmdOrCtrl+Alt+F");
+  });
+
   it("matches a Cmd+letter accelerator", () => {
     expect(matchAccelerator(key({ key: "k", metaKey: true }), "CmdOrCtrl+K")).toBe(true);
     expect(matchAccelerator(key({ key: "K", metaKey: true }), "CmdOrCtrl+K")).toBe(true);

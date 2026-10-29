@@ -2832,7 +2832,7 @@ async function runNativeExport(format: ExportFormat): Promise<void> {
 
 let replaceFlowPromise: Promise<ReturnType<typeof import("./replace/flow").createReplaceFlow>> | undefined;
 function getReplaceFlow() {
-  return replaceFlowPromise ??= Promise.all([import("./replace/flow"), import("./replace/review-sheet"), import("./replace/result-sheet")]).then(([{ createReplaceFlow }, { showReplaceReview }, { showReplaceResult }]) => createReplaceFlow({
+  return replaceFlowPromise ??= Promise.all([import("./replace/flow"), import("./replace/review-sheet"), import("./replace/result-sheet")]).then(([{ createReplaceFlow }, { showReplaceReview }, { showReplaceResult, showUndoResult }]) => createReplaceFlow({
   folder: () => getState().folder,
   tabs: () => getState().windows.flatMap(window => window.tabs.filter(tab => tab.path && !isPdfFile(tab.path)).map(tab => ({ path: tab.path!, text: editorForTab(tab.id).getText(tab.id), dirty: tab.dirty }))),
   invoke: (command, args) => invoke(command, args),
@@ -2857,6 +2857,7 @@ function getReplaceFlow() {
   }),
   review: showReplaceReview,
   result: showReplaceResult,
+  undoResult: showUndoResult,
   refresh: () => searchPanel.refresh(),
   }));
 }

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
 import { showReplaceReview } from "../replace/review-sheet";
-import { showReplaceResult } from "../replace/result-sheet";
+import { showReplaceResult, showUndoResult } from "../replace/result-sheet";
 import type { ReplacePreview } from "../replace/plan";
 const bad = "<img src=x onerror=alert(1)>";
 const preview: ReplacePreview = { files: [{ relative: bad, source: bad, matches: Array.from({ length: 46 }, () => ({ start: 0, end: 1, line: 1, line_text: bad, col_start: 0, col_end: 1, replacement: "x" })) }], skipped: [{ relative: "skip", reason: "binary" }], multiline: 0, too_many: false, cancelled: false };
@@ -15,3 +15,13 @@ it("renders text safely, groups matches, updates selection and expands", async (
   document.querySelector(".recovery-scrim")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(await pending).toBeNull();
 });
 it("Enter applies and result offers undo", async () => { const pending = showReplaceReview(preview, "a", "b", "", () => "Open"); document.querySelector("input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); expect(await pending).not.toBeNull(); const undo = vi.fn(); showReplaceResult([{ path: "a", matches: 1 }], [{ path: bad, reason: "changed on disk" }], undo); expect(document.body.textContent).toContain("changed on disk"); expect(document.querySelector("img")).toBeNull(); Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Undo replace")!.click(); expect(undo).toHaveBeenCalledOnce(); });
+it("shows folder-relative paths and words undo results as undo", () => {
+  showReplaceResult([{ path: "/root/a.md", matches: 2 }], [{ path: "/root/docs/b.md", reason: "changed on disk" }], () => {}, "/root/");
+  expect(document.body.textContent).toContain("docs/b.md — changed on disk"); expect(document.body.textContent).not.toContain("/root/docs");
+  document.body.innerHTML = "";
+  showUndoResult(["/root/a.md"], [{ path: "/root/docs/b.md", reason: "not undone; restore from Recovery" }], "/root/");
+  expect(document.querySelector("h3")?.textContent).toBe("Undo replace");
+  expect(document.body.textContent).toContain("Restored 1 file. 1 file not undone:");
+  expect(document.body.textContent).not.toContain("Replaced");
+  expect(Array.from(document.querySelectorAll("button")).map(b => b.textContent)).toEqual(["Done"]);
+});

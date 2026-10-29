@@ -147,6 +147,16 @@ export function parseAccelerator(accel: string): ParsedAccel | null {
   return parsed.key ? parsed : null;
 }
 
+/**
+ * The key an accelerator names. On macOS, Option turns letters and digits into other characters
+ * (⌥F gives "ƒ"), so with Option held the physical key from `event.code` is used instead.
+ */
+function eventKey(event: KeyboardEvent): string {
+  if (!event.altKey) return event.key;
+  const physical = /^(?:Key([A-Z])|Digit(\d))$/.exec(event.code ?? "");
+  return physical ? (physical[1] ?? physical[2]).toLowerCase() : event.key;
+}
+
 /** True if a keyboard event matches the given accelerator string (macOS semantics). */
 export function matchAccelerator(event: KeyboardEvent, accel: string): boolean {
   const parsed = parseAccelerator(accel);
@@ -156,7 +166,7 @@ export function matchAccelerator(event: KeyboardEvent, accel: string): boolean {
     event.ctrlKey === parsed.ctrl &&
     event.altKey === parsed.alt &&
     event.shiftKey === parsed.shift &&
-    normalizeKey(event.key) === parsed.key
+    normalizeKey(eventKey(event)) === parsed.key
   );
 }
 
@@ -170,7 +180,7 @@ export function acceleratorFromEvent(event: KeyboardEvent): string | null {
   if (event.ctrlKey) parts.push("Ctrl");
   if (event.altKey) parts.push("Alt");
   if (event.shiftKey) parts.push("Shift");
-  let key = event.key;
+  let key = eventKey(event);
   if (key === " ") key = "Space";
   else if (key.length === 1) key = key.toUpperCase();
   else key = key.charAt(0).toUpperCase() + key.slice(1);
