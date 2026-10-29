@@ -11,5 +11,13 @@ describe("folder replace plan", () => {
   it("skips changed open and disk files", async () => { const d = deps(); d.findOpen = p => p.endsWith("a.md") ? { text: "changed", apply: vi.fn() } : null; d.read = async () => "changed"; const result = await applyReplace(preview, [[true], [true]], "/root", d, "q", "r"); expect(result.notChanged.map(x => x.reason)).toEqual(["changed since preview", "changed on disk"]); });
   it("does not write after snapshot or write failure", async () => { const d = deps(); d.snapshot = vi.fn(async () => { throw Error(); }); const result = await applyReplace(preview, [[true], []], "/root", d, "q", "r"); expect(result.notChanged[0].reason).toBe("couldn't be written"); expect(d.write).not.toHaveBeenCalled(); d.snapshot = async () => {}; d.write = async () => { throw Error(); }; expect((await applyReplace(preview, [[true], []], "/root", d, "q", "r")).notChanged[0].reason).toBe("couldn't be written"); });
   it("stops when the folder changes", async () => { const d = deps(); d.folderStillOpen = () => false; expect((await applyReplace(preview, [[true], [true]], "/root", d, "q", "r")).notChanged.map(x => x.reason)).toEqual(["folder changed", "folder changed"]); });
-  it("undoes unchanged open buffers in one change and reports changed files", async () => { const d = deps(), apply = vi.fn(); d.findOpen = p => p.endsWith("a") ? { text: "after", apply } : null; d.read = async () => "edited"; const result = await undoReplace([{ path: "/root/a", before: "before", after: "after", open: true }, { path: "/root/b", before: "before", after: "after", open: false }], d); expect(apply).toHaveBeenCalledWith([{ from: 0, to: 5, insert: "before" }]); expect(result.undone).toEqual(["/root/a"]); expect(result.notUndone).toHaveLength(1); });
+  it("undoes unchanged open buffers in one change and reports changed files", async () => { const d = deps(), apply = vi.fn(); d.findOpen = p => p.endsWith("a") ? { text: "after", apply } : null; d.read = async () => "edited"; const result = await undoReplace([{ path: "/root/a", before: "before", after: "after", open: true, inverse: [{ from: 0, to: 5, insert: "before" }] }, { path: "/root/b", before: "before", after: "after", open: false, inverse: [] }], d); expect(apply).toHaveBeenCalledWith([{ from: 0, to: 5, insert: "before" }]); expect(result.undone).toEqual(["/root/a"]); expect(result.notUndone).toHaveLength(1); });
+});
+
+it("undo uses inverse ranges in the changed document", async () => {
+  const d = deps(), apply = vi.fn(); let text = "é😀 cat cat";
+  d.findOpen = () => ({ text, apply: changes => { apply(changes); } });
+  const result = await applyReplace(preview, [[true, true], []], "/root", d, "cat", "X");
+  text = "é😀 X X"; await undoReplace(result.undo, d);
+  expect(apply).toHaveBeenLastCalledWith([{ from: 4, to: 5, insert: "cat" }, { from: 6, to: 7, insert: "cat" }]);
 });

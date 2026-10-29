@@ -4,7 +4,15 @@ export type ReplaceMatch = { start: number; end: number; line: number; line_text
 export type ReplaceFile = { relative: string; source: string; matches: ReplaceMatch[] };
 export type ReplacePreview = { files: ReplaceFile[]; skipped: { relative: string; reason: string }[]; multiline: number; too_many: boolean; cancelled: boolean };
 export type ReplaceSelection = boolean[][];
-export type UndoRecord = { path: string; before: string; after: string; open: boolean };
+export type UndoRecord = { path: string; before: string; after: string; open: boolean; inverse: { from: number; to: number; insert: string }[] };
+export function inverseChanges(source: string, matches: ReplaceMatch[]): UndoRecord["inverse"] {
+  let delta = 0;
+  return [...matches].sort((a, b) => a.start - b.start).map(m => {
+    const from = m.start + delta;
+    delta += m.replacement.length - (m.end - m.start);
+    return { from, to: from + m.replacement.length, insert: source.slice(m.start, m.end) };
+  });
+}
 export function filterByGlobs(relatives: string[], include: string, exclude: string): string[] {
   const parse = (s: string) => s.split(",").map(v => v.trim()).filter(Boolean);
   const includes = parse(include), excludes = parse(exclude);

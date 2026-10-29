@@ -1,4 +1,4 @@
-import { applyMatches, toChanges, type ReplacePreview, type ReplaceSelection, type UndoRecord } from "./plan";
+import { applyMatches, inverseChanges, toChanges, type ReplacePreview, type ReplaceSelection, type UndoRecord } from "./plan";
 
 type Change = { from: number; to: number; insert: string };
 export type ReplaceDeps = {
@@ -25,7 +25,7 @@ export async function applyReplace(preview: ReplacePreview, selection: ReplaceSe
     if (open) {
       if (open.text !== file.source) { fail("changed since preview"); continue; }
       open.apply(toChanges(matches));
-      changed.push({ path, matches: matches.length }); undo.push({ path, before: file.source, after, open: true }); continue;
+      changed.push({ path, matches: matches.length }); undo.push({ path, before: file.source, after, open: true, inverse: inverseChanges(file.source, matches) }); continue;
     }
     try {
       if (await deps.read(path) !== file.source) { fail("changed on disk"); continue; }
@@ -34,7 +34,7 @@ export async function applyReplace(preview: ReplacePreview, selection: ReplaceSe
       if (await deps.read(path) !== file.source || deps.findOpen(path)) { fail("changed on disk"); continue; }
       if (!deps.folderStillOpen()) { fail("folder changed"); continue; }
       await deps.write(path, after, file.source);
-      changed.push({ path, matches: matches.length }); undo.push({ path, before: file.source, after, open: false });
+      changed.push({ path, matches: matches.length }); undo.push({ path, before: file.source, after, open: false, inverse: inverseChanges(file.source, matches) });
     } catch { fail("couldn't be written"); }
   }
   return { changed, notChanged, undo };
@@ -47,7 +47,7 @@ export async function undoReplace(records: UndoRecord[], deps: ReplaceDeps) {
       const open = deps.findOpen(record.path);
       if (open) {
         if (open.text !== record.after) throw new Error();
-        open.apply([{ from: 0, to: record.after.length, insert: record.before }]);
+        open.apply(record.inverse);
       } else {
         if (record.open || await deps.read(record.path) !== record.after || deps.findOpen(record.path) || !deps.folderStillOpen()) throw new Error();
         await deps.snapshot(record.path, record.after, "Before undo replace");
