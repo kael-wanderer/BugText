@@ -18,6 +18,18 @@ describe("annotations panel", () => {
     [...panel.element.querySelectorAll("button")].find((b) => b.textContent === "Export…")!.click(); expect(exportItems).toHaveBeenCalledWith([items[0]]);
     filter.value = ""; filter.dispatchEvent(new Event("input")); panel.element.querySelector<HTMLButtonElement>('[aria-label="Filter yellow"]')!.click(); expect(panel.element.querySelectorAll(".pdf-annotations-row")).toHaveLength(1);
   });
+  it("presents a cross-page group as one selectable, expandable entry", () => {
+    const items = [{ ...a(1), group: "group1" }, { ...a(2), group: "group1" }];
+    const exportItems = vi.fn();
+    const panel = createAnnotationsPanel(document, { list: () => items, open: vi.fn(), edit: vi.fn(), copy: vi.fn(), export: exportItems });
+    expect(panel.element.querySelectorAll(".pdf-annotations-row")).toHaveLength(1);
+    expect(panel.element.textContent).toContain("Page 1 – 2");
+    [...panel.element.querySelectorAll("button")].find((b) => b.textContent === "Expand quote")!.click();
+    expect(panel.element.querySelector(".pdf-annotations-quote.expanded")).not.toBeNull();
+    const check = panel.element.querySelector<HTMLInputElement>('input[type="checkbox"]')!; check.checked = true; check.dispatchEvent(new Event("change"));
+    [...panel.element.querySelectorAll("button")].find((b) => b.textContent === "Export…")!.click();
+    expect(exportItems).toHaveBeenCalledWith(items);
+  });
   it("shows an empty state and disables actions", () => {
     const panel = createAnnotationsPanel(document, { list: () => [], open: vi.fn(), edit: vi.fn(), copy: vi.fn(), export: vi.fn() });
     expect(panel.element.textContent).toContain("Select text and press H to highlight.");

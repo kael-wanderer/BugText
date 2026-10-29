@@ -3528,3 +3528,7 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .pdf-annotation-export { display: grid; gap: 12px; width: min(620px, 90vw); }
 .pdf-export-options { display: flex; flex-wrap: wrap; gap: 12px; }
 .pdf-export-preview { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; background: var(--bg-editor); }
+.pdf-annot-comment { flex-direction: column; align-items: stretch; }
+.pdf-annot-comment-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 11px; }
+.pdf-annotations-quote.expanded { display: block; }
+.pdf-annotations-row summary { cursor: pointer; }
