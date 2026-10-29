@@ -21,6 +21,7 @@ export default defineConfig(async () => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.endsWith("/src/search.ts")) return "folder-search";
           if (!id.includes("node_modules")) return;
           if (id.includes("@codemirror/commands/")) return "editor-commands";
           if (id.includes("@codemirror/lang-markdown/")) return "editor-markdown";

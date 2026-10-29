@@ -10,6 +10,7 @@ mod defaults;
 mod dock_icon;
 mod export;
 mod files;
+mod replace;
 mod links;
 mod macos_dock;
 mod mcp_bridge;
@@ -269,6 +270,8 @@ pub fn run() {
             links::scan_note_links_for,
             files::search_in_folder,
             files::search_cancel,
+            replace::replace_preview,
+            replace::replace_check_groups,
             files::get_settings,
             conversations::conversations_list,
             conversations::conversation_read,

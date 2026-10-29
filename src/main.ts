@@ -2795,9 +2795,41 @@ async function runNativeExport(format: ExportFormat): Promise<void> {
   runExportFormat(format);
 }
 
+let replaceFlowPromise: Promise<ReturnType<typeof import("./replace/flow").createReplaceFlow>> | undefined;
+function getReplaceFlow() {
+  return replaceFlowPromise ??= Promise.all([import("./replace/flow"), import("./replace/review-sheet"), import("./replace/result-sheet")]).then(([{ createReplaceFlow }, { showReplaceReview }, { showReplaceResult }]) => createReplaceFlow({
+  folder: () => getState().folder,
+  tabs: () => getState().windows.flatMap(window => window.tabs.filter(tab => tab.path && !isPdfFile(tab.path)).map(tab => ({ path: tab.path!, text: editorForTab(tab.id).getText(tab.id), dirty: tab.dirty }))),
+  invoke: (command, args) => invoke(command, args),
+  writer: folder => ({
+    findOpen: path => {
+      const found = findTabByPath(getState().windows, path);
+      if (!found) return null;
+      const editor = editorForTab(found.tab.id);
+      return { text: editor.getText(found.tab.id), apply: changes => {
+        editor.applyChanges(found.tab.id, changes);
+        const text = editor.getText(found.tab.id); workspaceIndex.onFileChanged(path, text); linkIndex.onFileChanged(path, text);
+      } };
+    },
+    read: path => invoke<string>("read_file", { path }),
+    snapshot: (path, text, label) => manualSnapshot(path, text, label, true),
+    write: async (path, contents, expected) => {
+      if (getState().folder !== folder) throw new Error("Folder changed");
+      await invoke("write_file_atomic", { path, contents, folder, expected });
+      workspaceIndex.onFileChanged(path, contents); linkIndex.onFileChanged(path, contents);
+    },
+    folderStillOpen: () => getState().folder === folder,
+  }),
+  review: showReplaceReview,
+  result: showReplaceResult,
+  refresh: () => searchPanel.refresh(),
+  }));
+}
 const searchPanel = createSearchPanel(document.getElementById("search-panel")!, {
   getFolder: () => getState().folder,
   getFiles: () => fileList,
+  previewReplace: async (query, replacement, options, files) => (await getReplaceFlow()).preview(query, replacement, options, files),
+  onReplacePreview: (preview, query, replacement, options) => { void getReplaceFlow().then(flow => flow.show(preview, query, replacement, options)); },
   onOpenHit: (path, line, page) => {
     void doOpenPath(path).then(() => {
       const tab = activeMeta();
@@ -3231,6 +3263,7 @@ async function pastePlainText(): Promise<void> {
 const appKeyActions: Record<string, () => void> = {
   "palette.open": () => palette.open(),
   "search.find_in_files": () => toggleSearch(),
+  "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
   "ai.new_chat": newAIChat,

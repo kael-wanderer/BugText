@@ -2,6 +2,8 @@
 let current: HTMLElement | null = null;
 let timer = 0;
 
+export function dismissToast(): void { current?.remove(); current = null; window.clearTimeout(timer); }
+
 export function showToast(text: string, ms = 3200, action?: { label: string; run: () => void }): void {
   current?.remove();
   window.clearTimeout(timer);

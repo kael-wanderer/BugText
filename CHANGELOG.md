@@ -8,6 +8,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Replace in Folder (⌥⌘F) previews selected text changes, supports include/exclude globs and regex groups, and offers Recovery-backed undo.
 - PDF and Word export presets, with a pre-export sheet checking tools, fonts and missing images; manage presets and tool diagnostics in Settings ▸ Export.
 - Named workspaces: Save Workspace As, automatic layout updates, and Close Workspace; Switch Workspace (⌃⌘O) groups Pinned, Workspaces and Recent folders. ⌘Enter or Open in New Window opens a separate window, with one window per workspace.
 - A missing-files strip for workspace references, and pinned workspaces in File ▸ Workspaces and the Dock menu.

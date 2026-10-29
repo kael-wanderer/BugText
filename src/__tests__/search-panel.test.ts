@@ -40,3 +40,23 @@ describe("search panel", () => {
     expect(host.textContent).toContain("Invalid regular expression"); expect(input.getAttribute("aria-invalid")).toBe("true");
   });
 });
+describe("replace in search", () => {
+  beforeEach(() => { mocks.invoke.mockReset(); mocks.pdf.mockReset(); });
+  it("opens replace, shows literal previews and filters results without PDF search", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("docs/a.md")) : Promise.resolve());
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => ["a.pdf", "docs/a.md"], onOpenHit: () => {} });
+    const query = host.querySelector<HTMLInputElement>(".search-input")!, replacement = host.querySelector<HTMLInputElement>(".search-replacement")!;
+    expect(host.querySelector<HTMLButtonElement>(".search-preview-replace")!.disabled).toBe(true);
+    query.value = "hello"; replacement.value = "world"; host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush();
+    expect(host.querySelector<HTMLElement>(".search-replace-fields")!.hidden).toBe(false); expect(host.querySelector("del")?.textContent).toBe("hello"); expect(host.querySelector("ins")?.textContent).toBe("world"); expect(mocks.pdf).not.toHaveBeenCalled(); expect(host.textContent).toContain("Replace searches text files only.");
+    const exclude = host.querySelector<HTMLInputElement>(".search-exclude")!; exclude.value = "*.md"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); expect(host.querySelector(".search-hit")).toBeNull();
+  });
+  it("expands regex groups and disables preview for invalid groups", async () => {
+    mocks.invoke.mockImplementation((command: string, args: { replacement?: string }) => command === "replace_check_groups" && args.replacement === "$4" ? Promise.reject("Group 4 is not in the pattern.") : command === "search_in_folder" ? Promise.resolve(result("a.md")) : Promise.resolve());
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
+    const query = host.querySelector<HTMLInputElement>(".search-input")!, replacement = host.querySelector<HTMLInputElement>(".search-replacement")!;
+    query.value = "(hello)"; replacement.value = "$1!"; host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush(); host.querySelector<HTMLButtonElement>('[data-option="regex"]')!.click(); await flush(); await flush(); expect(host.querySelector("ins")?.textContent).toBe("hello!");
+    query.value = "(?P<word>hello)"; replacement.value = "${word}!"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush(); expect(host.querySelector("ins")?.textContent).toBe("hello!");
+    replacement.value = "$4"; query.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); expect(host.textContent).toContain("Group 4 is not in the pattern."); expect(host.querySelector<HTMLButtonElement>(".search-preview-replace")!.disabled).toBe(true);
+  });
+});
