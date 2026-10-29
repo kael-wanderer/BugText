@@ -4,8 +4,8 @@ import { renderMarkdown } from "../preview";
 /** Check the same relative image URLs that the preview resolves beside the note. */
 export async function missingImages(markdown: string, notePath: string | null, stat: (path: string) => Promise<unknown>): Promise<string[]> {
   if (!notePath) return [];
-  const host = document.createElement("div");
-  host.innerHTML = renderMarkdown(markdown);
+  // Inert parse: listing images must not start loading them.
+  const host = new DOMParser().parseFromString(renderMarkdown(markdown), "text/html").body;
   const missing: string[] = [];
   for (const image of Array.from(host.querySelectorAll("img"))) {
     const src = image.getAttribute("src") ?? "";
