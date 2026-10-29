@@ -121,9 +121,9 @@ pub struct SearchOptions {
 }
 
 const SEARCH_HIT_CAP: usize = 500;
-const SEARCH_FILE_BYTES: u64 = 2_000_000;
+pub(crate) const SEARCH_FILE_BYTES: u64 = 2_000_000;
 
-fn search_pattern(query: &str, options: &SearchOptions) -> Result<regex::Regex, String> {
+pub(crate) fn search_pattern(query: &str, options: &SearchOptions) -> Result<regex::Regex, String> {
     let source = if options.regex {
         query.to_string()
     } else {
@@ -233,7 +233,7 @@ pub struct SkippedFile {
     reason: &'static str,
 }
 
-fn is_known_binary(extension: &str) -> bool {
+pub(crate) fn is_known_binary(extension: &str) -> bool {
     const BINARY: &[&str] = &[
         "png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff", "ico", "icns",
         "mp3", "m4a", "wav", "aac", "flac", "ogg", "mp4", "mov", "m4v", "webm", "avi", "mkv",
