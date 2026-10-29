@@ -216,6 +216,7 @@ export function createEditor(
   onPasteFiles: (id: string, files: File[]) => boolean = () => false,
   onPasteText: PasteTextHandler = () => null,
   onBeforeSwitch: (id: string | null) => void = () => {},
+  onPasteQuote: (id: string, text: string) => string | null = () => null,
 ): EditorHandle {
   const states = new Map<string, EditorState>();
   const changed = (id: string, text: string): void => {
@@ -272,6 +273,12 @@ export function createEditor(
         if (!data) return false;
         const text = data.getData("text/plain");
         if (text) {
+          const quote = onPasteQuote(id, text);
+          if (quote !== null) {
+            event.preventDefault();
+            view.dispatch(view.state.replaceSelection(quote), { scrollIntoView: true, userEvent: "input.paste" });
+            return true;
+          }
           const html = data.getData("text/html");
           // Only tables are replaced; ordinary paste skips the document scan.
           if (view.state.selection.ranges.length > 1 || (!text.includes("\t") && !/<table/i.test(html))) return false;

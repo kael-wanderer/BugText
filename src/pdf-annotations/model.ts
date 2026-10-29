@@ -66,7 +66,8 @@ export function rewriteQuoteLinks(text: string, fromDir: string, toDir: string):
     for (const part of segments) { if (part === "..") resolved.pop(); else if (part && part !== ".") resolved.push(part); }
     const absolute = `${fromDir.startsWith("/") ? "/" : ""}${resolved.join("/")}`;
     const replacement = target(toDir, absolute, anchor);
-    text = text.slice(0, link.start) + replacement.replace(/^<|>$/g, "") + text.slice(link.end);
+    const angled = text[link.start - 1] === "<" && text[link.end] === ">";
+    text = text.slice(0, angled ? link.start - 1 : link.start) + replacement + text.slice(angled ? link.end + 1 : link.end);
   }
   return text;
 }

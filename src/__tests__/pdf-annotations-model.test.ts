@@ -22,6 +22,8 @@ describe("PDF annotation model", () => {
     expect(quote).toContain("[a, p. 4](papers/a.pdf#page=4)");
     expect(rewriteQuoteLinks(quote, "/root", "/root/notes")).toContain("../papers/a.pdf#page=4");
     expect(rewriteQuoteLinks(quote, "/root", "/root")).toBe(quote);
+    const spaced = quoteMarkdown({ page: 4, quote: "text" }, "", "/root/papers/a b.pdf", "/root");
+    expect(rewriteQuoteLinks(spaced, "/root", "/root/notes")).toContain("<../papers/a b.pdf#page=4>");
   });
   it("exports options and grouped parts", () => {
     const parts = [{ ...a(7), group: "group1" }, { ...a(8, "def456"), group: "group1" }];

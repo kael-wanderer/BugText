@@ -7,10 +7,11 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn().mockResolvedValue
 import { openUrl } from "@tauri-apps/plugin-opener";
 function setup() {
   const open = vi.fn().mockResolvedValue(undefined), jump = vi.fn(), toast = vi.fn(), create = vi.fn().mockResolvedValue(undefined);
+  const openPdfAt = vi.fn();
   const read = vi.fn().mockResolvedValue("## Notes\n## Notes");
   const index = createLinkIndex(async () => ({ notes: [], skipped: [] }));
-  configureLinks({ index, open, jump, toast, create, read, context: () => null });
-  return { open, jump, toast, create, read };
+  configureLinks({ index, open, jump, toast, create, read, openPdfAt, context: () => null });
+  return { open, jump, toast, create, read, openPdfAt };
 }
 const context = { path: "/r/a.md", text: "[b](b.md)", folder: "/r" };
 describe("follow links", () => {
@@ -22,6 +23,14 @@ describe("follow links", () => {
     await followLink("b.md#missing", context);
     expect(s.jump).toHaveBeenLastCalledWith(1);
     expect(s.toast).toHaveBeenCalledWith("Heading not found: #missing");
+  });
+  it("opens PDF pages and flashes annotation IDs while ignoring other anchors", async () => {
+    const s = setup();
+    await followLink("papers/a.pdf#page=4&annotation=abc123", context);
+    expect(s.open).toHaveBeenCalledWith("/r/papers/a.pdf", false);
+    expect(s.openPdfAt).toHaveBeenCalledWith(4, "abc123");
+    await followLink("papers/a.pdf#chapter", context);
+    expect(s.openPdfAt).toHaveBeenCalledTimes(1);
   });
   it("allows only http https mailto through the opener", async () => {
     setup(); vi.mocked(openUrl).mockClear();

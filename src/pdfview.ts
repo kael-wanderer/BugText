@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
 import { AnnotationStore } from "./pdf-annotations/store";
 import { createAnnotationLayer, type AnnotationLayer } from "./pdf-annotations/layer";
+import type { Annotation } from "./pdf-annotations/model";
 import { createAnnotationsPanel } from "./pdf-annotations/panel";
 import { copyQuote } from "./pdf-annotations/quote";
 import { createAnnotationController } from "./pdf-annotations/controller";
@@ -86,6 +87,7 @@ import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
   goToPage(page: number): void;
+  flashAnnotation(id: string): void;
   pageCount(): number;
   setQuery: (query: string) => number;
   move: (delta: number) => { count: number; active: number };
@@ -104,6 +106,7 @@ export type PdfFindHandle = {
 export type PdfRenderOptions = {
   initialPage?: number;
   folder?: string | null;
+  onExportAnnotations?: (items: Annotation[], title: string, path: string) => void;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
   /** The page in view changed (one-based). */
@@ -2682,7 +2685,7 @@ export async function renderPdf(
       );
       const annotationLayer = createAnnotationLayer(window.document, pageNumber, RENDER_SCALE);
       annotationLayer.render(annotationStore.document.annotations);
-      annotationLayers.push(annotationLayer);
+      annotationLayers[pageNumber - 1] = annotationLayer;
       pageElement.appendChild(annotationLayer.element);
       const textLayer = window.document.createElement("div");
       textLayer.className = "pdf-text-layer";
@@ -2775,7 +2778,7 @@ export async function renderPdf(
     open: (item) => { goToPage(item.page); annotationLayers[item.page - 1]?.flash(item.id); },
     edit: (item) => { goToPage(item.page); annotationController.edit(item); },
     copy: (item) => { void copyQuote(item, annotationTitle, path, annotationBase).catch((error) => setStatus(String(error), { sticky: true })); },
-    export: () => setStatus("Export will be available in the next step"),
+    export: (items) => options?.onExportAnnotations?.(items, annotationTitle, path),
   });
   renderThumbnailPanel();
   capabilitySummary = summarizePdfCapabilities(textSignals);
@@ -2835,6 +2838,7 @@ export async function renderPdf(
   };
   return {
     goToPage,
+    flashAnnotation: (id) => annotationLayers.forEach((layer) => layer.flash(id)),
     pageCount: () => pages.length,
     fitZoom,
     keepAnchor,
