@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuote, sortAnnotations, filterAnnotations, parsePdfAnchor, quoteMarkdown, exportMarkdown, rewriteQuoteLinks, type Annotation } from "../pdf-annotations/model";
+import { normalizeQuote, sortAnnotations, filterAnnotations, parsePdfAnchor, quoteMarkdown, exportMarkdown, rewriteQuoteLinks, formatAnnotationDate, type Annotation } from "../pdf-annotations/model";
 const a = (page: number, id = "abc123"): Annotation => ({ id, group: null, page, rects: [[2, 3, 4, 5]], quote: "Some text", color: "yellow", comment: "A thought", created: "", updated: "" });
 describe("PDF annotation model", () => {
   it("normalizes and caps quotes", () => {
@@ -31,5 +31,15 @@ describe("PDF annotation model", () => {
     expect(output).toContain("## Page 7 – 8"); expect(output).toContain("A thought"); expect(output).toContain("#page=7&annotation=abc123");
     const minimal = exportMarkdown(parts, { quotes: false, comments: false, pageLinks: false, groupByPage: false }, "", "/root/a.pdf", "/root");
     expect(minimal).not.toContain("## Page"); expect(minimal).not.toContain("A thought"); expect(minimal).not.toContain("Some text");
+  });
+});
+describe("formatAnnotationDate", () => {
+  it("shows today's time, a short date otherwise, and leaves junk alone", () => {
+    const now = new Date(2026, 9, 29, 12, 0);
+    expect(formatAnnotationDate(new Date(2026, 9, 29, 10, 15).toISOString(), now)).toMatch(/^Today /);
+    const earlier = formatAnnotationDate(new Date(2026, 9, 28, 9, 0).toISOString(), now);
+    expect(earlier).not.toMatch(/Today|T09/); expect(earlier).toMatch(/28/);
+    expect(formatAnnotationDate(new Date(2025, 0, 2).toISOString(), now)).toMatch(/2025/);
+    expect(formatAnnotationDate("today", now)).toBe("today");
   });
 });

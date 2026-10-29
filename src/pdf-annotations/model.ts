@@ -24,6 +24,13 @@ export function filterAnnotations(list: Annotation[], colors: AnnotationColor[],
   const query = text.trim().toLocaleLowerCase();
   return sortAnnotations(list).filter((a) => (!colors.length || colors.includes(a.color)) && (!query || `${a.quote}\n${a.comment}`.toLocaleLowerCase().includes(query)));
 }
+/** "Today 10:15" for today, else a short date ("Oct 28"); unreadable values are shown as given. */
+export function formatAnnotationDate(iso: string, now = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  if (date.toDateString() === now.toDateString()) return `Today ${date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+}
 export function parsePdfAnchor(anchor: string): { page?: number; annotation?: string } {
   const match = /^page=([1-9]\d*)(?:&annotation=([a-z0-9]{6,16}))?$/.exec(anchor);
   if (!match) return {};

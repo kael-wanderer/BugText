@@ -1,4 +1,4 @@
-import { filterAnnotations, type Annotation, type AnnotationColor } from "./model";
+import { filterAnnotations, formatAnnotationDate, type Annotation, type AnnotationColor } from "./model";
 export function createAnnotationsPanel(doc: Document, options: { list(): Annotation[]; open(item: Annotation): void; edit(item: Annotation): void; copy(item: Annotation): void; export(items: Annotation[]): void }): { element: HTMLElement; refresh(): void } {
   const element = doc.createElement("div"); element.className = "pdf-annotations-panel";
   const count = doc.createElement("p"); const filter = doc.createElement("input"); filter.placeholder = "Filter quotes and comments"; filter.setAttribute("aria-label", "Filter quotes and comments");
@@ -31,7 +31,7 @@ export function createAnnotationsPanel(doc: Document, options: { list(): Annotat
       const body = doc.createElement("button"); body.type = "button"; body.className = "pdf-annotations-entry";
       const quote = doc.createElement("span"); quote.className = "pdf-annotations-quote"; quote.textContent = parts.map((part) => part.quote).join(" ");
       const comment = doc.createElement("span"); comment.className = "pdf-annotations-comment"; comment.textContent = parts.map((part) => part.comment).filter(Boolean).join("\n");
-      const date = doc.createElement("small"); date.textContent = first.updated;
+      const date = doc.createElement("small"); date.textContent = formatAnnotationDate(first.updated); date.title = first.updated;
       body.append(quote, comment, date); body.addEventListener("click", () => options.open(first)); body.addEventListener("dblclick", () => options.edit(first));
       const more = doc.createElement("details"); const summary = doc.createElement("summary"); summary.textContent = "⋯"; summary.setAttribute("aria-label", "Annotation actions");
       const expand = doc.createElement("button"); expand.type = "button"; expand.textContent = "Expand quote"; expand.addEventListener("click", () => { quote.classList.toggle("expanded"); expand.textContent = quote.classList.contains("expanded") ? "Collapse quote" : "Expand quote"; });
