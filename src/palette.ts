@@ -15,7 +15,7 @@ export function createPalette(provider: PaletteProvider): { open: () => void } {
   overlay.className = "palette hidden";
   overlay.innerHTML = `
     <div class="palette-box" role="dialog" aria-label="Command palette">
-      <input class="palette-input" type="text" placeholder="Search files or run a command…" />
+      <input class="palette-input" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Search files or run a command…" />
       <div class="palette-list" role="listbox"></div>
     </div>`;
   document.body.appendChild(overlay);

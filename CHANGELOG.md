@@ -40,6 +40,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- The command palette input no longer capitalizes the first letter of the query (typing `alpha` showed `Alpha`), and no longer applies autocorrect.
 - The Markdown preview no longer shows a note's YAML frontmatter as text; the properties card above the editor shows it instead.
 - Opening Settings ▸ AI or Local CLI no longer asks for the macOS login password again each time you come back. Each saved key is read from the keychain once per app run.
 - App shortcuts with Option, such as Replace in Folder (⌥⌘F) and AI: New chat (⌥⌘J), now work on macOS, and the Shortcuts page records them as the key pressed instead of the Option character.
