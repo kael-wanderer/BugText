@@ -62,6 +62,8 @@ export function createWorkspaceController(deps: {
     const result = await loadWorkspaces(deps.io);
     if (result.file) {
       active = result.file.workspaces.find(item => item.id === active!.id) ?? null;
+      // Deleted from another window: stop auto-saving into it and free the claim.
+      if (!active) { if (timer) clearTimeout(timer); timer = undefined; await deps.release(); }
       deps.display(active?.name ?? null);
     }
   }

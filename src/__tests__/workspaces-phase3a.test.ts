@@ -34,6 +34,17 @@ describe("workspace saving", () => {
     expect(JSON.parse(f.get()!).workspaces[1].name).toBe("Other");
     await f.controller.close(); expect(f.tabs).toEqual(["unsaved"]);
   });
+  it("releases the active workspace when another window deletes it", async () => {
+    let released = 0; let contents: string | null = null; let shown: string | null = "x";
+    const io: WorkspacesIO = { read: async () => contents, write: async value => { contents = value; }, broadcast: () => {} };
+    const controller = createWorkspaceController({ io, capture: () => ({ folder: null, layout: sessionLayout(freshState()) }), claim: async () => null, release: async () => { released += 1; }, display: name => { shown = name; } });
+    await controller.save("Gone", false);
+    const file = JSON.parse(contents!); file.workspaces = []; contents = JSON.stringify(file);
+    await controller.reload();
+    expect(released).toBe(1); expect(shown).toBeNull();
+    controller.changed(); await controller.flush();
+    expect(JSON.parse(contents!).workspaces).toEqual([]);
+  });
   it("renders paths as text and removes missing references", async () => {
     const f = fixture(); await f.controller.save("First", false);
     const file = JSON.parse(f.get()!); const path = "/<img src=x>.md"; file.workspaces[0].layout.panes[0].files = [{ path }]; file.workspaces[0].layout.panes[0].active = path; f.set(JSON.stringify(file));

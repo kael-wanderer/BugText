@@ -282,6 +282,8 @@ const workspaceController = createWorkspaceController({
 function saveWorkspace(): void { showSaveWorkspaceSheet(getState().folder, workspaceController.save); }
 window.addEventListener("pagehide", flushUiState);
 window.addEventListener("beforeunload", flushUiState);
+// Best effort: the pending auto-save is otherwise lost when the window goes away.
+window.addEventListener("pagehide", () => void workspaceController.flush().catch(() => {}));
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
