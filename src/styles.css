@@ -3510,3 +3510,10 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .pdf-annot-marker { position: absolute; right: -12px; color: #b77a00; font-size: 10px; }
 .pdf-annotation-notice { display: flex; gap: 12px; align-items: center; padding: 6px 12px; background: var(--bg-elev); color: var(--text); }
 .pdf-annotation-notice[hidden] { display: none; }
+.pdf-annot-bar, .pdf-annot-comment { position: fixed; z-index: 30; display: flex; align-items: center; gap: 5px; padding: 6px; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border-soft); border-radius: 6px; box-shadow: 0 3px 12px #0004; }
+.pdf-annot-bar[hidden] { display: none; }
+.pdf-annot-bar button { cursor: pointer; }
+.pdf-annot-dot { width: 18px; height: 18px; border: 1px solid #0004; border-radius: 50%; }
+.pdf-annot-dot-yellow { background: #f2c200; } .pdf-annot-dot-green { background: #3fb565; }
+.pdf-annot-dot-blue { background: #4a8cf0; } .pdf-annot-dot-pink { background: #ec5aa0; }
+.pdf-annot-comment textarea { width: 260px; min-height: 80px; resize: vertical; }

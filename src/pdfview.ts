@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
 import { AnnotationStore } from "./pdf-annotations/store";
 import { createAnnotationLayer, type AnnotationLayer } from "./pdf-annotations/layer";
+import { createAnnotationController } from "./pdf-annotations/controller";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
@@ -2750,6 +2751,7 @@ export async function renderPdf(
       pageElement.scrollIntoView({ block: "start" });
     }
   }
+  const annotationController = createAnnotationController(host, annotationStore, pages, annotationLayers, () => activeTool === "select", path);
   renderThumbnailPanel();
   capabilitySummary = summarizePdfCapabilities(textSignals);
   setCurrentPage(pages.length ? Math.min(Math.max(options?.initialPage ?? 1, 1), pages.length) : 0);
@@ -2848,6 +2850,7 @@ export async function renderPdf(
     checkDisk,
     destroy: () => {
       destroyed = true;
+      annotationController.destroy();
       annotationStore.destroy();
       annotationLayers.forEach((layer) => layer.destroy());
       annotationNotice?.remove();

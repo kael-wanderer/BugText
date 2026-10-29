@@ -57,6 +57,9 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "window.left_half", label: "Move to Left Half", category: "Window", default: "", scope: "menu" },
   { id: "window.right_half", label: "Move to Right Half", category: "Window", default: "", scope: "menu" },
   { id: "app.settings", label: "Settings", category: "App", default: "CmdOrCtrl+,", scope: "menu" },
+  // H highlights within the PDF view; it is intentionally not a global accelerator.
+  { id: "pdf.copy_quote", label: "PDF: Copy Quote", category: "PDF", default: "CmdOrCtrl+Alt+C", scope: "app" },
+  { id: "pdf.annotations", label: "PDF: Annotations", category: "PDF", default: "CmdOrCtrl+Shift+A", scope: "app" },
   { id: "palette.open", label: "Command Palette", category: "App", default: "CmdOrCtrl+K", scope: "app" },
   { id: "search.replace_in_folder", label: "Replace in Folder", category: "App", default: "CmdOrCtrl+Alt+F", scope: "app" },
   { id: "search.find_in_files", label: "Find in Folder", category: "App", default: "CmdOrCtrl+Shift+F", scope: "app" },

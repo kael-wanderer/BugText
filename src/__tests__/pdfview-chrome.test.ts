@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { installTestDom } from "./setup";
 
 const calls = vi.hoisted(() => ({ saved: [] as { path: string; bytes: number[] }[], sameFile: false }));
+vi.mock("../pdf-annotations/controller", () => ({ createAnnotationController: () => ({ destroy: () => {} }) }));
 vi.mock("../pdf-annotations/store", () => ({
   AnnotationStore: { load: vi.fn(async (path: string, digest: string, pages: number) => ({
     document: { path, digest, pages, annotations: [] }, changed: false,
