@@ -1,3 +1,4 @@
+import { livePreviewExtension } from "./editor-live-preview/extension";
 import { applyPropertyEdit } from "./properties/write";
 import type { PropertyEdit } from "./properties/edit";
 import { linkCompletion } from "./links/complete";
@@ -62,6 +63,7 @@ export type EditorHandle = {
   applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
+  selectRange(from: number, to: number): void;
   /** Document position under a viewport point, or null when outside the text. */
   posAtPoint(x: number, y: number): number | null;
   /** Right-click: moves the caret to the point unless it falls inside the selection. */
@@ -81,6 +83,7 @@ export type EditorHandle = {
   setSoftWrap(on: boolean): void;
   setSoftWrapMode(mode: SoftWrapMode, column: number): void;
   setLineNumbers(on: boolean): void;
+  setLivePreview(on: boolean): void;
   requestMeasure(): void;
   gotoLine(line: number): void;
   scrollLineToTop(line: number, cursor?: boolean): void;
@@ -230,6 +233,9 @@ export function createEditor(
   let softWrapMode: SoftWrapMode = "window";
   let wrapColumn = 80;
   let lineNums = true;
+  let livePreview = false;
+  const live = new Compartment();
+  const kinds = new Map<string, EditorDocumentKind>();
 
   const reportCursor = (state: EditorState): void => {
     const head = state.selection.main.head;
@@ -255,6 +261,7 @@ export function createEditor(
     kind: EditorDocumentKind = "markdown",
   ): Extension[] => [
     gutter.of(lineNums ? lineNumbers() : []),
+    live.of(livePreview && kind === "markdown" ? livePreviewExtension() : []),
     history(),
     drawSelection(),
     highlightActiveLine(),
@@ -316,12 +323,14 @@ export function createEditor(
       effects: [
         wrap.reconfigure(wrapExtension()),
         gutter.reconfigure(lineNums ? lineNumbers() : []),
+        live.reconfigure(livePreview && activeId && kinds.get(activeId) === "markdown" ? livePreviewExtension() : []),
       ],
     });
   };
 
   const handle: EditorHandle = {
     openState(id, text, kind = "markdown") {
+      kinds.set(id, kind);
       states.set(
         id,
         EditorState.create({ doc: text, extensions: baseExtensions(id, kind) }),
@@ -343,6 +352,7 @@ export function createEditor(
     closeState(id) {
       if (id === activeId) onBeforeSwitch(null);
       states.delete(id);
+      kinds.delete(id);
       if (activeId === id) {
         activeId = null;
         view.setState(EditorState.create({ doc: "", extensions: baseExtensions("") }));
@@ -350,9 +360,10 @@ export function createEditor(
       }
     },
     setDocumentKind(id, kind) {
+      kinds.set(id, kind);
       if (id === activeId) {
         view.dispatch({
-          effects: language.reconfigure(languageExtension(kind, id)),
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExtension() : [])],
         });
         return;
       }
@@ -361,7 +372,7 @@ export function createEditor(
       states.set(
         id,
         state.update({
-          effects: language.reconfigure(languageExtension(kind, id)),
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExtension() : [])],
         }).state,
       );
     },
@@ -408,6 +419,9 @@ export function createEditor(
         to: selection.to,
         text: view.state.sliceDoc(selection.from, selection.to),
       };
+    },
+    selectRange(from, to) {
+      view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true }); view.focus();
     },
     replaceRange(from, to, text) {
       view.dispatch({ changes: { from, to, insert: text } });
@@ -487,6 +501,10 @@ export function createEditor(
       softWrapMode = mode;
       wrapColumn = column;
       reapplyToggles();
+    },
+    setLivePreview(on) {
+      if (livePreview === on) return;
+      livePreview = on; reapplyToggles();
     },
     setLineNumbers(on) {
       lineNums = on;

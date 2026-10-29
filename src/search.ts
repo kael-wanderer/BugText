@@ -1,3 +1,4 @@
+import { createSearchPreview } from "./search-preview";
 import {
   searchInFolder,
   type SearchHit,
@@ -16,6 +17,8 @@ export type SearchPanel = {
   focusReplace: () => void;
   refresh: () => void;
   cancel: () => void;
+  getQuery: () => string;
+  setQuery: (query: string) => void;
 };
 
 export type SearchPanelDeps = {
@@ -25,6 +28,8 @@ export type SearchPanelDeps = {
   previewReplace?: (query: string, replacement: string, options: SearchOptions, files: string[]) => Promise<ReplacePreview>;
   onReplacePreview?: (preview: ReplacePreview, query: string, replacement: string, options: SearchOptions) => void;
   onOpenHit: (path: string, line: number, page?: number) => void;
+  readPreview?: (path: string) => Promise<string>;
+  onOpenBeside?: (path: string, line: number, page?: number) => void;
 };
 
 export function createSearchPanel(
@@ -66,6 +71,9 @@ export function createSearchPanel(
   const results = host.querySelector<HTMLElement>(".search-results")!;
   const progress = host.querySelector<HTMLElement>(".search-progress")!;
   const notes = host.querySelector<HTMLElement>(".search-notes")!;
+  const previewHost = document.createElement("section"); previewHost.className = "search-preview"; previewHost.hidden = true; host.append(previewHost);
+  const preview = createSearchPreview(previewHost, { read: deps.readPreview, open: deps.onOpenHit, openBeside: deps.onOpenBeside });
+  let selectedKey = ""; const hitKey = (hit: SearchHit) => `${hit.path}:${hit.page ?? ""}:${hit.line}`;
   let state = new SearchRun();
   let timer: number | undefined;
   let token = 0;
@@ -78,11 +86,12 @@ export function createSearchPanel(
 
   function cancel(): void {
     window.clearTimeout(timer);
-    ++token;
+    ++token; preview.clear();
     cancellation = cancellation.then(() => invoke<void>("search_cancel")).catch(() => {});
   }
 
   function render(query: string): void {
+    const scrollTop = results.scrollTop;
     results.replaceChildren();
     status.textContent = state.status;
     status.classList.toggle("search-error", state.phase === "error");
@@ -150,12 +159,21 @@ export function createSearchPanel(
         }
         snippet.append(after);
         row.append(ln, snippet);
-        row.addEventListener("click", () =>
-          deps.onOpenHit(hit.path, hit.line, hit.page),
-        );
+        row.dataset.hitKey = hitKey(hit); row.setAttribute("aria-pressed", String(selectedKey === hitKey(hit)));
+        const select = () => { selectedKey = hitKey(hit); for (const other of results.querySelectorAll(".search-hit")) other.setAttribute("aria-pressed", String((other as HTMLElement).dataset.hitKey === selectedKey)); void preview.show(hit); };
+        row.addEventListener("click", select);
+        row.addEventListener("dblclick", () => void preview.open(hit));
+        row.addEventListener("keydown", event => {
+          if (event.key === "Enter") { event.preventDefault(); void preview.open(hit); }
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const rows = [...results.querySelectorAll<HTMLButtonElement>(".search-hit")]; const next = rows[rows.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1)]; next?.focus(); next?.click(); }
+        });
         group.appendChild(row);
       }
       results.appendChild(group);
+    }
+    results.scrollTop = scrollTop;
+    if (selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
+      const first = results.querySelector<HTMLButtonElement>(".search-hit"); if (first) first.click(); else { selectedKey = ""; preview.clear(); }
     }
   }
 
@@ -251,6 +269,8 @@ export function createSearchPanel(
       input.focus();
       input.select();
     },
+    getQuery: () => input.value,
+    setQuery: query => { input.value = query; setReplaceOpen(false); void run(); },
     focusReplace: () => { setReplaceOpen(true); replacement.focus(); void run(); },
     refresh: () => void run(),
     cancel,

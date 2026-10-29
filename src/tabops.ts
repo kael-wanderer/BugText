@@ -4,6 +4,7 @@ export type TabMeta = {
   name: string;
   dirty: boolean;
   pinned?: boolean;
+  temporary?: boolean;
 };
 
 export function findByPath(tabs: TabMeta[], path: string): TabMeta | undefined {
@@ -34,4 +35,15 @@ export function tabIdsRightOf(tabs: TabMeta[], tabId: string): string[] {
 
 export function savedTabIds(tabs: TabMeta[]): string[] {
   return tabs.filter((tab) => !tab.dirty).map((tab) => tab.id);
+}
+
+/** Only a clean, unpinned temporary tab may be replaced by browsing. */
+export function reusablePreviewTab(tabs: TabMeta[]): TabMeta | undefined {
+  return tabs.find(tab => tab.temporary && !tab.dirty && !tab.pinned);
+}
+export function promoteTab(tab: TabMeta): TabMeta {
+  return tab.temporary ? { ...tab, temporary: false } : tab;
+}
+export function restorableTabs(tabs: TabMeta[]): TabMeta[] {
+  return tabs.filter(tab => !tab.temporary || tab.dirty);
 }

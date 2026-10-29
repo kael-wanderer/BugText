@@ -1,9 +1,25 @@
+import "./compact.css";
 import { loadProperties, propertiesModule } from "./loader";
 import type { PropertyEdit } from "./edit";
 
 type Apply = (source: string, edit: PropertyEdit) => boolean;
 
-export function createPropertiesCard(host: HTMLElement, show: () => string | null, onShowSource: () => void, apply?: Apply) {
+const expandedTabs = new Set<string>();
+export function transferPropertiesExpansion(from: string, to: string): void {
+  if (expandedTabs.delete(from)) expandedTabs.add(to);
+}
+export function forgetPropertiesExpansion(id: string): void { expandedTabs.delete(id); }
+export function propertySummary(props: Record<string, unknown>): string {
+  const parts = [props.category, props.status].filter(value => typeof value === "string" && value.trim()).map(String);
+  const tags = Array.isArray(props.tags) ? props.tags.filter(value => typeof value === "string") : typeof props.tags === "string" ? props.tags.split(/[\s,]+/).filter(Boolean) : [];
+  parts.push(...tags.slice(0, 2).map(tag => `#${tag}`));
+  if (tags.length > 2) parts.push(`+${tags.length - 2}`);
+  return parts.join(" · ") || `${Object.keys(props).length} properties`;
+}
+export function createPropertiesCard(host: HTMLElement, show: () => string | null, onShowSource: () => void, apply?: Apply, identity: () => string | null = () => null) {
+  let expanded = false;
+  const isExpanded = () => identity() ? expandedTabs.has(identity()!) : expanded;
+  const setExpanded = (value: boolean) => { expanded = value; const id = identity(); if (id) { if (value) expandedTabs.add(id); else expandedTabs.delete(id); } };
   let sourceShown = false;
   let addingProperties = false;
   function render(): void {
@@ -20,7 +36,7 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
     if (host.hidden || source === null) return;
     if (!result && !addingProperties) {
       const add = document.createElement("button"); add.type = "button"; add.textContent = "+ add properties";
-      add.addEventListener("click", () => { addingProperties = true; render(); }); host.append(add); return;
+      add.addEventListener("click", () => { addingProperties = true; setExpanded(true); render(); }); host.append(add); return;
     }
     if (sourceShown) {
       const toggle = document.createElement("button"); toggle.type = "button"; toggle.textContent = "Show properties";
@@ -39,6 +55,18 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
       host.append(error); return;
     }
     const props = result?.ok ? result.props : {};
+    if (result?.ok) {
+      const toggle = document.createElement("button"); toggle.type = "button";
+      toggle.textContent = isExpanded() ? "Collapse properties" : "Edit properties";
+      toggle.setAttribute("aria-expanded", String(isExpanded()));
+      toggle.addEventListener("click", () => { setExpanded(!isExpanded()); render(); host.querySelector<HTMLButtonElement>("[aria-expanded]")?.focus(); });
+      actions.append(toggle);
+      if (!isExpanded()) {
+        const summary = document.createElement("span"); summary.className = "properties-summary";
+        summary.textContent = propertySummary(props); summary.title = summary.textContent;
+        header.append(summary); return;
+      }
+    }
     const message = document.createElement("div"); message.className = "properties-error"; message.hidden = true;
     const commit = (edit: PropertyEdit | null): void => {
       if (!edit || !apply || !apply(source, edit)) {
@@ -53,7 +81,7 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
         const input = document.createElement("input"); input.type = "text"; input.placeholder = "Property name"; input.setAttribute("aria-label", "Property name");
         actions.append(input); input.focus();
         input.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") { input.remove(); add.hidden = false; }
+          if (event.key === "Escape") { input.remove(); add.hidden = false; add.focus(); }
           if (event.key !== "Enter") return;
           const key = input.value.trim();
           if (Object.prototype.hasOwnProperty.call(props, key)) { message.textContent = "Property already exists"; message.hidden = false; return; }
@@ -84,7 +112,7 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
           add.addEventListener("click", () => {
             add.hidden = true; const input = document.createElement("input"); input.type = "text"; input.setAttribute("aria-label", `Add ${key}`); output.append(input); input.focus();
             input.addEventListener("keydown", event => {
-              if (event.key === "Escape") { input.remove(); add.hidden = false; }
+              if (event.key === "Escape") { input.remove(); add.hidden = false; add.focus(); }
               if (event.key === "Enter" && input.value.trim()) commit(setProperty(source, key, [...list, input.value.trim()]));
             });
           }); output.append(add);

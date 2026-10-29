@@ -49,6 +49,8 @@ import {
 } from "./preview-find";
 
 export type WindowHandlers = {
+  livePreviewEnabled?: () => boolean;
+  onKeepTab?: (windowId: string, tabId: string) => void;
   onActivateTab: (windowId: string, tabId: string) => void;
   onCloseTab: (windowId: string, tabId: string) => void;
   onTabContextMenu: (
@@ -189,6 +191,27 @@ export function createWindowView(
   const editorPane = root.querySelector<HTMLElement>(".pane-editor")!;
   const editorSurface = root.querySelector<HTMLElement>(".editor-surface")!;
   const formatToolbar = root.querySelector<HTMLElement>(".format-toolbar")!;
+  const contextAction = document.createElement("button"); contextAction.type = "button";
+  contextAction.textContent = "Context actions"; contextAction.disabled = true;
+  contextAction.className = "editor-context-action"; formatToolbar.append(contextAction);
+  let imageRange: { from: number; to: number } | null = null;
+  function refreshContextAction(): void {
+    const w = getWindow(windowId); const tab = w?.tabs.find(t => t.id === w.activeTabId);
+    imageRange = null;
+    if (!tab || !isMarkdownFile(tab.path ?? tab.name)) { contextAction.disabled = true; return; }
+    if (editor.tableContext()) { contextAction.disabled = false; contextAction.textContent = "Table actions"; return; }
+    const source = editor.getText(tab.id); const at = editor.cursorOffset(tab.id);
+    const start = source.lastIndexOf("\n", at - 1) + 1; const end = source.indexOf("\n", at);
+    const line = source.slice(start, end < 0 ? source.length : end);
+    const match = /!\[[^\]\n]*\]\([^\n]*\)/.exec(line);
+    if (match && at >= start + match.index && at <= start + match.index + match[0].length) imageRange = { from: start + match.index, to: start + match.index + match[0].length };
+    contextAction.disabled = !imageRange; contextAction.textContent = imageRange ? "Edit image source" : "Context actions";
+  }
+  contextAction.addEventListener("mousedown", event => event.preventDefault());
+  contextAction.addEventListener("click", () => {
+    if (imageRange) editor.selectRange(imageRange.from, imageRange.to);
+    else if (editor.tableContext()) { const rect = contextAction.getBoundingClientRect(); h.onTableMenu(windowId, rect.left, rect.bottom); }
+  });
   const previewPane = root.querySelector<HTMLElement>(".pane-preview")!;
   previewPane.tabIndex = -1;
   const wsName = root.querySelector<HTMLElement>(".ws-name")!;
@@ -362,7 +385,7 @@ export function createWindowView(
       editor.applyPropertyEdit(tab.id, edit);
       clearTimeout(cardTimer);
       return true;
-    });
+    }, () => getWindow(windowId)?.activeTabId ?? null);
     card.render();
   });
   const editor = createEditor(
@@ -376,6 +399,7 @@ export function createWindowView(
     ({ line, column }) => {
       wsCursor.textContent = `Ln ${line}, Col ${column}`;
       cursorLine = line;
+      queueMicrotask(refreshContextAction);
       captureReadingPosition();
       h.onNavigation(windowId);
     },
@@ -516,6 +540,8 @@ export function createWindowView(
   function render(): void {
     const w = getWindow(windowId);
     if (!w) return;
+    editor.setLivePreview(h.livePreviewEnabled?.() ?? false);
+    queueMicrotask(refreshContextAction);
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
@@ -587,7 +613,8 @@ export function createWindowView(
       tab.className =
         "tab" +
         (t.id === w.activeTabId ? " active" : "") +
-        (t.pinned ? " pinned" : "");
+        (t.pinned ? " pinned" : "") + (t.temporary ? " temporary" : "");
+      tab.addEventListener("dblclick", () => h.onKeepTab?.(windowId, t.id));
       tab.addEventListener("click", () => h.onActivateTab(windowId, t.id));
       tab.addEventListener("contextmenu", (event) => {
         event.preventDefault();
@@ -620,6 +647,13 @@ export function createWindowView(
       close.type = "button";
       close.textContent = "×";
       close.addEventListener("click", (e) => { e.stopPropagation(); h.onCloseTab(windowId, t.id); });
+      if (t.temporary) {
+        tab.setAttribute("aria-label", `${t.name}, temporary preview`);
+        const keep = document.createElement("button"); keep.type = "button"; keep.className = "tab-keep";
+        keep.textContent = "Keep"; keep.title = "Keep open"; keep.setAttribute("aria-label", `Keep ${t.name} open`);
+        keep.addEventListener("click", event => { event.stopPropagation(); h.onKeepTab?.(windowId, t.id); });
+        tab.append(keep);
+      }
       tab.append(dot, tabIcon, name, close);
       tabbarEl.appendChild(tab);
     }

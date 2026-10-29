@@ -24,6 +24,7 @@ export type PickerDeps = {
   onUsed: (name: string) => void;
   openTemplatesFolder: () => void;
   newTemplate: () => void;
+  onNoteTypes?: () => void;
 };
 
 type Entry = { info: TemplateInfo; text: string | null; error: string | null };
@@ -73,6 +74,7 @@ export async function showTemplatePicker(deps: PickerDeps): Promise<void> {
 
   const head = el("div", "tpl-head");
   head.append(el("h3", undefined, "New from Template"));
+  if (deps.onNoteTypes) head.append(button("Note types…", () => { close(); deps.onNoteTypes!(); }));
   sheet.append(head);
 
   if (!entries.length) {
