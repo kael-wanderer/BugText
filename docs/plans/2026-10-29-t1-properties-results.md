@@ -25,9 +25,11 @@ Phase 1: 152 test files, 822 tests passed; frontend build passed. Phase 2: 153 f
 - Invalid-frontmatter notes are excluded from metadata results and listed as skipped in Filter.
 - A local synthetic parse of 2,000 small notes took approximately 66 ms; this is not a folder rebuild measurement. Metadata parsing currently runs in the frontend after the existing native folder scan, so the plan's off-main-thread rebuild target and large-folder responsiveness still need native measurement.
 
-## Owner native checks — pending
+## Owner native checks
 
-- [ ] Edit a tag in the card and diff the file.
-- [ ] Open a note with invalid YAML and confirm the file is not rewritten.
-- [ ] Filter on a 2,000-note folder stays responsive while typing.
-- [ ] ⇧⌥⌘F opens Filter from the menu.
+Run by the agent in the dev app on 2026-10-29 (owner delegated the checks).
+
+- [x] Edit a tag in the card and diff the file. Passed: removing `team` via the card wrote `tags: [ retro ]`; the diff against the original changed only the tags and status lines.
+- [x] Open a note with invalid YAML and confirm the file is not rewritten. Passed: the card showed "Properties could not be read — line 3: Invalid YAML properties" with no edit controls; the file checksum was unchanged after opening.
+- [~] Filter on a 2,000-note folder stays responsive while typing. Partly passed: typing and tag clicks updated the list without visible lag. No timing was measured, and the off-main-thread index rebuild is still unmeasured.
+- [x] ⇧⌥⌘F opens Filter from the menu. Passed.
