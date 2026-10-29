@@ -1950,31 +1950,32 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
   const tab = activeMeta();
   if (!tab) return;
   try {
-    const tools = await invoke<{ pandoc: boolean; typst: boolean }>(
-      "export_tools",
-    );
-    const missing = [
-      !tools.pandoc ? "Pandoc (`brew install pandoc`)" : "",
-      kind === "pdf" && !tools.typst ? "Typst (`brew install typst`)" : "",
-    ].filter(Boolean);
-    if (missing.length) {
-      await message(
-        `Install the following export tool${missing.length === 1 ? "" : "s"} first:\n\n${missing.join("\n")}`,
-        { title: "Export setup required", kind: "warning" },
-      );
-      return;
-    }
+    const { showExportSheet } = await import("./export/export-sheet");
+    const { missingImages, exportTitle, exportDate, fontAvailable } = await import("./export/checks");
+    const { rememberLast } = await import("./export/presets");
+    const text = activeView().editor.getText(tab.id);
+    const missing = await missingImages(text, tab.path, path => invoke("file_stat", { path }));
+    const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
+      diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText });
+    if (!choice) return;
+    if (choice.action === "edit") { settingsScreen.open(); return; }
     const out = await pickExportPath(kind);
     if (!out) return;
+    const preset = choice.preset;
+    let heading = "";
     const { buildExportHtml } = await import("./export-render");
-    const html = await buildExportHtml(activeView().editor.getText(tab.id), {
-      rasterizeSvg: kind === "docx",
-      svgAsImage: kind === "pdf",
+    const html = await buildExportHtml(text, {
+      rasterizeSvg: kind === "docx", svgAsImage: kind === "pdf",
+      firstHeading: preset.id !== "standard" && preset.title.mode === "first-heading" ? value => { heading = value; } : undefined,
     });
-    await invoke(
-      kind === "pdf" ? "export_pdf_html" : "export_docx_html",
-      { html, out, resourceDir: tab.path ? dirOf(tab.path) : null },
-    );
+    const standard = preset.id === "standard";
+    const safePreset = !standard && kind === "pdf" && !fontAvailable(preset.type.font, choice.fonts)
+      ? { ...preset, type: { ...preset.type, font: null } } : preset;
+    const meta = standard ? null : { title: exportTitle(preset.title.mode, heading, tab.path ?? tab.name), author: preset.title.author, date: exportDate(preset.title.date) };
+    await invoke(kind === "pdf" ? "export_pdf_html" : "export_docx_html", {
+      html, out, resourceDir: tab.path ? dirOf(tab.path) : null, preset: standard ? null : safePreset, meta,
+    });
+    saveSettingsFromPanel({ ...currentSettings, export: rememberLast(currentSettings.export, kind, preset.id) });
   } catch (error) {
     await message(exportError(error), { title: "Export", kind: "error" });
   }
