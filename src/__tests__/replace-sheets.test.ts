@@ -8,8 +8,8 @@ const preview: ReplacePreview = { files: [{ relative: bad, source: bad, matches:
 afterEach(() => { document.body.innerHTML = ""; });
 it("renders text safely, groups matches, updates selection and expands", async () => {
   const pending = showReplaceReview(preview, "a", "b", "Aa", () => "Open · unsaved");
-  expect(document.querySelector("img")).toBeNull(); expect(document.body.textContent).toContain(bad); expect(document.body.textContent).toContain("Open · unsaved"); expect(document.body.textContent).toContain("1 files skipped");
-  const inputs = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'); inputs[1].click(); expect(inputs[0].indeterminate).toBe(true); expect(document.body.textContent).toContain("Replace 45 matches in 1 files");
+  expect(document.querySelector("img")).toBeNull(); expect(document.body.textContent).toContain(bad); expect(document.body.textContent).toContain("Open · unsaved"); expect(document.body.textContent).toContain("1 file skipped");
+  const inputs = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'); inputs[1].click(); expect(inputs[0].indeterminate).toBe(true); expect(document.body.textContent).toContain("Replace 45 matches in 1 file");
   const show = Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Show all 46")!; show.click(); expect(document.querySelectorAll("label[hidden]")).toHaveLength(0);
   inputs[0].click(); inputs[0].click(); expect(Array.from(document.querySelectorAll("button")).find(b => b.textContent?.startsWith("Replace"))?.disabled).toBe(true);
   document.querySelector(".recovery-scrim")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(await pending).toBeNull();

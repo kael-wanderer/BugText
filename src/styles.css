@@ -3430,6 +3430,9 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .link-review-note small { color: var(--muted); margin-left: 10px; }
 .link-review-note label { display: flex; gap: 10px; align-items: start; }
 .link-review-note pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.replace-diff del, .link-rename-review pre del { background: rgba(220, 100, 100, 0.16); text-decoration: line-through; }
+.replace-diff ins, .link-rename-review pre ins { background: rgba(120, 200, 120, 0.16); text-decoration: none; }
+.replace-tally { color: var(--muted); margin-left: auto; font-size: 12px; }
 
 #outline-panel [hidden] { display: none; }
 

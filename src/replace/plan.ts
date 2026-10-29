@@ -25,3 +25,6 @@ export function trimAround(line: string, colStart: number, colEnd: number, width
   const end = Math.min(line.length, Math.max(start + width, colEnd));
   return { text: (start ? "…" : "") + line.slice(start, end) + (end < line.length ? "…" : ""), start: colStart - start + (start ? 1 : 0), end: colEnd - start + (start ? 1 : 0) };
 }
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
