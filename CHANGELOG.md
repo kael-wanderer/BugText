@@ -38,6 +38,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Opening Settings ▸ AI or Local CLI no longer asks for the macOS login password again each time you come back. Each saved key is read from the keychain once per app run.
 - App shortcuts with Option, such as Replace in Folder (⌥⌘F) and AI: New chat (⌥⌘J), now work on macOS, and the Shortcuts page records them as the key pressed instead of the Option character.
 - Replace in Folder's result lists files relative to the folder, and Undo replace reports "Restored N files" (and any files it could not restore) instead of "Replaced 0 matches in 0 files".
 - PDF Comment closes the selection bar and opens the comment box below the selected text, instead of leaving the bar on screen and covering the text.
