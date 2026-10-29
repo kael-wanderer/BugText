@@ -159,3 +159,30 @@ of the BugText window while preserving a minimum document area.
 ## Backlog — feature requests 🔜
 
 Ideas raised during use that aren't planned for a specific stage yet.
+
+Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
+
+### Finish what's started
+
+- 🐞 Search-hit caret: clicking a folder-search hit can leave the caret at Ln 1, Col 1. Not reproduced on 2026-10-29 (caret landed on the hit line). Needs exact repro steps. Suspect: `gotoLine` in `src/main.ts` runs before the document loads.
+- 🔜 Bookmarks and history: `src/navigation/*` is built and tested but not wired into the app (no palette, menu, or keymap entry).
+- 🔜 Apply Note Type: keep unrelated bytes (comments, key order, body) on apply. Today the whole source is replaced (`src/note-types/sheet.ts`). Needs a test.
+- 🔜 Saved views: check Rename, Duplicate and Delete in the app. Update selected is fixed (`77163be`).
+- 🔜 Filter responsiveness at 2,000 notes: measure the Rust scan, the IPC payload, and typing latency. JS index build is 85 ms.
+- 🔜 Live preview editing: first version is in the workflow WIP. Needs a spec before more work.
+
+### Tier 2 features
+
+- 🔜 Daily note (⌥⌘D).
+- 🔜 Status bar.
+- 🔜 Empty states and first-run hint.
+- 🔜 Hover preview on links.
+- 🔜 Focus / zen mode and typewriter scrolling.
+- 🔜 Unlinked mentions.
+
+### Tier 3 features
+
+- 🔜 Table view over properties.
+- 🔜 Graph view.
+- 🔜 Citations.
+- 🔜 Spell check.
