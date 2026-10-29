@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
 import { AnnotationStore } from "./pdf-annotations/store";
 import { createAnnotationLayer, type AnnotationLayer } from "./pdf-annotations/layer";
+import { createAnnotationsPanel } from "./pdf-annotations/panel";
+import { copyQuote } from "./pdf-annotations/quote";
 import { createAnnotationController } from "./pdf-annotations/controller";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -101,6 +103,7 @@ export type PdfFindHandle = {
 
 export type PdfRenderOptions = {
   initialPage?: number;
+  folder?: string | null;
   onEditDirtyChange?: (dirty: boolean) => void;
   onReloadRequest?: () => void;
   /** The page in view changed (one-based). */
@@ -120,6 +123,8 @@ export class PdfRenderSuperseded extends Error {
 export const PDF_SAVE_EVENT = "bugtext:pdf-save";
 /** Toggles Edit PDF; the Reading View shortcut (⌘E) sends it for PDFs. */
 export const PDF_EDIT_EVENT = "bugtext:pdf-edit";
+export const PDF_ANNOTATIONS_EVENT = "bugtext:pdf-annotations";
+export const PDF_COPY_QUOTE_EVENT = "bugtext:pdf-copy-quote";
 export const PDF_SAVE_AS_EVENT = "bugtext:pdf-save-as";
 /** Raised by the PDF toolbar's Find; the workbench opens its find bar. */
 export const PDF_FIND_EVENT = "bugtext:pdf-find";
@@ -604,10 +609,16 @@ export async function renderPdf(
     data: new Uint8Array(bytes),
   });
   const document = await loadingTask.promise;
+  const metadata = await document.getMetadata().catch(() => null);
+  const pdfTitle = (metadata?.info as { Title?: unknown } | undefined)?.Title;
+  const annotationTitle = typeof pdfTitle === "string" ? pdfTitle : "";
+  const annotationBase = options?.folder ?? path.replace(/[/\\][^/\\]+$/, "");
   const annotationLayers: AnnotationLayer[] = [];
   let annotationNotice: HTMLElement | null = null;
   let annotationStore: AnnotationStore;
+  let annotationPanel: ReturnType<typeof createAnnotationsPanel> | null = null;
   const refreshAnnotations = (): void => {
+    annotationPanel?.refresh();
     annotationLayers.forEach((layer) => layer.render(annotationStore.document.annotations));
     if (annotationNotice) annotationNotice.hidden = !annotationStore.changed;
   };
@@ -1741,7 +1752,9 @@ export async function renderPdf(
     return { title: "Recognize Text", sub: "offline", body };
   };
   const renderInspectorPage = (page: PdfInspectorPage): PdfInspectorContent =>
-    page === "ocr"
+    page === "annotations"
+      ? { title: "Annotations", body: annotationPanel ? [annotationPanel.element] : [] }
+      : page === "ocr"
       ? ocrContent()
       : page === "properties"
       ? propertiesContent()
@@ -2299,6 +2312,7 @@ export async function renderPdf(
       return;
     }
     const actions: Record<string, () => void> = {
+      annotations: () => toggleInspector("annotations"),
       pages: openThumbnailPanel,
       "page-prev": () => goToPage(currentPage - 1),
       "page-next": () => goToPage(currentPage + 1),
@@ -2751,7 +2765,18 @@ export async function renderPdf(
       pageElement.scrollIntoView({ block: "start" });
     }
   }
-  const annotationController = createAnnotationController(host, annotationStore, pages, annotationLayers, () => activeTool === "select", path);
+  const annotationController = createAnnotationController(host, annotationStore, pages, annotationLayers, () => activeTool === "select", path, annotationBase, annotationTitle);
+  const onAnnotationsShortcut = (): void => toggleInspector("annotations");
+  const onCopyQuoteShortcut = (): void => annotationController.copy();
+  host.addEventListener(PDF_ANNOTATIONS_EVENT, onAnnotationsShortcut);
+  host.addEventListener(PDF_COPY_QUOTE_EVENT, onCopyQuoteShortcut);
+  annotationPanel = createAnnotationsPanel(window.document, {
+    list: () => annotationStore.document.annotations,
+    open: (item) => { goToPage(item.page); annotationLayers[item.page - 1]?.flash(item.id); },
+    edit: (item) => { goToPage(item.page); annotationController.edit(item); },
+    copy: (item) => { void copyQuote(item, annotationTitle, path, annotationBase).catch((error) => setStatus(String(error), { sticky: true })); },
+    export: () => setStatus("Export will be available in the next step"),
+  });
   renderThumbnailPanel();
   capabilitySummary = summarizePdfCapabilities(textSignals);
   setCurrentPage(pages.length ? Math.min(Math.max(options?.initialPage ?? 1, 1), pages.length) : 0);
@@ -2850,6 +2875,8 @@ export async function renderPdf(
     checkDisk,
     destroy: () => {
       destroyed = true;
+      host.removeEventListener(PDF_ANNOTATIONS_EVENT, onAnnotationsShortcut);
+      host.removeEventListener(PDF_COPY_QUOTE_EVENT, onCopyQuoteShortcut);
       annotationController.destroy();
       annotationStore.destroy();
       annotationLayers.forEach((layer) => layer.destroy());

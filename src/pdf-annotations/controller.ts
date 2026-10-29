@@ -1,15 +1,15 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { copyQuote } from "./quote";
 import { pdfSelectionClientRectsToPageRects } from "../pdf-selection-edit";
 import { showToast } from "../toast";
 import { createCommentBox } from "./comment-box";
 import { createSelectionBar } from "./selection-bar";
-import { newId, normalizeQuote, quoteMarkdown, type Annotation, type AnnotationColor } from "./model";
+import { newId, normalizeQuote, type Annotation, type AnnotationColor } from "./model";
 import type { AnnotationStore } from "./store";
 import type { AnnotationLayer } from "./layer";
 
 type Page = { element: HTMLElement; box: { page: number; width: number; height: number } };
-export function createAnnotationController(host: HTMLElement, store: AnnotationStore, pages: Page[], layers: AnnotationLayer[], enabled: () => boolean, path: string): { destroy(): void } {
+export function createAnnotationController(host: HTMLElement, store: AnnotationStore, pages: Page[], layers: AnnotationLayer[], enabled: () => boolean, path: string, baseDir: string, title: string): { edit(item: Annotation): void; copy(): void; destroy(): void } {
   let selected: string | null = null;
   let pending: { page: number; rects: Annotation["rects"]; quote: string }[] = [];
   let box: ReturnType<typeof createCommentBox> | null = null;
@@ -46,8 +46,7 @@ export function createAnnotationController(host: HTMLElement, store: AnnotationS
   };
   const copy = async (): Promise<void> => {
     const item = current() ?? pending[0]; if (!item) return;
-    const folder = path.replace(/[/\\][^/\\]+$/, "");
-    await writeText(quoteMarkdown(item, "", path, folder));
+    await copyQuote(item, title, path, baseDir);
   };
   const bar = createSelectionBar(document, {
     highlight: (c) => { void highlight(c).catch(report); }, comment: () => { void highlight(color, true).catch(report); },
@@ -90,9 +89,8 @@ export function createAnnotationController(host: HTMLElement, store: AnnotationS
     const target = event.target as HTMLElement | null;
     if (!enabled() || target?.closest("input, textarea, select, [contenteditable=true]") || event.defaultPrevented) return;
     if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "h") { event.preventDefault(); void highlight(color).catch(report); }
-    else if ((event.metaKey || event.ctrlKey) && event.altKey && event.key.toLowerCase() === "c") { event.preventDefault(); void copy().catch(report); }
     else if (!event.metaKey && !event.ctrlKey && !event.altKey && (event.key === "Backspace" || event.key === "Delete") && selected) { event.preventDefault(); void remove().catch(report); }
   };
   host.addEventListener("mouseup", onMouseUp); host.addEventListener("keyup", onSelection); host.addEventListener("keydown", onKey);
-  return { destroy() { host.removeEventListener("mouseup", onMouseUp); host.removeEventListener("keyup", onSelection); host.removeEventListener("keydown", onKey); box?.destroy(); bar.destroy(); } };
+  return { edit(item) { const page = pages.find((p) => p.box.page === item.page); if (page) { select(item.id); comment(item, page.element.getBoundingClientRect()); } }, copy() { if (enabled()) void copy().catch(report); }, destroy() { host.removeEventListener("mouseup", onMouseUp); host.removeEventListener("keyup", onSelection); host.removeEventListener("keydown", onKey); box?.destroy(); bar.destroy(); } };
 }

@@ -3517,3 +3517,11 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .pdf-annot-dot-yellow { background: #f2c200; } .pdf-annot-dot-green { background: #3fb565; }
 .pdf-annot-dot-blue { background: #4a8cf0; } .pdf-annot-dot-pink { background: #ec5aa0; }
 .pdf-annot-comment textarea { width: 260px; min-height: 80px; resize: vertical; }
+.pdf-annotations-panel { display: grid; gap: 10px; }
+.pdf-annotations-colors { display: flex; gap: 7px; }
+.pdf-annotations-colors [aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+.pdf-annotations-row { display: flex; align-items: flex-start; gap: 7px; padding: 8px; border-left: 3px solid #f2c200; border-bottom: 1px solid var(--border-soft); }
+.pdf-annotations-green { border-left-color: #3fb565; } .pdf-annotations-blue { border-left-color: #4a8cf0; } .pdf-annotations-pink { border-left-color: #ec5aa0; }
+.pdf-annotations-entry { display: grid; gap: 5px; min-width: 0; flex: 1; text-align: left; color: inherit; background: transparent; border: 0; cursor: pointer; }
+.pdf-annotations-quote { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pdf-annotations-comment { white-space: pre-wrap; overflow-wrap: anywhere; }

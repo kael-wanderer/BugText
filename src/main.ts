@@ -3282,6 +3282,15 @@ const appKeyActions: Record<string, () => void> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest("input, textarea, select, [contenteditable=true]")) {
+    for (const [id, command] of [["pdf.copy_quote", "copy"], ["pdf.annotations", "panel"]] as const) {
+      const accel = resolvedAccel(id);
+      if (accel && matchAccelerator(e, accel) && activeView().annotationCommand(command)) {
+        e.preventDefault(); e.stopImmediatePropagation(); return;
+      }
+    }
+  }
   if (
     e.key.toLowerCase() === "f" &&
     (e.metaKey || e.ctrlKey) &&

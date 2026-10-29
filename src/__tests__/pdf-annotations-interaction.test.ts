@@ -32,7 +32,7 @@ describe("annotation controls", () => {
     const second = { ...item, id: "def456", page: 2 };
     const store = { document: { annotations: [item, second] }, update: vi.fn(async () => {}), remove: vi.fn(async () => {}), restore: vi.fn(async () => {}) } as unknown as AnnotationStore;
     const layer = { select: vi.fn() }; let enabled = true;
-    const controller = createAnnotationController(host, store, [{ element: page, box: { page: 1, width: 100, height: 100 } }], [layer as never], () => enabled, "/a.pdf");
+    const controller = createAnnotationController(host, store, [{ element: page, box: { page: 1, width: 100, height: 100 } }], [layer as never], () => enabled, "/a.pdf", "/", "");
     page.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: 15, clientY: 25 }));
     host.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "h" })); await Promise.resolve();
     expect(store.update).toHaveBeenCalledWith("abc123", expect.objectContaining({ color: "blue" }));

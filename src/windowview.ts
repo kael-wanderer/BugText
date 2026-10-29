@@ -29,6 +29,8 @@ import type { MarkdownFormat } from "./markdown-format";
 import { THEME_OPTIONS, type ThemeName } from "./settings";
 import {
   PDF_FIND_EVENT,
+  PDF_ANNOTATIONS_EVENT,
+  PDF_COPY_QUOTE_EVENT,
   PDF_ZOOM_EVENT,
   PDF_EDIT_EVENT,
   PDF_SAVE_AS_EVENT,
@@ -93,6 +95,7 @@ export type WindowView = {
   destroy: () => void;
   setLineNumbersFlag: (on: boolean) => void;
   openPdfPage: (page: number) => void;
+  annotationCommand: (command: "panel" | "copy") => boolean;
   savePdf: () => boolean;
   savePdfAs: () => boolean;
   /** Toggles Edit PDF when a PDF is open; false otherwise. */
@@ -621,6 +624,7 @@ export function createWindowView(
       wsWords.textContent = "PDF";
       void renderPdf(previewPane, pathOrName!, {
         initialPage: pdfTargetPage,
+        folder: getState().folder,
         onEditDirtyChange: (dirty) => {
           if (pdfTabId) h.onPdfEditDirtyChange(windowId, pdfTabId, dirty);
         },
@@ -1013,6 +1017,11 @@ export function createWindowView(
     openPdfPage: (page: number) => {
       pdfTargetPage = page;
       if (pdfFind) pdfTargetPage = applyPdfPosition({ page }, pdfFind.pageCount(), pdfFind.goToPage).page;
+    },
+    annotationCommand: (command) => {
+      if (!isPdfFile(previewPathOrName) || !pdfFind) return false;
+      previewPane.dispatchEvent(new Event(command === "panel" ? PDF_ANNOTATIONS_EVENT : PDF_COPY_QUOTE_EVENT));
+      return true;
     },
     savePdf: () => {
       if (!isPdfFile(previewPathOrName)) return false;
