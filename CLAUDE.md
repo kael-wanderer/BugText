@@ -162,6 +162,8 @@ Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
 
+The Search panel’s Replace row previews folder-wide text changes with include/exclude globs and regex groups. Rust `replace_preview` confines paths and limits previews to 5,000 matches in 1,000 files. Open tabs change as unsaved edits; closed files receive Recovery snapshots and `write_file_atomic` checks. Undo replace checks current contents and applies inverse edits or Recovery-protected atomic writes.
+
 Saved actions live in `<app config dir>/ai-actions.json` v1 and run from the palette,
 editor AI menu or panel bar; Edit uses diff review, Answer replies in Chat, and both
 send only their input without folder access. Their default engine follows `uses.chat`.
