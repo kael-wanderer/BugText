@@ -3190,6 +3190,7 @@ listenScoped<string>("menu", (event) => {
   }
   switch (id) {
     case "file.new":
+    case "file.new_tab":
       return newDoc();
     case "file.new_from_template":
       return templateActions.newFromTemplate();

@@ -8,6 +8,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- New Tab (⌘T) creates an untitled document, the same as New File (⌘N).
+
 - Filter sidebar (⇧⌥⌘F) and folder search operators for tags, properties, paths and dates.
 
 - A properties card above Markdown notes shows and edits frontmatter values, with parse errors shown safely. Tags are indexed from frontmatter and inline `#tag` text.
