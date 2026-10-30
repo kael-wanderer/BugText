@@ -102,6 +102,16 @@ describe("status bar public behavior", () => {
     expect(host.childElementCount).toBe(1);
   });
 
+  it("marks the document while the bar shows, so the footer drops its duplicate count and cursor", () => {
+    const { bar } = fixture();
+    bar.update(note);
+    expect(document.documentElement.classList.contains("status-bar-active")).toBe(true);
+    bar.update({ ...note, enabled: false });
+    expect(document.documentElement.classList.contains("status-bar-active")).toBe(false);
+    bar.update({ ...note, pathOrName: "scan.pdf" });
+    expect(document.documentElement.classList.contains("status-bar-active")).toBe(false);
+  });
+
   it("never parses markup-like note or file text", () => {
     const source = '<img src=x onerror=alert(1)>';
     const { host, bar } = fixture();

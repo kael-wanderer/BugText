@@ -37,7 +37,10 @@ export function createStatusBar(host: HTMLElement, goToLine: () => void) {
   return {
     update(state: StatusBarState): void {
       const kind = fileLanguageInfo(state.pathOrName).editor;
-      if (!state.enabled || state.pathOrName === null || isPdfFile(state.pathOrName) || (kind !== "markdown" && kind !== "plain")) {
+      const shown = state.enabled && state.pathOrName !== null && !isPdfFile(state.pathOrName) && (kind === "markdown" || kind === "plain");
+      // The bar replaces the window footer's word count and cursor while it shows.
+      document.documentElement.classList.toggle("status-bar-active", shown);
+      if (!shown) {
         bar.remove();
         return;
       }
