@@ -1,0 +1,29 @@
+.graph-view { display: flex; flex: 1; flex-direction: column; min-height: 0; color: var(--text); background: var(--bg-preview); }
+.graph-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.graph-bar strong { color: var(--text-strong); }
+.graph-bar button, .graph-bar select, .graph-empty button { color: inherit; background: transparent; font: inherit; border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; }
+.graph-bar button:hover, .graph-empty button:hover { background: var(--bg-elev); }
+.graph-bar button:focus-visible, .graph-bar select:focus-visible, .graph-empty button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.graph-spacer { flex: 1; }
+.graph-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+.graph-body svg { display: block; width: 100%; height: 100%; min-height: 240px; }
+.graph-edge { stroke: var(--faint); stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.graph-edge.missing { stroke-dasharray: 4 4; }
+.graph-note circle { fill: var(--muted); }
+.graph-note.center circle { fill: var(--accent); }
+.graph-note.orphan circle { opacity: .5; }
+.graph-note { cursor: pointer; outline: none; }
+.graph-note:hover circle, .graph-note:focus-visible circle { stroke: var(--accent); stroke-width: 3; }
+.graph-missing circle { fill: none; stroke: var(--muted); stroke-dasharray: 3 3; }
+.graph-label { fill: var(--text); font: 11px var(--font-ui); }
+.graph-missing .graph-label { fill: var(--muted); }
+.graph-foot { padding: 8px 14px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+.graph-empty { margin: auto; padding: 32px; max-width: 400px; text-align: center; }
+.graph-empty strong { font-size: 16px; font-weight: 500; }
+.graph-empty p { color: var(--muted); line-height: 1.6; }
+.graph-empty button { font-size: 12px; margin-top: 12px; }
+.window.graph-active > .window-panes, .window.graph-active > .window-status, .window.graph-active .window-toolbar { display: none; }
+.graph-tab-host { display: flex; flex: 1; min-height: 0; }
+.graph-tab-host[hidden] { display: none; }
+
+.graph-tab-name { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }

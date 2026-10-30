@@ -559,7 +559,13 @@ pub fn copy_into_directory(source: &Path, destination_dir: &Path) -> Result<Path
 }
 
 #[tauri::command]
-pub fn read_file(path: String) -> Result<String, String> {
+pub fn read_file(path: String, folder: Option<String>) -> Result<String, String> {
+    if let Some(folder) = folder {
+        let root = Path::new(&folder).canonicalize().map_err(|_| "Note unavailable")?;
+        let target = Path::new(&path).canonicalize().map_err(|_| "Note unavailable")?;
+        if !target.starts_with(&root) { return Err("Note unavailable".into()); }
+        return fs::read_to_string(target).map_err(|_| "Note unavailable".into());
+    }
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
@@ -1313,5 +1319,27 @@ mod same_file_tests {
             assert!(same_file(text(&file), text(&link)));
         }
         let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod graph_read_tests {
+    use super::*;
+    #[test]
+    fn graph_read_confines_resolved_paths_and_hides_errors() {
+        let dir = std::env::temp_dir().join(format!("bugtext-graph-read-{}", std::process::id()));
+        let root = dir.join("notes");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("ok.md"), "safe").unwrap();
+        fs::write(dir.join("outside.md"), "outside").unwrap();
+        let folder = Some(root.to_string_lossy().into_owned());
+        assert_eq!(read_file(root.join("ok.md").to_string_lossy().into_owned(), folder.clone()).unwrap(), "safe");
+        assert_eq!(read_file(root.join("../outside.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
+        assert_eq!(read_file(root.join("missing.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
+        #[cfg(unix)] {
+            std::os::unix::fs::symlink(dir.join("outside.md"), root.join("escape.md")).unwrap();
+            assert_eq!(read_file(root.join("escape.md").to_string_lossy().into_owned(), folder).unwrap_err(), "Note unavailable");
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 }
