@@ -232,6 +232,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let links_panel = MenuItemBuilder::with_id("view.links_panel", "Links").accelerator("CmdOrCtrl+Alt+Shift+O").build(app)?;
     let filter_panel = MenuItemBuilder::with_id("view.filter_panel", "Filter").accelerator("CmdOrCtrl+Alt+Shift+F").build(app)?;
     let outline = MenuItemBuilder::with_id("view.outline", "Outline").accelerator("CmdOrCtrl+Alt+O").build(app)?;
+    let status_bar = CheckMenuItemBuilder::with_id("view.status_bar", "Show Status Bar").checked(true).build(app)?;
     let sync_scroll = CheckMenuItemBuilder::with_id("view.sync_scroll", "Sync Scroll").build(app)?;
     let toggle_preview = MenuItemBuilder::with_id("view.toggle_preview", "Show/Hide Preview")
         .accelerator("CmdOrCtrl+P")
@@ -306,6 +307,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&links_panel)
         .item(&filter_panel)
         .item(&sync_scroll)
+        .item(&status_bar)
         .item(&toggle_preview)
         .item(&reading)
         .item(&live_preview)

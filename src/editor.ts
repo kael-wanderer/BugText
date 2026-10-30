@@ -1,3 +1,4 @@
+import { cursorPosition } from "./status-bar/model";
 import { applyPropertyEdit } from "./properties/write";
 import type { PropertyEdit } from "./properties/edit";
 import { linkCompletion } from "./links/complete";
@@ -13,6 +14,7 @@ import { sql } from "@codemirror/lang-sql";
 import { yaml } from "@codemirror/lang-yaml";
 import {
   search,
+  gotoLine as openGotoLine,
   searchKeymap,
 } from "@codemirror/search";
 import { Compartment, EditorState, Transaction, type Extension } from "@codemirror/state";
@@ -85,6 +87,8 @@ export type EditorHandle = {
   setLivePreview(on: boolean): void;
   requestMeasure(): void;
   gotoLine(line: number): void;
+  openGoToLine(): void;
+  cursorPosition(): CursorPosition;
   scrollLineToTop(line: number, cursor?: boolean): void;
   visibleTopLine(): number;
   onScroll(callback: () => void): void;
@@ -240,9 +244,7 @@ export function createEditor(
   const kinds = new Map<string, EditorDocumentKind>();
 
   const reportCursor = (state: EditorState): void => {
-    const head = state.selection.main.head;
-    const line = state.doc.lineAt(head);
-    onCursorChange({ line: line.number, column: head - line.from + 1 });
+    onCursorChange(cursorPosition(state));
   };
 
   function wrapExtension(): Extension {
@@ -518,6 +520,8 @@ export function createEditor(
     requestMeasure() {
       view.requestMeasure();
     },
+    cursorPosition: () => cursorPosition(view.state),
+    openGoToLine: () => { openGotoLine(view); },
     gotoLine(line) {
       const clamped = Math.min(Math.max(line, 1), view.state.doc.lines);
       const info = view.state.doc.line(clamped);

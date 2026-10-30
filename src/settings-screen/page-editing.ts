@@ -69,6 +69,7 @@ export const editingPage: SettingsPage = {
         }),
       ),
       caption("Navigation"),
+      row("show-status-bar", "Show status bar", "Also in View ▸ Show Status Bar.", toggle("Show status bar", settings.showStatusBar, (showStatusBar) => deps.onSettingsChange({ ...deps.getSettings(), showStatusBar }))),
       row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
       caption("Links"),
       row("links-complete", "Suggest notes while typing links", "After ]( in Markdown notes.",
