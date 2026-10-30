@@ -46,6 +46,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- The window footer no longer repeats the word count and cursor position while the status bar is shown. Turning the status bar off restores them in the footer.
 - Saved view "Update selected" saves the current filter under the selected view's own name, even when the View name field is empty. The "Enter a view name." message now appears beside the save buttons instead of below the list.
 - The command palette input no longer capitalizes the first letter of the query (typing `alpha` showed `Alpha`), and no longer applies autocorrect.
 - The Markdown preview no longer shows a note's YAML frontmatter as text; the properties card above the editor shows it instead.

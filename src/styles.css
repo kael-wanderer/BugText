@@ -704,6 +704,11 @@ body[data-wrap="guide"] .doc {
   flex-shrink: 0;
 }
 
+.status-bar-active .ws-words,
+.status-bar-active .ws-cursor {
+  display: none;
+}
+
 .ws-cursor,
 .ws-language {
   color: var(--faint);
