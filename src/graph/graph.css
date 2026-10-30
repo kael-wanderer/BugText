@@ -25,3 +25,5 @@
 .window.graph-active > .window-panes, .window.graph-active > .window-status, .window.graph-active .window-toolbar { display: none; }
 .graph-tab-host { display: flex; flex: 1; min-height: 0; }
 .graph-tab-host[hidden] { display: none; }
+
+.graph-tab-name { border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }

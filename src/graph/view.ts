@@ -26,7 +26,7 @@ function select(label: string, values: [string, string][]): HTMLSelectElement {
   return node;
 }
 export function createGraphView(host: HTMLElement, index: LinkIndex, config: GraphViewOptions) {
-  const options: GraphOptions = { mode: config.mode ?? (config.center ? "local" : "folder"), center: config.center, depth: 1, folder: "", orphans: !config.center };
+  const options: GraphOptions = { mode: config.mode ?? (config.center ? "local" : "folder"), center: config.center, depth: 1, folder: "", orphans: (config.mode ?? (config.center ? "local" : "folder")) === "folder" };
   let disposed = false, generation = 0, worker: Worker | null = null;
   let result: (GraphLayout & { graph: GraphData }) | null = null;
   let scene: ReturnType<typeof drawGraph> | null = null;

@@ -729,6 +729,7 @@ function commandItems(): PaletteItem[] {
     command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
     command("close", "Close Tab", () => {
+      if (activeView().closeGraph()) return;
       const windowState = activeWindow();
       if (windowState.activeTabId) {
         void closeTab(windowState.id, windowState.activeTabId);
@@ -739,6 +740,8 @@ function commandItems(): PaletteItem[] {
     ),
     command("editor", "View: Editor", () => setMode(activeWindowId(), "editor")),
     command("read", "View: Read", () => setMode(activeWindowId(), "preview")),
+    command("view.graph", "Graph: Open Local Graph", () => { settingsScreen.close(); activeView().showGraph("local"); }),
+    command("view.folder_graph", "Graph: Open Folder Graph", () => { settingsScreen.close(); activeView().showGraph("folder"); }),
     command("softwrap", "Cycle Soft Wrap", cycleSoftWrap),
     command("lines", "Toggle Line Numbers", toggleLineNumbers),
     command("sub", "Toggle Sub Window", () => void toggleSub()),
@@ -812,6 +815,12 @@ const palette = createPalette(() => [
 let lastMarkdownFocus: { windowId: string; tabId: string } | null = null;
 
 const handlers = {
+  graphIndex: linkIndex,
+  onGraphNew: () => newDoc(),
+  onGraphOpen: (wid: string, path: string, newTab: boolean) => {
+    void doOpenPath(path, wid, newTab, linkIndex.folder);
+  },
+  onGraphFolder: () => { void pickFolder().then(folder => { if (folder) void openFolder(folder); }); },
   livePreviewEnabled: () => livePreviewOn,
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
@@ -1260,10 +1269,12 @@ function insertNoteLink(): void {
 
 function activeMeta(): TabMeta | undefined {
   const w = activeWindow();
+  if (views.get(w.id)?.graphActive()) return undefined;
   return w.tabs.find((t) => t.id === w.activeTabId);
 }
 
 function activateTab(windowId: string, tabId: string, recordNavigation = true): void {
+  views.get(windowId)?.hideGraph();
   const target = getWindow(windowId)?.tabs.find(tab => tab.id === tabId);
   if (recordNavigation && target?.path && !isPdfFile(target.path)) {
     const editor = views.get(windowId)!.editor;
@@ -1291,10 +1302,10 @@ function activateTab(windowId: string, tabId: string, recordNavigation = true): 
   void checkActiveForExternalChange(windowId);
 }
 
-function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true): void {
+function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true, forceNewTab = false): void {
   // Every document-opening path ends here: leave settings so the tab is visible.
   settingsScreen.close();
-  if (opts.path) {
+  if (opts.path && !forceNewTab) {
     const found = findTabByPath(getState().windows, opts.path);
     if (found) {
       activateTab(found.windowId, found.tab.id, recordNavigation);
@@ -1480,6 +1491,8 @@ async function openDailyNote(): Promise<void> {
 async function doOpenPath(
   path: string,
   windowId = getState().activeWindowId,
+  forceNewTab = false,
+  confinedFolder?: string | null,
 ): Promise<void> {
   const recent = loadRecent();
   saveRecent({ ...recent, files: addRecent(recent.files, path) });
@@ -1488,10 +1501,12 @@ async function doOpenPath(
     return;
   }
   try {
-    const contents = await invoke<string>("read_file", { path });
-    openInWindow(windowId, { path, name: basename(path), text: contents });
+    const contents = await invoke<string>("read_file", { path, ...(confinedFolder ? { folder: confinedFolder } : {}) });
+    if (confinedFolder && getState().folder !== confinedFolder) return;
+    openInWindow(windowId, { path, name: basename(path), text: contents }, true, forceNewTab);
   } catch (error) {
-    await showOpenError(error);
+    if (confinedFolder) showToast("Could not open note.");
+    else await showOpenError(error);
   }
 }
 
@@ -3408,6 +3423,7 @@ listenScoped<string>("menu", (event) => {
     case "file.recover":
       return openRecoveryReview();
     case "file.close": {
+      if (activeView().closeGraph()) return;
       const w = activeWindow();
       return w.activeTabId ? void closeTab(w.id, w.activeTabId) : undefined;
     }
@@ -3531,6 +3547,7 @@ const appKeyActions: Record<string, () => void> = {
   "ai.quick.outline": () => runQuickActionById("ai.quick.outline"),
   "file.recover": () => openRecoveryReview(),
   "file.close": () => {
+    if (activeView().closeGraph()) return;
     const w = activeWindow();
     if (w.activeTabId) void closeTab(w.id, w.activeTabId);
   },

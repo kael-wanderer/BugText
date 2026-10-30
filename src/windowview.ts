@@ -1,4 +1,7 @@
 import { countWords } from "./status-bar/model";
+import { createGraphView } from "./graph/view";
+import { createGraphTab } from "./graph/tab";
+import type { LinkIndex } from "./links/index";
 import type { FilePosition } from "./workspaces/layout";
 import { applyTextPosition, applyPdfPosition, captureTextPosition } from "./workspaces/positions";
 import { bindPreviewLinks } from "./links/follow";
@@ -50,6 +53,10 @@ import {
 } from "./preview-find";
 
 export type WindowHandlers = {
+  graphIndex?: LinkIndex;
+  onGraphOpen?: (windowId: string, path: string, newTab: boolean) => void;
+  onGraphFolder?: () => void;
+  onGraphNew?: () => void;
   livePreviewEnabled?: () => boolean;
   onStatusChange?: () => void;
   onWordCount?: (tabId: string, count: number) => void;
@@ -88,6 +95,10 @@ export type WindowHandlers = {
 };
 
 export type WindowView = {
+  showGraph: (mode?: "local" | "folder") => void;
+  hideGraph: () => void;
+  closeGraph: () => boolean;
+  graphActive: () => boolean;
   id: string;
   editor: EditorHandle;
   render: () => void;
@@ -233,6 +244,28 @@ export function createWindowView(
     h.onThemeChange(themeSelect.value as ThemeName);
   });
 
+  let graphShown = false;
+  let graphView: ReturnType<typeof createGraphView> | null = null;
+  const graphHost = document.createElement("div"); graphHost.className = "graph-tab-host"; graphHost.hidden = true; root.append(graphHost);
+  const graphTab = createGraphTab(root, () => showGraph(), () => { graphShown = true; closeGraph(); });
+  function hideGraph() { graphShown = false; graphHost.hidden = true; root.classList.remove("graph-active"); }
+  function closeGraph(): boolean {
+    if (!graphShown) return false;
+    hideGraph(); graphView?.destroy(); graphView = null; graphTab.destroy(); render(); editor.focus(); return true;
+  }
+  function showGraph(mode?: "local" | "folder") {
+    if (!h.graphIndex) return;
+    const w = getWindow(windowId), tab = w?.tabs.find(t => t.id === w.activeTabId);
+    const center = tab?.path && isMarkdownFile(tab.path) ? tab.path : null;
+    captureReadingPosition();
+    if (!graphView) graphView = createGraphView(graphHost, h.graphIndex, {
+      center, mode, open: (path, newTab) => h.onGraphOpen?.(windowId, path, newTab),
+      newNote: () => { hideGraph(); h.onGraphNew?.(); }, openFolder: () => h.onGraphFolder?.(),
+    });
+    else { graphView.setCenter(center); if (mode) graphView.setMode(mode); }
+    graphShown = true; graphHost.hidden = false; render();
+    graphHost.querySelector<HTMLElement>("select")?.focus();
+  }
   let lineNums = true;
   let focusedPane: "editor" | "preview" = "editor";
   let cursorLine = 1;
@@ -660,6 +693,10 @@ export function createWindowView(
       tab.append(dot, tabIcon, name, close);
       tabbarEl.appendChild(tab);
     }
+    if (graphView) {
+      const center = active?.path && isMarkdownFile(active.path) ? active.path : null;
+      graphView.setCenter(center); graphTab.render(tabbarEl, graphShown);
+    }
   }
 
   function renderPreview(
@@ -1056,6 +1093,7 @@ export function createWindowView(
   });
 
   return {
+    showGraph, hideGraph, closeGraph, graphActive: () => graphShown,
     id: windowId,
     activateDocument,
     captureReadingPosition,
@@ -1085,6 +1123,7 @@ export function createWindowView(
       editor.focus();
     },
     destroy: () => {
+      graphView?.destroy(); graphTab.destroy();
       captureReadingPosition();
       clearTimeout(cardTimer);
       positionGeneration += 1;
