@@ -43,6 +43,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Shortcut hints list modifiers in the standard macOS order (⌃⌥⇧⌘), e.g. ⇧⌘D instead of ⌘⇧D.
 - Search: the result count now matches the list when Files to include/exclude hide some results.
 - After linking a mention in an open note, Undo or closing the note without saving also removes it from "Linked from"; the list kept showing the undone link.
 - Unlinked mentions in the Links tab use the panel's styles: compact Line, Link and Skip buttons and a section heading matching the others; they showed as large unstyled buttons.

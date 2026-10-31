@@ -13,6 +13,6 @@ it("shows the first-run hint only for explicit fresh settings", () => {
 it("identifies visibly empty folders and displays resolved key hints", () => {
   expect(isFolderEmpty([], true)).toBe(true); expect(isFolderEmpty([{ name: ".DS_Store" }], false)).toBe(true);
   expect(isFolderEmpty([{ name: ".DS_Store" }], true)).toBe(false); expect(isFolderEmpty([{ name: "a.md" }], false)).toBe(false);
-  expect(keyHint("file.new", {})).toBe("⌘N"); expect(keyHint("file.new", { "file.new": "Cmd+Shift+K" })).toBe("⌘⇧K");
+  expect(keyHint("file.new", {})).toBe("⌘N"); expect(keyHint("file.new", { "file.new": "Cmd+Shift+K" })).toBe("⇧⌘K");
   expect(keyHint("file.new", { "file.new": "" })).toBe(""); expect(keyHint("unknown", {})).toBe("");
 });

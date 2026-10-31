@@ -68,7 +68,8 @@ describe("acceleratorFromEvent", () => {
 
 describe("formatAccelerator", () => {
   it("renders symbols", () => {
-    expect(formatAccelerator("CmdOrCtrl+Shift+N")).toBe("⌘⇧N");
+    expect(formatAccelerator("CmdOrCtrl+Shift+N")).toBe("⇧⌘N");
+    expect(formatAccelerator("CmdOrCtrl+Alt+Shift+Ctrl+V")).toBe("⌃⌥⇧⌘V");
     expect(formatAccelerator("CmdOrCtrl+Enter")).toBe("⌘↩");
     expect(formatAccelerator("")).toBe("—");
   });
