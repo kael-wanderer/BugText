@@ -148,7 +148,7 @@ link index builds lazily off-thread, refreshes changed notes and supplies the Li
 beside Outline (⇧⌥⌘O). Explorer rename/move offers a checked target-only review: open tabs
 receive one undoable edit; closed notes are compared with the scan, snapshotted in Recovery
 and written atomically inside the open folder. Settings ▸ Editing controls suggestions and
-whether to ask on rename. Hover cards in preview and Links use saved text from the link index without reads; `links.hoverPreview` controls them.
+whether to ask on rename. Hover cards in preview and Links use saved text from the link index without reads; `links.hoverPreview` controls them. Unlinked mentions scan the index in slices while expanded and use the rename writer and review sheet to create links.
 
 Markdown properties appear above the editor and edit only the active note’s YAML
 frontmatter through the normal dirty and undo path. Invalid YAML is read-only;
