@@ -95,6 +95,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Hover or focus a note link in the preview or Links tab to see a plain-text preview; Settings ▸ Editing can turn it off.
 - Focus mode (⌃⌘Z or Esc to exit) centers Markdown and text editing, with configurable column width and optional typewriter scrolling.
 - Empty Explorer and search states offer relevant actions, and a dismissible first-run hint helps new users start a note or open a folder.
 - Checklists: `- [ ]` items show as checkboxes in the preview. Clicking one (or Space

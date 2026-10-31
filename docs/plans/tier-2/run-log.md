@@ -46,3 +46,15 @@ Branch `feat/focus-zen` from `feat/empty-states` (`7b0fb88`). Base: 188 files, 1
 - `b53d94d` feat(focus): wire focus mode and typewriter into the app — 190 files, 1,010 tests; TypeScript passed. The captured view is restored only if its original tab and native window remain active, preventing a selection being applied to another document. Full native view-preservation and menu dispatch checks remain outstanding.
 
 Focus final checks: 190 frontend files, 1,010 tests; TypeScript and production build passed. The existing main-chunk warning remains (851.10 kB). Native checks are listed in focus-zen/results.md.
+
+## Link hover preview
+
+Branch `feat/link-hover-preview` from `feat/focus-zen` (`1c49da3`). Base: 190 files, 1,010 tests; TypeScript passed.
+- `76534ba` feat(links): hover excerpt and card state — 191 files, 1,012 tests; TypeScript passed.
+- `9830bfb` feat(links): hover card element and positioning — 192 files, 1,014 tests; TypeScript passed. The card uses delegated document events and weak element bindings to avoid retaining replaced preview rows.
+- `9fd8216` feat(links): hover previews in preview and Links tab — 193 files, 1,017 tests; TypeScript passed. The link index retains saved text separately because some existing workspace edits update the live index before saving; hover never reads files or displays those unsaved changes.
+- Existing `links.test.ts` expected the entire old settings object; its expected values gained the new default field, preserving all existing fallback assertions.
+- `052b7f4` feat(links): hover preview setting and wiring — 193 files, 1,021 tests; TypeScript passed. Disabling the setting removes document-level card listeners and restores native broken-link titles.
+- `af57ffa` fix(links): dismiss hover card when preview changes — 193 files, 1,022 tests; TypeScript passed.
+
+Hover final checks: 193 files, 1,022 tests; TypeScript and production build passed. The existing main-chunk warning remains (858.36 kB). Native checks: pointer timing and card movement in WKWebView, four window edges, setting and native tooltip, VoiceOver, tab switching, saved-only content.
