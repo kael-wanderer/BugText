@@ -267,6 +267,12 @@ the browser; the app never downloads or installs itself, so there is no updater
 plugin or signing key. Settings ▸ General offers Manual (no background checks) and
 Automatic (at most once per 24 hours).
 
+Source Control finds the installed Git executable like export tools and runs only explicit
+user actions, with Rust-built arguments and an environment allowlist; BugText does not handle
+credentials. Pull is fast-forward only; Merge is explicit and stops before commit or on
+conflicts. Recovery snapshots protect dirty tabs before worktree changes, followed by the
+Reload / Keep mine check. The Git log is redacted and kept only in memory.
+
 The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
 (started at 249). Raise it by one for every build handed out, even when the version
 is unchanged, and never reuse a number. `build.rs` bakes it in as `BUGTEXT_BUILD`

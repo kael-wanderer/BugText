@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.
 - The Links tab finds unlinked mentions and lets you review and link them, with Recovery snapshots for closed notes.
 - Large folders refresh less often while preserving open-file checks; Settings ▸ General controls the mode and performance diagnostics are available from the status bar and command palette.
 - A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to toggle reading time; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
