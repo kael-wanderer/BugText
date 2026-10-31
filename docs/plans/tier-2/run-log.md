@@ -58,3 +58,15 @@ Branch `feat/link-hover-preview` from `feat/focus-zen` (`1c49da3`). Base: 190 fi
 - `af57ffa` fix(links): dismiss hover card when preview changes — 193 files, 1,022 tests; TypeScript passed.
 
 Hover final checks: 193 files, 1,022 tests; TypeScript and production build passed. The existing main-chunk warning remains (858.36 kB). Native checks: pointer timing and card movement in WKWebView, four window edges, setting and native tooltip, VoiceOver, tab switching, saved-only content.
+
+## Unlinked mentions
+
+Branch `feat/unlinked-mentions` from `feat/link-hover-preview` (`86d341f`). Base: 193 files, 1,022 tests; TypeScript passed.
+- `551395a` feat(links): unlinked mention matching — 194 files, 1,025 tests; TypeScript passed. Mention records retain a reference to the source string, needed for the shared writer's stale-content check.
+- `7568724` feat(links): time-sliced mention scan — 195 files, 1,027 tests; TypeScript passed. Individual notes are processed atomically within each slice; responsiveness for unusually large notes remains a native check.
+- `8b16030` refactor(links): parameterise the link review sheet — 195 files, 1,028 tests; TypeScript passed.
+- `e6516ce` fix(links): reject traversal in reviewed edits — 195 files, 1,029 tests; TypeScript passed.
+- `95e9eff` feat(links): unlinked mentions section — 196 files, 1,032 tests; TypeScript passed.
+- `23fa641` feat(links): wire unlinked mentions into the Links tab — 197 files, 1,034 tests; TypeScript passed.
+
+Unlinked mentions final checks: 197 files, 1,034 tests; TypeScript and production build passed. Native checks: large-folder responsiveness, open-tab undo/dirty state, and Recovery entry after a closed-note link. A single unusually large note is processed atomically within a slice.
