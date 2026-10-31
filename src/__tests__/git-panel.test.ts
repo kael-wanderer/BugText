@@ -16,7 +16,7 @@ const result: GitActionResult = { outcome: "done", changed: [], log: [] };
 const diff: GitDiff = { lines: ["meta", "hunk", "add", "del", "ctx", "marker"].map(kind => ({ kind: kind as GitDiff["lines"][number]["kind"], text: hostile })), binary: false, truncated: false };
 const make = (status: GitStatus, action = vi.fn(async () => result)) => {
   const host = document.createElement("div");
-  const deps = { repo: vi.fn(async () => ({ in_repo: true, repo_name: "notes", subfolder: "" })), status: vi.fn(async () => status), diff: vi.fn(async () => diff), action, cancel: vi.fn(async () => {}) };
+  const deps = { repo: vi.fn(async () => ({ in_repo: true, repo_name: "notes", subfolder: "", root: "/repo" })), status: vi.fn(async () => status), diff: vi.fn(async () => diff), action, cancel: vi.fn(async () => {}) };
   const panel = createGitPanel(host, deps); panel.setFolder("/notes");
   return { host, panel, deps };
 };
@@ -28,7 +28,7 @@ describe("Git model", () => {
     const groups = groupEntries(base());
     expect([groups.conflicted.length, groups.changed.length, groups.new.length]).toEqual([1, 1, 1]);
     expect(aheadText(2, 1)).toBe("↑2 ↓1");
-    expect(scopeLine({ in_repo: true, repo_name: "notes", subfolder: "daily" })).toBe("Repository: notes (whole repository for pull and push)");
+    expect(scopeLine({ in_repo: true, repo_name: "notes", subfolder: "daily", root: "/notes" })).toBe("Repository: notes (whole repository for pull and push)");
   });
   it("requires a message and selection, disables conflicting and busy actions, and explains the upstream", () => {
     const s = base(); s.entries = s.entries.filter(e => e.group !== "conflicted");

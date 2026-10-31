@@ -1,5 +1,5 @@
 export interface GitDiagnostics { found: boolean; path: string; version: string; supported: boolean }
-export interface GitRepoInfo { in_repo: boolean; repo_name: string; subfolder: string }
+export interface GitRepoInfo { in_repo: boolean; repo_name: string; subfolder: string; root: string }
 export type GitGroup = "conflicted" | "changed" | "new";
 export interface GitEntry { path: string; orig_path: string | null; group: GitGroup; badge: "M" | "D" | "R" | "A" | "C" | "T" }
 export interface GitStatus { branch: string; upstream: string | null; ahead: number; behind: number; merging: boolean; entries: GitEntry[]; total: number }

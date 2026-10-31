@@ -1,7 +1,7 @@
 import "./git/git.css";
 import { gitRepo, gitStatus, gitDiff, gitAction, gitCancel } from "./git/api";
 import { createGitPanel, type GitPanelControl } from "./git/panel";
-import { runGitAction } from "./git/flow";
+import { gitRoots, runGitAction } from "./git/flow";
 import { gitPaletteItems } from "./git/palette";
 import type { GitRepoInfo } from "./git/model";
 import type { GuardDeps } from "./ai/agent-run-guard";
@@ -3277,9 +3277,7 @@ const gitPanel = createGitPanel(gitHost, {
   },
   diff: gitDiff,
   action: async req => {
-    const suffix = gitInfo?.subfolder;
-    const root = suffix ? req.folder.replace(/[\\/]$/, "").slice(0, -(suffix.length + 1)) || "/" : req.folder;
-    return runGitAction(req, root, {
+    return runGitAction(req, gitRoots(req.folder, gitInfo), {
       ...gitGuard,
       invoke: gitAction,
       save: async path => {
@@ -3298,6 +3296,10 @@ const gitPanel = createGitPanel(gitHost, {
   cancel: gitCancel,
   openFile: (folder, path) => { void doOpenPath(`${folder.replace(/[\\/]$/, "")}/${path}`); },
 });
+function toggleGit(): void {
+  if (settingsScreen.isOpen()) settingsScreen.close();
+  setGitActive(!document.body.classList.contains("git-active"));
+}
 async function refreshGitAvailability(): Promise<void> {
   const folder = getState().folder, generation = ++gitAvailabilityGeneration;
   gitInfo = null; gitAvailable = false; gitButton.hidden = true;
@@ -3366,7 +3368,7 @@ initActivityBar(
     setAIVisible(true);
   },
   openExportMenu,
-  () => { if (settingsScreen.isOpen()) settingsScreen.close(); setGitActive(!document.body.classList.contains("git-active")); },
+  toggleGit,
 );
 
 void refreshGitAvailability();
@@ -3712,7 +3714,7 @@ listenScoped<string>("menu", (event) => {
       showExplorerColumn(); applySidebarView(); outlineView.selectTab("links"); updateOutline(true);
       return;
     case "view.source_control":
-      settingsScreen.close(); setGitActive(!document.body.classList.contains("git-active")); return;
+      toggleGit(); return;
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
@@ -3801,7 +3803,7 @@ const appKeyActions: Record<string, () => void> = {
   "go.back": () => travelHistory("back"),
   "go.forward": () => travelHistory("forward"),
   "palette.open": () => palette.open(),
-  "view.source_control": () => setGitActive(!document.body.classList.contains("git-active")),
+  "view.source_control": () => toggleGit(),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
   "file.daily_note": () => void openDailyNote(),

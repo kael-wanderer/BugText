@@ -39,6 +39,8 @@ pub struct GitRepoInfo {
     in_repo: bool,
     repo_name: String,
     subfolder: String,
+    /// Canonical repository root; changed paths in action results are under it.
+    root: String,
 }
 fn call(repo: &Repo, args: Vec<OsString>) -> RunOutput {
     run(RunSpec {
@@ -106,11 +108,13 @@ pub async fn git_repo(req: GitFolder) -> Result<GitRepoInfo, GitError> {
                 .to_string_lossy()
                 .into_owned(),
             subfolder: repo.subfolder,
+            root: repo.root.to_string_lossy().into_owned(),
         }),
         Err("not_repo") => Ok(GitRepoInfo {
             in_repo: false,
             repo_name: String::new(),
             subfolder: String::new(),
+            root: String::new(),
         }),
         Err(e) => Err(e.into()),
     })
