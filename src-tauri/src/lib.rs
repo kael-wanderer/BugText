@@ -98,6 +98,8 @@ fn sync_view_menu(
     automatic_updates: bool,
     sync_scroll: bool,
     show_status_bar: bool,
+    typewriter: bool,
+    focus_mode: bool,
 ) {
     let set = |id: String, on: bool| {
         if let Some(item) = menu::find_check_item(&app, &id) {
@@ -122,13 +124,17 @@ fn sync_view_menu(
     set("help.automatic_updates".into(), automatic_updates);
     set("view.sync_scroll".into(), sync_scroll);
     set("view.status_bar".into(), show_status_bar);
+    set("view.typewriter".into(), typewriter);
+    set("view.focus_mode".into(), focus_mode);
 }
 
 #[tauri::command]
 fn set_accelerators(app: tauri::AppHandle, accelerators: HashMap<String, String>) {
     for (id, accel) in accelerators {
+        let value: Option<String> = if accel.is_empty() { None } else { Some(accel) };
         if let Some(item) = menu::find_normal_item(&app, &id) {
-            let value: Option<String> = if accel.is_empty() { None } else { Some(accel) };
+            let _ = item.set_accelerator(value);
+        } else if let Some(item) = menu::find_check_item(&app, &id) {
             let _ = item.set_accelerator(value);
         }
     }

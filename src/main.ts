@@ -2506,6 +2506,8 @@ function syncViewMenu(): void {
     automaticUpdates: currentSettings.updateMode === "auto",
     syncScroll: currentSettings.syncScroll,
     showStatusBar: currentSettings.showStatusBar,
+    typewriter: currentSettings.editor.typewriterScrolling,
+    focusMode: false,
   });
 }
 

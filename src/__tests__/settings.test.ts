@@ -200,3 +200,10 @@ it("round trips the large-folder setting and defaults invalid values", () => {
   expect(parseSettings(JSON.stringify({ performance: { largeFolders: "off" } })).performance.largeFolders).toBe("off");
   expect(parseSettings(JSON.stringify({ performance: { largeFolders: "bad" } })).performance.largeFolders).toBe("auto");
 });
+
+it("validates and round trips focus and typewriter settings", () => {
+  expect(parseSettings('{"focus":{"width":"invalid"},"editor":{"typewriterScrolling":"yes"}}').focus.width).toBe("standard");
+  expect(parseSettings('{"editor":{"typewriterScrolling":"yes"}}').editor.typewriterScrolling).toBe(false);
+  const settings = parseSettings('{"focus":{"width":"wide"},"editor":{"typewriterScrolling":true}}');
+  expect(parseSettings(JSON.stringify(settings)).focus.width).toBe("wide"); expect(parseSettings(JSON.stringify(settings)).editor.typewriterScrolling).toBe(true);
+});

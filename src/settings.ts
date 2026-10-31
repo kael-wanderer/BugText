@@ -82,12 +82,16 @@ export type Settings = {
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
   onboarding: { hintDismissed: boolean };
+  focus: { width: "narrow" | "standard" | "wide" };
+  editor: { typewriterScrolling: boolean };
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
   { id: "system", label: "System" }, ...THEME_CATALOG,
 ];
 const THEMES = THEME_OPTIONS.map((theme) => theme.id);
+
+export const FOCUS_WIDTHS = { narrow: 560, standard: 680, wide: 880 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {
   export: parsePresets(undefined),
@@ -117,6 +121,8 @@ export const DEFAULT_SETTINGS: Settings = {
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
   onboarding: { hintDismissed: true },
+  focus: { width: "standard" },
+  editor: { typewriterScrolling: false },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
@@ -173,6 +179,8 @@ function defaults(): Settings {
     templates: { ...DEFAULT_SETTINGS.templates },
     performance: { ...DEFAULT_SETTINGS.performance },
     onboarding: { ...DEFAULT_SETTINGS.onboarding },
+    focus: { ...DEFAULT_SETTINGS.focus },
+    editor: { ...DEFAULT_SETTINGS.editor },
     export: parsePresets(undefined),
   };
 }
@@ -309,6 +317,8 @@ export function parseSettings(raw: string): Settings {
     templates: parseTemplates(data.templates),
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
     onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
+    focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },
+    editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true },
   };
 }
 

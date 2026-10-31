@@ -143,3 +143,11 @@ describe("bookmark and navigation shortcuts", () => {
     }
   });
 });
+
+it("reserves distinct focus and typewriter shortcuts and matches Option by code", () => {
+  const shortcuts = KEYMAP_COMMANDS.filter(command => ["view.focus_mode", "view.typewriter"].includes(command.id)).map(command => command.default);
+  expect(shortcuts).toEqual(["Ctrl+Cmd+Z", "CmdOrCtrl+Alt+T"]);
+  for (const reserved of ["Ctrl+Cmd+F", "Ctrl+Cmd+D", "CmdOrCtrl+Alt+D", "CmdOrCtrl+H", "CmdOrCtrl+M", "CmdOrCtrl+Q"]) expect(shortcuts).not.toContain(reserved);
+  expect(conflictingIds({}).size).toBe(0);
+  expect(matchAccelerator(key({ key: "†", code: "KeyT", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+T")).toBe(true);
+});
