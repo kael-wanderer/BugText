@@ -81,6 +81,16 @@ describe("Git panel", () => {
     const activeMark = [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Mark resolved")!;
     expect(activeMark.disabled).toBe(false); activeMark.click(); expect(deps.action).toHaveBeenCalledWith(expect.objectContaining({ action: "resolve", paths: ["conflict.md"] }));
   });
+  it("keeps an action's error visible after the status refresh that follows it", async () => {
+    vi.useFakeTimers(); const s = base(); s.merging = true;
+    const action = vi.fn(async () => { throw { kind: "markers", log: [] }; });
+    const { host, deps } = make(s, action as never); await flush();
+    [...host.querySelectorAll<HTMLButtonElement>(".git-file-name")].find(b => b.textContent === "conflict.md")!.click(); await flush();
+    [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Mark resolved")!.click();
+    await flush(); await flush();
+    expect(deps.status.mock.calls.length).toBeGreaterThan(1);
+    expect(host.textContent).toContain(ERROR_TEXT.markers);
+  });
   it("invokes abort only when its conflict control is clicked", async () => {
     vi.useFakeTimers(); const s = base(); s.merging = true;
     const { host, deps } = make(s); await flush();

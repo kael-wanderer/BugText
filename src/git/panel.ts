@@ -138,7 +138,12 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
       if (action === "commit") box.message.value = "";
       await refresh();
       if (showMerge && token === generation) error.textContent = ERROR_TEXT.diverged;
-    } catch (e) { if (token === generation) { showError(e); void refresh(); } }
+    } catch (e) {
+      if (token !== generation) return;
+      // The status refresh clears stale errors, so show this one again once it finishes.
+      showError(e); const text = error.textContent;
+      void refresh().then(() => { if (token === generation && !busy) error.textContent = text; });
+    }
     finally { if (token === generation) { busy = false; request = null; updateControls(); } }
   }
   function setFolder(value: string | null) {
