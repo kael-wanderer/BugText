@@ -67,3 +67,15 @@ it("changes the hover-preview setting from Editing", async () => {
   const toggle = row.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
   toggle.checked = false; toggle.dispatchEvent(new Event("change")); expect(settings.links.hoverPreview).toBe(false);
 });
+
+it("keeps the other editor setting when toggling spelling and typewriter", async () => {
+  const { editingPage } = await import("../settings-screen/page-editing");
+  let settings = parseSettings('{}'); const host = document.createElement("div");
+  editingPage.render(host, { getSettings: () => settings, onSettingsChange: (next: Settings) => { settings = next; } } as unknown as ScreenDeps);
+  const typewriter = host.querySelector<HTMLInputElement>('[data-setting="typewriter-scrolling"] input')!;
+  const spelling = host.querySelector<HTMLInputElement>('[data-setting="spell-check"] input')!;
+  typewriter.checked = true; typewriter.dispatchEvent(new Event("change"));
+  expect(settings.editor).toEqual({ typewriterScrolling: true, spellCheck: true });
+  spelling.checked = false; spelling.dispatchEvent(new Event("change"));
+  expect(settings.editor).toEqual({ typewriterScrolling: true, spellCheck: false });
+});

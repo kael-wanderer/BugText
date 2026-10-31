@@ -2602,6 +2602,7 @@ function syncViewMenu(): void {
     syncScroll: currentSettings.syncScroll,
     showStatusBar: currentSettings.showStatusBar,
     typewriter: currentSettings.editor.typewriterScrolling,
+    spellCheck: currentSettings.editor.spellCheck,
     focusMode: focusMode.active(),
   });
 }
@@ -3676,7 +3677,8 @@ listenScoped<string>("menu", (event) => {
   }
   switch (id) {
     case "view.focus_mode": return focusMode.toggle();
-    case "view.typewriter": currentSettings = { ...currentSettings, editor: { typewriterScrolling: !currentSettings.editor.typewriterScrolling } }; persistCurrentSettings(); return;
+    case "edit.spell_check": currentSettings = { ...currentSettings, editor: { ...currentSettings.editor, spellCheck: !currentSettings.editor.spellCheck } }; persistCurrentSettings(); return;
+    case "view.typewriter": currentSettings = { ...currentSettings, editor: { ...currentSettings.editor, typewriterScrolling: !currentSettings.editor.typewriterScrolling } }; persistCurrentSettings(); return;
     case "file.add_bookmark": return void bookmarkActions.add();
     case "file.show_bookmarks": return bookmarkActions.show();
     case "go.back": return travelHistory("back");

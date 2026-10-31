@@ -35,6 +35,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "file.close_workspace", label: "Close Workspace", category: "File", default: "", scope: "menu" },
   { id: "file.recover", label: "Recover unsaved documents", category: "File", default: "", scope: "menu" },
   { id: "file.close", label: "Close Tab", category: "File", default: "CmdOrCtrl+W", scope: "menu" },
+  { id: "edit.spell_check", label: "Check Spelling While Typing", category: "Edit", default: "", scope: "menu" },
   { id: "edit.paste_plain", label: "Paste as Plain Text", category: "Edit", default: "CmdOrCtrl+Alt+Shift+V", scope: "menu" },
   { id: "edit.toggle_task", label: "Toggle Task", category: "Edit", default: "CmdOrCtrl+Shift+X", scope: "menu" },
   { id: "edit.extract_note", label: "Extract Selection to Note", category: "Edit", default: "", scope: "menu" },

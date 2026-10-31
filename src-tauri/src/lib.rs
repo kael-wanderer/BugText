@@ -116,6 +116,7 @@ fn sync_view_menu(
     sync_scroll: bool,
     show_status_bar: bool,
     typewriter: bool,
+    spell_check: bool,
     focus_mode: bool,
 ) {
     let set = |id: String, on: bool| {
@@ -142,6 +143,7 @@ fn sync_view_menu(
     set("view.sync_scroll".into(), sync_scroll);
     set("view.status_bar".into(), show_status_bar);
     set("view.typewriter".into(), typewriter);
+    set("edit.spell_check".into(), spell_check);
     set("view.focus_mode".into(), focus_mode);
 }
 

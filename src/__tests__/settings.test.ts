@@ -213,3 +213,11 @@ it("defaults hover previews on and preserves explicit false", () => {
   expect(parseSettings('{"links":{"hoverPreview":"no"}}').links.hoverPreview).toBe(true);
   const off = parseSettings('{"links":{"hoverPreview":false}}'); expect(parseSettings(JSON.stringify(off)).links.hoverPreview).toBe(false);
 });
+
+it("spell check defaults on and round trips", () => {
+  expect(parseSettings("{}").editor.spellCheck).toBe(true);
+  expect(parseSettings('{"editor":{"spellCheck":false}}').editor.spellCheck).toBe(false);
+  expect(parseSettings('{"editor":{"spellCheck":"no"}}').editor.spellCheck).toBe(true);
+  const settings = parseSettings('{"editor":{"spellCheck":false,"typewriterScrolling":true}}');
+  expect(parseSettings(JSON.stringify(settings)).editor).toEqual(settings.editor);
+});

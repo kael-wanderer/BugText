@@ -84,7 +84,7 @@ export type Settings = {
   performance: { largeFolders: "auto" | "off" };
   onboarding: { hintDismissed: boolean };
   focus: { width: "narrow" | "standard" | "wide" };
-  editor: { typewriterScrolling: boolean };
+  editor: { typewriterScrolling: boolean; spellCheck: boolean };
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -124,7 +124,7 @@ export const DEFAULT_SETTINGS: Settings = {
   performance: { largeFolders: "auto" },
   onboarding: { hintDismissed: true },
   focus: { width: "standard" },
-  editor: { typewriterScrolling: false },
+  editor: { typewriterScrolling: false, spellCheck: true },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
@@ -322,7 +322,7 @@ export function parseSettings(raw: string): Settings {
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
     onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
     focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },
-    editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true },
+    editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true, spellCheck: (data.editor as { spellCheck?: unknown } | undefined)?.spellCheck !== false },
   };
 }
 
