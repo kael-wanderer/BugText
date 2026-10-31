@@ -3592,3 +3592,12 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .first-run-card { pointer-events: auto; position: relative; max-width: 500px; padding: 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 .first-run-dismiss { position: absolute; right: 10px; top: 10px; }
 .first-run-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+body.focus-active #activitybar, body.focus-active #explorer, body.focus-active #outline-panel,
+body.focus-active #search-panel, body.focus-active #explorer-resize, body.focus-active #ai-resize,
+body.focus-active #ai-panel, body.focus-active .status-bar, body.focus-active .window-status,
+body.focus-active .editor-header, body.focus-active .format-toolbar, body.focus-active .properties-card,
+body.focus-active .pane-preview, body.focus-active .seam, body.focus-active .window:not(.active) { display: none !important; }
+body.focus-active .window.active .pane-editor { display: flex !important; }
+body.focus-active .window.active .cm-content { max-width: min(var(--focus-width, 680px), var(--guide-width, 100%)); margin-inline: auto; }
+.focus-exit { position: fixed; top: 12px; right: 16px; z-index: 50; }
+.focus-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 6px 12px; border-radius: 6px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
