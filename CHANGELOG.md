@@ -14,7 +14,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Folder-scoped bookmarks capture the current note and line, with a keyboard-accessible list and safe Missing states. Add Bookmark (⌥⌘B), Show Bookmarks (⇧⌥⌘B), and per-window Go Back / Go Forward (⌃⌘Left / Right) are available from the palette and native menus; note navigation retains up to 100 entries.
 - Read-only Table view from Filter and the command palette, with property columns, sorting, keyboard navigation and batches of 500 notes.
 
-- Open Daily Note (⌥⌘D) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.
+- Open Daily Note (⇧⌘D; ⌥⌘D is reserved by the macOS Dock) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.
 
 - New Tab (⌘T) creates an untitled document, the same as New File (⌘N).
 
