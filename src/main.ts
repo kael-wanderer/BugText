@@ -2128,6 +2128,7 @@ async function checkActiveForExternalChange(
 // mtime/size: a stale or failed stat used to leave a tab permanently stale, and
 // re-reading the handful of open files is cheap.
 async function refreshCleanOpenFilesFromDisk(): Promise<void> {
+  let changed = false;
   for (const windowState of getState().windows) {
     const view = views.get(windowState.id);
     if (!view) continue;
@@ -2154,6 +2155,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       cleanReloads.add(changeKey);
       try {
         view.editor.setTextFor(tab.id, text);
+        changed = true;
       } finally {
         cleanReloads.delete(changeKey);
       }
@@ -2164,7 +2166,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       }
     }
   }
-  renderAll();
+  if (changed) renderAll();
 }
 
 const refreshRunner = createRefreshRunner(async (kind, reason) => {
