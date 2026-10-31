@@ -277,3 +277,10 @@ The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
 (started at 249). Raise it by one for every build handed out, even when the version
 is unchanged, and never reuse a number. `build.rs` bakes it in as `BUGTEXT_BUILD`
 (the runtime config omits bundle settings) for Settings ▸ General and About.
+
+Spell checking uses the system `NSSpellChecker` through async Rust commands in
+`spell.rs`, with UTF-16 input limits. A CodeMirror field draws underlines for the
+viewport and a margin using a per-line cache; the editor element keeps
+`spellcheck="false"`. Suggestions appear in BugText's context menu. Ignore lasts
+until quit; Learn uses the macOS dictionary. `editor.spellCheck` and Edit ▸
+Check Spelling While Typing control the feature.
