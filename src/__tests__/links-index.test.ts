@@ -53,3 +53,42 @@ it("indexes properties and tags while retaining links on invalid YAML", () => {
   expect(invalid.links).toHaveLength(1);
   expect(invalid.headings).toHaveLength(1);
 });
+
+it("notifies only when refresh changes indexed content or skipped notes", async () => {
+  const a = parseNote("/r/a.md", "one");
+  let result: LinkScan = { notes: [a], stamps: { [a.path]: "1" }, skipped: [] };
+  const index = createLinkIndex(async () => result);
+  await index.ensure("/r");
+  let calls = 0; index.subscribe(() => calls++);
+  await index.refresh(); await index.refresh();
+  index.onFileChanged(a.path, "one"); index.onFileRemoved("/r/absent.md"); index.onFileChanged("/r/a.txt", "text");
+  expect(calls).toBe(0);
+  result = { ...result, notes: [parseNote(a.path, "two")] };
+  await index.refresh(); expect(calls).toBe(1);
+  result = { ...result, notes: [], skipped: ["/r/skipped.md"] };
+  await index.refresh(); expect(calls).toBe(2);
+});
+
+it("does not invalidate an in-flight scan for identical text", async () => {
+  let finish!: (result: LinkScan) => void;
+  let first = true;
+  const index = createLinkIndex(async () => first ? (first = false, { notes: [parseNote("/r/a.md", "old")], stamps: { "/r/a.md": "1" }, skipped: [] }) : new Promise(resolve => { finish = resolve; }));
+  await index.ensure("/r");
+  const refresh = index.refresh();
+  index.onFileChanged("/r/a.md", "old");
+  finish({ notes: [parseNote("/r/a.md", "new")], stamps: { "/r/a.md": "2" }, skipped: [] });
+  await refresh; expect(index.get("/r/a.md")?.source).toBe("new");
+});
+
+it("drops an old folder's refresh without notifying", async () => {
+  let finish!: (result: LinkScan) => void;
+  let calls = 0;
+  const index = createLinkIndex(async () => ++calls === 1 ? { notes: [], stamps: {}, skipped: [] } : new Promise(resolve => { finish = resolve; }));
+  await index.ensure("/a");
+  const refresh = index.refresh();
+  index.setFolder("/b");
+  let notifications = 0; index.subscribe(() => notifications++);
+  finish({ notes: [parseNote("/a/stale.md", "old")], stamps: { "/a/stale.md": "1" }, skipped: [] });
+  await refresh;
+  expect(notifications).toBe(0); expect(index.notes()).toEqual([]);
+});

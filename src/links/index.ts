@@ -75,6 +75,8 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   }
   function onFileChanged(path: string, text: string | null) {
     if (!contains(path)) return;
+    if (!/\.(md|markdown)$/i.test(path) && !notes.has(path)) return;
+    if (ready && (text === null ? !notes.has(path) : notes.get(path)?.source === text)) return;
     versions.set(path, (versions.get(path) ?? 0) + 1);
     if (building) pending.set(path, text);
     if (ready) { apply(path, text); notify(); }
@@ -98,10 +100,16 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         const result = await scan(folder, undefined, stamps);
         if (current !== generation) return;
         const next = result.stamps ?? {};
-        for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) notes.delete(path);
-        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) notes.set(note.path, withProperties(note));
-        for (const path of result.skipped) if (versions.get(path) === before.get(path)) notes.delete(path);
-        stamps = next; skipped = result.skipped; notify();
+        let changed = false;
+        for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
+        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path) && notes.get(note.path)?.source !== note.source) { notes.set(note.path, withProperties(note)); changed = true; }
+        for (const path of result.skipped) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
+        const nextSkipped = [...result.skipped].sort();
+        const previousSkipped = [...skipped].sort();
+        if (nextSkipped.length !== previousSkipped.length || nextSkipped.some((path, i) => path !== previousSkipped[i])) changed = true;
+        stamps = next; skipped = nextSkipped;
+        for (const path of versions.keys()) if (!(path in stamps)) versions.delete(path);
+        if (changed) notify();
       } finally { if (current === generation) refreshing = false; }
     },
     onFileRemoved: (path: string) => onFileChanged(path, null),
