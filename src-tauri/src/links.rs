@@ -343,12 +343,21 @@ fn scan(
     if full { result.removed = known.keys().filter(|path| !seen.contains(*path)).cloned().collect(); result.removed.sort(); }
     Ok(result)
 }
+fn expand_known(folder: &str, known: HashMap<String, String>) -> HashMap<String, String> {
+    known.into_iter().map(|(path, stamp)| {
+        let path = if Path::new(&path).is_absolute() { path } else { Path::new(folder).join(path).to_string_lossy().into_owned() };
+        (path, stamp)
+    }).collect()
+}
 #[tauri::command]
 pub async fn scan_note_links(
     folder: String,
     known: Option<HashMap<String, String>>,
 ) -> Result<Scan, String> {
-    tauri::async_runtime::spawn_blocking(move || scan(folder, None, known.unwrap_or_default()))
+    tauri::async_runtime::spawn_blocking(move || {
+        let known = expand_known(&folder, known.unwrap_or_default());
+        scan(folder, None, known)
+    })
         .await
         .map_err(|_| "Link scan failed")?
 }
@@ -393,6 +402,8 @@ mod tests {
             serde_json::to_vec(&first).unwrap().len(),
             serde_json::to_vec(&first.stamps).unwrap().len()
         );
+        let compact: std::collections::HashMap<_, _> = first.stamps.iter().map(|(path, stamp)| (std::path::Path::new(path).strip_prefix(&root).unwrap().to_string_lossy().into_owned(), stamp.clone())).collect();
+        println!("compact known bytes {}", serde_json::to_vec(&compact).unwrap().len());
         let start = std::time::Instant::now();
         let second = super::scan(root.to_string_lossy().into(), None, first.stamps).unwrap();
         println!(
@@ -402,6 +413,11 @@ mod tests {
             serde_json::to_vec(&second).unwrap().len()
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn expands_relative_known_paths() {
+        let known = super::expand_known("/notes", [("dir/a.md".into(), "3:1".into())].into_iter().collect());
+        assert_eq!(known.get("/notes/dir/a.md").map(String::as_str), Some("3:1"));
     }
     #[test]
     fn delta_scan_tracks_changes_removals_and_stamps() {

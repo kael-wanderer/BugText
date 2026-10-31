@@ -134,3 +134,8 @@ it("merges delta stamps, removes deleted notes and reports cap changes", async (
   result = { ...result, removed: [], capped: true };
   await index.refresh(); expect(index.capped).toBe(true); expect(calls).toBe(2);
 });
+
+it("compacts known paths for the scan request without changing stamp values", async () => {
+  const { compactKnown } = await import("../links/index");
+  expect(compactKnown("/long/folder/", { "/long/folder/a.md": "10:123", "/other/a.md": "2:4" })).toEqual({ "a.md": "10:123", "/other/a.md": "2:4" });
+});

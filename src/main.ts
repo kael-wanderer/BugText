@@ -25,7 +25,7 @@ import { parseNote, type IndexedNote } from "./links/index";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink } from "./links/follow";
-import { createLinkIndex, type LinkScan } from "./links/index";
+import { createLinkIndex, compactKnown, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
 import { createFrameCoalescer } from "./render-coalescer";
 import { createRefreshRunner, createFocusDeduper, decideLarge, tickKind, BASE_MS } from "./workspace-refresh";
@@ -199,11 +199,12 @@ const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.excl
 const diagnostics = createDiagnostics();
 const linkIndex = createLinkIndex(async (folder, paths, known) => {
   const start = performance.now();
-  const result = await invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known });
+  const compact = known && compactKnown(folder, known);
+  const result = await invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known: compact });
   const tick = diagnostics.current();
   if (tick) {
     tick.scanMs = performance.now() - start;
-    tick.sentBytes = Object.entries(known ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
+    tick.sentBytes = Object.entries(compact ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
     tick.receivedBytes = result.notes.reduce((n, note) => n + note.path.length + note.source.length + 16 + 32 * (note.links.length + note.headings.length), 0)
       + Object.entries(result.stamps ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
     tick.reread = result.notes.length;

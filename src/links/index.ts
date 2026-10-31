@@ -33,7 +33,11 @@ export function folderTags(index: LinkIndex): Map<string, { name: string; count:
   }
   return tags;
 }
-export function createLinkIndex(scan = (folder: string, paths?: string[], known?: Record<string, string>) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known })) {
+export function compactKnown(folder: string, known: Record<string, string> = {}): Record<string, string> {
+  const prefix = folder.replace(/\/$/, "") + "/";
+  return Object.fromEntries(Object.entries(known).map(([path, stamp]) => [path.startsWith(prefix) ? path.slice(prefix.length) : path, stamp]));
+}
+export function createLinkIndex(scan = (folder: string, paths?: string[], known?: Record<string, string>) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known: known && compactKnown(folder, known) })) {
   let folder: string | null = null;
   let generation = 0;
   let ready = false;
