@@ -4,21 +4,22 @@ import { transpile } from "typescript";
 import mainSource from "../main.ts?raw";
 import { KEYMAP_COMMANDS, matchAccelerator, resolveAccelerator } from "../keymap";
 import { dailyNotePlan } from "../notes/daily";
+import { escapeExitsFocus } from "../focus/rules";
 
 // Exercise the actual bootstrap listener and action binding without starting Tauri.
-function installShortcut(openDailyNote: () => void = vi.fn()) {
+function installShortcut(openDailyNote: () => void = vi.fn(), focus = { active: () => false, exit: () => {} }, overlay = () => false) {
   const start = mainSource.indexOf("const appKeyActions:");
   const end = mainSource.indexOf("\nfunction applyZoom", start);
   const add = vi.spyOn(window, "addEventListener");
   const noop = () => {};
   new Function("window", "resolvedAccel", "matchAccelerator", "openDailyNote",
-    "showActiveHistory", "snapshotActiveDocument", "newAIChat", transpile(mainSource.slice(start, end)))(
+    "showActiveHistory", "snapshotActiveDocument", "newAIChat", "focusMode", "escapeExitsFocus", "focusOverlayOpen", transpile(mainSource.slice(start, end)))(
     window,
     (id: string) => {
       const command = KEYMAP_COMMANDS.find(c => c.id === id);
       return command ? resolveAccelerator(command, {}) : "";
     },
-    matchAccelerator, openDailyNote, noop, noop, noop,
+    matchAccelerator, openDailyNote, noop, noop, noop, focus, escapeExitsFocus, overlay,
   );
   const listeners = [...add.mock.calls];
   add.mockRestore();
@@ -98,4 +99,14 @@ describe("daily note shortcut", () => {
       expect(doOpenPath).not.toHaveBeenCalled();
     } finally { cleanup(); }
   });
+});
+
+it("keeps focus while an overlay uses Escape and exits after it closes", () => {
+  let active = true, overlay = true; const exit = vi.fn(() => { active = false; });
+  const { cleanup } = installShortcut(vi.fn(), { active: () => active, exit }, () => overlay);
+  try {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); expect(exit).not.toHaveBeenCalled();
+    overlay = false; const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }); document.body.dispatchEvent(event);
+    expect(exit).toHaveBeenCalledOnce(); expect(event.defaultPrevented).toBe(true);
+  } finally { cleanup(); }
 });

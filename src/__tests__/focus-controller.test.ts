@@ -23,3 +23,15 @@ it("only exits on unmodified, unhandled Escape without an overlay", () => {
   expect(escapeExitsFocus(new KeyboardEvent("keydown", { key: "Escape" }), true)).toBe(false);
   const event = new KeyboardEvent("keydown", { key: "Escape", cancelable: true }); event.preventDefault(); expect(escapeExitsFocus(event, false)).toBe(false);
 });
+
+it("preserves editor state while toggling and never targets recovery UI", async () => {
+  const { EditorState } = await import("@codemirror/state");
+  const { history, undoDepth } = await import("@codemirror/commands");
+  let state = EditorState.create({ doc: "hello", extensions: [history()] });
+  state = state.update({ changes: { from: 5, insert: "!" }, selection: { anchor: 3 }, userEvent: "input.type" }).state;
+  const before = { text: state.doc.toString(), selection: state.selection.main.from, undo: undoDepth(state) };
+  const strip = document.createElement("div"); strip.className = "recovery-banner"; document.body.append(strip);
+  const focus = createFocusMode({ eligible: () => true, overlayOpen: () => false, captureView: () => ({ topLine: 1, selection: { from: 3, to: 3 } }), restoreView: () => {}, onChange: () => {}, toast: () => {}, exitHint: () => "⌃⌘Z" });
+  focus.toggle(); expect(getComputedStyle(strip).display).not.toBe("none"); focus.exit();
+  expect({ text: state.doc.toString(), selection: state.selection.main.from, undo: undoDepth(state) }).toEqual(before);
+});

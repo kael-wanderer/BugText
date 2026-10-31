@@ -3601,3 +3601,4 @@ body.focus-active .window.active .pane-editor { display: flex !important; }
 body.focus-active .window.active .cm-content { max-width: min(var(--focus-width, 680px), var(--guide-width, 100%)); margin-inline: auto; }
 .focus-exit { position: fixed; top: 12px; right: 16px; z-index: 50; }
 .focus-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 6px 12px; border-radius: 6px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; }

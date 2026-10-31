@@ -1,3 +1,5 @@
+import { createFocusMode } from "./focus/controller";
+import { isFocusEligible, escapeExitsFocus } from "./focus/rules";
 import { createFirstRunHint } from "./empty-states/first-run";
 import { createOnboarding } from "./empty-states/onboarding";
 import { shouldShowHint } from "./empty-states/rules";
@@ -117,6 +119,7 @@ import {
   FRESH_SETTINGS_JSON,
   normalizeThemeName,
   parseSettings,
+  FOCUS_WIDTHS,
   tryParseSettings,
   type ThemeName,
   type Settings,
@@ -377,6 +380,17 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 
 const views = new Map<string, WindowView>();
 const statusWordCounts = new Map<string, number>();
+let focusSource: { windowId: string; tabId: string } | null = null;
+function focusOverlayOpen(): boolean {
+  return document.body.classList.contains("settings-active") || !!document.querySelector('.recovery-scrim, [aria-modal="true"], #palette:not(.hidden), .preview-find:not(.hidden), .cm-search, .cm-tooltip-autocomplete');
+}
+const focusMode = createFocusMode({
+  eligible: () => { const tab = activeMeta(), view = views.get(getState().activeWindowId); return !!tab && !!view && isFocusEligible({ pathOrName: tab.path ?? tab.name, tableView: !!tab.tableView, graphActive: view.graphActive() }); },
+  overlayOpen: focusOverlayOpen,
+  captureView: () => { const view = activeView(), tab = activeMeta()!; focusSource = { windowId: getState().activeWindowId, tabId: tab.id }; const selection = view.editor.getSelection(); return { topLine: view.editor.visibleTopLine(), selection: { from: selection.from, to: selection.to } }; },
+  restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); editor.selectRange(snapshot.selection.from, snapshot.selection.to); editor.scrollLineToTop(snapshot.topLine); }); },
+  onChange: () => { requestWindowMeasure(); syncViewMenu(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
+});
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();
@@ -399,6 +413,7 @@ function refreshStatusBar(): void {
     recovered: tab ? recoveredDraftIds.has(tab.id) : false,
     largeFolder,
   });
+  focusMode.sync();
 }
 
 function editorForTab(id: string): WindowView["editor"] {
@@ -781,8 +796,8 @@ function commandItems(): PaletteItem[] {
     command("editor", "View: Editor", () => setMode(activeWindowId(), "editor")),
     command("read", "View: Read", () => setMode(activeWindowId(), "preview")),
     command("perf.diagnostics", "Workspace: Show Performance Diagnostics", () => { settingsScreen.close(); openDiagnostics(); }),
-    command("view.graph", "Graph: Open Local Graph", () => { settingsScreen.close(); activeView().showGraph("local"); }),
-    command("view.folder_graph", "Graph: Open Folder Graph", () => { settingsScreen.close(); activeView().showGraph("folder"); }),
+    command("view.graph", "Graph: Open Local Graph", () => { focusMode.exit(); settingsScreen.close(); activeView().showGraph("local"); }),
+    command("view.folder_graph", "Graph: Open Folder Graph", () => { focusMode.exit(); settingsScreen.close(); activeView().showGraph("folder"); }),
     command("softwrap", "Cycle Soft Wrap", cycleSoftWrap),
     command("lines", "Toggle Line Numbers", toggleLineNumbers),
     command("sub", "Toggle Sub Window", () => void toggleSub()),
@@ -1173,6 +1188,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   const v = createWindowView(windowsHost, windowId, isMain, handlers);
   v.setLineNumbersFlag(ui.lineNumbers);
   v.editor.setSoftWrapMode(currentSettings.softWrapMode, currentSettings.wrapColumn);
+  v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
   v.editor.setLineNumbers(ui.lineNumbers);
   views.set(windowId, v);
   return v;
@@ -1180,6 +1196,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 
 const tableSurfaces = new Map<HTMLElement, ReturnType<typeof createTableSurface>>();
 async function showTableView(): Promise<void> {
+  focusMode.exit();
   settingsScreen.close();
   const w = activeWindow();
   const existing = w.tabs.find(tab => tab.tableView);
@@ -2488,7 +2505,11 @@ function resolvedAccel(id: string): string {
 
 function applySoftWrap(): void {
   document.body.dataset.wrap = currentSettings.softWrapMode;
+  document.body.style.setProperty("--focus-width", `${FOCUS_WIDTHS[currentSettings.focus.width]}px`);
+  if (currentSettings.softWrapMode === "guide") document.body.style.setProperty("--guide-width", `${currentSettings.wrapColumn}ch`);
+  else document.body.style.removeProperty("--guide-width");
   for (const v of views.values()) {
+    v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
     v.editor.setSoftWrapMode(
       currentSettings.softWrapMode,
       currentSettings.wrapColumn,
@@ -2507,12 +2528,13 @@ function syncViewMenu(): void {
     syncScroll: currentSettings.syncScroll,
     showStatusBar: currentSettings.showStatusBar,
     typewriter: currentSettings.editor.typewriterScrolling,
-    focusMode: false,
+    focusMode: focusMode.active(),
   });
 }
 
 function persistCurrentSettings(): void {
   applySettings(currentSettings);
+  applySoftWrap();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   requestWindowMeasure();
@@ -3455,7 +3477,7 @@ window.addEventListener("focus", refreshOnFocus);
 // focus, so listen on the native window too.
 void currentNativeWindow?.onFocusChanged(({ payload: focused }) => {
   nativeFocused = focused;
-  if (focused) refreshOnFocus();
+  if (focused) { syncViewMenu(); refreshOnFocus(); }
 });
 
 window.setInterval(() => {
@@ -3505,6 +3527,8 @@ listenScoped<string>("menu", (event) => {
     return setMenuTheme(id.slice("view.theme.".length));
   }
   switch (id) {
+    case "view.focus_mode": return focusMode.toggle();
+    case "view.typewriter": currentSettings = { ...currentSettings, editor: { typewriterScrolling: !currentSettings.editor.typewriterScrolling } }; persistCurrentSettings(); return;
     case "file.add_bookmark": return void bookmarkActions.add();
     case "file.show_bookmarks": return bookmarkActions.show();
     case "go.back": return travelHistory("back");
@@ -3673,6 +3697,7 @@ const appKeyActions: Record<string, () => void> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  if (focusMode.active() && escapeExitsFocus(e, focusOverlayOpen())) { focusMode.exit(); e.preventDefault(); return; }
   const target = e.target as HTMLElement | null;
   if (!target?.closest("input, textarea, select, [contenteditable=true]")) {
     for (const [id, command] of [["pdf.copy_quote", "copy"], ["pdf.annotations", "panel"]] as const) {
