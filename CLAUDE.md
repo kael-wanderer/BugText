@@ -167,6 +167,8 @@ Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
 
+Workspace refreshes use a single-flight runner. Open tabs are checked every 3 seconds; automatic large-folder mode starts at 2,000 Markdown notes or the walk cap, ends below 1,800, and checks the folder every 10 seconds while focused. Unfocused large windows skip folder walks until focus. Link scans return deltas, `read_file_bytes` transfers raw bytes, and performance diagnostics remain in memory only.
+
 The Search panel’s Replace row previews folder-wide text changes with include/exclude globs and regex groups. Rust `replace_preview` confines paths and limits previews to 5,000 matches in 1,000 files. Open tabs change as unsaved edits; closed files receive Recovery snapshots and `write_file_atomic` checks. Undo replace checks current contents and applies inverse edits or Recovery-protected atomic writes.
 
 Saved actions live in `<app config dir>/ai-actions.json` v1 and run from the palette,

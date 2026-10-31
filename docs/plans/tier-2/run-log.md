@@ -1,0 +1,27 @@
+# Tier 2 run log
+
+## S8 large workspace
+
+Branch: `feat/s8-large-workspace` from `main`.
+
+- `bff6b68` test(perf): large-folder fixture, baselines and diagnostics counters — frontend: 178 files, 967 tests; TypeScript passed; Rust: 147 passed, 1 ignored; clippy passed. Ignored benchmark passed. Baseline numbers are in large-workspace/results.md.
+- `f3d4f21` perf(links): notify only when the index changes — frontend: 178 files, 970 tests; TypeScript passed.
+
+Next: task 3, coalesced rendering and backlinks cache. Task 2's version-map pruning is implemented but lacks a direct size assertion; add coverage before considering that acceptance item verified. Native checks have not been run.
+
+Choices: fixture data uses deterministic synthetic text. No later plan has started.
+
+- `6d0ab5f` test(links): cover version-map pruning — 178 files, 971 tests; TypeScript passed.
+- `0567b0c` perf(render): coalesce index renders and cache backlinks — 179 files, 975 tests; TypeScript passed. Graph snapshots are sorted by path because editing can change map insertion order without changing the graph.
+- `69af80c` perf(refresh): single-flight refresh and quiet explorer — 181 files, 979 tests; TypeScript passed.
+- `c8804d5` perf(rust): async file commands and delta link scan — 181 files, 980 tests; TypeScript passed; Rust 149 passed, 1 ignored; clippy passed. Unchanged scan reads files to preserve complete invalid-UTF-8 and unreadable-file reporting; payload and timing recorded in results. Request-size acceptance remains unmet (75% of baseline).
+- `3a32c6e` perf(pdf): transfer file bytes as raw binary — 182 files, 982 tests; TypeScript passed; Rust 150 passed, 1 ignored; clippy passed.
+- `414c7be` perf(ai): rebuild workspace index lazily — 183 files, 983 tests; TypeScript passed. Chat panel mock gained the new chunk-count field.
+- `6e0bb91` feat(perf): large-folder mode — 183 files, 986 tests; TypeScript passed. The fake-timer scheduling test uses a simulated tab reader; real two-window behavior still needs native verification.
+- `1411c6c` feat(perf): large-folder status, cap notice and diagnostics sheet — 184 files, 991 tests; TypeScript passed.
+- `fa620bc` fix(perf): compact link scan request paths — 184 files, 992 tests; TypeScript passed; Rust 151 passed, 1 ignored; clippy passed. Folder-relative paths reduce fixture request to 102,391 bytes (32% of baseline).
+- `67f8586` fix(perf): avoid renders for unchanged open tabs — 184 files, 992 tests; TypeScript passed.
+
+S8 final checks: 184 frontend files, 992 tests passed; TypeScript passed. Rust: 151 passed, 1 ignored; clippy passed. Production build passed. The main chunk warning already existed on `main` (835.94 kB baseline, 842.92 kB after S8); no new warning category was introduced.
+
+Native S8 checks: 20 idle ticks and 5 ms JS budget; exactly one render per external edit and one full refresh on focus; two real windows and 3 s clean-tab reload; typing scan/backlink counts and p95; 50 MB PDF first-page timing; Off mode, dirty tabs, and 300 notes with cap notice. Pre-change native idle/PDF timings were not captured, so the relative timing target cannot be verified from this run. The unchanged link scan reads all candidate note files to preserve unreadable/invalid-UTF-8 reporting; this raises its measured disk time even though its response is small. The simulated timer test does not exercise the real native windows.

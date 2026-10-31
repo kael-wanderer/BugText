@@ -7,21 +7,15 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
-
+- Large folders refresh less often while preserving open-file checks; Settings ▸ General controls the mode and performance diagnostics are available from the status bar and command palette.
 - A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to toggle reading time; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
 - Graph view tabs from the command palette: local links and backlinks at depth 1 or 2, folder graphs capped at the 500 most-linked notes, folder/orphan filters, missing targets, keyboard navigation and zoom. Layout runs in a Web Worker with a fixed 300-step budget.
-
 - Folder-scoped bookmarks capture the current note and line, with a keyboard-accessible list and safe Missing states. Add Bookmark (⌥⌘B), Show Bookmarks (⇧⌥⌘B), and per-window Go Back / Go Forward (⌃⌘Left / Right) are available from the palette and native menus; note navigation retains up to 100 entries.
 - Read-only Table view from Filter and the command palette, with property columns, sorting, keyboard navigation and batches of 500 notes.
-
 - Open Daily Note (⇧⌘D; ⌥⌘D is reserved by the macOS Dock) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.
-
 - New Tab (⌘T) creates an untitled document, the same as New File (⌘N).
-
 - Filter sidebar (⇧⌥⌘F) and folder search operators for tags, properties, paths and dates.
-
 - A properties card above Markdown notes shows and edits frontmatter values, with parse errors shown safely. Tags are indexed from frontmatter and inline `#tag` text.
-
 - PDF highlights and comments, an annotations panel, linked Copy Quote and Markdown export to notes or the clipboard.
 - Replace in Folder (⌥⌘F) previews selected text changes, supports include/exclude globs and regex groups, and offers Recovery-backed undo.
 - PDF and Word export presets, with a pre-export sheet checking tools, fonts and missing images; manage presets and tool diagnostics in Settings ▸ Export.
@@ -47,10 +41,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
-
 - Reduced large-folder refresh request size by sending note paths relative to the open folder.
 - Avoided redundant workbench renders while unchanged open files are checked.
-
+- Reduced repeated folder refresh, backlink, graph layout and AI index work; file reads run off the native main thread and PDFs transfer as raw bytes.
 - The window footer no longer repeats the word count and cursor position while the status bar is shown. Turning the status bar off restores them in the footer.
 - Saved view "Update selected" saves the current filter under the selected view's own name, even when the View name field is empty. The "Enter a view name." message now appears beside the save buttons instead of below the list.
 - The command palette input no longer capitalizes the first letter of the query (typing `alpha` showed `Alpha`), and no longer applies autocorrect.
