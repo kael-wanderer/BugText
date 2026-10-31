@@ -1,3 +1,6 @@
+import { suggestSpelling, ignoreSpelling, learnSpelling } from "./spell/api";
+import { spellMenuItems, replaceMisspelling } from "./spell/menu";
+import { spellCache } from "./spell/cache";
 import "./git/git.css";
 import { gitRepo, gitStatus, gitDiff, gitAction, gitCancel } from "./git/api";
 import { createGitPanel, type GitPanelControl } from "./git/panel";
@@ -414,6 +417,10 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 }
 
 const views = new Map<string, WindowView>();
+function refreshAllSpelling(): void { spellCache.clear(); for (const view of views.values()) view.editor.refreshSpelling(); }
+function spellRefreshAll(): void { refreshAllSpelling(); void emit("bugtext://spell-changed").catch(() => {}); }
+void listen("bugtext://spell-changed", refreshAllSpelling);
+
 const statusWordCounts = new Map<string, number>();
 let focusSource: { windowId: string; tabId: string } | null = null;
 function focusOverlayOpen(): boolean {
@@ -992,7 +999,7 @@ const handlers = {
   },
   onThemeChange: (theme: ThemeName) => setMenuTheme(theme),
   getTheme: () => currentSettings.theme,
-  onEditorContextMenu: (wid: string, x: number, y: number) => {
+  onEditorContextMenu: async (wid: string, x: number, y: number) => {
     if (getState().activeWindowId !== wid) {
       const tab = getWindow(wid)?.tabs.find(tab => tab.id === getWindow(wid)?.activeTabId);
       if (tab?.path && !isPdfFile(tab.path)) {
@@ -1002,8 +1009,19 @@ const handlers = {
       setState({ activeWindowId: wid });
       renderAll();
     }
-    const table = activeView().editor.tableContext();
+    const editor = views.get(wid)!.editor;
+    const tabId = getWindow(wid)?.activeTabId;
+    const hit = currentSettings.editor.spellCheck ? editor.misspellingAtPoint(x, y) : null;
+    const suggestions = hit ? await suggestSpelling(hit.word) : [];
+    if (getWindow(wid)?.activeTabId !== tabId) return;
+    const spelling = hit && tabId && currentSettings.editor.spellCheck ? spellMenuItems(hit.word, suggestions, {
+      replace: text => { if (getWindow(wid)?.activeTabId === tabId) replaceMisspelling(editor, tabId, hit, text); },
+      ignore: () => { void ignoreSpelling(hit.word).then(ok => { if (ok) spellRefreshAll(); }); },
+      learn: () => { void learnSpelling(hit.word).then(ok => { if (ok) spellRefreshAll(); }); },
+    }) : [];
+    const table = editor.tableContext();
     showContextMenu(x, y, [
+      ...spelling,
       {
         label: "AI",
         children: availableActions().flatMap((action, index, all) => [

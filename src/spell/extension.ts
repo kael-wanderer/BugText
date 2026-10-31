@@ -64,8 +64,10 @@ export function spellExtension(kind: "markdown" | "plain", checker: (text: strin
         pending.push({ text: line, offset: size }); seen.add(line); size += line.length;
       }
       if (pending.length) {
+        const cacheVersion = spellCache.version();
         try {
           const ranges = await checker(pending.map(item => item.text).join("\n"));
+          if (cacheVersion !== spellCache.version()) return;
           for (const item of pending) spellCache.set(item.text, ranges.filter(([start, length]) => start >= item.offset && length > 0 && start + length <= item.offset + item.text.length).map(([start, length]) => [start - item.offset, length]));
         } catch { return; }
       }

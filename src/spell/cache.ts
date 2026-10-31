@@ -2,6 +2,7 @@ export type SpellRange = [number, number];
 
 export function createLineCache(limit = 5000) {
   const entries = new Map<string, SpellRange[]>();
+  let generation = 0;
   return {
     get(line: string): SpellRange[] | undefined {
       const value = entries.get(line);
@@ -13,7 +14,8 @@ export function createLineCache(limit = 5000) {
       entries.set(line, ranges);
       if (entries.size > limit) entries.delete(entries.keys().next().value!);
     },
-    clear(): void { entries.clear(); },
+    version(): number { return generation; },
+    clear(): void { entries.clear(); generation++; },
   };
 }
 

@@ -38,3 +38,12 @@ it("checks only changed lines in a large document and tolerates rejection", asyn
   const other = new EditorView({ state: EditorState.create({ doc: "recieve", extensions: spellExtension("plain", reject) }), parent: document.body });
   await tick(); expect(other.dom.querySelector(".cm-misspelled")).toBeNull(); other.destroy();
 });
+
+it("does not repopulate a cleared cache with an in-flight result", async () => {
+  vi.useFakeTimers();
+  let finish!: (ranges: [number, number][]) => void;
+  const delayed = vi.fn(() => new Promise<[number, number][]>(resolve => { finish = resolve; }));
+  const view = new EditorView({ state: EditorState.create({ doc: "recieve", extensions: spellExtension("plain", delayed) }), parent: document.body });
+  await tick(); spellCache.clear(); finish([[0, 7]]); await Promise.resolve();
+  expect(spellCache.get("recieve")).toBeUndefined(); expect(view.dom.querySelector(".cm-misspelled")).toBeNull(); view.destroy();
+});
