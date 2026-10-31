@@ -3600,6 +3600,10 @@ body.focus-active .pane-preview, body.focus-active .seam, body.focus-active .win
 body.focus-active .window.active .pane-editor { display: flex !important; }
 body.focus-active .window.active .cm-content { max-width: min(var(--focus-width, 680px), var(--guide-width, 100%)); margin-inline: auto; }
 .focus-exit { position: fixed; top: 12px; right: 16px; z-index: 50; }
+/* The text column is centered, so a gutter at the window edge would float far from it. */
+body.focus-active .window.active .cm-gutters { display: none; }
+/* Keep the recovery strip's own buttons clear of Exit Focus. */
+body.focus-active .recovery-banner { padding-right: 132px; }
 .focus-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 6px 12px; border-radius: 6px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; }
 .link-hover-card { position: fixed; z-index: 1001; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); color: var(--text); box-shadow: 0 8px 24px #0005; }
