@@ -1,5 +1,5 @@
 import { newAction } from "./api";
-import { createCommitBox } from "./commit-box";
+import { createCommitBox, createSaveAndCommitSheet } from "./commit-box";
 import { renderConflictBanner } from "./conflict-banner";
 import { renderGitDiff } from "./diff-view";
 import { createGitLog } from "./log";
@@ -11,7 +11,7 @@ export interface GitPanelDeps {
   status(folder: string): Promise<GitStatus>;
   diff(folder: string, path: string): Promise<GitDiff>;
   // The caller owns the Recovery and save checks around worktree-changing actions.
-  action(req: GitActionRequest): Promise<GitActionResult>;
+  action(req: GitActionRequest): Promise<GitActionResult | null>;
   cancel(requestId: string): Promise<void>;
   openFile?(folder: string, path: string): void;
 }
@@ -127,7 +127,9 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     const req = newAction(origin, action, actionPaths, action === "commit" ? box.message.value : null);
     request = req; busy = true; error.textContent = ""; updateControls();
     try {
-      const result = await deps.action(req); log.add(result.log);
+      const result = await deps.action(req);
+      if (!result) return;
+      log.add(result.log);
       if (token !== generation) return;
       if (action === "fetch" || action === "pull") fetchedAt = new Date();
       showMerge = result.outcome === "diverged";
@@ -147,6 +149,14 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     if (control === "log") { log.show(host); return; }
     ({ commit: box.message, pull, push, fetch })[control].focus();
   }
+  function confirmSave(count: number): Promise<boolean> {
+    return new Promise(resolve => {
+      const sheet = createSaveAndCommitSheet(count, () => finish(true), () => finish(false));
+      function finish(accepted: boolean) { sheet.remove(); resolve(accepted); }
+      host.append(sheet);
+      sheet.querySelector<HTMLButtonElement>("button")?.focus();
+    });
+  }
   render();
-  return { refresh, setFolder, focus };
+  return { refresh, setFolder, focus, confirmSave };
 }
