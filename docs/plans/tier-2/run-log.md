@@ -70,3 +70,12 @@ Branch `feat/unlinked-mentions` from `feat/link-hover-preview` (`86d341f`). Base
 - `23fa641` feat(links): wire unlinked mentions into the Links tab — 197 files, 1,034 tests; TypeScript passed.
 
 Unlinked mentions final checks: 197 files, 1,034 tests; TypeScript and production build passed. Native checks: large-folder responsiveness, open-tab undo/dirty state, and Recovery entry after a closed-note link. A single unusually large note is processed atomically within a slice.
+- `d44b1f6` docs: describe unlinked mention workflow — updates the local architecture guide omitted from the first docs commit.
+
+## Git backup and sync
+
+Branch `feat/s9-git-sync` from `feat/unlinked-mentions` (`d44b1f6`). Base: 197 files, 1,034 tests; TypeScript passed.
+- `d4987ad` feat(git): locate git and run it safely — 197 files, 1,034 tests; TypeScript passed; Rust 155 passed, 1 ignored; clippy passed. Process-group grandchild and inherited hostile-environment integration tests remain to be added.
+- `b94afdc` test(git): cover timeout and cancellation — Rust 156 passed, 1 ignored; clippy passed; frontend 197 files, 1,034 tests; TypeScript passed. Timeout and cancellation are exercised against a local stalled HTTP listener.
+- `ea1f162` feat(git): add argument and status parsers — partial Task 2 only; frontend 197 files, 1,034 tests; TypeScript passed; Rust 159 passed, 1 ignored; clippy passed. Repository resolution, confined paths, status/diff commands and the remaining Task 2 tests are still required. Do not treat Task 2 as complete.
+- `5d6a50f` feat(git): confine repository paths — partial Task 2; frontend 197 files, 1,034 tests; TypeScript passed; Rust 160 passed, 1 ignored; clippy passed. Status and diff commands, integration fixtures, and remaining tests are not yet implemented.
