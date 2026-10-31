@@ -6,7 +6,7 @@ import { gitPaletteItems } from "./git/palette";
 import type { GitRepoInfo } from "./git/model";
 import type { GuardDeps } from "./ai/agent-run-guard";
 import { createFocusMode } from "./focus/controller";
-import { isFocusEligible, escapeExitsFocus } from "./focus/rules";
+import { isFocusEligible, escapeExitsFocus, focusExitScroll } from "./focus/rules";
 import { createFirstRunHint } from "./empty-states/first-run";
 import { createOnboarding } from "./empty-states/onboarding";
 import { shouldShowHint } from "./empty-states/rules";
@@ -422,7 +422,7 @@ const focusMode = createFocusMode({
   eligible: () => { const tab = activeMeta(), view = views.get(getState().activeWindowId); return !!tab && !!view && isFocusEligible({ pathOrName: tab.path ?? tab.name, tableView: !!tab.tableView, graphActive: view.graphActive() }); },
   overlayOpen: focusOverlayOpen,
   captureView: () => { const view = activeView(), tab = activeMeta()!; focusSource = { windowId: getState().activeWindowId, tabId: tab.id }; const selection = view.editor.getSelection(); return { topLine: view.editor.visibleTopLine(), selection: { from: selection.from, to: selection.to } }; },
-  restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); editor.selectRange(snapshot.selection.from, snapshot.selection.to); editor.scrollLineToTop(snapshot.topLine); }); },
+  restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
   onChange: () => { requestWindowMeasure(); syncViewMenu(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
 });
 const statusBar = createStatusBar(document.getElementById("app")!, () => {

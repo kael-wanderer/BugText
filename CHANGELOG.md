@@ -43,6 +43,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Leaving Focus mode keeps the cursor and selection where they are; it no longer moves the cursor to the top visible line or back to where it was on entry.
 - Choosing Keep mine when a file changed on disk no longer asks again each time the window regains focus; it asks again only if the file changes once more.
 - Source Control checks dirty files inside selected untracked folders before committing.
 - Reduced large-folder refresh request size by sending note paths relative to the open folder.

@@ -35,3 +35,10 @@ it("preserves editor state while toggling and never targets recovery UI", async 
   focus.toggle(); expect(getComputedStyle(strip).display).not.toBe("none"); focus.exit();
   expect({ text: state.doc.toString(), selection: state.selection.main.from, undo: undoDepth(state) }).toEqual(before);
 });
+it("keeps the caret on exit and restores scroll only when the caret did not move", async () => {
+  const { focusExitScroll } = await import("../focus/rules");
+  const saved = { topLine: 12, selection: { from: 30, to: 59 } };
+  expect(focusExitScroll(saved, { from: 30, to: 59 })).toBe(12);
+  expect(focusExitScroll(saved, { from: 59, to: 59 })).toBeNull();
+  expect(focusExitScroll(saved, { from: 200, to: 200 })).toBeNull();
+});

@@ -92,6 +92,8 @@ export type EditorHandle = {
   openGoToLine(): void;
   cursorPosition(): CursorPosition;
   scrollLineToTop(line: number, cursor?: boolean): void;
+  /** Scrolls the caret into view without moving it. */
+  scrollCaretIntoView(): void;
   visibleTopLine(): number;
   onScroll(callback: () => void): void;
   /** Toggle Task on every line touched by the selection; one undo step. */
@@ -546,6 +548,9 @@ export function createEditor(
       const info = view.state.doc.line(Math.min(Math.max(Math.round(line), 1), view.state.doc.lines));
       view.dispatch({ ...(cursor ? { selection: { anchor: info.from } } : {}), effects: EditorView.scrollIntoView(info.from, { y: "start" }) });
       if (cursor) view.focus();
+    },
+    scrollCaretIntoView() {
+      view.dispatch({ effects: EditorView.scrollIntoView(view.state.selection.main.head, { y: "nearest" }) });
     },
     visibleTopLine() {
       const block = view.lineBlockAtHeight(view.scrollDOM.scrollTop);
