@@ -37,6 +37,5 @@ export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: (
     }
     if (index.skipped.length) host.append(node("p", `Skipped ${index.skipped.length} note${index.skipped.length === 1 ? "" : "s"} (unreadable or over 2 MB).`, "link-panel-note"));
   }
-  index.subscribe(render);
   return { render, async show(on: boolean) { active = on; host.hidden = !on; if (on) { render(); try { await index.ensure(); render(); } catch { host.replaceChildren(node("p", "Could not index notes.", "outline-empty")); } } } };
 }

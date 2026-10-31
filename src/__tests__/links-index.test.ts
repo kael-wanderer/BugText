@@ -113,3 +113,14 @@ it("prunes version entries when their stamps disappear", async () => {
     expect(versions?.has(path)).toBe(false);
   } finally { spy.mockRestore(); }
 });
+
+it("caches the same backlinks as a full scan and invalidates on edits", async () => {
+  const notes = [parseNote("/r/a.md", "[b](b.md)\n[b again](b.md)"), parseNote("/r/b.md", "[a](a.md)"), parseNote("/r/c.md", "[b](b.md)")];
+  const index = createLinkIndex(async () => ({ notes, skipped: [] }));
+  await index.ensure("/r");
+  const old = (path: string) => index.notes().flatMap(note => index.outgoing(note.path).filter(link => link.resolved.kind === "note" && link.resolved.path === path).map(link => ({ ...link, path: note.path, context: note.source.split("\n")[link.line - 1] ?? "" })));
+  expect(index.backlinks("/r/b.md")).toEqual(old("/r/b.md"));
+  index.onFileChanged("/r/c.md", "[a](a.md)");
+  expect(index.backlinks("/r/b.md")).toEqual(old("/r/b.md"));
+  expect(index.backlinks("/r/a.md")).toEqual(old("/r/a.md"));
+});

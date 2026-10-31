@@ -20,3 +20,14 @@ it("measures a large folder refresh, backlinks, links panel and table", async ()
   console.log(`Large folder: refresh ${refresh.toFixed(2)} ms; backlinks ${backlinks.toFixed(2)} ms; panel ${panel.toFixed(2)} ms; table ${table.toFixed(2)} ms`);
   expect(Math.max(refresh, backlinks, panel, table)).toBeLessThan(2000);
 }, 30000);
+
+it("cached backlinks match the original scan for the large fixture", async () => {
+  await loadProperties();
+  const fixture = largeFolder();
+  const index = createLinkIndex(async () => fixture);
+  await index.ensure("/notes");
+  for (const target of fixture.notes.slice(0, 20)) {
+    const expected = index.notes().flatMap(note => index.outgoing(note.path).filter(link => link.resolved.kind === "note" && link.resolved.path === target.path).map(link => ({ ...link, path: note.path, context: note.source.split("\n")[link.line - 1] ?? "" })));
+    expect(index.backlinks(target.path)).toEqual(expected);
+  }
+}, 30000);

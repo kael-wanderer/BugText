@@ -43,16 +43,20 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   let skipped: string[] = [];
   let stamps: Record<string, string> = {};
   let refreshing = false;
+  let backlinksDirty = true;
+  let backlinksMap = new Map<string, (ReturnType<typeof outgoing>[number] & { path: string; context: string })[]>();
   const versions = new Map<string, number>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const contains = (path: string) => folder !== null && path.startsWith(folder.replace(/\/$/, "") + "/");
   function apply(path: string, text: string | null) {
+    backlinksDirty = true;
     notes.delete(path);
     if (text !== null && /\.(md|markdown)$/i.test(path)) notes.set(path, parseNote(path, text));
   }
   function setFolder(next: string | null) {
     if (folder === next) return;
+    backlinksDirty = true;
     generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; refreshing = false; versions.clear(); notify();
   }
   async function ensure(next = folder): Promise<void> {
@@ -65,6 +69,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
       const promise = scan(root).then((result) => {
         if (current !== generation) return;
         stamps = result.stamps ?? {};
+        backlinksDirty = true;
         notes = new Map(result.notes.map((note) => [note.path, withProperties(note)])); skipped = result.skipped;
         for (const [path, text] of pending) apply(path, text);
         pending.clear(); ready = true; notify();
@@ -109,7 +114,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         if (nextSkipped.length !== previousSkipped.length || nextSkipped.some((path, i) => path !== previousSkipped[i])) changed = true;
         stamps = next; skipped = nextSkipped;
         for (const path of versions.keys()) if (!(path in stamps)) versions.delete(path);
-        if (changed) notify();
+        if (changed) { backlinksDirty = true; notify(); }
       } finally { if (current === generation) refreshing = false; }
     },
     onFileRemoved: (path: string) => onFileChanged(path, null),
@@ -122,7 +127,20 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
       result.notes.forEach((note) => onFileChanged(note.path, note.source));
     },
     backlinks(path: string) {
-      return [...notes.values()].flatMap((note) => outgoing(note.path).filter((link) => link.resolved.kind === "note" && link.resolved.path === path).map((link) => ({ ...link, path: note.path, context: note.source.split("\n")[link.line - 1] ?? "" })));
+      if (backlinksDirty) {
+        backlinksMap = new Map();
+        for (const note of notes.values()) {
+          const lines = note.source.split("\n");
+          for (const link of outgoing(note.path)) {
+            if (link.resolved.kind !== "note" || !link.resolved.path) continue;
+            const entries = backlinksMap.get(link.resolved.path) ?? [];
+            entries.push({ ...link, path: note.path, context: lines[link.line - 1] ?? "" });
+            backlinksMap.set(link.resolved.path, entries);
+          }
+        }
+        backlinksDirty = false;
+      }
+      return backlinksMap.get(path) ?? [];
     },
     notes: () => [...notes.values()],
     get: (path: string) => notes.get(path),

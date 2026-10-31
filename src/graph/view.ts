@@ -31,6 +31,7 @@ export function createGraphView(host: HTMLElement, index: LinkIndex, config: Gra
   let result: (GraphLayout & { graph: GraphData }) | null = null;
   let scene: ReturnType<typeof drawGraph> | null = null;
   let currentFolder = index.folder;
+  let laidOutKey: string | null = null;
   const root = element("section", undefined, "graph-view"); root.setAttribute("aria-label", "Graph view");
   const bar = element("div", undefined, "graph-bar"), heading = element("strong", "Graph");
   const mode = select("Graph mode", [["local", "Local"], ["folder", "Folder"]]); mode.value = options.mode;
@@ -79,6 +80,9 @@ export function createGraphView(host: HTMLElement, index: LinkIndex, config: Gra
   function fail() { state("Could not lay out graph.", "", ["Try again", rebuild]); }
   function rebuild() {
     if (disposed) return;
+    const snapshot: GraphSnapshot | null = index.folder && index.ready ? { folder: index.folder, notes: index.notes().sort((a, b) => a.path.localeCompare(b.path)).map(note => ({ path: note.path, title: note.headings[0]?.text || note.path.split("/").pop()!.replace(/\.(md|markdown)$/i, ""), links: note.links.map(link => link.target) })) } : null;
+    const snapshotKey = snapshot ? snapshot.folder + "\n" + snapshot.notes.map(note => note.path + "\t" + note.title + "\t" + note.links.join("\t")).join("\n") : null;
+    if (result && snapshotKey === laidOutKey) return;
     const token = ++generation;
     worker?.terminate(); worker = null; result = null;
     if (currentFolder !== index.folder) { currentFolder = index.folder; options.folder = ""; folder.value = ""; }
@@ -88,13 +92,14 @@ export function createGraphView(host: HTMLElement, index: LinkIndex, config: Gra
       void index.ensure().catch(() => { if (!disposed && token === generation) state("Could not index notes.", "", ["Try again", rebuild]); }); return;
     }
     state("Laying out…");
-    const snapshot: GraphSnapshot = { folder: index.folder, notes: index.notes().map(note => ({ path: note.path, title: note.headings[0]?.text || note.path.split("/").pop()!.replace(/\.(md|markdown)$/i, ""), links: note.links.map(link => link.target) })) };
+    if (!snapshot) return;
     try {
       worker = new Worker(new URL("./layout.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = event => {
         if (disposed || token !== generation) return;
         if (event.data.error) { fail(); return; }
         result = event.data;
+        laidOutKey = snapshotKey;
         const folders = new Set<string>();
         for (const note of result!.graph.nodes) {
           if (note.missing) continue;

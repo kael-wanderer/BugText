@@ -26,6 +26,7 @@ import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink } from "./links/follow";
 import { createLinkIndex, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
+import { createFrameCoalescer } from "./render-coalescer";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -1179,9 +1180,11 @@ function filterPanelModel() {
   return currentTableFilter ?? { tags: [], rows: [], folder: null, mode: "all" as const };
 }
 let currentTableFilter: import("./properties/filter-query").FilterModel | null = null;
-linkIndex.subscribe(() => renderAll());
+const indexRender = createFrameCoalescer(renderAll);
+linkIndex.subscribe(() => indexRender.request());
 
 function renderAll(): void {
+  indexRender.cancel();
   diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
