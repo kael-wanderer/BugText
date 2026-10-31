@@ -362,6 +362,38 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
+    fn push_command_contains_only_fixed_prefix_and_push() {
+        let env = RunEnv {
+            home: "/tmp".into(),
+            path: "/usr/bin:/bin".into(),
+            tmpdir: "/tmp".into(),
+            ssh_auth_sock: None,
+            user: None,
+            logname: None,
+            lang: None,
+        };
+        let runs = GitRuns::default();
+        let spec = RunSpec {
+            git: Path::new("/usr/bin/git"),
+            repo_root: Path::new("/tmp"),
+            args: crate::git_args::push(),
+            stdin: None,
+            timeout: Duration::from_secs(1),
+            request_id: None,
+            env: &env,
+            runs: &runs,
+        };
+        let command = command(&spec);
+        let args: Vec<_> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        let mut expected: Vec<String> = vec!["-C".into(), "/tmp".into()];
+        expected.extend(PREFIX.iter().map(|s| (*s).to_owned()));
+        expected.push("push".into());
+        assert_eq!(args, expected);
+    }
+    #[test]
     fn timeout_and_cancel_stop_slow_git_requests() {
         use std::net::TcpListener;
         let git = Path::new("/usr/bin/git");

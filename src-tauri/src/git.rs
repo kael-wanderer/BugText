@@ -9,8 +9,16 @@ use std::{ffi::OsString, io::Read, time::Duration};
 
 #[derive(Serialize, Debug)]
 pub struct GitError {
-    kind: &'static str,
-    log: Vec<String>,
+    pub(crate) kind: &'static str,
+    pub(crate) log: Vec<GitLogEntry>,
+}
+#[derive(Serialize, Clone, Debug)]
+pub struct GitLogEntry {
+    pub at_ms: u64,
+    pub action: String,
+    pub args: String,
+    pub exit: Option<i32>,
+    pub stderr_tail: String,
 }
 impl From<&'static str> for GitError {
     fn from(kind: &'static str) -> Self {

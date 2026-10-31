@@ -26,6 +26,12 @@ fn scoped(path: &str, scope: &str) -> Option<String> {
     }
 }
 pub fn parse_status(bytes: &[u8], scope: &str, merging: bool) -> GitStatus {
+    parse_status_with_limit(bytes, scope, merging, 5000)
+}
+pub(crate) fn parse_status_all(bytes: &[u8], scope: &str, merging: bool) -> GitStatus {
+    parse_status_with_limit(bytes, scope, merging, usize::MAX)
+}
+fn parse_status_with_limit(bytes: &[u8], scope: &str, merging: bool, limit: usize) -> GitStatus {
     let mut result = GitStatus {
         branch: "(detached)".into(),
         upstream: None,
@@ -110,7 +116,7 @@ pub fn parse_status(bytes: &[u8], scope: &str, merging: bool) -> GitStatus {
         };
         if let Some(path) = path.and_then(|p| scoped(p, scope)) {
             result.total += 1;
-            if result.entries.len() < 5000 {
+            if result.entries.len() < limit {
                 result.entries.push(GitEntry {
                     path,
                     orig_path: orig.and_then(|p| scoped(&p, scope)),

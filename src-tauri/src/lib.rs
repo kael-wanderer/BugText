@@ -1,3 +1,4 @@
+mod git_action;
 mod git;
 mod export_presets;
 mod conversations;
@@ -194,6 +195,7 @@ pub fn run() {
         .manage(files::SearchRequests::default())
         .manage(ai::AIState::default())
         .manage(git_run::GitRuns::default())
+        .manage(git_repo::RepoLocks::default())
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
@@ -236,6 +238,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            git_action::git_action,
             git::git_repo,
             git::git_status,
             git::git_diff,
