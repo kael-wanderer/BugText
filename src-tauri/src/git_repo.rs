@@ -67,18 +67,19 @@ pub fn resolve(folder: &str) -> Result<Repo, &'static str> {
         git,
     })
 }
+pub fn valid_rel(rel: &str) -> bool {
+    !rel.is_empty()
+        && !rel.contains('\0')
+        && !rel.contains('\\')
+        && Path::new(rel)
+            .components()
+            .all(|p| matches!(p, Component::Normal(_)))
+}
 pub fn to_repo_rel(repo: &Repo, rel: &str) -> Result<String, &'static str> {
-    if rel.is_empty() || rel.contains('\0') || rel.contains('\\') {
+    if !valid_rel(rel) {
         return Err("outside");
     }
-    let path = Path::new(rel);
-    if path
-        .components()
-        .any(|p| !matches!(p, Component::Normal(_)))
-    {
-        return Err("outside");
-    }
-    let joined = repo.folder.join(path);
+    let joined = repo.folder.join(rel);
     let parent = joined
         .parent()
         .ok_or("outside")?

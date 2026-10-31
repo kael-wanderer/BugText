@@ -188,6 +188,48 @@ pub fn parse_diff(text: &str) -> GitDiff {
     }
     result
 }
+pub fn file_diff(bytes: &[u8], conflicted: bool) -> GitDiff {
+    let truncated = bytes.len() > 512 * 1024;
+    let bytes = &bytes[..bytes.len().min(512 * 1024)];
+    if bytes.iter().take(8192).any(|b| *b == 0) {
+        return GitDiff {
+            lines: vec![],
+            binary: true,
+            truncated,
+        };
+    }
+    let mut lines = Vec::new();
+    if !conflicted {
+        lines.push(DiffLine {
+            kind: "meta",
+            text: "New file".into(),
+        });
+    }
+    let text = String::from_utf8_lossy(bytes);
+    let mut too_many = false;
+    for line in text.lines() {
+        if lines.len() == 2000 {
+            too_many = true;
+            break;
+        }
+        let kind = if !conflicted {
+            "add"
+        } else if has_conflict_markers(line) {
+            "marker"
+        } else {
+            "ctx"
+        };
+        lines.push(DiffLine {
+            kind,
+            text: line.into(),
+        });
+    }
+    GitDiff {
+        lines,
+        binary: false,
+        truncated: truncated || too_many,
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,6 +241,31 @@ mod tests {
         assert_eq!((s.ahead, s.behind), (2, 1));
         assert_eq!(s.total, 2);
         assert_eq!(s.entries[0].path, "a.md");
+    }
+    #[test]
+    fn porcelain_renames_conflicts_detached_and_cap() {
+        let fixture = b"# branch.head (detached)\0\
+2 R. N... 100644 100644 100644 a b R100 dir/new name.md\0dir/old name.md\0\
+u UU N... 100644 100644 100644 100644 a b c dir/conflict.md\0\
+? dir/new.md\0";
+        let status = parse_status(fixture, "dir", true);
+        assert_eq!(status.branch, "(detached)");
+        assert_eq!(status.upstream, None);
+        assert_eq!((status.ahead, status.behind), (0, 0));
+        assert_eq!(status.entries[0].orig_path.as_deref(), Some("old name.md"));
+        assert_eq!(status.entries[0].badge, "R");
+        assert_eq!(status.entries[1].group, "conflicted");
+        assert_eq!(status.entries[2].group, "new");
+        let many = "? note.md\0".repeat(5001);
+        let status = parse_status(many.as_bytes(), "", false);
+        assert_eq!((status.entries.len(), status.total), (5000, 5001));
+    }
+    #[test]
+    fn file_views_detect_binary_markers_and_limits() {
+        assert!(file_diff(b"a\0b", false).binary);
+        let view = file_diff(b"<<<<<<< ours\n=======\n>>>>>>> theirs\n", true);
+        assert!(view.lines.iter().all(|line| line.kind == "marker"));
+        assert!(file_diff("line\n".repeat(2001).as_bytes(), false).truncated);
     }
     #[test]
     fn markers_and_diff_limits() {

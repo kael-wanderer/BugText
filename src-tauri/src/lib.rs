@@ -1,3 +1,4 @@
+mod git;
 mod export_presets;
 mod conversations;
 mod workspaces;
@@ -235,6 +236,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            git::git_repo,
+            git::git_status,
+            git::git_diff,
             git_locate::git_diagnostics,
             git_run::git_cancel,
             workflow_store::read_workflow_store,
