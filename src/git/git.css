@@ -26,6 +26,6 @@
 .git-diff-add, .git-diff-hunk { color: var(--accent); }
 .git-diff-del, .git-diff-marker { color: var(--text-strong); background: var(--bg-elev); }
 .git-diff-meta { color: var(--muted); }
-.git-sheet { position: absolute; inset: 10%; z-index: 10; overflow: auto; padding: 16px; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); box-shadow: 0 4px 18px var(--border); }
-.git-sheet pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .recovery-sheet.git-confirm { width: min(420px, 100%); }
+.recovery-sheet.git-log { display: flex; flex-direction: column; }
+.git-log-text { flex: 1; min-height: 0; max-height: calc(100vh - 220px); overflow: auto; margin: 0; padding: 12px 18px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }

@@ -125,10 +125,12 @@ describe("Git panel", () => {
   it("keeps only fifty log entries and copies plain text", async () => {
     const log = createGitLog();
     const entries: GitLogEntry[] = Array.from({ length: 51 }, (_, i) => ({ at_ms: i * 1000, action: `action-${i}`, args: hostile, exit: 0, stderr_tail: "" }));
-    log.add(entries); const host = document.createElement("div"); const sheet = log.show(host);
+    log.add(entries); const sheet = log.show();
     const writeText = vi.fn(async () => {}); Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     expect(sheet.textContent).not.toContain("action-0"); expect(sheet.textContent).toContain("action-50"); expect(sheet.querySelector("img")).toBeNull();
     [...sheet.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Copy")!.click();
     expect(writeText).toHaveBeenCalledWith(sheet.querySelector("pre")!.textContent);
+    expect(sheet.querySelector("[role=dialog]")?.getAttribute("aria-modal")).toBe("true"); expect(document.activeElement?.textContent).toBe("Close");
+    sheet.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(sheet.isConnected).toBe(false);
   });
 });

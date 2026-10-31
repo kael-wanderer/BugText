@@ -32,7 +32,7 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
   const fetch = button("Fetch", () => { void run("fetch"); });
   const menu = button("⋯", () => { menuItems.hidden = !menuItems.hidden; }); menu.setAttribute("aria-label", "More: Show Git Log");
   const menuItems = node("div", "git-menu"); menuItems.hidden = true;
-  const showLog = button("Show Git Log", () => { menuItems.hidden = true; log.show(host); }); menuItems.append(showLog);
+  const showLog = button("Show Git Log", () => { menuItems.hidden = true; log.show(); }); menuItems.append(showLog);
   title.append(node("strong", "", "Source Control"), fetch, menu, menuItems); header.append(title, branch, scope);
   const banner = node("div"), error = node("div", "git-error"); error.setAttribute("role", "status");
   const box = createCommitBox(() => { void run("commit"); }, updateControls);
@@ -153,7 +153,7 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     if (folder) void refresh();
   }
   function focus(control: GitPanelControl) {
-    if (control === "log") { log.show(host); return; }
+    if (control === "log") { log.show(); return; }
     ({ commit: box.message, pull, push, fetch })[control].focus();
   }
   function confirmSave(count: number): Promise<boolean> {
