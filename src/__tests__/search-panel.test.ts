@@ -75,3 +75,23 @@ it("preselects files for operator-only and combined searches", async () => {
   input.value = "tag:work"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
   expect(host.textContent).toContain("a.md"); expect(host.textContent).not.toContain("b.md");
 });
+
+it("shows finished empty results and clears active file filters", async () => {
+  mocks.invoke.mockReset();
+  mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve({ ...result("a.md"), hits: [] }) : Promise.resolve());
+  const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
+  const input = host.querySelector<HTMLInputElement>(".search-input")!; input.value = '<img src=x onerror=alert(1)>'; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
+  expect(host.textContent).toContain(`No matches for "${input.value}".`); expect(host.querySelector("img")).toBeNull();
+  host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush(); await flush();
+  const include = host.querySelector<HTMLInputElement>(".search-include")!, exclude = host.querySelector<HTMLInputElement>(".search-exclude")!;
+  include.value = "*.md"; exclude.value = "private/**"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
+  expect(host.textContent).toContain("narrowing this search"); const before = mocks.invoke.mock.calls.filter(([name]) => name === "search_in_folder").length;
+  [...host.querySelectorAll("button")].find(button => button.textContent === "Clear file filters")!.click(); await flush(); await flush();
+  expect(include.value).toBe(""); expect(exclude.value).toBe(""); expect(mocks.invoke.mock.calls.filter(([name]) => name === "search_in_folder").length).toBeGreaterThan(before);
+});
+it("does not show empty results while a search is running", async () => {
+  mocks.invoke.mockImplementation(command => command === "search_in_folder" ? new Promise(() => {}) : Promise.resolve());
+  const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
+  const input = host.querySelector("input")!; input.value = "missing"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
+  expect(host.textContent).not.toContain("No matches for");
+});

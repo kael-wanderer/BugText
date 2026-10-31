@@ -1,3 +1,4 @@
+import { searchEmpty } from "./empty-states/views";
 import { createSearchPreview } from "./search-preview";
 import {
   searchInFolder,
@@ -171,6 +172,9 @@ export function createSearchPanel(
       }
       results.appendChild(group);
     }
+    if ((state.phase === "done" || state.phase === "stopped") && query.length >= 2 && groups.size === 0) {
+      results.append(searchEmpty(query, replaceOpen && !!(include.value.trim() || exclude.value.trim()), () => { include.value = ""; exclude.value = ""; void run(); }, () => { input.value = ""; cancel(); state = new SearchRun(); render(""); }));
+    }
     results.scrollTop = scrollTop;
     if (selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
       const first = results.querySelector<HTMLButtonElement>(".search-hit"); if (first) first.click(); else { selectedKey = ""; preview.clear(); }
@@ -244,6 +248,7 @@ export function createSearchPanel(
     finally { previewBusy = false; render(input.value.trim()); }
   });
   input.addEventListener("input", () => {
+    results.replaceChildren();
     cancel(); groupValid = false; updateButton();
     timer = window.setTimeout(() => void run(), 250);
   });
