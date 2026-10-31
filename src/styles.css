@@ -3602,3 +3602,7 @@ body.focus-active .window.active .cm-content { max-width: min(var(--focus-width,
 .focus-exit { position: fixed; top: 12px; right: 16px; z-index: 50; }
 .focus-hint { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 6px 12px; border-radius: 6px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
 body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; }
+.link-hover-card { position: fixed; z-index: 1001; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); color: var(--text); box-shadow: 0 8px 24px #0005; }
+.link-hover-card[hidden] { display: none; }
+.link-hover-card p { margin: 4px 0; overflow-wrap: anywhere; }
+.link-hover-path, .link-hover-footer { color: var(--muted); font-size: .9em; }
