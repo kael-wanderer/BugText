@@ -72,6 +72,7 @@ describe("Git panel", () => {
     const { host, deps } = make(s); await flush();
     expect(host.textContent).toContain("Showing 3 of 12,408 changes.");
     expect([...host.querySelectorAll<HTMLInputElement>('.git-file input')].every(e => e.checked && e.disabled)).toBe(true);
+    expect(host.textContent).toContain("Merge stopped: 1 file has conflicts."); expect(host.textContent).not.toContain("Pull stopped");
     const mark = [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Mark resolved")!;
     const abort = [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Abort merge")!;
     expect(mark.disabled).toBe(true); expect(abort).toBeTruthy();
