@@ -95,3 +95,14 @@ it("does not show empty results while a search is running", async () => {
   const input = host.querySelector("input")!; input.value = "missing"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
   expect(host.textContent).not.toContain("No matches for");
 });
+it("counts only the results the file filters keep", async () => {
+  mocks.invoke.mockReset();
+  mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("a.md")) : Promise.resolve());
+  const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
+  host.querySelector<HTMLButtonElement>(".search-replace-toggle")!.click(); await flush(); await flush();
+  const input = host.querySelector<HTMLInputElement>(".search-input")!; input.value = "hello";
+  host.querySelector<HTMLInputElement>(".search-include")!.value = "*.txt";
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
+  expect(host.textContent).toContain("narrowing this search");
+  expect(host.textContent).toContain("No results"); expect(host.textContent).not.toContain("1 result in 1 file");
+});

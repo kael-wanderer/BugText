@@ -94,7 +94,6 @@ export function createSearchPanel(
   function render(query: string): void {
     const scrollTop = results.scrollTop;
     results.replaceChildren();
-    status.textContent = state.status;
     status.classList.toggle("search-error", state.phase === "error");
     if (state.phase === "error") status.setAttribute("role", "alert"); else status.removeAttribute("role");
     input.setAttribute("aria-invalid", String(state.phase === "error"));
@@ -117,6 +116,7 @@ export function createSearchPanel(
     const groups = new Map<string, SearchHit[]>();
     const allowed = new Set(filterByGlobs(state.hits.map(hit => hit.relative), include.value, exclude.value));
     for (const hit of state.hits) { if (replaceOpen && !allowed.has(hit.relative)) continue; const list = groups.get(hit.relative); if (list) list.push(hit); else groups.set(hit.relative, [hit]); }
+    status.textContent = state.statusFor([...groups.values()].flat());
     for (const [relative, fileHits] of groups) {
       const group = document.createElement("div");
       group.className = "search-group";
