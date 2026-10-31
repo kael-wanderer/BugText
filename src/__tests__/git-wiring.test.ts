@@ -31,7 +31,7 @@ it("shows diagnostics as text, checks again, and sets the toggle", async () => {
   expect(host.textContent).toContain(hostile); expect(host.querySelector("img")).toBeNull();
   for (const row of host.querySelectorAll<HTMLElement>("[data-setting]")) expect(SETTING_ENTRIES.some(e => e.id === row.dataset.setting)).toBe(true);
   [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Check again")!.click(); await Promise.resolve(); expect(diagnostics).toHaveBeenCalledWith(true);
-  const toggle = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!; toggle.checked = false; toggle.dispatchEvent(new Event("change")); expect(settings.git.showSourceControl).toBe(false);
+  const toggle = host.querySelector<HTMLInputElement>('input.st-switch[role="switch"]')!; toggle.checked = false; toggle.dispatchEvent(new Event("change")); expect(settings.git.showSourceControl).toBe(false);
   diagnostics.mockResolvedValue({ found: false, path: "", version: "", supported: false });
   [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Check again")!.click(); await Promise.resolve();
   expect(host.textContent).toContain("Git was not found. Install it with: brew install git");

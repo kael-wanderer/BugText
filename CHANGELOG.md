@@ -43,6 +43,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Settings ▸ Git uses the standard on/off switch for Show Source Control instead of a plain checkbox.
 - Show Git Log opens as a dialog with Copy and Close always visible and Esc to close; the buttons were below the full log and Esc did nothing.
 - The Source Control diff for the selected file updates after Git actions and refreshes; it kept showing the earlier content, such as conflict markers already resolved.
 - Source Control error messages (for example conflict markers left in a file, sign-in or network failures) stay visible; they disappeared about a second after appearing.
