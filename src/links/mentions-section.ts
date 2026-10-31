@@ -28,20 +28,22 @@ export function createMentionsSection(deps: MentionDeps) {
     if (capped) body.append(node("p", "Showing the first 200 mentions.", "link-panel-note"));
     for (const path of paths) {
       const group = visible.filter(m => m.path === path), section = node("div", undefined, "mentions-group");
-      section.append(node("strong", path.split(/[\\/]/).pop()), node("small", path.slice((deps.folder() ?? "").replace(/[\\/]$/, "").length + 1)));
+      const name = path.split(/[\\/]/).pop() ?? path, relative = path.slice((deps.folder() ?? "").replace(/[\\/]$/, "").length + 1);
+      section.append(node("strong", name)); if (relative !== name) section.append(node("small", relative));
       if (group.length >= 2) {
         const all = node("button", "Link all in this note…");
         all.onclick = () => { const plan = mentionEdit(group[0], activePath); plan.edits = group.map(m => mentionEdit(m, activePath).edits[0]); void link([plan], true); };
         section.append(all);
       }
       for (const m of group) {
-        const row = node("div", undefined, "link-panel-row"), line = node("button", `Line ${m.line}`), excerpt = node("span");
+        const row = node("div", undefined, "link-panel-row mentions-row"), line = node("button", `Line ${m.line}`), excerpt = node("span");
         line.onclick = () => deps.open(m.path, m.line);
         excerpt.append(document.createTextNode(m.lineText.slice(0, m.column)), node("strong", m.text), document.createTextNode(m.lineText.slice(m.column + m.text.length)));
-        const add = node("button", "Link"), skip = node("button", "Skip");
+        const add = node("button", "Link", "primary"), skip = node("button", "Skip");
         add.onclick = () => { void link([mentionEdit(m, activePath)], false); };
         skip.onclick = () => { skipped.add(key(m)); draw(); };
-        row.append(line, excerpt, add, skip); section.append(row);
+        const actions = node("div", undefined, "mentions-actions"); actions.append(line, add, skip);
+        row.append(excerpt, actions); section.append(row);
       }
       body.append(section);
     }

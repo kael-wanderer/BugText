@@ -43,6 +43,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Unlinked mentions in the Links tab use the panel's styles: compact Line, Link and Skip buttons and a section heading matching the others; they showed as large unstyled buttons.
+- Export sheet summaries and Explorer notices use the muted text color; they referenced an undefined color variable.
 - A disabled Commit button in Source Control looks disabled; it kept the accent color.
 - Settings ▸ Git uses the standard on/off switch for Show Source Control instead of a plain checkbox.
 - Show Git Log opens as a dialog with Copy and Close always visible and Esc to close; the buttons were below the full log and Esc did nothing.
