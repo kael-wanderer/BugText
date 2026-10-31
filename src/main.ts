@@ -24,7 +24,8 @@ import { parseNote, type IndexedNote } from "./links/index";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink } from "./links/follow";
-import { createLinkIndex } from "./links/index";
+import { createLinkIndex, type LinkScan } from "./links/index";
+import { createDiagnostics } from "./perf/diagnostics";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -191,7 +192,20 @@ import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
-const linkIndex = createLinkIndex();
+const diagnostics = createDiagnostics();
+const linkIndex = createLinkIndex(async (folder, paths, known) => {
+  const start = performance.now();
+  const result = await invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known });
+  const tick = diagnostics.current();
+  if (tick) {
+    tick.scanMs = performance.now() - start;
+    tick.sentBytes = Object.entries(known ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
+    tick.receivedBytes = result.notes.reduce((n, note) => n + note.path.length + note.source.length + 16 + 32 * (note.links.length + note.headings.length), 0)
+      + Object.entries(result.stamps ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
+    tick.reread = result.notes.length;
+  }
+  return result;
+});
 
 const windowsHost = document.getElementById("windows")!;
 
@@ -1168,6 +1182,7 @@ let currentTableFilter: import("./properties/filter-query").FilterModel | null =
 linkIndex.subscribe(() => renderAll());
 
 function renderAll(): void {
+  diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
   refreshStatusBar();
@@ -2111,6 +2126,8 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       let text: string;
       try {
         text = await invoke<string>("read_file", { path: tab.path });
+        const tick = diagnostics.current();
+        if (tick) tick.tabsChecked++;
       } catch {
         continue;
       }
@@ -2141,14 +2158,18 @@ let autoRefreshRunning = false;
 async function refreshWorkspaceFromDisk(force = false): Promise<void> {
   if (autoRefreshRunning && !force) return;
   autoRefreshRunning = true;
+  const tick = diagnostics.begin(force ? "manual" : "timer", "full");
   try {
+    const walkStart = performance.now();
     if (getState().folder) {
       await refreshExpandedDirs().catch(() => {});
       await refreshFileList();
     }
+    tick.walkMs = performance.now() - walkStart;
     await linkIndex.refresh().catch(() => {});
     await refreshCleanOpenFilesFromDisk();
   } finally {
+    diagnostics.end();
     autoRefreshRunning = false;
   }
 }

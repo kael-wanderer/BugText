@@ -354,6 +354,49 @@ pub async fn scan_note_links_for(folder: String, paths: Vec<String>) -> Result<S
 #[cfg(test)]
 mod tests {
     #[test]
+    #[ignore]
+    fn bench_scan_2000() {
+        let root = std::env::temp_dir().join(format!("bugtext-bench-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for i in 0..2000 {
+            let dir = root.join(format!("folder-{}", i / 50));
+            std::fs::create_dir_all(&dir).unwrap();
+            let source = format!(
+                "# Note {i}\n#one #two\n[one](a.md)\n[two](b.md)\n[three](c.md)\n{}",
+                "text ".repeat(1600)
+            );
+            std::fs::write(dir.join(format!("note-{i}.md")), source).unwrap();
+        }
+        for i in 0..1000 {
+            std::fs::write(
+                root.join(format!(
+                    "asset-{i}.{}",
+                    if i % 2 == 0 { "pdf" } else { "png" }
+                )),
+                b"dummy",
+            )
+            .unwrap();
+        }
+        let start = std::time::Instant::now();
+        let first = super::scan(root.to_string_lossy().into(), None, Default::default()).unwrap();
+        println!(
+            "first: {:?}, walked 3000, notes {}, result bytes {}, known bytes {}",
+            start.elapsed(),
+            first.notes.len(),
+            serde_json::to_vec(&first).unwrap().len(),
+            serde_json::to_vec(&first.stamps).unwrap().len()
+        );
+        let start = std::time::Instant::now();
+        let second = super::scan(root.to_string_lossy().into(), None, first.stamps).unwrap();
+        println!(
+            "unchanged: {:?}, walked 3000, notes {}, result bytes {}",
+            start.elapsed(),
+            second.notes.len(),
+            serde_json::to_vec(&second).unwrap().len()
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn scanner_caps_and_confines_files() {
         let root = std::env::temp_dir().join(format!("bugtext-links-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
