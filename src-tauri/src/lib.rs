@@ -35,6 +35,7 @@ mod mcp_paths;
 mod mcp_protocol;
 mod mcp_server;
 mod menu;
+mod spell;
 mod native_windows;
 mod pdf_drafts;
 mod pdf_annotations;
@@ -238,6 +239,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            spell::spell_check,
+            spell::spell_suggest,
+            spell::spell_ignore,
+            spell::spell_learn,
             git_action::git_action,
             git::git_repo,
             git::git_status,
