@@ -86,3 +86,5 @@ Branch `feat/s9-git-sync` from `feat/unlinked-mentions` (`d44b1f6`). Base: 197 f
 - Validation: frontend 197 files / 1,034 tests; TypeScript passed; Rust 168 passed / 1 ignored; clippy passed. Fixed a process-tree test race reading the PID file before its contents were written. Native checks remain outstanding.
 - Task 3: explicit commit, fetch, pull, merge, abort, resolve and push with per-repository locking, cancellation, confined selections and redacted logs; local two-clone and HTTP fixtures cover the action flows.
 - Validation: frontend 197 files / 1,034 tests; TypeScript passed; Rust 175 passed / 1 ignored; clippy passed. Git rejects the planned branch name containing a space, so the hostile-branch test uses valid `x;touch-pwned`. Native checks remain outstanding.
+- Task 4: standalone Source Control panel, typed API/model, diff, commit and conflict controls, in-memory log, and theme-token styling; action execution is injected for Task 5 Recovery integration.
+- Validation: frontend 198 files / 1,044 tests; TypeScript passed. Native visual and interaction checks remain outstanding; Tasks 5–6 will connect Recovery and the panel entry points.
