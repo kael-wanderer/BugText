@@ -1,3 +1,4 @@
+import { typewriterExtension } from "./editor-typewriter";
 import { cursorPosition } from "./status-bar/model";
 import { applyPropertyEdit } from "./properties/write";
 import type { PropertyEdit } from "./properties/edit";
@@ -81,6 +82,7 @@ export type EditorHandle = {
   setCursor(id: string, offset: number): void;
   setText(text: string): void;
   setTextFor(id: string, text: string): void;
+  setTypewriter(on: boolean): void;
   setSoftWrap(on: boolean): void;
   setSoftWrapMode(mode: SoftWrapMode, column: number): void;
   setLineNumbers(on: boolean): void;
@@ -241,6 +243,8 @@ export function createEditor(
   let livePreviewModule: typeof import("./editor-live-preview/extension") | null = null;
   const livePreviewExt = (): Extension => (livePreviewModule ? livePreviewModule.livePreviewExtension() : []);
   const live = new Compartment();
+  const typewriter = new Compartment();
+  let typewriterOn = false;
   const kinds = new Map<string, EditorDocumentKind>();
 
   const reportCursor = (state: EditorState): void => {
@@ -265,6 +269,7 @@ export function createEditor(
     kind: EditorDocumentKind = "markdown",
   ): Extension[] => [
     gutter.of(lineNums ? lineNumbers() : []),
+    typewriter.of(typewriterOn ? typewriterExtension() : []),
     live.of(livePreview && kind === "markdown" ? livePreviewExt() : []),
     history(),
     drawSelection(),
@@ -326,6 +331,7 @@ export function createEditor(
     view.dispatch({
       effects: [
         wrap.reconfigure(wrapExtension()),
+        typewriter.reconfigure(typewriterOn ? typewriterExtension() : []),
         gutter.reconfigure(lineNums ? lineNumbers() : []),
         live.reconfigure(livePreview && activeId && kinds.get(activeId) === "markdown" ? livePreviewExt() : []),
       ],
@@ -496,6 +502,10 @@ export function createEditor(
       const transaction = state.update({ changes: { from: 0, to: state.doc.length, insert: text } });
       states.set(id, transaction.state);
       if (transaction.docChanged) changed(id, transaction.state.doc.toString());
+    },
+    setTypewriter(on) {
+      if (typewriterOn === on) return;
+      typewriterOn = on; reapplyToggles();
     },
     setSoftWrap(on) {
       softWrapMode = on ? "window" : "off";
