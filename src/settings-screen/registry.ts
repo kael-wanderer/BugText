@@ -83,6 +83,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   { id: "export-numbered", page: "export", label: "Numbered sections", keywords: "export preset" },
   { id: "export-pandoc", page: "export", label: "Pandoc", keywords: "export tool install" },
   { id: "export-typst", page: "export", label: "Typst", keywords: "export tool install" },
+  { id: "large-folders", page: "general", label: "Large folders", keywords: "performance refresh slow many files notes index" },
   { id: "interface-size", page: "general", label: "App Font Size", keywords: "interface text size scale toolbar tabs pdf chrome" },
   { id: "interface-font", page: "general", label: "App Font", keywords: "interface font family typeface custom" },
   { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },

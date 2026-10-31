@@ -36,6 +36,7 @@ export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: (
       row.onclick = (e) => { if ((e.metaKey || e.ctrlKey) && follow) follow(link.target); else jump(link.line); }; host.append(row);
     }
     if (index.skipped.length) host.append(node("p", `Skipped ${index.skipped.length} note${index.skipped.length === 1 ? "" : "s"} (unreadable or over 2 MB).`, "link-panel-note"));
+    if (index.capped) host.append(node("p", "Indexed the first 5,000 files. Some notes are not included.", "link-panel-note"));
   }
   return { render, async show(on: boolean) { active = on; host.hidden = !on; if (on) { render(); try { await index.ensure(); render(); } catch { host.replaceChildren(node("p", "Could not index notes.", "outline-empty")); } } } };
 }

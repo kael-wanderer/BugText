@@ -708,3 +708,11 @@ export function initExplorer(
   subscribe(render);
   render();
 }
+
+export function setExplorerNotice(text: string | null): void {
+  const tree = document.getElementById("explorer-tree");
+  if (!tree) return;
+  let notice = tree.parentElement?.querySelector<HTMLElement>(".explorer-notice");
+  if (!notice && text) { notice = document.createElement("p"); notice.className = "explorer-notice"; notice.setAttribute("role", "status"); tree.after(notice); }
+  if (notice) { notice.textContent = text ?? ""; notice.hidden = !text; }
+}

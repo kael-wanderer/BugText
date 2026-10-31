@@ -3575,3 +3575,11 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .filter-tag:hover { background: var(--bg-elev); }
 .filter-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 4px; }
 .filter-results { padding: 8px; }
+.perf-sheet { width: min(760px, 90vw); max-height: 85vh; }
+.perf-sheet header, .perf-totals { display: flex; align-items: center; gap: 16px; }
+.perf-sheet header strong { margin-right: auto; }
+.perf-totals { justify-content: space-between; }
+.perf-scroll { overflow: auto; }
+.perf-sheet table { width: 100%; border-collapse: collapse; text-align: left; }
+.perf-sheet th, .perf-sheet td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.explorer-notice { padding: 8px 12px; color: var(--text-muted); }

@@ -63,7 +63,8 @@ import {
   openFolder,
   setExplorerActivePath,
 } from "./explorer";
-import { revealExplorerPath } from "./explorer";
+import { revealExplorerPath, setExplorerNotice } from "./explorer";
+import { showDiagnosticsSheet } from "./perf/diagnostics-sheet";
 import { explorerDropDirectory, logicalDropPoint, type DropPoint } from "./file-drop";
 import {
   getInitialFile,
@@ -367,8 +368,11 @@ const statusWordCounts = new Map<string, number>();
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();
-});
+}, openDiagnostics);
 
+function openDiagnostics(): void {
+  showDiagnosticsSheet(document.getElementById("app")!, { diagnostics, copy: writeClipboardText });
+}
 function refreshStatusBar(): void {
   const windowState = getWindow(getState().activeWindowId);
   const tab = windowState?.tabs.find(item => item.id === windowState.activeTabId);
@@ -381,6 +385,7 @@ function refreshStatusBar(): void {
     words: tab ? statusWordCounts.get(tab.id) ?? 0 : 0,
     dirty: tab?.dirty ?? false,
     recovered: tab ? recoveredDraftIds.has(tab.id) : false,
+    largeFolder,
   });
 }
 
@@ -762,6 +767,7 @@ function commandItems(): PaletteItem[] {
     ),
     command("editor", "View: Editor", () => setMode(activeWindowId(), "editor")),
     command("read", "View: Read", () => setMode(activeWindowId(), "preview")),
+    command("perf.diagnostics", "Workspace: Show Performance Diagnostics", () => { settingsScreen.close(); openDiagnostics(); }),
     command("view.graph", "Graph: Open Local Graph", () => { settingsScreen.close(); activeView().showGraph("local"); }),
     command("view.folder_graph", "Graph: Open Folder Graph", () => { settingsScreen.close(); activeView().showGraph("folder"); }),
     command("softwrap", "Cycle Soft Wrap", cycleSoftWrap),
@@ -2174,6 +2180,8 @@ const refreshRunner = createRefreshRunner(async (kind, reason) => {
       if (getState().folder && !linkIndex.ready) await linkIndex.ensure(getState().folder).catch(() => {});
       else await linkIndex.refresh().catch(() => {});
       largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
+      setExplorerNotice(linkIndex.capped ? "Indexed the first 5,000 files. Some notes are not included." : null);
+      diagnostics.setTotals({ notes: linkIndex.markdownCount, walked: linkIndex.walked, capped: linkIndex.capped, heldTextBytes: linkIndex.notes().reduce((sum, note) => sum + note.source.length * 2, 0), aiChunks: workspaceIndex.chunkCount, large: largeFolder });
     }
     await refreshCleanOpenFilesFromDisk();
   } finally { diagnostics.end(); }
@@ -3373,6 +3381,7 @@ subscribe(() => {
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
     largeFolder = false;
+    setExplorerNotice(null);
     bookmarkActions.refresh();
     linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
