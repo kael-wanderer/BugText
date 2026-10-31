@@ -102,6 +102,16 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     if (building) pending.set(path, text);
     if (ready) { apply(path, text); notify(); }
   }
+  /**
+   * Editor text changed. The index normally follows saves only; when it holds unsaved text for
+   * this note (a Link action or task edit applied to an open tab), it follows the tab until the
+   * text matches the saved copy again, so Undo does not leave a link that is no longer there.
+   */
+  function onLiveEdit(path: string, text: string) {
+    const current = notes.get(path), saved = savedSources.get(path);
+    if (!ready || !current || saved === undefined || current.source === saved) return;
+    onFileChanged(path, text, false);
+  }
   function outgoing(path: string, source?: string) {
     const note = source === undefined ? notes.get(path) : { path, source, links: noteLinks(source), headings: markdownOutline(source) };
     return (note?.links ?? []).map((link) => {
@@ -112,7 +122,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     });
   }
   return {
-    ensure, setFolder, onFileChanged, outgoing,
+    ensure, setFolder, onFileChanged, onLiveEdit, outgoing,
     async refresh() {
       if (!folder || !ready || refreshing) return;
       refreshing = true;

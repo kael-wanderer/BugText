@@ -1486,6 +1486,9 @@ async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean>
       return false;
     }
     recoveredDraftIds.delete(tab.id);
+    // Unsaved text the link index was following goes away with the tab.
+    const saved = tab.path ? linkIndex.savedSource(tab.path) : undefined;
+    if (tab.path && saved !== undefined) linkIndex.onLiveEdit(tab.path, saved);
     return true;
   } catch {
     await message("Could not discard the draft. The document remains open.", { title: "Close tab", kind: "error" });
@@ -1553,6 +1556,7 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
       replacedDraftId: recoveredDraftIds.get(tabId),
     });
   }
+  if (t?.path) linkIndex.onLiveEdit(t.path, text);
   if (tabId === w.activeTabId) {
     schedulePreview(windowId, tabId, text);
   }

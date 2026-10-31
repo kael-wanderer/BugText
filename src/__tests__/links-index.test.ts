@@ -13,6 +13,18 @@ describe("link index", () => {
       expect(markdownOutline(fixture.source), fixture.name).toEqual(fixture.headings);
     }
   });
+  it("follows later edits only while it holds unsaved text for a note", async () => {
+    const index = createLinkIndex(async () => ({ notes: [parseNote("/r/a.md", "saved"), parseNote("/r/b.md", "b saved")], stamps: {}, skipped: [] }));
+    await index.ensure("/r");
+    index.onLiveEdit("/r/b.md", "b typed");
+    expect(index.get("/r/b.md")?.source).toBe("b saved");
+    index.onFileChanged("/r/a.md", "saved [x](b.md)", false);
+    index.onLiveEdit("/r/a.md", "saved");
+    expect(index.get("/r/a.md")?.source).toBe("saved");
+    expect(index.savedSource("/r/a.md")).toBe("saved");
+    index.onLiveEdit("/r/a.md", "typed after undo");
+    expect(index.get("/r/a.md")?.source).toBe("saved");
+  });
   it("refreshes changed and removed notes without losing saves during the scan", async () => {
     let finish!: (value: LinkScan) => void;
     let calls = 0;
