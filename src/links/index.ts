@@ -6,7 +6,7 @@ import { loadProperties, propertiesModule } from "../properties/loader";
 import { bodyTags, frontMatterTags, tagKey } from "../properties/tags";
 
 export type IndexedNote = { path: string; source: string; links: NoteLink[]; headings: OutlineHeading[]; tags: string[]; properties: Record<string, unknown> | null; propertyError?: { line: number; message: string } };
-export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string> };
+export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string>; removed?: string[]; walked?: number; capped?: boolean };
 export type LinkIndex = ReturnType<typeof createLinkIndex>;
 // Properties need the lazily loaded parser: await loadProperties() before calling this (ensure() does).
 export function parseNote(path: string, source: string): IndexedNote {
@@ -43,6 +43,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   let skipped: string[] = [];
   let stamps: Record<string, string> = {};
   let refreshing = false;
+  let walked = 0, capped = false;
   let backlinksDirty = true;
   let backlinksMap = new Map<string, (ReturnType<typeof outgoing>[number] & { path: string; context: string })[]>();
   const versions = new Map<string, number>();
@@ -57,7 +58,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   function setFolder(next: string | null) {
     if (folder === next) return;
     backlinksDirty = true;
-    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; refreshing = false; versions.clear(); notify();
+    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; walked = 0; capped = false; refreshing = false; versions.clear(); notify();
   }
   async function ensure(next = folder): Promise<void> {
     setFolder(next);
@@ -69,6 +70,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
       const promise = scan(root).then((result) => {
         if (current !== generation) return;
         stamps = result.stamps ?? {};
+        walked = result.walked ?? 0; capped = result.capped ?? false;
         backlinksDirty = true;
         notes = new Map(result.notes.map((note) => [note.path, withProperties(note)])); skipped = result.skipped;
         for (const [path, text] of pending) apply(path, text);
@@ -106,13 +108,18 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         if (current !== generation) return;
         const next = result.stamps ?? {};
         let changed = false;
-        for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
+        const removed = result.removed ?? Object.keys(stamps).filter(path => !(path in next));
+        for (const path of removed) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
         for (const note of result.notes) if (versions.get(note.path) === before.get(note.path) && notes.get(note.path)?.source !== note.source) { notes.set(note.path, withProperties(note)); changed = true; }
         for (const path of result.skipped) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
         const nextSkipped = [...result.skipped].sort();
         const previousSkipped = [...skipped].sort();
         if (nextSkipped.length !== previousSkipped.length || nextSkipped.some((path, i) => path !== previousSkipped[i])) changed = true;
-        stamps = next; skipped = nextSkipped;
+        if ((result.walked ?? walked) !== walked || (result.capped ?? capped) !== capped) changed = true;
+        walked = result.walked ?? walked; capped = result.capped ?? capped;
+        if (result.removed) { stamps = { ...stamps, ...next }; for (const path of removed) delete stamps[path]; }
+        else stamps = next;
+        skipped = nextSkipped;
         for (const path of versions.keys()) if (!(path in stamps)) versions.delete(path);
         if (changed) { backlinksDirty = true; notify(); }
       } finally { if (current === generation) refreshing = false; }
@@ -147,6 +154,9 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     get folder() { return folder; },
     get ready() { return ready; },
     get skipped() { return skipped; },
+    get walked() { return walked; },
+    get capped() { return capped; },
+    get markdownCount() { return Object.keys(stamps).length; },
     subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

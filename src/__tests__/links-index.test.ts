@@ -124,3 +124,13 @@ it("caches the same backlinks as a full scan and invalidates on edits", async ()
   expect(index.backlinks("/r/b.md")).toEqual(old("/r/b.md"));
   expect(index.backlinks("/r/a.md")).toEqual(old("/r/a.md"));
 });
+
+it("merges delta stamps, removes deleted notes and reports cap changes", async () => {
+  let result: LinkScan = { notes: [parseNote("/r/a.md", "a"), parseNote("/r/b.md", "b")], stamps: { "/r/a.md": "1", "/r/b.md": "1" }, skipped: [], removed: [], walked: 2, capped: false };
+  const index = createLinkIndex(async () => result); await index.ensure("/r");
+  let calls = 0; index.subscribe(() => calls++);
+  result = { notes: [], stamps: {}, skipped: [], removed: ["/r/a.md"], walked: 1, capped: false };
+  await index.refresh(); expect(index.get("/r/a.md")).toBeUndefined(); expect(index.get("/r/b.md")).toBeDefined(); expect(index.markdownCount).toBe(1); expect(calls).toBe(1);
+  result = { ...result, removed: [], capped: true };
+  await index.refresh(); expect(index.capped).toBe(true); expect(calls).toBe(2);
+});
