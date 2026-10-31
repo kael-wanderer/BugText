@@ -6,10 +6,10 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Serialize)]
 pub struct GitDiagnostics {
-    found: bool,
+    pub(crate) found: bool,
     path: String,
     version: String,
-    supported: bool,
+    pub(crate) supported: bool,
 }
 type Cache = Option<(GitDiagnostics, PathBuf)>;
 static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new();

@@ -10,6 +10,8 @@ mod git_args;
 #[allow(dead_code)]
 mod git_status;
 #[allow(dead_code)]
+mod git_repo;
+#[allow(dead_code)]
 mod git_locate;
 #[allow(dead_code)]
 mod git_redact;
