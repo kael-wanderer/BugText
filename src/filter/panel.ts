@@ -9,16 +9,17 @@ import { tagAncestors, tagKey } from "../properties/tags";
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, text = "", className = ""): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag); node.textContent = text; node.className = className; return node;
 }
-export function createFilterPanel(host: HTMLElement, index: LinkIndex, open: (path: string) => void, options: { savedViews?: SavedViewStore } = {}) {
+export function createFilterPanel(host: HTMLElement, index: LinkIndex, open: (path: string) => void, options: { savedViews?: SavedViewStore; openTable?: () => void; onFilterChange?: (model: FilterModel) => void } = {}) {
   let selectedView: SavedView | null = null; let savedPanel: ReturnType<typeof createSavedViewsPanel> | undefined;
   const model: FilterModel = { tags: [], rows: [], folder: null, mode: "all" };
   let editingRow = -1;
   let active = false; let tagSearch = ""; let lastFolder: string | null = null;
   const collapsed = new Set<string>(); let collapseInitialized = false;
   function render() {
+    if (lastFolder !== index.folder) { lastFolder = index.folder; selectedView = null; model.tags = []; model.rows = []; model.folder = null; tagSearch = ""; collapsed.clear(); collapseInitialized = false; }
+    options.onFilterChange?.(copyFilter(model));
     if (!active) return;
     savedPanel?.dispose(); savedPanel = undefined; host.replaceChildren();
-    if (lastFolder !== index.folder) { lastFolder = index.folder; selectedView = null; model.tags = []; model.rows = []; model.folder = null; tagSearch = ""; collapsed.clear(); collapseInitialized = false; }
     if (!index.folder) { host.append(element("p", "Open a folder to filter notes.", "outline-empty")); return; }
     if (!index.ready) { host.append(element("p", "Indexing notes…", "outline-empty")); void index.ensure().catch(() => { if (active) host.replaceChildren(element("p", "Could not index notes.", "outline-empty")); }); return; }
     const notes = index.notes();
@@ -41,7 +42,8 @@ export function createFilterPanel(host: HTMLElement, index: LinkIndex, open: (pa
       button.addEventListener("click", () => { model.tags.splice(model.tags.indexOf(chip), 1); render(); }); chips.append(button);
     }
     const clear = element("button", "Clear all"); clear.type = "button"; clear.addEventListener("click", () => { model.tags = []; model.rows = []; model.folder = null; model.mode = "all"; selectedView = null; render(); host.querySelector<HTMLButtonElement>("button")?.focus(); });
-    controls.append(chips, clear);
+    const table = element("button", "Table view"); table.type = "button"; table.onclick = () => options.openTable?.();
+    controls.append(chips, clear, table);
     const search = element("input"); search.placeholder = "Filter tags"; search.setAttribute("aria-label", "Filter tags"); search.value = tagSearch;
     const tagList = element("div", "", "filter-tags");
     function renderTags() {
@@ -92,7 +94,7 @@ export function createFilterPanel(host: HTMLElement, index: LinkIndex, open: (pa
     }
     const mode = element("select"); mode.setAttribute("aria-label", "Match");
     for (const v of ["all", "any"] as const) { const option = element("option", v); option.value = v; mode.append(option); } mode.value = model.mode;
-    mode.addEventListener("change", () => { model.mode = mode.value as "all" | "any"; renderResults(); });
+    mode.addEventListener("change", () => { model.mode = mode.value as "all" | "any"; options.onFilterChange?.(copyFilter(model)); renderResults(); });
     const folder = element("select"); folder.setAttribute("aria-label", "Folder"); const all = element("option", "All folders"); all.value = ""; folder.append(all);
     const folders = new Set<string>();
     for (const note of notes) { const parts = relative(note.path).split("/"); parts.pop(); while (parts.length) { folders.add(parts.join("/")); parts.pop(); } }

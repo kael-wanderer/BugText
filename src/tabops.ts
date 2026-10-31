@@ -5,6 +5,7 @@ export type TabMeta = {
   dirty: boolean;
   pinned?: boolean;
   temporary?: boolean;
+  tableView?: boolean;
 };
 
 export function findByPath(tabs: TabMeta[], path: string): TabMeta | undefined {

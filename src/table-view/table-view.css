@@ -1,0 +1,12 @@
+.table-view { overflow: auto; flex: 1; min-height: 0; padding: 0 16px 16px; color: var(--text); background: var(--bg); }
+.table-view[hidden] { display: none; }
+.window:has(> .table-view:not([hidden])) > .window-panes,
+.window:has(> .table-view:not([hidden])) .window-status,
+.window:has(> .table-view:not([hidden])) .window-toolbar { display: none !important; }
+.table-view table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; }
+.table-view td, .table-view th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); max-width: 360px; overflow-wrap: break-word; }
+.table-view th { position: sticky; top: 0; background: var(--bg); white-space: nowrap; }
+.table-view button { color: inherit; font: inherit; cursor: pointer; }
+.table-view th button { background: none; border: 0; padding: 0; font-weight: 600; }
+.table-view tr:focus, .table-view tr:hover { background: var(--bg-hover); outline: 1px solid var(--border); }
+.table-view small { display: block; opacity: .75; }
