@@ -3416,13 +3416,16 @@ document.getElementById("ab-explorer")!.addEventListener(
   true,
 );
 
-// Clicking Explorer while search is open should just return to the tree.
+// Clicking Explorer while search or Source Control is open should just return to the tree.
 document.getElementById("ab-explorer")!.addEventListener(
   "click",
   (event) => {
     if (document.body.classList.contains("search-active")) {
       event.stopImmediatePropagation();
       setSearchActive(false);
+    } else if (document.body.classList.contains("git-active")) {
+      event.stopImmediatePropagation();
+      setGitActive(false);
     }
   },
   true,
