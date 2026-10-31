@@ -3,6 +3,14 @@ mod conversations;
 mod workspaces;
 mod pinned_workspaces;
 mod ai;
+#[allow(dead_code)]
+mod git_run;
+#[allow(dead_code)]
+mod git_locate;
+#[allow(dead_code)]
+mod git_redact;
+#[allow(dead_code)]
+mod git_errors;
 mod assets;
 mod cli_args;
 mod cli_scan;
@@ -178,6 +186,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(files::SearchRequests::default())
         .manage(ai::AIState::default())
+        .manage(git_run::GitRuns::default())
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
@@ -220,6 +229,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            git_locate::git_diagnostics,
+            git_run::git_cancel,
             workflow_store::read_workflow_store,
             workflow_store::write_workflow_store,
             update_feed::update_feed_fetch,

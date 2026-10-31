@@ -566,14 +566,14 @@ fn terminate_and_schedule_kill(pid: u32) {
 }
 
 #[cfg(unix)]
-fn terminate_group(pid: u32) {
+pub(crate) fn terminate_group(pid: u32) {
     unsafe {
         let _ = kill(-(pid as i32), 15);
     }
 }
 
 #[cfg(unix)]
-fn kill_group(pid: u32) {
+pub(crate) fn kill_group(pid: u32) {
     unsafe {
         let _ = kill(-(pid as i32), 9);
     }
@@ -585,10 +585,10 @@ unsafe extern "C" {
 }
 
 #[cfg(not(unix))]
-fn terminate_group(_pid: u32) {}
+pub(crate) fn terminate_group(_pid: u32) {}
 
 #[cfg(not(unix))]
-fn kill_group(_pid: u32) {}
+pub(crate) fn kill_group(_pid: u32) {}
 
 #[cfg(test)]
 mod review_tests {
