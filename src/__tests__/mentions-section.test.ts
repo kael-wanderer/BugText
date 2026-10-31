@@ -29,3 +29,16 @@ it("explains short titles and empty scans", () => {
   host.replaceChildren(); section.mount(host, { path: "/r/Title.md" }); host.querySelector("details")!.open = true; host.querySelector("details")!.dispatchEvent(new Event("toggle")); vi.runAllTimers();
   expect(host.textContent).toContain('No other note mentions "Title" without linking it.'); expect(host.textContent).toContain("none");
 });
+it("applies an open-buffer mention and reports a stale source without writing", async () => {
+  vi.useFakeTimers(); const { applyRename } = await import("../links/rename-plan");
+  let source = "Title here", original = source; const apply = vi.fn((changes: { from: number; to: number; insert: string }[]) => { source = source.slice(0, changes[0].from) + changes[0].insert + source.slice(changes[0].to); });
+  const writer = { findOpen: () => ({ text: source, apply }), read: vi.fn(), snapshot: vi.fn(), write: vi.fn() };
+  const host = document.createElement("div");
+  const section = createMentionsSection({ notes: () => [parseNote("/r/source.md", original)], folder: () => "/r", open: vi.fn(), link: async edits => ({ stale: await applyRename(edits, "/r", writer), failed: 0 }) });
+  section.mount(host, { path: "/r/Title.md" }); host.querySelector("details")!.open = true; host.querySelector("details")!.dispatchEvent(new Event("toggle")); vi.runAllTimers();
+  source = "changed"; [...host.querySelectorAll("button")].find(b => b.textContent === "Link")!.click(); await Promise.resolve(); await Promise.resolve();
+  expect(apply).not.toHaveBeenCalled(); expect(host.textContent).toContain("Changed since scan — Refresh");
+  source = original; [...host.querySelectorAll("button")].find(b => b.textContent === "Refresh")!.click(); vi.runAllTimers();
+  [...host.querySelectorAll("button")].find(b => b.textContent === "Link")!.click(); await Promise.resolve(); await Promise.resolve();
+  expect(apply).toHaveBeenCalledOnce(); expect(source).toBe("[Title](Title.md) here"); expect(writer.write).not.toHaveBeenCalled();
+});

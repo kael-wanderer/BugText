@@ -25,6 +25,8 @@ import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/acti
 import { runnableActions } from "./ai/actions";
 import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
+import { createMentionsSection } from "./links/mentions-section";
+import { applyRename } from "./links/rename-plan";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
@@ -243,15 +245,38 @@ const outlineView = createOutlineView(document.getElementById("outline-panel")!,
   void linksPanel.show(tab === "links");
   if (tab === "filter" || filterPanel) void loadFilterPanel().then((panel) => panel.show(tab === "filter"));
 });
+const mentionsSection = createMentionsSection({
+  notes: () => linkIndex.notes().map(note => {
+    const found = findTabByPath(getState().windows, note.path);
+    return found ? parseNote(note.path, editorForTab(found.tab.id).getText(found.tab.id)) : note;
+  }),
+  folder: () => getState().folder,
+  open: (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); },
+  link: async (edits, batch) => {
+    const folder = getState().folder;
+    if (!folder) return { stale: edits.length, failed: 0 };
+    const writer = noteLinkWriter(folder, "Before linking mentions"), findOpen = writer.findOpen;
+    writer.findOpen = path => {
+      const open = findOpen(path); if (!open) return null;
+      return { ...open, apply: changes => { open.apply(changes); const found = findTabByPath(getState().windows, path); if (found) linkIndex.onFileChanged(path, editorForTab(found.tab.id).getText(found.tab.id), false); } };
+    };
+    if (batch) return showRenameReview(edits, folder, writer, showToast, {
+      title: "Link mentions?", intro: "Choose the mentions to link.", outsideHeading: `Mentions in ${edits[0].path.split("/").pop()}`, insideHeading: "Mentions", cancel: "Don't Link", apply: n => `Link ${n} mention${n === 1 ? "" : "s"}`, snapshotNote: "Closed notes get a Recovery snapshot first.",
+    });
+    let failed = 0; writer.onFailure = () => { failed++; };
+    const skipped = await applyRename(edits, folder, writer);
+    return { stale: skipped - failed, failed };
+  },
+});
 const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
-  return tab && views.has(getState().activeWindowId) && isMarkdownFile(tab.path ?? tab.name)
+  return tab && !tab.tableView && views.has(getState().activeWindowId) && !views.get(getState().activeWindowId)!.graphActive() && isMarkdownFile(tab.path ?? tab.name)
     ? { path: tab.path ?? `${getState().folder}/untitled.md`, text: activeView().editor.getText(tab.id) } : null;
 }, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line), (target) => {
   const tab = activeMeta();
   const context = tab && linkContext(tab.id);
   if (context) void followLink(target, context);
-}, { card: hoverCard, enabled: () => currentSettings.links.hoverPreview });
+}, { card: hoverCard, enabled: () => currentSettings.links.hoverPreview }, mentionsSection);
 // The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
 let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
 let savedViews: SavedViewStore | undefined;

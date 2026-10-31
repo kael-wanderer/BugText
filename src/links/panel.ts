@@ -1,12 +1,14 @@
+import type { createMentionsSection } from "./mentions-section";
 import type { LinkIndex } from "./index";
 import { node } from "./insert-picker";
 import type { createHoverCard } from "./hover-card";
 import { cardStateForPath, cardStateForTarget } from "./hover-state";
-export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: () => { path: string; text: string } | null, open: (path: string, line: number) => void, jump: (line: number) => void, follow?: (target: string) => void, hover?: { card: ReturnType<typeof createHoverCard>; enabled(): boolean }) {
+export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: () => { path: string; text: string } | null, open: (path: string, line: number) => void, jump: (line: number) => void, follow?: (target: string) => void, hover?: { card: ReturnType<typeof createHoverCard>; enabled(): boolean }, mentions?: ReturnType<typeof createMentionsSection>) {
   let active = false;
   function render() {
     if (!active) return;
     hover?.card.hideWithin(host);
+    mentions?.cancel();
     host.replaceChildren();
     if (!index.folder) { host.append(node("p", "No folder open — links between notes need a folder.", "outline-empty")); return; }
     if (!index.ready) { host.append(node("p", "Indexing notes…", "outline-empty")); return; }
@@ -40,8 +42,9 @@ export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: (
       if (follow) row.title = "Click to show in note · ⌘-click to open";
       row.onclick = (e) => { if ((e.metaKey || e.ctrlKey) && follow) follow(link.target); else jump(link.line); }; host.append(row);
     }
+    mentions?.mount(host, note);
     if (index.skipped.length) host.append(node("p", `Skipped ${index.skipped.length} note${index.skipped.length === 1 ? "" : "s"} (unreadable or over 2 MB).`, "link-panel-note"));
     if (index.capped) host.append(node("p", "Indexed the first 5,000 files. Some notes are not included.", "link-panel-note"));
   }
-  return { render, async show(on: boolean) { active = on; host.hidden = !on; if (on) { render(); try { await index.ensure(); render(); } catch { host.replaceChildren(node("p", "Could not index notes.", "outline-empty")); } } } };
+  return { render, async show(on: boolean) { active = on; if (!on) mentions?.cancel(); host.hidden = !on; if (on) { render(); try { await index.ensure(); render(); } catch { host.replaceChildren(node("p", "Could not index notes.", "outline-empty")); } } } };
 }
