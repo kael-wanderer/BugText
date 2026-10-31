@@ -54,6 +54,7 @@ export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 
 export type Settings = {
   export: ExportSettings;
+  git: { showSourceControl: boolean };
   mcp: { enabled: boolean };
   theme: ThemeName;
   darkTheme: DarkThemeName;
@@ -77,9 +78,13 @@ export type Settings = {
   workspaceContextK: number;
   appIcon: AppIconId;
   images: ImageSettings;
-  links: { complete: boolean; onRename: "ask" | "never" };
+  links: { complete: boolean; onRename: "ask" | "never"; hoverPreview: boolean };
   tables: TableSettings;
   templates: TemplateSettings;
+  performance: { largeFolders: "auto" | "off" };
+  onboarding: { hintDismissed: boolean };
+  focus: { width: "narrow" | "standard" | "wide" };
+  editor: { typewriterScrolling: boolean };
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -87,8 +92,11 @@ export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
 ];
 const THEMES = THEME_OPTIONS.map((theme) => theme.id);
 
+export const FOCUS_WIDTHS = { narrow: 560, standard: 680, wide: 880 } as const;
+
 export const DEFAULT_SETTINGS: Settings = {
   export: parsePresets(undefined),
+  git: { showSourceControl: true },
   mcp: { enabled: false },
   theme: "dark",
   darkTheme: "dark",
@@ -111,12 +119,17 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceContextK: 5,
   appIcon: DEFAULT_APP_ICON,
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
-  links: { complete: true, onRename: "ask" },
+  links: { complete: true, onRename: "ask", hoverPreview: true },
   tables: { formatOnEdit: true, pasteAsTable: true },
+  performance: { largeFolders: "auto" },
+  onboarding: { hintDismissed: true },
+  focus: { width: "standard" },
+  editor: { typewriterScrolling: false },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
+export const FRESH_SETTINGS_JSON = JSON.stringify({ ...DEFAULT_SETTINGS, onboarding: { hintDismissed: false } }, null, 2);
 
 export function normalizeThemeName(value: unknown): ThemeName | null {
   if (typeof value !== "string") return null;
@@ -166,7 +179,12 @@ function defaults(): Settings {
     links: { ...DEFAULT_SETTINGS.links },
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
+    performance: { ...DEFAULT_SETTINGS.performance },
+    onboarding: { ...DEFAULT_SETTINGS.onboarding },
+    focus: { ...DEFAULT_SETTINGS.focus },
+    editor: { ...DEFAULT_SETTINGS.editor },
     export: parsePresets(undefined),
+    git: { ...DEFAULT_SETTINGS.git },
   };
 }
 
@@ -256,6 +274,7 @@ export function parseSettings(raw: string): Settings {
 
   return {
     export: parsePresets(data.export),
+    git: { showSourceControl: (data.git as { showSourceControl?: unknown } | undefined)?.showSourceControl !== false },
     mcp: { enabled: (data.mcp as { enabled?: unknown } | undefined)?.enabled === true },
     theme,
     darkTheme: (() => {
@@ -300,6 +319,10 @@ export function parseSettings(raw: string): Settings {
     links: parseLinks(data.links),
     tables: parseTables(data.tables),
     templates: parseTemplates(data.templates),
+    performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
+    onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
+    focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },
+    editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true },
   };
 }
 
@@ -334,5 +357,5 @@ export function applySettings(settings: Settings): void {
 
 function parseLinks(value: unknown): Settings["links"] {
   const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  return { complete: typeof data.complete === "boolean" ? data.complete : true, onRename: data.onRename === "never" ? "never" : "ask" };
+  return { complete: typeof data.complete === "boolean" ? data.complete : true, onRename: data.onRename === "never" ? "never" : "ask", hoverPreview: data.hoverPreview !== false };
 }

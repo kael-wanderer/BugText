@@ -7,21 +7,17 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
-
+- Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.
+- The Links tab finds unlinked mentions and lets you review and link them, with Recovery snapshots for closed notes.
+- Large folders refresh less often while preserving open-file checks; Settings ▸ General controls the mode and performance diagnostics are available from the status bar and command palette.
 - A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to toggle reading time; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
 - Graph view tabs from the command palette: local links and backlinks at depth 1 or 2, folder graphs capped at the 500 most-linked notes, folder/orphan filters, missing targets, keyboard navigation and zoom. Layout runs in a Web Worker with a fixed 300-step budget.
-
 - Folder-scoped bookmarks capture the current note and line, with a keyboard-accessible list and safe Missing states. Add Bookmark (⌥⌘B), Show Bookmarks (⇧⌥⌘B), and per-window Go Back / Go Forward (⌃⌘Left / Right) are available from the palette and native menus; note navigation retains up to 100 entries.
 - Read-only Table view from Filter and the command palette, with property columns, sorting, keyboard navigation and batches of 500 notes.
-
 - Open Daily Note (⇧⌘D; ⌥⌘D is reserved by the macOS Dock) opens today's note in `Daily/` inside the open folder. On first use it creates the note with a `date` property and a heading. It never overwrites an existing note.
-
 - New Tab (⌘T) creates an untitled document, the same as New File (⌘N).
-
 - Filter sidebar (⇧⌥⌘F) and folder search operators for tags, properties, paths and dates.
-
 - A properties card above Markdown notes shows and edits frontmatter values, with parse errors shown safely. Tags are indexed from frontmatter and inline `#tag` text.
-
 - PDF highlights and comments, an annotations panel, linked Copy Quote and Markdown export to notes or the clipboard.
 - Replace in Folder (⌥⌘F) previews selected text changes, supports include/exclude globs and regex groups, and offers Recovery-backed undo.
 - PDF and Word export presets, with a pre-export sheet checking tools, fonts and missing images; manage presets and tool diagnostics in Settings ▸ Export.
@@ -47,7 +43,30 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
-
+- Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").
+- Unlinked Mentions no longer draws a second divider above its heading.
+- Source Control: the Commit button says "Commit" instead of "Commit 0 files" when nothing is checked, and the conflict banner offers Open file for the selected conflicted file.
+- The status bar no longer shows through at the bottom of the Settings screen.
+- Search: Preview replace and the empty-result buttons use the panel's button style, and an empty result no longer repeats "No results".
+- Undoing back to the saved text marks the tab saved again and drops its recovery draft; it stayed marked unsaved.
+- Shortcut hints list modifiers in the standard macOS order (⌃⌥⇧⌘), e.g. ⇧⌘D instead of ⌘⇧D.
+- Search: the result count now matches the list when Files to include/exclude hide some results.
+- After linking a mention in an open note, Undo or closing the note without saving also removes it from "Linked from"; the list kept showing the undone link.
+- Unlinked mentions in the Links tab use the panel's styles: compact Line, Link and Skip buttons and a section heading matching the others; they showed as large unstyled buttons.
+- Export sheet summaries and Explorer notices use the muted text color; they referenced an undefined color variable.
+- A disabled Commit button in Source Control looks disabled; it kept the accent color.
+- Settings ▸ Git uses the standard on/off switch for Show Source Control instead of a plain checkbox.
+- Show Git Log opens as a dialog with Copy and Close always visible and Esc to close; the buttons were below the full log and Esc did nothing.
+- The Source Control diff for the selected file updates after Git actions and refreshes; it kept showing the earlier content, such as conflict markers already resolved.
+- Source Control error messages (for example conflict markers left in a file, sign-in or network failures) stay visible; they disappeared about a second after appearing.
+- The Source Control conflict banner says the merge stopped; it said "Pull stopped" although only Merge can produce conflicts.
+- The Save before committing prompt is a centered dialog sized to its text, with Esc to cancel; it no longer covers most of the window as an unstyled panel.
+- Leaving Focus mode keeps the cursor and selection where they are; it no longer moves the cursor to the top visible line or back to where it was on entry.
+- Choosing Keep mine when a file changed on disk no longer asks again each time the window regains focus; it asks again only if the file changes once more.
+- Source Control checks dirty files inside selected untracked folders before committing.
+- Reduced large-folder refresh request size by sending note paths relative to the open folder.
+- Avoided redundant workbench renders while unchanged open files are checked.
+- Reduced repeated folder refresh, backlink, graph layout and AI index work; file reads run off the native main thread and PDFs transfer as raw bytes.
 - The window footer no longer repeats the word count and cursor position while the status bar is shown. Turning the status bar off restores them in the footer.
 - Saved view "Update selected" saves the current filter under the selected view's own name, even when the View name field is empty. The "Enter a view name." message now appears beside the save buttons instead of below the list.
 - The command palette input no longer capitalizes the first letter of the query (typing `alpha` showed `Alpha`), and no longer applies autocorrect.
@@ -99,6 +118,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Hover or focus a note link in the preview or Links tab to see a plain-text preview; Settings ▸ Editing can turn it off.
+- Focus mode (⌃⌘Z or Esc to exit) centers Markdown and text editing, with configurable column width and optional typewriter scrolling.
+- Empty Explorer and search states offer relevant actions, and a dismissible first-run hint helps new users start a note or open a folder.
 - Checklists: `- [ ]` items show as checkboxes in the preview. Clicking one (or Space
   on a focused box) ticks the item in the source as one undo step, without moving the
   cursor. Edit ▸ Toggle Task (⌘⇧X) turns the selected lines into tasks or flips them.
@@ -128,6 +150,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Reject traversal paths before applying reviewed note-link edits.
+- Close link previews when the rendered document changes.
 - A pending preview refresh no longer replaces the newly selected tab's preview.
 - Outline no longer drops a heading that has an HTML comment on the same line.
 - Heading search ignores fenced code, front matter, comments and indented code, and recognizes setext headings.

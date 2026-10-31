@@ -9,9 +9,10 @@ export type StatusBarState = {
   words: number;
   dirty: boolean;
   recovered: boolean;
+  largeFolder: boolean;
 };
 
-export function createStatusBar(host: HTMLElement, goToLine: () => void) {
+export function createStatusBar(host: HTMLElement, goToLine: () => void, onLargeFolder: () => void = () => {}) {
   const bar = document.createElement("div");
   bar.className = "status-bar";
   const cursor = document.createElement("button");
@@ -25,7 +26,10 @@ export function createStatusBar(host: HTMLElement, goToLine: () => void) {
   save.className = "status-bar-save";
   save.setAttribute("role", "status");
   save.setAttribute("aria-live", "polite");
-  bar.append(cursor, selection, words, save);
+  const large = document.createElement("button");
+  large.type = "button"; large.className = "status-bar-large"; large.textContent = "Large folder";
+  large.title = "Folder checked every 10 s · Show diagnostics"; large.onclick = onLargeFolder;
+  bar.append(cursor, selection, words, large, save);
   let readingTime = false;
   let wordCount = 0;
   const updateWords = (): void => {
@@ -44,6 +48,7 @@ export function createStatusBar(host: HTMLElement, goToLine: () => void) {
         bar.remove();
         return;
       }
+      large.hidden = !state.largeFolder;
       cursor.textContent = cursorLabel(state.cursor);
       selection.hidden = !state.selection.length;
       selection.textContent = state.selection.length

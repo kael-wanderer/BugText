@@ -19,6 +19,8 @@ const DRAFT_DEBOUNCE_MS = 1500;
 const draftTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const diskStats = new Map<string, DiskState>();
 const pendingStats = new Map<string, Promise<void>>();
+// Disk versions the user answered "Keep mine" to; not asked again until the file changes again.
+const keptStats = new Map<string, DiskState>();
 const lastSnapshotHashes = new Map<string, string>();
 
 export type DiscardedDraft = { file: string; name: string; path: string | null; updatedAt: number; discardedAt: number };
@@ -136,6 +138,7 @@ async function statOf(path: string): Promise<DiskState> {
 export async function recordStat(path: string): Promise<void> {
   const pending = statOf(path).then((stat) => {
     diskStats.set(path, stat);
+    keptStats.delete(path);
   });
   pendingStats.set(path, pending);
   await pending;
@@ -145,6 +148,7 @@ export async function recordStat(path: string): Promise<void> {
 export function forgetStat(path: string): void {
   diskStats.delete(path);
   pendingStats.delete(path);
+  keptStats.delete(path);
 }
 
 export async function hasDiskChanged(path: string): Promise<boolean> {
@@ -169,6 +173,7 @@ export async function checkExternalChange(
   const current = await statOf(path);
   const decision = changeDecision(diskStats.get(path) ?? null, current, dirty);
   if (decision === "unchanged") return decision;
+  if (decision === "conflict" && keptStats.has(path) && changeDecision(keptStats.get(path)!, current, true) === "unchanged") return "kept";
   if (decision === "deleted") {
     deps.markDirty();
     return decision;
@@ -204,6 +209,7 @@ export async function checkExternalChange(
     }
   }
 
+  keptStats.set(path, current);
   try {
     const onDisk = await invoke<string>("read_file", { path });
     showComparison(

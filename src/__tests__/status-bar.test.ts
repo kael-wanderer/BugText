@@ -13,7 +13,7 @@ import { searchSettings } from "../settings-screen/registry";
 
 const note: StatusBarState = {
   pathOrName: "note.md", enabled: true, cursor: { line: 12, column: 4 },
-  selection: "", words: 1204, dirty: false, recovered: false,
+  selection: "", words: 1204, dirty: false, recovered: false, largeFolder: false,
 };
 
 function fixture() {

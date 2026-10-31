@@ -6,7 +6,7 @@ import { loadProperties, propertiesModule } from "../properties/loader";
 import { bodyTags, frontMatterTags, tagKey } from "../properties/tags";
 
 export type IndexedNote = { path: string; source: string; links: NoteLink[]; headings: OutlineHeading[]; tags: string[]; properties: Record<string, unknown> | null; propertyError?: { line: number; message: string } };
-export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string> };
+export type LinkScan = { notes: IndexedNote[]; skipped: string[]; stamps?: Record<string, string>; removed?: string[]; walked?: number; capped?: boolean };
 export type LinkIndex = ReturnType<typeof createLinkIndex>;
 // Properties need the lazily loaded parser: await loadProperties() before calling this (ensure() does).
 export function parseNote(path: string, source: string): IndexedNote {
@@ -33,27 +33,38 @@ export function folderTags(index: LinkIndex): Map<string, { name: string; count:
   }
   return tags;
 }
-export function createLinkIndex(scan = (folder: string, paths?: string[], known?: Record<string, string>) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known })) {
+export function compactKnown(folder: string, known: Record<string, string> = {}): Record<string, string> {
+  const prefix = folder.replace(/\/$/, "") + "/";
+  return Object.fromEntries(Object.entries(known).map(([path, stamp]) => [path.startsWith(prefix) ? path.slice(prefix.length) : path, stamp]));
+}
+export function createLinkIndex(scan = (folder: string, paths?: string[], known?: Record<string, string>) => invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known: known && compactKnown(folder, known) })) {
   let folder: string | null = null;
   let generation = 0;
   let ready = false;
   let building: Promise<void> | null = null;
   let notes = new Map<string, IndexedNote>();
+  let savedSources = new Map<string, string>();
+  let pendingSaved = new Map<string, string | null>();
   let pending = new Map<string, string | null>();
   let skipped: string[] = [];
   let stamps: Record<string, string> = {};
   let refreshing = false;
+  let walked = 0, capped = false;
+  let backlinksDirty = true;
+  let backlinksMap = new Map<string, (ReturnType<typeof outgoing>[number] & { path: string; context: string })[]>();
   const versions = new Map<string, number>();
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((fn) => fn());
   const contains = (path: string) => folder !== null && path.startsWith(folder.replace(/\/$/, "") + "/");
   function apply(path: string, text: string | null) {
+    backlinksDirty = true;
     notes.delete(path);
     if (text !== null && /\.(md|markdown)$/i.test(path)) notes.set(path, parseNote(path, text));
   }
   function setFolder(next: string | null) {
     if (folder === next) return;
-    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; refreshing = false; versions.clear(); notify();
+    backlinksDirty = true;
+    generation++; folder = next; ready = false; building = null; notes = new Map(); savedSources = new Map(); pendingSaved = new Map(); pending = new Map(); skipped = []; stamps = {}; walked = 0; capped = false; refreshing = false; versions.clear(); notify();
   }
   async function ensure(next = folder): Promise<void> {
     setFolder(next);
@@ -65,7 +76,12 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
       const promise = scan(root).then((result) => {
         if (current !== generation) return;
         stamps = result.stamps ?? {};
-        notes = new Map(result.notes.map((note) => [note.path, withProperties(note)])); skipped = result.skipped;
+        walked = result.walked ?? 0; capped = result.capped ?? false;
+        backlinksDirty = true;
+        notes = new Map(result.notes.map((note) => [note.path, withProperties(note)]));
+        savedSources = new Map(result.notes.map(note => [note.path, note.source]));
+        for (const [path, text] of pendingSaved) { if (text === null) savedSources.delete(path); else savedSources.set(path, text); }
+        pendingSaved.clear(); skipped = result.skipped;
         for (const [path, text] of pending) apply(path, text);
         pending.clear(); ready = true; notify();
       }).finally(() => { if (current === generation) building = null; });
@@ -73,11 +89,28 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     }
     await building;
   }
-  function onFileChanged(path: string, text: string | null) {
+  function onFileChanged(path: string, text: string | null, persisted = true) {
     if (!contains(path)) return;
+    const savedChanged = persisted && (text === null ? savedSources.has(path) : savedSources.get(path) !== text);
+    if (persisted) {
+      if (text === null) savedSources.delete(path); else if (/\.(md|markdown)$/i.test(path)) savedSources.set(path, text);
+      if (building) pendingSaved.set(path, text);
+    }
+    if (!/\.(md|markdown)$/i.test(path) && !notes.has(path)) return;
+    if (ready && (text === null ? !notes.has(path) : notes.get(path)?.source === text)) { if (savedChanged) notify(); return; }
     versions.set(path, (versions.get(path) ?? 0) + 1);
     if (building) pending.set(path, text);
     if (ready) { apply(path, text); notify(); }
+  }
+  /**
+   * Editor text changed. The index normally follows saves only; when it holds unsaved text for
+   * this note (a Link action or task edit applied to an open tab), it follows the tab until the
+   * text matches the saved copy again, so Undo does not leave a link that is no longer there.
+   */
+  function onLiveEdit(path: string, text: string) {
+    const current = notes.get(path), saved = savedSources.get(path);
+    if (!ready || !current || saved === undefined || current.source === saved) return;
+    onFileChanged(path, text, false);
   }
   function outgoing(path: string, source?: string) {
     const note = source === undefined ? notes.get(path) : { path, source, links: noteLinks(source), headings: markdownOutline(source) };
@@ -89,7 +122,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     });
   }
   return {
-    ensure, setFolder, onFileChanged, outgoing,
+    ensure, setFolder, onFileChanged, onLiveEdit, outgoing,
     async refresh() {
       if (!folder || !ready || refreshing) return;
       refreshing = true;
@@ -98,10 +131,24 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         const result = await scan(folder, undefined, stamps);
         if (current !== generation) return;
         const next = result.stamps ?? {};
-        for (const path of Object.keys(stamps)) if (!(path in next) && versions.get(path) === before.get(path)) notes.delete(path);
-        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) notes.set(note.path, withProperties(note));
-        for (const path of result.skipped) if (versions.get(path) === before.get(path)) notes.delete(path);
-        stamps = next; skipped = result.skipped; notify();
+        let changed = false;
+        const removed = result.removed ?? Object.keys(stamps).filter(path => !(path in next));
+        for (const path of removed) if (versions.get(path) === before.get(path)) savedSources.delete(path);
+        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) savedSources.set(note.path, note.source);
+        for (const path of result.skipped) if (versions.get(path) === before.get(path)) savedSources.delete(path);
+        for (const path of removed) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
+        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path) && notes.get(note.path)?.source !== note.source) { notes.set(note.path, withProperties(note)); changed = true; }
+        for (const path of result.skipped) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
+        const nextSkipped = [...result.skipped].sort();
+        const previousSkipped = [...skipped].sort();
+        if (nextSkipped.length !== previousSkipped.length || nextSkipped.some((path, i) => path !== previousSkipped[i])) changed = true;
+        if ((result.walked ?? walked) !== walked || (result.capped ?? capped) !== capped) changed = true;
+        walked = result.walked ?? walked; capped = result.capped ?? capped;
+        if (result.removed) { stamps = { ...stamps, ...next }; for (const path of removed) delete stamps[path]; }
+        else stamps = next;
+        skipped = nextSkipped;
+        for (const path of versions.keys()) if (!(path in stamps)) versions.delete(path);
+        if (changed) { backlinksDirty = true; notify(); }
       } finally { if (current === generation) refreshing = false; }
     },
     onFileRemoved: (path: string) => onFileChanged(path, null),
@@ -114,13 +161,30 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
       result.notes.forEach((note) => onFileChanged(note.path, note.source));
     },
     backlinks(path: string) {
-      return [...notes.values()].flatMap((note) => outgoing(note.path).filter((link) => link.resolved.kind === "note" && link.resolved.path === path).map((link) => ({ ...link, path: note.path, context: note.source.split("\n")[link.line - 1] ?? "" })));
+      if (backlinksDirty) {
+        backlinksMap = new Map();
+        for (const note of notes.values()) {
+          const lines = note.source.split("\n");
+          for (const link of outgoing(note.path)) {
+            if (link.resolved.kind !== "note" || !link.resolved.path) continue;
+            const entries = backlinksMap.get(link.resolved.path) ?? [];
+            entries.push({ ...link, path: note.path, context: lines[link.line - 1] ?? "" });
+            backlinksMap.set(link.resolved.path, entries);
+          }
+        }
+        backlinksDirty = false;
+      }
+      return backlinksMap.get(path) ?? [];
     },
     notes: () => [...notes.values()],
     get: (path: string) => notes.get(path),
+    savedSource: (path: string) => savedSources.get(path),
     get folder() { return folder; },
     get ready() { return ready; },
     get skipped() { return skipped; },
+    get walked() { return walked; },
+    get capped() { return capped; },
+    get markdownCount() { return Object.keys(stamps).length; },
     subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

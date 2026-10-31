@@ -1,3 +1,5 @@
+import { isFolderEmpty } from "./empty-states/rules";
+import { emptyState } from "./empty-states/views";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
 import { compareActions } from "./compareactions";
 import { showContextMenu, type MenuItem } from "./contextmenu";
@@ -31,6 +33,11 @@ let pathChangeCallback: (from: string, to: string | null) => void = () => {};
 let explorerActions: ExplorerActions = {};
 
 export type ExplorerActions = {
+  onOpenFile?: () => void;
+  onNewNote?: () => void;
+  onNewFromTemplateRoot?: () => void;
+  onDailyNote?: () => void;
+  keyHint?: (id: string) => string;
   onOpenPreview?: (path: string) => void;
   onOpenSide?: (path: string) => void;
   onCompare?: (selectedPath: string, path: string) => void;
@@ -598,6 +605,18 @@ function render(): void {
     ? pathName(folder)
     : "No folder";
 
+  const emptyFolder = document.getElementById("explorer-empty-folder");
+  if (emptyFolder) {
+    const show = !!folder && !!tree && isFolderEmpty(tree.children ?? undefined, explorerActions.isShowingHidden?.() ?? true);
+    emptyFolder.hidden = !show; emptyFolder.replaceChildren();
+    if (show) emptyFolder.append(emptyState("This folder is empty.", null, [
+      { label: "New Note", hint: explorerActions.keyHint?.("file.new") ?? "", run: () => explorerActions.onNewNote?.(), primary: true },
+      { label: "New from Template", hint: explorerActions.keyHint?.("file.new_from_template") ?? "", run: () => explorerActions.onNewFromTemplateRoot?.() },
+      { label: "Open Daily Note", hint: explorerActions.keyHint?.("file.daily_note") ?? "", run: () => explorerActions.onDailyNote?.() },
+    ]));
+  }
+  const folderHint = document.getElementById("explorer-open-folder-hint"); if (folderHint) folderHint.textContent = explorerActions.keyHint?.("file.open_folder") ?? "";
+  const fileHint = document.getElementById("explorer-open-file-hint"); if (fileHint) fileHint.textContent = explorerActions.keyHint?.("file.open") ?? "";
   const treeElement = document.getElementById("explorer-tree")!;
   treeElement.replaceChildren();
   if (tree?.children) {
@@ -689,6 +708,8 @@ export function initExplorer(
     void chooseFolder();
   });
 
+  document.getElementById("explorer-empty-open-file")?.addEventListener("click", () => explorerActions.onOpenFile?.());
+
   const rootMenu = (event: MouseEvent): void => {
     if ((event.target as HTMLElement).closest(".tree-row")) return;
     const folder = getState().folder;
@@ -707,4 +728,12 @@ export function initExplorer(
 
   subscribe(render);
   render();
+}
+
+export function setExplorerNotice(text: string | null): void {
+  const tree = document.getElementById("explorer-tree");
+  if (!tree) return;
+  let notice = tree.parentElement?.querySelector<HTMLElement>(".explorer-notice");
+  if (!notice && text) { notice = document.createElement("p"); notice.className = "explorer-notice"; notice.setAttribute("role", "status"); tree.after(notice); }
+  if (notice) { notice.textContent = text ?? ""; notice.hidden = !text; }
 }

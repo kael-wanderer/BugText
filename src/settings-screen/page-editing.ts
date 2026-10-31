@@ -68,10 +68,14 @@ export const editingPage: SettingsPage = {
           onChange: (wrapColumn) => deps.onSettingsChange({ ...deps.getSettings(), wrapColumn }),
         }),
       ),
+      caption("Focus"),
+      row("focus-width", "Focus width", "Width of the centered writing column.", select<Settings["focus"]["width"]>("Focus width", [{ value: "narrow", label: "Narrow" }, { value: "standard", label: "Standard" }, { value: "wide", label: "Wide" }], settings.focus.width, width => deps.onSettingsChange({ ...deps.getSettings(), focus: { width } }))),
+      row("typewriter-scrolling", "Typewriter scrolling", "Keep the caret near the center while typing.", toggle("Typewriter scrolling", settings.editor.typewriterScrolling, typewriterScrolling => deps.onSettingsChange({ ...deps.getSettings(), editor: { typewriterScrolling } }))),
       caption("Navigation"),
       row("show-status-bar", "Show status bar", "Also in View ▸ Show Status Bar.", toggle("Show status bar", settings.showStatusBar, (showStatusBar) => deps.onSettingsChange({ ...deps.getSettings(), showStatusBar }))),
       row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
       caption("Links"),
+      row("links-hover-preview", "Preview links on hover", "Show a short preview of linked notes.", toggle("Preview links on hover", settings.links.hoverPreview, hoverPreview => deps.onSettingsChange({ ...deps.getSettings(), links: { ...deps.getSettings().links, hoverPreview } }))),
       row("links-complete", "Suggest notes while typing links", "After ]( in Markdown notes.",
         toggle("Suggest notes while typing links", settings.links.complete, (complete) => {
           const current = deps.getSettings(); deps.onSettingsChange({ ...current, links: { ...current.links, complete } });

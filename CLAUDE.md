@@ -148,7 +148,7 @@ link index builds lazily off-thread, refreshes changed notes and supplies the Li
 beside Outline (⇧⌥⌘O). Explorer rename/move offers a checked target-only review: open tabs
 receive one undoable edit; closed notes are compared with the scan, snapshotted in Recovery
 and written atomically inside the open folder. Settings ▸ Editing controls suggestions and
-whether to ask on rename.
+whether to ask on rename. Hover cards in preview and Links use saved text from the link index without reads; `links.hoverPreview` controls them. Unlinked mentions scan the index in slices while expanded and use the rename writer and review sheet to create links.
 
 Markdown properties appear above the editor and edit only the active note’s YAML
 frontmatter through the normal dirty and undo path. Invalid YAML is read-only;
@@ -166,6 +166,12 @@ the `clipboard-manager:allow-read-text` capability. `⌘Enter` is the native
 Table ▸ Insert Row Below accelerator; outside a table it inserts a line below.
 
 Folder search runs text matching off the main thread, then searches PDFs progressively with cancellation and explicit limit and skipped-file notes. The AI workspace index is scoped to the current folder, cancels superseded builds, retries failures, and applies saves received during indexing.
+
+Focus mode uses `body.focus-active` per native window and is never persisted; ⌃⌘Z or Esc exits, and only Markdown/plain tabs qualify. Typewriter scrolling uses a transaction extender for user edits and keyboard selections. Native check menu items accept accelerator overrides.
+
+Empty-state builders live in `src/empty-states/`. `FRESH_SETTINGS_JSON` sets `onboarding.hintDismissed` to false only when settings are first created; existing or corrupt settings default to dismissed and are never rewritten by the hint code.
+
+Workspace refreshes use a single-flight runner. Open tabs are checked every 3 seconds; automatic large-folder mode starts at 2,000 Markdown notes or the walk cap, ends below 1,800, and checks the folder every 10 seconds while focused. Unfocused large windows skip folder walks until focus. Link scans return deltas, `read_file_bytes` transfers raw bytes, and performance diagnostics remain in memory only.
 
 The Search panel’s Replace row previews folder-wide text changes with include/exclude globs and regex groups. Rust `replace_preview` confines paths and limits previews to 5,000 matches in 1,000 files. Open tabs change as unsaved edits; closed files receive Recovery snapshots and `write_file_atomic` checks. Undo replace checks current contents and applies inverse edits or Recovery-protected atomic writes.
 
@@ -260,6 +266,12 @@ CORS headers). A newer semantic version offers to open the `https` release page 
 the browser; the app never downloads or installs itself, so there is no updater
 plugin or signing key. Settings ▸ General offers Manual (no background checks) and
 Automatic (at most once per 24 hours).
+
+Source Control finds the installed Git executable like export tools and runs only explicit
+user actions, with Rust-built arguments and an environment allowlist; BugText does not handle
+credentials. Pull is fast-forward only; Merge is explicit and stops before commit or on
+conflicts. Recovery snapshots protect dirty tabs before worktree changes, followed by the
+Reload / Keep mine check. The Git log is redacted and kept only in memory.
 
 The build number lives in `tauri.conf.json` as `bundle.macOS.bundleVersion`
 (started at 249). Raise it by one for every build handed out, even when the version

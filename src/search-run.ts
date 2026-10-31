@@ -21,12 +21,14 @@ export class SearchRun {
     this.walkLimit = result.walk_limit;
     this.hitLimit ||= result.hit_limit;
   }
-  get status(): string {
+  get status(): string { return this.statusFor(this.hits); }
+  /** Status line counting only `hits`, the results actually shown. */
+  statusFor(hits: SearchHit[]): string {
     if (this.phase === "text") return "Searching…";
     if (this.phase === "error") return "Invalid regular expression";
-    const files = new Set(this.hits.map((h) => h.relative)).size;
-    const count = this.hits.length
-      ? `${this.hits.length} result${this.hits.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
+    const files = new Set(hits.map((h) => h.relative)).size;
+    const count = hits.length
+      ? `${hits.length} result${hits.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}`
       : "No results";
     const left = this.pdfTotal - this.pdfDone;
     return this.phase === "stopped" ? `Stopped · ${count} · ${left} PDF${left === 1 ? "" : "s"} not searched` : count;

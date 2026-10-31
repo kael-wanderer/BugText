@@ -6,7 +6,7 @@ import { KEYMAP_COMMANDS } from "../keymap";
 export type AiSubPage = "use-for" | "context" | "actions" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
-  "general" | "editing" | "export" | "theme" | "shortcuts" | "ai";
+  "general" | "editing" | "export" | "git" | "theme" | "shortcuts" | "ai";
 
 export const SETTINGS_PAGES: ReadonlyArray<{
   id: SettingsPageId;
@@ -26,6 +26,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
       "wrap wrapping column soft lines",
   },
   { id: "export", label: "Export", keywords: "presets tools pandoc typst pdf word" },
+  { id: "git", label: "Git", keywords: "source control backup sync version path" },
   {
     id: "theme",
     label: "Themes",
@@ -48,6 +49,7 @@ export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
   editing: "How lines wrap, how links and tables behave, where pasted images go, and where templates and quick notes live.",
   export: "Tools and presets for PDF and Word export.",
+  git: "Source Control and installed Git.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -68,6 +70,9 @@ export function shortcutEntryId(commandId: string): string {
 }
 
 export const SETTING_ENTRIES: SettingEntry[] = [
+  { id: "git.path", page: "git", label: "Git path", keywords: "git executable" },
+  { id: "git.version", page: "git", label: "Git version", keywords: "git version" },
+  { id: "git.show", page: "git", label: "Show Source Control", keywords: "sidebar git" },
   { id: "export-preset", page: "export", label: "Export preset", keywords: "presets" },
   { id: "export-page-size", page: "export", label: "Page size", keywords: "paper pdf" },
   { id: "export-margins", page: "export", label: "Margins", keywords: "page pdf mm" },
@@ -83,6 +88,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   { id: "export-numbered", page: "export", label: "Numbered sections", keywords: "export preset" },
   { id: "export-pandoc", page: "export", label: "Pandoc", keywords: "export tool install" },
   { id: "export-typst", page: "export", label: "Typst", keywords: "export tool install" },
+  { id: "large-folders", page: "general", label: "Large folders", keywords: "performance refresh slow many files notes index" },
   { id: "interface-size", page: "general", label: "App Font Size", keywords: "interface text size scale toolbar tabs pdf chrome" },
   { id: "interface-font", page: "general", label: "App Font", keywords: "interface font family typeface custom" },
   { id: "explorer-size", page: "general", label: "File Explorer Font Size", keywords: "sidebar file folder text size readability" },
@@ -134,8 +140,11 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Fonts and sizes",
     keywords: "font typeface in general",
   },
+  { id: "links-hover-preview", page: "editing", label: "Preview links on hover", keywords: "note link hover tooltip preview" },
   { id: "links-complete", page: "editing", label: "Suggest notes while typing links", keywords: "links completion notes markdown" },
   { id: "links-on-rename", page: "editing", label: "When renaming or moving notes", keywords: "links rename move backlinks ask never" },
+  { id: "focus-width", page: "editing", label: "Focus width", keywords: "zen writing column narrow wide" },
+  { id: "typewriter-scrolling", page: "editing", label: "Typewriter scrolling", keywords: "caret center typing scroll" },
   { id: "show-status-bar", page: "editing", label: "Show status bar", keywords: "cursor words reading time save" },
   { id: "sync-scroll", page: "editing", label: "Sync scroll", keywords: "navigation preview editor" },
   {

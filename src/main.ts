@@ -1,3 +1,17 @@
+import "./git/git.css";
+import { gitRepo, gitStatus, gitDiff, gitAction, gitCancel } from "./git/api";
+import { createGitPanel, type GitPanelControl } from "./git/panel";
+import { gitRoots, runGitAction } from "./git/flow";
+import { gitPaletteItems } from "./git/palette";
+import type { GitRepoInfo } from "./git/model";
+import type { GuardDeps } from "./ai/agent-run-guard";
+import { createFocusMode } from "./focus/controller";
+import { isFocusEligible, escapeExitsFocus, focusExitScroll } from "./focus/rules";
+import { createFirstRunHint } from "./empty-states/first-run";
+import { createOnboarding } from "./empty-states/onboarding";
+import { shouldShowHint } from "./empty-states/rules";
+import { keyHint } from "./empty-states/key-hint";
+import { readFileBytes } from "./file-bytes";
 import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
@@ -18,13 +32,19 @@ import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/acti
 import { runnableActions } from "./ai/actions";
 import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
+import { createMentionsSection } from "./links/mentions-section";
+import { applyRename } from "./links/rename-plan";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
-import { configureLinks, followEditorLink, followLink } from "./links/follow";
-import { createLinkIndex } from "./links/index";
+import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
+import { createHoverCard } from "./links/hover-card";
+import { createLinkIndex, compactKnown, type LinkScan } from "./links/index";
+import { createDiagnostics } from "./perf/diagnostics";
+import { createFrameCoalescer } from "./render-coalescer";
+import { createRefreshRunner, createFocusDeduper, decideLarge, tickKind, BASE_MS } from "./workspace-refresh";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -59,7 +79,8 @@ import {
   openFolder,
   setExplorerActivePath,
 } from "./explorer";
-import { revealExplorerPath } from "./explorer";
+import { revealExplorerPath, setExplorerNotice } from "./explorer";
+import { showDiagnosticsSheet } from "./perf/diagnostics-sheet";
 import { explorerDropDirectory, logicalDropPoint, type DropPoint } from "./file-drop";
 import {
   getInitialFile,
@@ -105,9 +126,10 @@ import { clearPdfEditDraft, hasPdfEditDraft } from "./pdfview";
 import {
   applySettings,
   DEFAULT_APP_ICON,
-  DEFAULT_SETTINGS_JSON,
+  FRESH_SETTINGS_JSON,
   normalizeThemeName,
   parseSettings,
+  FOCUS_WIDTHS,
   tryParseSettings,
   type ThemeName,
   type Settings,
@@ -149,6 +171,7 @@ import {
 } from "./recovery";
 import { draftIdFor, type DraftRecord } from "./recovery-policy";
 import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
+import { cleanText } from "./clean-text";
 import { showRecoveryReview } from "./recovery-review";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
@@ -191,7 +214,21 @@ import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 
 const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
-const linkIndex = createLinkIndex();
+const diagnostics = createDiagnostics();
+const linkIndex = createLinkIndex(async (folder, paths, known) => {
+  const start = performance.now();
+  const compact = known && compactKnown(folder, known);
+  const result = await invoke<LinkScan>(paths ? "scan_note_links_for" : "scan_note_links", { folder, paths, known: compact });
+  const tick = diagnostics.current();
+  if (tick) {
+    tick.scanMs = performance.now() - start;
+    tick.sentBytes = Object.entries(compact ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
+    tick.receivedBytes = result.notes.reduce((n, note) => n + note.path.length + note.source.length + 16 + 32 * (note.links.length + note.headings.length), 0)
+      + Object.entries(result.stamps ?? {}).reduce((n, [path, value]) => n + path.length + value.length + 16, 0);
+    tick.reread = result.notes.length;
+  }
+  return result;
+});
 
 const windowsHost = document.getElementById("windows")!;
 
@@ -209,21 +246,45 @@ const listenScoped: typeof listen = currentNativeWindow
 const isPrimaryNativeWindow = nativeWindowLabel === "main";
 const startupUi = isPrimaryNativeWindow ? loadState() : freshState();
 let ui = { ...startupUi, aiVisible: false };
+const hoverCard = createHoverCard();
 let outlineKey = "";
 const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus(), (tab) => {
   ui = { ...ui, outlineTab: tab }; persistUiState();
   void linksPanel.show(tab === "links");
   if (tab === "filter" || filterPanel) void loadFilterPanel().then((panel) => panel.show(tab === "filter"));
 });
+const mentionsSection = createMentionsSection({
+  notes: () => linkIndex.notes().map(note => {
+    const found = findTabByPath(getState().windows, note.path);
+    return found ? parseNote(note.path, editorForTab(found.tab.id).getText(found.tab.id)) : note;
+  }),
+  folder: () => getState().folder,
+  open: (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); },
+  link: async (edits, batch) => {
+    const folder = getState().folder;
+    if (!folder) return { stale: edits.length, failed: 0 };
+    const writer = noteLinkWriter(folder, "Before linking mentions"), findOpen = writer.findOpen;
+    writer.findOpen = path => {
+      const open = findOpen(path); if (!open) return null;
+      return { ...open, apply: changes => { open.apply(changes); const found = findTabByPath(getState().windows, path); if (found) linkIndex.onFileChanged(path, editorForTab(found.tab.id).getText(found.tab.id), false); } };
+    };
+    if (batch) return showRenameReview(edits, folder, writer, showToast, {
+      title: "Link mentions?", intro: "Choose the mentions to link.", outsideHeading: `Mentions in ${edits[0].path.split("/").pop()}`, insideHeading: "Mentions", cancel: "Don't Link", apply: n => `Link ${n} mention${n === 1 ? "" : "s"}`, snapshotNote: "Closed notes get a Recovery snapshot first.",
+    });
+    let failed = 0; writer.onFailure = () => { failed++; };
+    const skipped = await applyRename(edits, folder, writer);
+    return { stale: skipped - failed, failed };
+  },
+});
 const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
-  return tab && views.has(getState().activeWindowId) && isMarkdownFile(tab.path ?? tab.name)
+  return tab && !tab.tableView && views.has(getState().activeWindowId) && !views.get(getState().activeWindowId)!.graphActive() && isMarkdownFile(tab.path ?? tab.name)
     ? { path: tab.path ?? `${getState().folder}/untitled.md`, text: activeView().editor.getText(tab.id) } : null;
 }, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line), (target) => {
   const tab = activeMeta();
   const context = tab && linkContext(tab.id);
   if (context) void followLink(target, context);
-});
+}, { card: hoverCard, enabled: () => currentSettings.links.hoverPreview }, mentionsSection);
 // The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
 let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
 let savedViews: SavedViewStore | undefined;
@@ -250,6 +311,13 @@ function updateOutline(force = false): void {
   if (view) outlineView.setActive(view.navigationLine());
 }
 let currentSettings = parseSettings("{}");
+let openingDocuments = 1; // Startup restore may open a document asynchronously.
+let firstRunHint: ReturnType<typeof createFirstRunHint> | null = null;
+const onboarding = createOnboarding({ get: () => currentSettings, set: settings => { currentSettings = settings; }, write: writeSettings, toast: showToast, refresh: refreshFirstRunHint });
+function refreshFirstRunHint(): void {
+  firstRunHint?.update(shouldShowHint({ dismissed: onboarding.dismissed(), folder: getState().folder, tabCount: getState().windows.reduce((n, w) => n + w.tabs.length, 0), loading: openingDocuments > 0, settingsOpen: document.body.classList.contains("settings-active"), recoveryOpen: !!document.querySelector(".recovery-scrim") }));
+}
+function markOnboarded(): void { onboarding.mark(); }
 let settingsPath = "";
 let aiSettingsPath = "";
 let aiSettingsMigrationReady = false;
@@ -272,7 +340,9 @@ let tabSeq = 0;
 const nextId = () => `t${++tabSeq}`;
 const cleanReloads = new Set<string>();
 const recoveredDraftIds = new Map<string, string>();
-const AUTO_REFRESH_MS = 3_000;
+let largeFolder = false;
+let nativeFocused = document.hasFocus();
+let lastFullAt = 0;
 
 let sessionReady = false;
 let persistTimer: number | undefined;
@@ -345,11 +415,25 @@ function editorKind(pathOrName: string | null): EditorDocumentKind {
 
 const views = new Map<string, WindowView>();
 const statusWordCounts = new Map<string, number>();
+let focusSource: { windowId: string; tabId: string } | null = null;
+function focusOverlayOpen(): boolean {
+  return document.body.classList.contains("settings-active") || !!document.querySelector('.recovery-scrim, [aria-modal="true"], #palette:not(.hidden), .preview-find:not(.hidden), .cm-search, .cm-tooltip-autocomplete');
+}
+const focusMode = createFocusMode({
+  eligible: () => { const tab = activeMeta(), view = views.get(getState().activeWindowId); return !!tab && !!view && isFocusEligible({ pathOrName: tab.path ?? tab.name, tableView: !!tab.tableView, graphActive: view.graphActive() }); },
+  overlayOpen: focusOverlayOpen,
+  captureView: () => { const view = activeView(), tab = activeMeta()!; focusSource = { windowId: getState().activeWindowId, tabId: tab.id }; const selection = view.editor.getSelection(); return { topLine: view.editor.visibleTopLine(), selection: { from: selection.from, to: selection.to } }; },
+  restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
+  onChange: () => { requestWindowMeasure(); syncViewMenu(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
+});
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();
-});
+}, openDiagnostics);
 
+function openDiagnostics(): void {
+  showDiagnosticsSheet(document.getElementById("app")!, { diagnostics, copy: writeClipboardText });
+}
 function refreshStatusBar(): void {
   const windowState = getWindow(getState().activeWindowId);
   const tab = windowState?.tabs.find(item => item.id === windowState.activeTabId);
@@ -362,7 +446,9 @@ function refreshStatusBar(): void {
     words: tab ? statusWordCounts.get(tab.id) ?? 0 : 0,
     dirty: tab?.dirty ?? false,
     recovered: tab ? recoveredDraftIds.has(tab.id) : false,
+    largeFolder,
   });
+  focusMode.sync();
 }
 
 function editorForTab(id: string): WindowView["editor"] {
@@ -469,11 +555,10 @@ function broadcastSettingsChange(file: SettingsFile): void {
   void emit(SETTINGS_CHANGED_EVENT, { file, from: nativeWindowLabel }).catch(() => {});
 }
 
-function writeSettings(next: Settings): void {
-  if (!settingsPath) return;
-  void writeFile(settingsPath, JSON.stringify(next, null, 2))
-    .then(() => { syncMcpEnabled(); broadcastSettingsChange("settings"); })
-    .catch(() => {});
+function writeSettings(next: Settings): Promise<void> {
+  if (!settingsPath) return Promise.reject(new Error("Settings unavailable"));
+  return writeFile(settingsPath, JSON.stringify(next, null, 2))
+    .then(() => { syncMcpEnabled(); broadcastSettingsChange("settings"); });
 }
 
 function writeAISettings(next: AISettings): void {
@@ -496,13 +581,15 @@ function writeAISettings(next: AISettings): void {
 
 async function loadSettings(): Promise<void> {
   try {
-    const file = await getSettingsFile(DEFAULT_SETTINGS_JSON);
+    const file = await getSettingsFile(FRESH_SETTINGS_JSON);
     settingsPath = file.path;
     currentSettings = parseSettings(file.contents);
   } catch {
     currentSettings = parseSettings("{}");
   }
+  hoverCard.setEnabled(currentSettings.links.hoverPreview);
   applySettings(currentSettings);
+  refreshFirstRunHint();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
@@ -597,11 +684,16 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
     if (file === "ai-actions") {
       await reloadActions();
     } else if (file === "settings") {
-      const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
+      const raw = await getSettingsFile(FRESH_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
+      const hoverChanged = next.links.hoverPreview !== currentSettings.links.hoverPreview;
+      const gitVisibilityChanged = next.git.showSourceControl !== currentSettings.git.showSourceControl;
       currentSettings = next;
+      if (gitVisibilityChanged) void refreshGitAvailability();
+      if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
+      refreshFirstRunHint();
       applySettings(currentSettings);
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -669,8 +761,12 @@ function openAISettings(): void {
 }
 
 function saveSettingsFromPanel(settings: Settings): void {
+  const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
+  const gitVisibilityChanged = settings.git.showSourceControl !== currentSettings.git.showSourceControl;
   currentSettings = settings;
+  if (gitVisibilityChanged) void refreshGitAvailability();
+  if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
   applySettings(currentSettings);
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -680,7 +776,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   if (themeChanged) renderAll();
-  writeSettings(settings);
+  void writeSettings(settings).catch(() => {});
 }
 
 function saveAISettingsFromPanel(settings: AISettings): void {
@@ -702,6 +798,7 @@ function commandItems(): PaletteItem[] {
 
   const recent = loadRecent();
   return [
+    ...gitPaletteItems(gitAvailable, openGitControl),
     command("show_table_view", "Show Table View", () => { void showTableView(); }),
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
@@ -743,8 +840,9 @@ function commandItems(): PaletteItem[] {
     ),
     command("editor", "View: Editor", () => setMode(activeWindowId(), "editor")),
     command("read", "View: Read", () => setMode(activeWindowId(), "preview")),
-    command("view.graph", "Graph: Open Local Graph", () => { settingsScreen.close(); activeView().showGraph("local"); }),
-    command("view.folder_graph", "Graph: Open Folder Graph", () => { settingsScreen.close(); activeView().showGraph("folder"); }),
+    command("perf.diagnostics", "Workspace: Show Performance Diagnostics", () => { settingsScreen.close(); openDiagnostics(); }),
+    command("view.graph", "Graph: Open Local Graph", () => { focusMode.exit(); settingsScreen.close(); activeView().showGraph("local"); }),
+    command("view.folder_graph", "Graph: Open Folder Graph", () => { focusMode.exit(); settingsScreen.close(); activeView().showGraph("folder"); }),
     command("softwrap", "Cycle Soft Wrap", cycleSoftWrap),
     command("lines", "Toggle Line Numbers", toggleLineNumbers),
     command("sub", "Toggle Sub Window", () => void toggleSub()),
@@ -1000,6 +1098,7 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
       if (tab.path) forgetStat(tab.path);
     }
     view.editor.closeState(id);
+    cleanText.forget(id);
   }
 
   const remaining = w.tabs.filter((x) => !toClose.has(x.id));
@@ -1135,6 +1234,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   const v = createWindowView(windowsHost, windowId, isMain, handlers);
   v.setLineNumbersFlag(ui.lineNumbers);
   v.editor.setSoftWrapMode(currentSettings.softWrapMode, currentSettings.wrapColumn);
+  v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
   v.editor.setLineNumbers(ui.lineNumbers);
   views.set(windowId, v);
   return v;
@@ -1142,6 +1242,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
 
 const tableSurfaces = new Map<HTMLElement, ReturnType<typeof createTableSurface>>();
 async function showTableView(): Promise<void> {
+  focusMode.exit();
   settingsScreen.close();
   const w = activeWindow();
   const existing = w.tabs.find(tab => tab.tableView);
@@ -1165,9 +1266,13 @@ function filterPanelModel() {
   return currentTableFilter ?? { tags: [], rows: [], folder: null, mode: "all" as const };
 }
 let currentTableFilter: import("./properties/filter-query").FilterModel | null = null;
-linkIndex.subscribe(() => renderAll());
+const indexRender = createFrameCoalescer(renderAll);
+linkIndex.subscribe(() => indexRender.request());
 
 function renderAll(): void {
+  refreshFirstRunHint();
+  indexRender.cancel();
+  diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
   refreshStatusBar();
@@ -1360,7 +1465,7 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
       opts.text,
       editorKind(opts.path ?? opts.name),
     );
-  if (opts.path) void recordStat(opts.path);
+  if (opts.path) { cleanText.set(id, opts.text); void recordStat(opts.path); }
   activateTab(windowId, id, recordNavigation);
 }
 
@@ -1383,6 +1488,9 @@ async function discardTabDraft(windowId: string, tab: TabMeta): Promise<boolean>
       return false;
     }
     recoveredDraftIds.delete(tab.id);
+    // Unsaved text the link index was following goes away with the tab.
+    const saved = tab.path ? linkIndex.savedSource(tab.path) : undefined;
+    if (tab.path && saved !== undefined) linkIndex.onLiveEdit(tab.path, saved);
     return true;
   } catch {
     await message("Could not discard the draft. The document remains open.", { title: "Close tab", kind: "error" });
@@ -1408,6 +1516,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   if (t.path) forgetStat(t.path);
   const next = nextActiveAfterClose(w.tabs, tabId, w.activeTabId);
   views.get(windowId)!.editor.closeState(tabId);
+  cleanText.forget(tabId);
   patchWindow(windowId, {
     tabs: w.tabs.filter((x) => x.id !== tabId),
     activeTabId: next,
@@ -1435,12 +1544,19 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
   if (cleanReloads.has(changeKey)) return;
   // A PDF tab's hidden text editor is not the document; PDF edits track their own state.
   if (t && isPdfFile(t.path ?? t.name)) return;
-  if (t && !t.dirty) {
+  if (t?.path && t.dirty && cleanText.matches(tabId, text)) {
+    // Undo (or retyping) brought the tab back to its saved text.
+    patchWindow(windowId, {
+      tabs: w.tabs.map((x) => (x.id === tabId ? { ...x, dirty: false } : x)),
+    });
+    clearDraft(t.path, tabId);
+    renderAll();
+  } else if (t && !t.dirty) {
     patchWindow(windowId, {
       tabs: w.tabs.map((x) => (x.id === tabId ? { ...x, dirty: true } : x)),
     });
   }
-  if (t) {
+  if (t && !cleanText.matches(tabId, text)) {
     scheduleDraft({
       windowId,
       tabId,
@@ -1450,6 +1566,7 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
       replacedDraftId: recoveredDraftIds.get(tabId),
     });
   }
+  if (t?.path) linkIndex.onLiveEdit(t.path, text);
   if (tabId === w.activeTabId) {
     schedulePreview(windowId, tabId, text);
   }
@@ -1529,6 +1646,8 @@ async function doOpenPath(
   forceNewTab = false,
   confinedFolder?: string | null,
 ): Promise<void> {
+  openingDocuments++; refreshFirstRunHint();
+  try {
   const recent = loadRecent();
   saveRecent({ ...recent, files: addRecent(recent.files, path) });
   if (isPdfFile(path)) {
@@ -1543,6 +1662,7 @@ async function doOpenPath(
     if (confinedFolder) showToast("Could not open note.");
     else await showOpenError(error);
   }
+  } finally { openingDocuments--; refreshFirstRunHint(); }
 }
 
 type ExplorerDropTarget = {
@@ -1739,6 +1859,7 @@ async function initNativeFileDrop(): Promise<void> {
 }
 
 async function doOpen(): Promise<void> {
+  openingDocuments++; refreshFirstRunHint();
   try {
     const result = await openFile();
     if (result) {
@@ -1754,7 +1875,7 @@ async function doOpen(): Promise<void> {
     }
   } catch (error) {
     await showOpenError(error);
-  }
+  } finally { openingDocuments--; refreshFirstRunHint(); }
 }
 
 function openPdf(windowId: string, path: string): void {
@@ -1770,6 +1891,7 @@ function openPdf(windowId: string, path: string): void {
 }
 
 function afterDiskWrite(path: string): void {
+  if (getState().folder && path.startsWith(getState().folder!.replace(/[\\/]$/, "") + "/")) void gitPanel.refresh();
   void invoke<string>("read_file", { path }).then((text) => {
     workspaceIndex.onFileChanged(path, text);
     linkIndex.onFileChanged(path, text);
@@ -1784,7 +1906,7 @@ const templateActions = createTemplateActions({
   setLastUsed: (lastUsed) => {
     if (lastUsed === currentSettings.templates.lastUsed) return;
     currentSettings = { ...currentSettings, templates: { ...currentSettings.templates, lastUsed } };
-    writeSettings(currentSettings);
+    void writeSettings(currentSettings).catch(() => {});
   },
   refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
   revealInExplorer: revealExplorerPath,
@@ -1819,6 +1941,7 @@ function newDoc(): void {
 }
 
 async function finishBoundSave(binding: SaveBinding, target: string): Promise<void> {
+  if (getState().folder && target.startsWith(getState().folder!.replace(/[\\/]$/, "") + "/")) void gitPanel.refresh();
   const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === binding.tabId));
   const tab = windowState?.tabs.find((item) => item.id === binding.tabId);
   const view = windowState && views.get(windowState.id);
@@ -1829,6 +1952,7 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
   view.editor.setDocumentKind(tab.id, editorKind(target));
   if (windowState.activeTabId === tab.id) view.renderPreview(view.editor.getText(tab.id), target);
   if (clean) {
+    cleanText.set(tab.id, view.editor.getText(tab.id));
     clearDraft(binding.path, tab.id);
     const recoveredId = recoveredDraftIds.get(tab.id);
     if (recoveredId) clearDraftById(recoveredId);
@@ -1857,7 +1981,7 @@ async function doSave(saveAs = false): Promise<boolean> {
   const text = view.editor.getText(t.id);
   const binding: SaveBinding = { windowId: getState().activeWindowId, tabId: t.id, path: t.path, revision: view.editor.revision(t.id) };
   try {
-    return await runSerialized(`tab:${t.id}`, async (queuedTab) => {
+    const saved = await runSerialized(`tab:${t.id}`, async (queuedTab) => {
     const latest = getState().windows.flatMap((window) => window.tabs).find((tab) => tab.id === t.id);
     if (queuedTab && !saveAs && latest && !latest.dirty && editorForTab(t.id).revision(t.id) === binding.revision) return true;
     let target = saveAs ? null : (latest?.path ?? t.path);
@@ -1907,6 +2031,8 @@ async function doSave(saveAs = false): Promise<boolean> {
     if (target === settingsPath) {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
+      if (currentSettings.git.showSourceControl !== previous.git.showSourceControl) void refreshGitAvailability();
+      if (currentSettings.links.hoverPreview !== previous.links.hoverPreview) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       applySettings(currentSettings);
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -1941,6 +2067,8 @@ async function doSave(saveAs = false): Promise<boolean> {
     return true;
     });
     });
+    if (saved) markOnboarded();
+    return saved;
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     await message(text, { title: "Save file", kind: "error" });
@@ -1977,10 +2105,10 @@ function snapshotActiveDocument(): void {
   const tab = activeMeta();
   if (!tab?.path) return;
   if (isPdfFile(tab.path)) {
-    void invoke<number[]>("read_file_bytes", { path: tab.path }).then((bytes) =>
+    void readFileBytes(tab.path).then((bytes) =>
       manualBinarySnapshot(
         tab.path!,
-        new Uint8Array(bytes),
+        bytes,
         "Manual PDF snapshot",
       ),
     ).catch(() => {});
@@ -2064,6 +2192,7 @@ async function checkActiveForExternalChange(
         cleanReloads.delete(changeKey);
       }
       clearDraft(tab.path, tab.id);
+      cleanText.set(tab.id, text);
       patchWindow(windowId, {
         tabs: getWindow(windowId)!.tabs.map((item) =>
           item.id === tab.id ? { ...item, dirty: false } : item,
@@ -2077,6 +2206,7 @@ async function checkActiveForExternalChange(
     markDirty: () => {
       const current = getWindow(windowId);
       if (!current) return;
+      cleanText.forget(tab.id);
       patchWindow(windowId, {
         tabs: current.tabs.map((item) =>
           item.id === tab.id ? { ...item, dirty: true } : item,
@@ -2099,6 +2229,7 @@ async function checkActiveForExternalChange(
 // mtime/size: a stale or failed stat used to leave a tab permanently stale, and
 // re-reading the handful of open files is cheap.
 async function refreshCleanOpenFilesFromDisk(): Promise<void> {
+  let changed = false;
   for (const windowState of getState().windows) {
     const view = views.get(windowState.id);
     if (!view) continue;
@@ -2111,6 +2242,8 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       let text: string;
       try {
         text = await invoke<string>("read_file", { path: tab.path });
+        const tick = diagnostics.current();
+        if (tick) tick.tabsChecked++;
       } catch {
         continue;
       }
@@ -2123,6 +2256,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       cleanReloads.add(changeKey);
       try {
         view.editor.setTextFor(tab.id, text);
+        changed = true;
       } finally {
         cleanReloads.delete(changeKey);
       }
@@ -2133,25 +2267,29 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       }
     }
   }
-  renderAll();
+  if (changed) renderAll();
 }
 
-let autoRefreshRunning = false;
-
-async function refreshWorkspaceFromDisk(force = false): Promise<void> {
-  if (autoRefreshRunning && !force) return;
-  autoRefreshRunning = true;
+const refreshRunner = createRefreshRunner(async (kind, reason) => {
+  const tick = diagnostics.begin(reason, kind);
   try {
-    if (getState().folder) {
-      await refreshExpandedDirs().catch(() => {});
-      await refreshFileList();
+    if (kind === "full") {
+      lastFullAt = Date.now();
+      const walkStart = performance.now();
+      if (getState().folder) {
+        await refreshExpandedDirs().catch(() => {});
+        await refreshFileList();
+      }
+      tick.walkMs = performance.now() - walkStart;
+      if (getState().folder && !linkIndex.ready) await linkIndex.ensure(getState().folder).catch(() => {});
+      else await linkIndex.refresh().catch(() => {});
+      largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
+      setExplorerNotice(linkIndex.capped ? "Indexed the first 5,000 files. Some notes are not included." : null);
+      diagnostics.setTotals({ notes: linkIndex.markdownCount, walked: linkIndex.walked, capped: linkIndex.capped, heldTextBytes: linkIndex.notes().reduce((sum, note) => sum + note.source.length * 2, 0), aiChunks: workspaceIndex.chunkCount, large: largeFolder });
     }
-    await linkIndex.refresh().catch(() => {});
     await refreshCleanOpenFilesFromDisk();
-  } finally {
-    autoRefreshRunning = false;
-  }
-}
+  } finally { diagnostics.end(); }
+});
 
 function openRecoveryReview(restoreAll = false): void {
   void showRecoveryReview({
@@ -2183,6 +2321,7 @@ function openDraft(draft: DraftRecord): void {
       const current = getWindow(found.windowId)!;
       patchWindow(found.windowId, { tabs: current.tabs.map((tab) => tab.id === found.tab.id ? { ...tab, dirty: true } : tab) });
       recoveredDraftIds.set(found.tab.id, draft.id);
+      cleanText.forget(found.tab.id);
       renderAll();
       return;
     }
@@ -2195,6 +2334,7 @@ function openDraft(draft: DraftRecord): void {
   const windowState = getWindow(preferredWindowId)!;
   if (windowState.activeTabId) {
     recoveredDraftIds.set(windowState.activeTabId, draft.id);
+    cleanText.forget(windowState.activeTabId);
     patchWindow(preferredWindowId, {
       tabs: windowState.tabs.map((item) =>
         item.id === windowState.activeTabId
@@ -2254,7 +2394,7 @@ function captureImages(notePath: string | null) {
   if (!notePath) return undefined;
   return {
     notePath,
-    read: async (path: string) => new Uint8Array(await invoke<number[]>("read_file_bytes", { path })),
+    read: async (path: string) => await readFileBytes(path),
   };
 }
 
@@ -2316,8 +2456,12 @@ function handleExplorerPathChange(from: string, to: string | null): void {
   for (const note of linkIndex.notes()) {
     const path = to ? movedPath(note.path, from, to) : note.path;
     if (note.path === from || note.path.startsWith(from + "/")) {
+      const saved = linkIndex.savedSource(note.path);
       linkIndex.onFileRemoved(note.path);
-      if (to) linkIndex.onFileChanged(path, note.source);
+      if (to) {
+        if (saved !== undefined) linkIndex.onFileChanged(path, saved);
+        if (saved !== note.source) linkIndex.onFileChanged(path, note.source, false);
+      }
     }
   }
 
@@ -2382,7 +2526,10 @@ function handleExplorerPathChange(from: string, to: string | null): void {
 
   syncExplorerActivePath();
   renderAll();
-  if (folder && plans.length) void showRenameReview(plans, folder, {
+  if (folder && plans.length) void showRenameReview(plans, folder, noteLinkWriter(folder, "Before updating note links"), showToast);
+}
+function noteLinkWriter(folder: string, snapshotLabel: string): import("./links/rename-plan").RenameWriter {
+  return {
     findOpen: (path) => {
       const found = findTabByPath(getState().windows, path);
       if (!found) return null;
@@ -2390,13 +2537,13 @@ function handleExplorerPathChange(from: string, to: string | null): void {
       return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes) };
     },
     read: (path) => invoke<string>("read_file", { path }),
-    snapshot: (path, text) => manualSnapshot(path, text, "Before updating note links", true),
+    snapshot: (path, text) => manualSnapshot(path, text, snapshotLabel, true),
     write: async (path, contents, expected) => {
       if (getState().folder !== folder) throw new Error("Folder changed");
       await invoke("write_file_atomic", { path, contents, folder, expected });
       linkIndex.onFileChanged(path, contents);
     },
-  }, showToast);
+  };
 }
 
 function setMode(windowId: string, mode: ViewMode): void {
@@ -2432,7 +2579,11 @@ function resolvedAccel(id: string): string {
 
 function applySoftWrap(): void {
   document.body.dataset.wrap = currentSettings.softWrapMode;
+  document.body.style.setProperty("--focus-width", `${FOCUS_WIDTHS[currentSettings.focus.width]}px`);
+  if (currentSettings.softWrapMode === "guide") document.body.style.setProperty("--guide-width", `${currentSettings.wrapColumn}ch`);
+  else document.body.style.removeProperty("--guide-width");
   for (const v of views.values()) {
+    v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
     v.editor.setSoftWrapMode(
       currentSettings.softWrapMode,
       currentSettings.wrapColumn,
@@ -2450,16 +2601,19 @@ function syncViewMenu(): void {
     automaticUpdates: currentSettings.updateMode === "auto",
     syncScroll: currentSettings.syncScroll,
     showStatusBar: currentSettings.showStatusBar,
+    typewriter: currentSettings.editor.typewriterScrolling,
+    focusMode: focusMode.active(),
   });
 }
 
 function persistCurrentSettings(): void {
   applySettings(currentSettings);
+  applySoftWrap();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   requestWindowMeasure();
   syncViewMenu();
-  writeSettings(currentSettings);
+  void writeSettings(currentSettings).catch(() => {});
   settingsScreen.refresh();
 }
 
@@ -2701,15 +2855,7 @@ function editReviewDeps(actionLabel: string): EditReviewDeps {
   };
 }
 
-function buildAIPanel(): void {
-  const panelReview = editReviewDeps("AI edit");
-  aiPanel = createAIPanel(aiPanelElement, {
-    workspaceIndex,
-    getSettings: () => currentAISettings,
-    onSettingsChange: saveAISettingsFromPanel,
-    getClis: () => cliInfos,
-    getModelsCache: () => modelsCache,
-    guard: {
+const gitGuard: GuardDeps = {
       tabsInFolder: (folder) => {
         const prefix = folder.replace(/[\\/]$/, "") + "/";
         return getState().windows.flatMap((windowState) => {
@@ -2735,7 +2881,17 @@ function buildAIPanel(): void {
           }
         }
       },
-    },
+};
+
+function buildAIPanel(): void {
+  const panelReview = editReviewDeps("AI edit");
+  aiPanel = createAIPanel(aiPanelElement, {
+    workspaceIndex,
+    getSettings: () => currentAISettings,
+    onSettingsChange: saveAISettingsFromPanel,
+    getClis: () => cliInfos,
+    getModelsCache: () => modelsCache,
+    guard: gitGuard,
     onNewNote: (text) => {
       const windowId = getState().activeWindowId;
       openInWindow(windowId, { path: null, name: "Untitled", text });
@@ -2989,8 +3145,16 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
+  [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "git", async render(host, deps) { const { gitPage } = await import("./settings-screen/page-git"); await gitPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
 );
+firstRunHint = createFirstRunHint(document.getElementById("first-run-hint")!, {
+  openFolder: openFolderDialog, newNote: newDoc, showShortcuts: () => settingsScreen.open("shortcuts"), dismiss: markOnboarded, keymap: () => currentSettings.keymap,
+});
+new MutationObserver(() => refreshFirstRunHint()).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+new MutationObserver(records => {
+  if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node instanceof HTMLElement && (node.matches(".recovery-scrim") || !!node.querySelector(".recovery-scrim"))))) refreshFirstRunHint();
+}).observe(document.getElementById("app")!, { childList: true, subtree: true });
+refreshFirstRunHint();
 onSettingsSynced = () => settingsScreen.refresh();
 void listenScoped<typeof mcpStatus>("bugtext://mcp-status", ({ payload }) => {
   mcpStatus = payload;
@@ -3079,7 +3243,7 @@ function getReplaceFlow() {
       const editor = editorForTab(found.tab.id);
       return { text: editor.getText(found.tab.id), apply: changes => {
         editor.applyChanges(found.tab.id, changes);
-        const text = editor.getText(found.tab.id); workspaceIndex.onFileChanged(path, text); linkIndex.onFileChanged(path, text);
+        const text = editor.getText(found.tab.id); workspaceIndex.onFileChanged(path, text); linkIndex.onFileChanged(path, text, false);
       } };
     },
     read: path => invoke<string>("read_file", { path }),
@@ -3118,7 +3282,69 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
   },
 });
 
+let gitAvailable = false;
+let gitInfo: GitRepoInfo | null = null;
+let gitAvailabilityGeneration = 0;
+const gitButton = document.getElementById("ab-git")!;
+const gitHost = document.getElementById("git-panel")!;
+const gitPanel = createGitPanel(gitHost, {
+  repo: gitRepo,
+  status: async folder => {
+    const status = await gitStatus(folder);
+    if (folder === getState().folder) gitButton.classList.toggle("has-changes", status.total > 0);
+    return status;
+  },
+  diff: gitDiff,
+  action: async req => {
+    return runGitAction(req, gitRoots(req.folder, gitInfo), {
+      ...gitGuard,
+      invoke: gitAction,
+      save: async path => {
+        const found = findTabByPath(getState().windows, path);
+        if (!found) return false;
+        const oldWindow = getState().activeWindowId;
+        const oldTab = getState().windows.find(w => w.id === oldWindow)?.activeTabId;
+        activateTab(found.windowId, found.tab.id, false);
+        try { return await doSave(); }
+        finally { if (oldTab && getState().windows.some(w => w.id === oldWindow && w.tabs.some(t => t.id === oldTab))) activateTab(oldWindow, oldTab, false); }
+      },
+      confirmSave: count => gitPanel.confirmSave(count),
+      refresh: async () => {},
+    });
+  },
+  cancel: gitCancel,
+  openFile: (folder, path) => { void doOpenPath(`${folder.replace(/[\\/]$/, "")}/${path}`); },
+});
+function toggleGit(): void {
+  if (settingsScreen.isOpen()) settingsScreen.close();
+  setGitActive(!document.body.classList.contains("git-active"));
+}
+async function refreshGitAvailability(): Promise<void> {
+  const folder = getState().folder, generation = ++gitAvailabilityGeneration;
+  gitInfo = null; gitAvailable = false; gitButton.hidden = true;
+  if (!folder || !currentSettings.git.showSourceControl) { setGitActive(false); return; }
+  try {
+    const info = await gitRepo(folder);
+    if (generation !== gitAvailabilityGeneration || folder !== getState().folder) return;
+    gitInfo = info; gitAvailable = info.in_repo; gitButton.hidden = !gitAvailable;
+    if (gitAvailable) { gitPanel.setFolder(folder); void gitPanel.refresh(); }
+    else setGitActive(false);
+  } catch { if (generation === gitAvailabilityGeneration) setGitActive(false); }
+}
+function setGitActive(on: boolean): void {
+  on = on && gitAvailable && currentSettings.git.showSourceControl;
+  if (on && document.body.classList.contains("search-active")) setSearchActive(false);
+  document.body.classList.toggle("git-active", on); gitHost.hidden = !on;
+  gitButton.classList.toggle("active", on); gitButton.setAttribute("aria-pressed", String(on));
+  if (on) { showExplorerColumn(); void gitPanel.refresh(); }
+  requestWindowMeasure();
+}
+function openGitControl(control: GitPanelControl): void {
+  if (!gitAvailable) return;
+  settingsScreen.close(); setGitActive(true); gitPanel.focus(control);
+}
 function setSearchActive(on: boolean): void {
+  if (on && document.body.classList.contains("git-active")) setGitActive(false);
   document.body.classList.toggle("search-active", on);
   const button = document.getElementById("ab-search")!;
   button.classList.toggle("active", on);
@@ -3147,7 +3373,7 @@ function toggleSearch(): void {
 }
 
 initActivityBar(
-  requestWindowMeasure,
+  () => { if (document.body.classList.contains("git-active")) setGitActive(false); requestWindowMeasure(); },
   () => {
     // Leaving settings through a panel button shows that panel, never hides it.
     if (!settingsScreen.isOpen()) return toggleSearch();
@@ -3161,7 +3387,10 @@ initActivityBar(
     setAIVisible(true);
   },
   openExportMenu,
+  toggleGit,
 );
+
+void refreshGitAvailability();
 
 function applySidebarView(): void {
   const outline = ui.sidebarView === "outline";
@@ -3173,6 +3402,7 @@ function applySidebarView(): void {
   document.getElementById("ab-explorer")!.setAttribute("aria-pressed", String(!outline && getState().explorerVisible));
 }
 document.getElementById("ab-outline")!.addEventListener("click", () => {
+  if (document.body.classList.contains("git-active")) setGitActive(false);
   if (settingsScreen.isOpen()) settingsScreen.close();
   if (document.body.classList.contains("search-active")) setSearchActive(false);
   const hide = ui.sidebarView === "outline" && getState().explorerVisible;
@@ -3205,13 +3435,16 @@ document.getElementById("ab-explorer")!.addEventListener(
   true,
 );
 
-// Clicking Explorer while search is open should just return to the tree.
+// Clicking Explorer while search or Source Control is open should just return to the tree.
 document.getElementById("ab-explorer")!.addEventListener(
   "click",
   (event) => {
     if (document.body.classList.contains("search-active")) {
       event.stopImmediatePropagation();
       setSearchActive(false);
+    } else if (document.body.classList.contains("git-active")) {
+      event.stopImmediatePropagation();
+      setGitActive(false);
     }
   },
   true,
@@ -3252,6 +3485,11 @@ initExplorer(
   (path) => void doOpenPath(path),
   handleExplorerPathChange,
   {
+    onOpenFile: () => void doOpen(),
+    onNewNote: newDoc,
+    onNewFromTemplateRoot: () => templateActions.newFromTemplate(),
+    onDailyNote: () => void openDailyNote(),
+    keyHint: id => keyHint(id, currentSettings.keymap),
     onBeforePathChange: async () => {
       const folder = getState().folder;
       renameNotes = [];
@@ -3280,7 +3518,7 @@ initExplorer(
       if (getState().explorerVisible) document.getElementById("ab-explorer")!.click();
     },
     onToggleLineNumbers: () => toggleLineNumbers(),
-    onRefresh: () => void refreshWorkspaceFromDisk(true),
+    onRefresh: () => void refreshRunner.request("full", "manual"),
     isShowingHidden: () => currentSettings.showHiddenFiles,
     onToggleHidden: () =>
       saveSettingsFromPanel({ ...currentSettings, showHiddenFiles: !currentSettings.showHiddenFiles }),
@@ -3301,6 +3539,7 @@ function linkContext(id: string) {
 }
 configureLinks({
   index: linkIndex,
+  hoverCard, hoverPreview: () => currentSettings.links.hoverPreview,
   context: linkContext,
   open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
   jump: (line) => activeView().jumpToLine(line),
@@ -3345,7 +3584,11 @@ subscribe(() => {
   refreshStatusBar();
   const s = getState();
   if (s.folder !== indexedFolder) {
+    if (!indexedFolder && s.folder) markOnboarded();
     indexedFolder = s.folder;
+    gitPanel.setFolder(null); void refreshGitAvailability();
+    largeFolder = false;
+    setExplorerNotice(null);
     bookmarkActions.refresh();
     linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
@@ -3370,21 +3613,38 @@ subscribe(() => {
   scheduleWindowReport();
 });
 
-function refreshOnFocus(): void {
-  void refreshWorkspaceFromDisk(true);
+const refreshOnFocus = createFocusDeduper(() => {
+  nativeFocused = true;
+  if (gitAvailable) void gitPanel.refresh();
+  void refreshRunner.request("full", "focus");
   void checkActiveForExternalChange(getState().activeWindowId);
-}
+});
 
 window.addEventListener("focus", refreshOnFocus);
 // The webview does not always get a DOM focus event when the app regains
 // focus, so listen on the native window too.
 void currentNativeWindow?.onFocusChanged(({ payload: focused }) => {
-  if (focused) refreshOnFocus();
+  nativeFocused = focused;
+  if (focused) { syncViewMenu(); refreshOnFocus(); }
 });
 
 window.setInterval(() => {
-  void refreshWorkspaceFromDisk();
-}, AUTO_REFRESH_MS);
+  largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
+  void refreshRunner.request(tickKind({ large: largeFolder, focused: nativeFocused, now: Date.now(), lastFullAt }), "timer");
+}, BASE_MS);
+
+function openFolderDialog(): void {
+  return void pickFolder().then(async (directory) => {
+        if (!directory) return;
+        await openFolder(directory);
+        const recentItems = loadRecent();
+        saveRecent({
+          ...recentItems,
+          folders: addRecent(recentItems.folders, directory),
+        });
+        await refreshFileList();
+      });
+}
 
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;
@@ -3415,6 +3675,8 @@ listenScoped<string>("menu", (event) => {
     return setMenuTheme(id.slice("view.theme.".length));
   }
   switch (id) {
+    case "view.focus_mode": return focusMode.toggle();
+    case "view.typewriter": currentSettings = { ...currentSettings, editor: { typewriterScrolling: !currentSettings.editor.typewriterScrolling } }; persistCurrentSettings(); return;
     case "file.add_bookmark": return void bookmarkActions.add();
     case "file.show_bookmarks": return bookmarkActions.show();
     case "go.back": return travelHistory("back");
@@ -3435,16 +3697,7 @@ listenScoped<string>("menu", (event) => {
     case "file.open":
       return void doOpen();
     case "file.open_folder":
-      return void pickFolder().then(async (directory) => {
-        if (!directory) return;
-        await openFolder(directory);
-        const recentItems = loadRecent();
-        saveRecent({
-          ...recentItems,
-          folders: addRecent(recentItems.folders, directory),
-        });
-        await refreshFileList();
-      });
+      return openFolderDialog();
     case "file.save":
       return void doSave(false);
     case "file.save_as":
@@ -3482,6 +3735,8 @@ listenScoped<string>("menu", (event) => {
       ui = { ...ui, sidebarView: "outline", outlineTab: "links" };
       showExplorerColumn(); applySidebarView(); outlineView.selectTab("links"); updateOutline(true);
       return;
+    case "view.source_control":
+      toggleGit(); return;
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
@@ -3570,6 +3825,7 @@ const appKeyActions: Record<string, () => void> = {
   "go.back": () => travelHistory("back"),
   "go.forward": () => travelHistory("forward"),
   "palette.open": () => palette.open(),
+  "view.source_control": () => toggleGit(),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
   "file.daily_note": () => void openDailyNote(),
@@ -3592,6 +3848,7 @@ const appKeyActions: Record<string, () => void> = {
 };
 
 window.addEventListener("keydown", (e) => {
+  if (focusMode.active() && escapeExitsFocus(e, focusOverlayOpen())) { focusMode.exit(); e.preventDefault(); return; }
   const target = e.target as HTMLElement | null;
   if (!target?.closest("input, textarea, select, [contenteditable=true]")) {
     for (const [id, command] of [["pdf.copy_quote", "copy"], ["pdf.annotations", "panel"]] as const) {
@@ -3796,6 +4053,7 @@ async function restoreWindows(): Promise<void> {
 async function boot(): Promise<void> {
   await refreshPinnedMenu();
   await loadSettings();
+  await refreshGitAvailability();
   await refreshMcpStatus();
   reportWindow();
   // The Dock forgets a custom icon on quit; re-apply it (app-wide, idempotent).
@@ -3849,7 +4107,7 @@ void listenScoped<string>("open-path", (event) => {
 void initNativeFileDrop().catch((error) => {
   console.warn("Native file drag and drop unavailable:", error);
 });
-void boot();
+void boot().finally(() => { openingDocuments--; refreshFirstRunHint(); });
 
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
   if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }

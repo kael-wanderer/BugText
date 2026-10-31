@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { readFileBytes } from "./file-bytes";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { SearchHit, SearchOptions } from "./filesys";
 import { firstSearchMatch } from "./search-match";
@@ -14,8 +14,8 @@ export async function searchPdf(
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   let task: ReturnType<typeof pdfjs.getDocument> | undefined;
   try {
-  const bytes = await invoke<number[]>("read_file_bytes", { path });
-  task = pdfjs.getDocument({ data: new Uint8Array(bytes) });
+  const bytes = await readFileBytes(path);
+  task = pdfjs.getDocument({ data: bytes });
   const pdf = await task.promise;
   const hits: SearchHit[] = [];
   for (let page = 1; page <= pdf.numPages && hits.length < 50; page += 1) {

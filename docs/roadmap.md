@@ -173,6 +173,8 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 
 ### Tier 2 features
 
+- ✅ Git backup and sync (Source Control sidebar).
+
 - ✅ Daily note (⇧⌘D).
 - ✅ Status bar.
 - 🔜 Empty states and first-run hint.

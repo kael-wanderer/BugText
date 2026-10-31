@@ -49,6 +49,8 @@ export const generalPage: SettingsPage = {
       fontRow("main", "main-font", "Editor Font"),
       sizeRow("sub", "sub-text-size", "Sub Editor Font Size", "Second panel editor and reading view when split is open."),
       fontRow("sub", "sub-font", "Sub Editor Font"),
+      caption("Performance"),
+      row("large-folders", "Large folders", "In folders with 2,000 or more notes, check the folder every 10 seconds instead of 3. Open files are still checked every 3 seconds.", segmented("Large folders", [{ value: "auto", label: "Automatic" }, { value: "off", label: "Off" }], settings.performance.largeFolders, value => deps.onSettingsChange({ ...deps.getSettings(), performance: { largeFolders: value } }))),
       caption("Session"),
       row(
         "restore-session",

@@ -21,6 +21,7 @@ export function createWorkspaceIndex(getExclusions: () => readonly string[] = ()
   let builtFolder: string | null = null;
   let chunks: Chunk[] = [];
   let index = buildIndex([]);
+  let stale = false;
   let generation = 0;
   let building: { folder: string; promise: Promise<void> } | null = null;
   let pending = new Map<string, string | null>();
@@ -28,7 +29,11 @@ export function createWorkspaceIndex(getExclusions: () => readonly string[] = ()
   function apply(path: string, text: string | null): void {
     chunks = chunks.filter((chunk) => chunk.path !== path);
     if (!excluded(path, builtFolder ?? building?.folder ?? "") && text !== null && TEXT_EXT.test(path) && text.length <= MAX_BYTES) chunks.push(...chunkDocument(path, text));
-    index = buildIndex(chunks);
+    stale = true;
+  }
+  function currentIndex() {
+    if (stale) { index = buildIndex(chunks); stale = false; }
+    return index;
   }
   async function build(folder: string, current: number): Promise<void> {
     await listDir(folder);
@@ -46,13 +51,13 @@ export function createWorkspaceIndex(getExclusions: () => readonly string[] = ()
       if (!excluded(path, folder) && text.length <= MAX_BYTES) next.push(...chunkDocument(path, text));
     }
     if (current !== generation) return;
-    builtFolder = folder; chunks = next; index = buildIndex(chunks);
+    builtFolder = folder; chunks = next; index = buildIndex(chunks); stale = false;
     for (const [path, text] of pending) apply(path, text);
     pending.clear();
   }
   async function ensure(folder: string): Promise<boolean> {
     const key = JSON.stringify(getExclusions());
-    if (key !== patternsKey) { patternsKey = key; generation++; builtFolder = null; chunks = []; index = buildIndex([]); building = null; pending.clear(); }
+    if (key !== patternsKey) { patternsKey = key; generation++; builtFolder = null; chunks = []; index = buildIndex([]); stale = false; building = null; pending.clear(); }
     if (builtFolder === folder && !building) return true;
     if (!building || building.folder !== folder) {
       const current = ++generation;
@@ -65,11 +70,12 @@ export function createWorkspaceIndex(getExclusions: () => readonly string[] = ()
     return builtFolder === folder && (!building || building.folder === folder);
   }
   return {
+    get chunkCount() { return chunks.length; },
     async query(folder: string, q: string, k: number, excludePath?: string): Promise<Chunk[]> {
-      return await ensure(folder) ? retrieve(index, q, k, excludePath) : [];
+      return await ensure(folder) ? retrieve(currentIndex(), q, k, excludePath) : [];
     },
     async queryScored(folder: string, q: string, k: number, excludePath?: string): Promise<{ chunk: Chunk; score: number }[]> {
-      return await ensure(folder) ? retrieveScored(index, q, k, excludePath) : [];
+      return await ensure(folder) ? retrieveScored(currentIndex(), q, k, excludePath) : [];
     },
     onFileChanged(path: string, text: string): void {
       if (excluded(path, builtFolder ?? building?.folder ?? "")) { if (building) pending.set(path, null); apply(path, null); return; }
@@ -81,7 +87,7 @@ export function createWorkspaceIndex(getExclusions: () => readonly string[] = ()
       if (builtFolder && contains(builtFolder, path)) apply(path, null);
     },
     reset(): void {
-      generation++; builtFolder = null; chunks = []; index = buildIndex([]); building = null; pending.clear();
+      generation++; builtFolder = null; chunks = []; index = buildIndex([]); stale = false; building = null; pending.clear();
     },
   };
 }

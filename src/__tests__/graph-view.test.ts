@@ -138,3 +138,12 @@ it("shows only a generic retryable error when layout fails", async () => {
   click(host, "Try again"); latest().finish();
   expect(host.querySelectorAll(".graph-note")).toHaveLength(1);
 });
+
+it("keeps the layout when edits leave the graph snapshot unchanged", async () => {
+  const { index, host } = await mount([["/notes/a.md", "# A\n[b](b.md)"], ["/notes/b.md", "# B"]]);
+  latest().finish();
+  index.onFileChanged("/notes/a.md", "# A\n[b](b.md)\nExtra text");
+  expect(TestWorker.all).toHaveLength(1); expect(host.textContent).not.toContain("Laying out…");
+  index.onFileChanged("/notes/a.md", "# A\n[c](c.md)");
+  expect(TestWorker.all).toHaveLength(2);
+});

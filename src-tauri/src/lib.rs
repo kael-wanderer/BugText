@@ -1,8 +1,24 @@
+mod git_action;
+mod git;
 mod export_presets;
 mod conversations;
 mod workspaces;
 mod pinned_workspaces;
 mod ai;
+#[allow(dead_code)]
+mod git_run;
+#[allow(dead_code)]
+mod git_args;
+#[allow(dead_code)]
+mod git_status;
+#[allow(dead_code)]
+mod git_repo;
+#[allow(dead_code)]
+mod git_locate;
+#[allow(dead_code)]
+mod git_redact;
+#[allow(dead_code)]
+mod git_errors;
 mod assets;
 mod cli_args;
 mod cli_scan;
@@ -98,6 +114,8 @@ fn sync_view_menu(
     automatic_updates: bool,
     sync_scroll: bool,
     show_status_bar: bool,
+    typewriter: bool,
+    focus_mode: bool,
 ) {
     let set = |id: String, on: bool| {
         if let Some(item) = menu::find_check_item(&app, &id) {
@@ -122,13 +140,17 @@ fn sync_view_menu(
     set("help.automatic_updates".into(), automatic_updates);
     set("view.sync_scroll".into(), sync_scroll);
     set("view.status_bar".into(), show_status_bar);
+    set("view.typewriter".into(), typewriter);
+    set("view.focus_mode".into(), focus_mode);
 }
 
 #[tauri::command]
 fn set_accelerators(app: tauri::AppHandle, accelerators: HashMap<String, String>) {
     for (id, accel) in accelerators {
+        let value: Option<String> = if accel.is_empty() { None } else { Some(accel) };
         if let Some(item) = menu::find_normal_item(&app, &id) {
-            let value: Option<String> = if accel.is_empty() { None } else { Some(accel) };
+            let _ = item.set_accelerator(value);
+        } else if let Some(item) = menu::find_check_item(&app, &id) {
             let _ = item.set_accelerator(value);
         }
     }
@@ -172,6 +194,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(files::SearchRequests::default())
         .manage(ai::AIState::default())
+        .manage(git_run::GitRuns::default())
+        .manage(git_repo::RepoLocks::default())
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
@@ -214,6 +238,12 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            git_action::git_action,
+            git::git_repo,
+            git::git_status,
+            git::git_diff,
+            git_locate::git_diagnostics,
+            git_run::git_cancel,
             workflow_store::read_workflow_store,
             workflow_store::write_workflow_store,
             update_feed::update_feed_fetch,

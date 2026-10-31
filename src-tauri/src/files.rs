@@ -57,6 +57,12 @@ pub fn walk_files(dir: &Path, root: &Path, out: &mut Vec<String>) {
     walk_files_capped(dir, root, out, &|| true);
 }
 
+pub fn walk_files_counted(root: &Path) -> (Vec<String>, bool) {
+    let mut out = Vec::new();
+    let capped = walk_files_capped(root, root, &mut out, &|| true);
+    (out, capped)
+}
+
 fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>, is_current: &impl Fn() -> bool) -> bool {
     if out.len() >= WALK_CAP {
         return true;
@@ -90,16 +96,13 @@ fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>, is_current:
 }
 
 #[tauri::command]
-pub fn list_dir(path: String) -> Result<Vec<Entry>, String> {
-    read_entries(&path)
+pub async fn list_dir(path: String) -> Result<Vec<Entry>, String> {
+    tauri::async_runtime::spawn_blocking(move || read_entries(&path)).await.map_err(|_| "File read failed")?
 }
 
 #[tauri::command]
-pub fn list_files_recursive(folder: String) -> Vec<String> {
-    let root = Path::new(&folder);
-    let mut out = Vec::new();
-    walk_files(root, root, &mut out);
-    out
+pub async fn list_files_recursive(folder: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || walk_files_counted(Path::new(&folder)).0).await.map_err(|_| "File read failed".into())
 }
 
 #[derive(Serialize)]
@@ -147,6 +150,13 @@ pub(crate) fn search_pattern(query: &str, options: &SearchOptions) -> Result<reg
 mod search_tests {
     use super::{search_pattern, SearchOptions};
 
+    #[test]
+    fn binary_read_preserves_bytes() {
+        let path = std::env::temp_dir().join(format!("bugtext-bytes-{}", std::process::id()));
+        std::fs::write(&path, [0u8, 1, 255]).unwrap();
+        assert_eq!(super::read_file_bytes_inner(path.to_string_lossy().into_owned()).unwrap(), vec![0, 1, 255]);
+        std::fs::remove_file(path).unwrap();
+    }
     #[test]
     fn search_options_control_case_word_and_regex_matching() {
         let whole = search_pattern(
@@ -559,7 +569,10 @@ pub fn copy_into_directory(source: &Path, destination_dir: &Path) -> Result<Path
 }
 
 #[tauri::command]
-pub fn read_file(path: String, folder: Option<String>) -> Result<String, String> {
+pub async fn read_file(path: String, folder: Option<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || read_file_inner(path, folder)).await.map_err(|_| "File read failed")?
+}
+fn read_file_inner(path: String, folder: Option<String>) -> Result<String, String> {
     if let Some(folder) = folder {
         let root = Path::new(&folder).canonicalize().map_err(|_| "Note unavailable")?;
         let target = Path::new(&path).canonicalize().map_err(|_| "Note unavailable")?;
@@ -570,7 +583,12 @@ pub fn read_file(path: String, folder: Option<String>) -> Result<String, String>
 }
 
 #[tauri::command]
-pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || read_file_bytes_inner(path))
+        .await.map_err(|_| "File read failed")??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+fn read_file_bytes_inner(path: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|error| error.to_string())
 }
 
@@ -1333,12 +1351,12 @@ mod graph_read_tests {
         fs::write(root.join("ok.md"), "safe").unwrap();
         fs::write(dir.join("outside.md"), "outside").unwrap();
         let folder = Some(root.to_string_lossy().into_owned());
-        assert_eq!(read_file(root.join("ok.md").to_string_lossy().into_owned(), folder.clone()).unwrap(), "safe");
-        assert_eq!(read_file(root.join("../outside.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
-        assert_eq!(read_file(root.join("missing.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
+        assert_eq!(read_file_inner(root.join("ok.md").to_string_lossy().into_owned(), folder.clone()).unwrap(), "safe");
+        assert_eq!(read_file_inner(root.join("../outside.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
+        assert_eq!(read_file_inner(root.join("missing.md").to_string_lossy().into_owned(), folder.clone()).unwrap_err(), "Note unavailable");
         #[cfg(unix)] {
             std::os::unix::fs::symlink(dir.join("outside.md"), root.join("escape.md")).unwrap();
-            assert_eq!(read_file(root.join("escape.md").to_string_lossy().into_owned(), folder).unwrap_err(), "Note unavailable");
+            assert_eq!(read_file_inner(root.join("escape.md").to_string_lossy().into_owned(), folder).unwrap_err(), "Note unavailable");
         }
         fs::remove_dir_all(dir).unwrap();
     }

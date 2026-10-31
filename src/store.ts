@@ -38,41 +38,35 @@ export function subscribe(listener: () => void): () => void {
   };
 }
 
+function sameEntries(old: TreeNode[] | null, next: TreeNode[]): boolean {
+  return old !== null && old.length === next.length && old.every((entry, i) => entry.name === next[i].name && entry.path === next[i].path && entry.isDir === next[i].isDir);
+}
+async function refreshTreeDir(tree: TreeNode, dirPath: string): Promise<TreeNode> {
+  const directory = findNode(tree, dirPath);
+  if (!directory) return tree;
+  const entries = await listDir(dirPath);
+  const children: TreeNode[] = entries.map(entry => {
+    const existing = findNode(tree, entry.path);
+    return existing && existing.isDir === entry.isDir ? { ...existing, name: entry.name, path: entry.path } : { ...entry, expanded: false, children: null };
+  });
+  return sameEntries(directory.children, children) ? tree : setChildren(tree, dirPath, children);
+}
 export async function refreshDir(dirPath: string): Promise<void> {
   const tree = state.tree;
   if (!tree) return;
-
-  const isRoot = tree.path === dirPath;
-  if (!isRoot && findNode(tree, dirPath) === null) return;
-
-  const entries = await listDir(dirPath);
-  const children: TreeNode[] = entries.map((entry) => {
-    const existing = findNode(tree, entry.path);
-    if (existing && existing.isDir === entry.isDir) {
-      return { ...existing, name: entry.name, path: entry.path };
-    }
-    return {
-      name: entry.name,
-      path: entry.path,
-      isDir: entry.isDir,
-      expanded: false,
-      children: null,
-    };
-  });
-  setState({ tree: setChildren(tree, dirPath, children) });
+  const next = await refreshTreeDir(tree, dirPath);
+  if (next !== tree && state.tree === tree) setState({ tree: next });
 }
-
 function expandedDirPaths(node: TreeNode): string[] {
   if (!node.isDir || !node.expanded) return [];
-  const childPaths = (node.children ?? []).flatMap(expandedDirPaths);
-  return [node.path, ...childPaths];
+  return [node.path, ...(node.children ?? []).flatMap(expandedDirPaths)];
 }
-
 export async function refreshExpandedDirs(): Promise<void> {
-  const paths = state.tree ? expandedDirPaths(state.tree) : [];
-  for (const path of paths) {
-    await refreshDir(path);
-  }
+  const tree = state.tree;
+  if (!tree) return;
+  let next = tree;
+  for (const path of expandedDirPaths(tree)) next = await refreshTreeDir(next, path);
+  if (next !== tree && state.tree === tree) setState({ tree: next });
 }
 
 export function getWindow(id: string): WindowState | undefined {

@@ -1,3 +1,4 @@
+import { searchEmpty } from "./empty-states/views";
 import { createSearchPreview } from "./search-preview";
 import {
   searchInFolder,
@@ -93,7 +94,6 @@ export function createSearchPanel(
   function render(query: string): void {
     const scrollTop = results.scrollTop;
     results.replaceChildren();
-    status.textContent = state.status;
     status.classList.toggle("search-error", state.phase === "error");
     if (state.phase === "error") status.setAttribute("role", "alert"); else status.removeAttribute("role");
     input.setAttribute("aria-invalid", String(state.phase === "error"));
@@ -116,6 +116,7 @@ export function createSearchPanel(
     const groups = new Map<string, SearchHit[]>();
     const allowed = new Set(filterByGlobs(state.hits.map(hit => hit.relative), include.value, exclude.value));
     for (const hit of state.hits) { if (replaceOpen && !allowed.has(hit.relative)) continue; const list = groups.get(hit.relative); if (list) list.push(hit); else groups.set(hit.relative, [hit]); }
+    status.textContent = state.statusFor([...groups.values()].flat());
     for (const [relative, fileHits] of groups) {
       const group = document.createElement("div");
       group.className = "search-group";
@@ -170,6 +171,11 @@ export function createSearchPanel(
         group.appendChild(row);
       }
       results.appendChild(group);
+    }
+    if ((state.phase === "done" || state.phase === "stopped") && query.length >= 2 && groups.size === 0) {
+      results.append(searchEmpty(query, replaceOpen && !!(include.value.trim() || exclude.value.trim()), () => { include.value = ""; exclude.value = ""; void run(); }, () => { input.value = ""; cancel(); state = new SearchRun(); render(""); }));
+      // The empty state already says there are no matches.
+      if (state.phase === "done") status.textContent = "";
     }
     results.scrollTop = scrollTop;
     if (selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
@@ -244,6 +250,7 @@ export function createSearchPanel(
     finally { previewBusy = false; render(input.value.trim()); }
   });
   input.addEventListener("input", () => {
+    results.replaceChildren();
     cancel(); groupValid = false; updateButton();
     timer = window.setTimeout(() => void run(), 250);
   });

@@ -29,6 +29,9 @@ pub struct Scan {
     notes: Vec<Note>,
     skipped: Vec<String>,
     stamps: HashMap<String, String>,
+    removed: Vec<String>,
+    walked: usize,
+    capped: bool,
 }
 
 fn escaped(s: &[u8], at: usize) -> bool {
@@ -271,12 +274,10 @@ fn scan(
     let root = Path::new(&folder)
         .canonicalize()
         .map_err(|_| "Folder unavailable")?;
-    let paths = paths.unwrap_or_else(|| {
-        let mut out = Vec::new();
-        crate::files::walk_files(&root, &root, &mut out);
-        out
-    });
-    let mut result = Scan::default();
+    let full = paths.is_none();
+    let (paths, capped) = paths.map(|paths| (paths, false)).unwrap_or_else(|| crate::files::walk_files_counted(&root));
+    let mut result = Scan { walked: paths.len(), capped, ..Default::default() };
+    let mut seen = std::collections::HashSet::new();
     for relative in paths.into_iter().take(5000) {
         let path = if Path::new(&relative).is_absolute() {
             relative.into()
@@ -302,16 +303,17 @@ fn scan(
             result.skipped.push(name);
             continue;
         };
-        let stamp = format!("{}:{:?}", meta.len(), meta.modified().ok());
-        result.stamps.insert(name.clone(), stamp.clone());
+        seen.insert(name.clone());
+        let nanos = meta.modified().ok().and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_nanos().to_string()).unwrap_or_default();
+        let stamp = format!("{}:{}", meta.len(), nanos);
+        let changed = known.get(&name) != Some(&stamp);
         if meta.len() > MAX_BYTES {
+            if changed { result.stamps.insert(name.clone(), stamp); }
             result.skipped.push(name);
             continue;
         }
-        if known.get(&name) == Some(&stamp) {
-            continue;
-        }
         let Ok(file) = fs::File::open(&real) else {
+            if changed { result.stamps.insert(name.clone(), stamp); }
             result.skipped.push(name);
             continue;
         };
@@ -319,13 +321,17 @@ fn scan(
         if file.take(MAX_BYTES + 1).read_to_end(&mut bytes).is_err()
             || bytes.len() as u64 > MAX_BYTES
         {
+            if changed { result.stamps.insert(name.clone(), stamp); }
             result.skipped.push(name);
             continue;
         }
         let Ok(source) = String::from_utf8(bytes) else {
+            if changed { result.stamps.insert(name.clone(), stamp); }
             result.skipped.push(name);
             continue;
         };
+        if !changed { continue; }
+        result.stamps.insert(name.clone(), stamp);
         let (links, headings) = parse(&source);
         result.notes.push(Note {
             path: name,
@@ -334,14 +340,24 @@ fn scan(
             headings,
         });
     }
+    if full { result.removed = known.keys().filter(|path| !seen.contains(*path)).cloned().collect(); result.removed.sort(); }
     Ok(result)
+}
+fn expand_known(folder: &str, known: HashMap<String, String>) -> HashMap<String, String> {
+    known.into_iter().map(|(path, stamp)| {
+        let path = if Path::new(&path).is_absolute() { path } else { Path::new(folder).join(path).to_string_lossy().into_owned() };
+        (path, stamp)
+    }).collect()
 }
 #[tauri::command]
 pub async fn scan_note_links(
     folder: String,
     known: Option<HashMap<String, String>>,
 ) -> Result<Scan, String> {
-    tauri::async_runtime::spawn_blocking(move || scan(folder, None, known.unwrap_or_default()))
+    tauri::async_runtime::spawn_blocking(move || {
+        let known = expand_known(&folder, known.unwrap_or_default());
+        scan(folder, None, known)
+    })
         .await
         .map_err(|_| "Link scan failed")?
 }
@@ -353,6 +369,93 @@ pub async fn scan_note_links_for(folder: String, paths: Vec<String>) -> Result<S
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[ignore]
+    fn bench_scan_2000() {
+        let root = std::env::temp_dir().join(format!("bugtext-bench-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for i in 0..2000 {
+            let dir = root.join(format!("folder-{}", i / 50));
+            std::fs::create_dir_all(&dir).unwrap();
+            let source = format!(
+                "# Note {i}\n#one #two\n[one](a.md)\n[two](b.md)\n[three](c.md)\n{}",
+                "text ".repeat(1600)
+            );
+            std::fs::write(dir.join(format!("note-{i}.md")), source).unwrap();
+        }
+        for i in 0..1000 {
+            std::fs::write(
+                root.join(format!(
+                    "asset-{i}.{}",
+                    if i % 2 == 0 { "pdf" } else { "png" }
+                )),
+                b"dummy",
+            )
+            .unwrap();
+        }
+        let start = std::time::Instant::now();
+        let first = super::scan(root.to_string_lossy().into(), None, Default::default()).unwrap();
+        println!(
+            "first: {:?}, walked 3000, notes {}, result bytes {}, known bytes {}",
+            start.elapsed(),
+            first.notes.len(),
+            serde_json::to_vec(&first).unwrap().len(),
+            serde_json::to_vec(&first.stamps).unwrap().len()
+        );
+        let compact: std::collections::HashMap<_, _> = first.stamps.iter().map(|(path, stamp)| (std::path::Path::new(path).strip_prefix(&root).unwrap().to_string_lossy().into_owned(), stamp.clone())).collect();
+        println!("compact known bytes {}", serde_json::to_vec(&compact).unwrap().len());
+        let start = std::time::Instant::now();
+        let second = super::scan(root.to_string_lossy().into(), None, first.stamps).unwrap();
+        println!(
+            "unchanged: {:?}, walked 3000, notes {}, result bytes {}",
+            start.elapsed(),
+            second.notes.len(),
+            serde_json::to_vec(&second).unwrap().len()
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn expands_relative_known_paths() {
+        let known = super::expand_known("/notes", [("dir/a.md".into(), "3:1".into())].into_iter().collect());
+        assert_eq!(known.get("/notes/dir/a.md").map(String::as_str), Some("3:1"));
+    }
+    #[test]
+    fn delta_scan_tracks_changes_removals_and_stamps() {
+        let root = std::env::temp_dir().join(format!("bugtext-delta-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("a.md");
+        std::fs::write(&path, "old").unwrap();
+        let folder = root.to_string_lossy().into_owned();
+        let first = super::scan(folder.clone(), None, Default::default()).unwrap();
+        let name = path.to_string_lossy().into_owned();
+        let stamp = &first.stamps[&name];
+        assert_eq!(stamp.split(':').count(), 2);
+        assert!(stamp.starts_with("3:"));
+        let unchanged = super::scan(folder.clone(), None, first.stamps.clone()).unwrap();
+        assert!(unchanged.notes.is_empty() && unchanged.stamps.is_empty() && unchanged.removed.is_empty());
+        std::fs::write(&path, "changed contents").unwrap();
+        let changed = super::scan(folder.clone(), None, first.stamps).unwrap();
+        assert_eq!(changed.notes.len(), 1); assert_eq!(changed.stamps.len(), 1);
+        std::fs::remove_file(path).unwrap();
+        let deleted = super::scan(folder, None, changed.stamps).unwrap();
+        assert_eq!(deleted.removed, vec![name]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn delta_scan_reports_cap_and_confines_symlinks() {
+        let root = std::env::temp_dir().join(format!("bugtext-cap-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for i in 0..5001 { std::fs::write(root.join(format!("{i:04}.txt")), "").unwrap(); }
+        let scan = super::scan(root.to_string_lossy().into(), None, Default::default()).unwrap();
+        assert!(scan.capped); assert_eq!(scan.walked, 5000);
+        #[cfg(unix)] {
+            let outside = root.with_extension("md"); std::fs::write(&outside, "secret").unwrap();
+            std::os::unix::fs::symlink(&outside, root.join("escape.md")).unwrap();
+            let scan = super::scan(root.to_string_lossy().into(), Some(vec!["escape.md".into()]), Default::default()).unwrap();
+            assert!(scan.notes.is_empty()); std::fs::remove_file(outside).unwrap();
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn scanner_caps_and_confines_files() {
         let root = std::env::temp_dir().join(format!("bugtext-links-{}", std::process::id()));

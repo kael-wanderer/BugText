@@ -57,8 +57,11 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "edit.open_link", label: "Open Link", category: "Edit", default: "", scope: "menu" },
   { id: "view.filter_panel", label: "Filter", category: "View", default: "CmdOrCtrl+Alt+Shift+F", scope: "menu" },
   { id: "view.links_panel", label: "Links", category: "View", default: "CmdOrCtrl+Alt+Shift+O", scope: "menu" },
+  { id: "view.source_control", label: "Source Control", category: "View", default: "Ctrl+Shift+G", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
   { id: "view.status_bar", label: "Show Status Bar", category: "View", default: "", scope: "menu" },
+  { id: "view.focus_mode", label: "Focus Mode", category: "View", default: "Ctrl+Cmd+Z", scope: "menu" },
+  { id: "view.typewriter", label: "Typewriter Scrolling", category: "View", default: "CmdOrCtrl+Alt+T", scope: "menu" },
   { id: "view.sync_scroll", label: "Sync Scroll", category: "View", default: "", scope: "menu" },
   { id: "view.toggle_preview", label: "Show/Hide Preview", category: "View", default: "CmdOrCtrl+P", scope: "menu" },
   { id: "view.reading", label: "Reading View", category: "View", default: "CmdOrCtrl+E", scope: "menu" },
@@ -227,16 +230,18 @@ const KEY_SYMBOLS: Record<string, string> = {
   arrowright: "→",
 };
 
-/** Human-readable accelerator for display, e.g. "CmdOrCtrl+Shift+N" -> "⌘⇧N". */
+/** macOS menu order for modifier glyphs. */
+const MODIFIER_ORDER = ["⌃", "⌥", "⇧", "⌘"];
+
+/** Human-readable accelerator for display, e.g. "CmdOrCtrl+Shift+N" -> "⇧⌘N". */
 export function formatAccelerator(accel: string): string {
   if (!accel) return "—";
-  return accel
-    .split("+")
-    .map((part) => {
-      const lower = part.trim().toLowerCase();
-      if (SYMBOLS[lower]) return SYMBOLS[lower];
-      if (KEY_SYMBOLS[lower]) return KEY_SYMBOLS[lower];
-      return part.length === 1 ? part.toUpperCase() : part;
-    })
-    .join("");
+  const modifiers: string[] = [], keys: string[] = [];
+  for (const part of accel.split("+")) {
+    const lower = part.trim().toLowerCase();
+    if (SYMBOLS[lower]) modifiers.push(SYMBOLS[lower]);
+    else keys.push(KEY_SYMBOLS[lower] ?? (part.length === 1 ? part.toUpperCase() : part));
+  }
+  modifiers.sort((a, b) => MODIFIER_ORDER.indexOf(a) - MODIFIER_ORDER.indexOf(b));
+  return [...modifiers, ...keys].join("");
 }
