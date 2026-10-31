@@ -195,3 +195,8 @@ describe("templates settings", () => {
   });
 });
 
+
+it("round trips the large-folder setting and defaults invalid values", () => {
+  expect(parseSettings(JSON.stringify({ performance: { largeFolders: "off" } })).performance.largeFolders).toBe("off");
+  expect(parseSettings(JSON.stringify({ performance: { largeFolders: "bad" } })).performance.largeFolders).toBe("auto");
+});

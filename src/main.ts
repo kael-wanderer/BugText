@@ -28,7 +28,7 @@ import { configureLinks, followEditorLink, followLink } from "./links/follow";
 import { createLinkIndex, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
 import { createFrameCoalescer } from "./render-coalescer";
-import { createRefreshRunner, createFocusDeduper } from "./workspace-refresh";
+import { createRefreshRunner, createFocusDeduper, decideLarge, tickKind, BASE_MS } from "./workspace-refresh";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -289,7 +289,9 @@ let tabSeq = 0;
 const nextId = () => `t${++tabSeq}`;
 const cleanReloads = new Set<string>();
 const recoveredDraftIds = new Map<string, string>();
-const AUTO_REFRESH_MS = 3_000;
+let largeFolder = false;
+let nativeFocused = document.hasFocus();
+let lastFullAt = 0;
 
 let sessionReady = false;
 let persistTimer: number | undefined;
@@ -2162,13 +2164,16 @@ const refreshRunner = createRefreshRunner(async (kind, reason) => {
   const tick = diagnostics.begin(reason, kind);
   try {
     if (kind === "full") {
+      lastFullAt = Date.now();
       const walkStart = performance.now();
       if (getState().folder) {
         await refreshExpandedDirs().catch(() => {});
         await refreshFileList();
       }
       tick.walkMs = performance.now() - walkStart;
-      await linkIndex.refresh().catch(() => {});
+      if (getState().folder && !linkIndex.ready) await linkIndex.ensure(getState().folder).catch(() => {});
+      else await linkIndex.refresh().catch(() => {});
+      largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
     }
     await refreshCleanOpenFilesFromDisk();
   } finally { diagnostics.end(); }
@@ -3367,6 +3372,7 @@ subscribe(() => {
   const s = getState();
   if (s.folder !== indexedFolder) {
     indexedFolder = s.folder;
+    largeFolder = false;
     bookmarkActions.refresh();
     linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
@@ -3392,6 +3398,7 @@ subscribe(() => {
 });
 
 const refreshOnFocus = createFocusDeduper(() => {
+  nativeFocused = true;
   void refreshRunner.request("full", "focus");
   void checkActiveForExternalChange(getState().activeWindowId);
 });
@@ -3400,12 +3407,14 @@ window.addEventListener("focus", refreshOnFocus);
 // The webview does not always get a DOM focus event when the app regains
 // focus, so listen on the native window too.
 void currentNativeWindow?.onFocusChanged(({ payload: focused }) => {
+  nativeFocused = focused;
   if (focused) refreshOnFocus();
 });
 
 window.setInterval(() => {
-  void refreshRunner.request("full", "timer");
-}, AUTO_REFRESH_MS);
+  largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
+  void refreshRunner.request(tickKind({ large: largeFolder, focused: nativeFocused, now: Date.now(), lastFullAt }), "timer");
+}, BASE_MS);
 
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;

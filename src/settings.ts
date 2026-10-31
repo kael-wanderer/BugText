@@ -80,6 +80,7 @@ export type Settings = {
   links: { complete: boolean; onRename: "ask" | "never" };
   tables: TableSettings;
   templates: TemplateSettings;
+  performance: { largeFolders: "auto" | "off" };
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -113,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
   links: { complete: true, onRename: "ask" },
   tables: { formatOnEdit: true, pasteAsTable: true },
+  performance: { largeFolders: "auto" },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
@@ -166,6 +168,7 @@ function defaults(): Settings {
     links: { ...DEFAULT_SETTINGS.links },
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
+    performance: { ...DEFAULT_SETTINGS.performance },
     export: parsePresets(undefined),
   };
 }
@@ -300,6 +303,7 @@ export function parseSettings(raw: string): Settings {
     links: parseLinks(data.links),
     tables: parseTables(data.tables),
     templates: parseTemplates(data.templates),
+    performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
   };
 }
 
