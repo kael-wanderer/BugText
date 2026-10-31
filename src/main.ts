@@ -171,6 +171,7 @@ import {
 } from "./recovery";
 import { draftIdFor, type DraftRecord } from "./recovery-policy";
 import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
+import { cleanText } from "./clean-text";
 import { showRecoveryReview } from "./recovery-review";
 import { checkForUpdates, startDailyUpdateChecks } from "./updater";
 import {
@@ -1097,6 +1098,7 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
       if (tab.path) forgetStat(tab.path);
     }
     view.editor.closeState(id);
+    cleanText.forget(id);
   }
 
   const remaining = w.tabs.filter((x) => !toClose.has(x.id));
@@ -1463,7 +1465,7 @@ function openInWindow(windowId: string, opts: { path: string | null; name: strin
       opts.text,
       editorKind(opts.path ?? opts.name),
     );
-  if (opts.path) void recordStat(opts.path);
+  if (opts.path) { cleanText.set(id, opts.text); void recordStat(opts.path); }
   activateTab(windowId, id, recordNavigation);
 }
 
@@ -1514,6 +1516,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   if (t.path) forgetStat(t.path);
   const next = nextActiveAfterClose(w.tabs, tabId, w.activeTabId);
   views.get(windowId)!.editor.closeState(tabId);
+  cleanText.forget(tabId);
   patchWindow(windowId, {
     tabs: w.tabs.filter((x) => x.id !== tabId),
     activeTabId: next,
@@ -1541,12 +1544,19 @@ function onDocChange(windowId: string, tabId: string, text: string): void {
   if (cleanReloads.has(changeKey)) return;
   // A PDF tab's hidden text editor is not the document; PDF edits track their own state.
   if (t && isPdfFile(t.path ?? t.name)) return;
-  if (t && !t.dirty) {
+  if (t?.path && t.dirty && cleanText.matches(tabId, text)) {
+    // Undo (or retyping) brought the tab back to its saved text.
+    patchWindow(windowId, {
+      tabs: w.tabs.map((x) => (x.id === tabId ? { ...x, dirty: false } : x)),
+    });
+    clearDraft(t.path, tabId);
+    renderAll();
+  } else if (t && !t.dirty) {
     patchWindow(windowId, {
       tabs: w.tabs.map((x) => (x.id === tabId ? { ...x, dirty: true } : x)),
     });
   }
-  if (t) {
+  if (t && !cleanText.matches(tabId, text)) {
     scheduleDraft({
       windowId,
       tabId,
@@ -1942,6 +1952,7 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
   view.editor.setDocumentKind(tab.id, editorKind(target));
   if (windowState.activeTabId === tab.id) view.renderPreview(view.editor.getText(tab.id), target);
   if (clean) {
+    cleanText.set(tab.id, view.editor.getText(tab.id));
     clearDraft(binding.path, tab.id);
     const recoveredId = recoveredDraftIds.get(tab.id);
     if (recoveredId) clearDraftById(recoveredId);
@@ -2181,6 +2192,7 @@ async function checkActiveForExternalChange(
         cleanReloads.delete(changeKey);
       }
       clearDraft(tab.path, tab.id);
+      cleanText.set(tab.id, text);
       patchWindow(windowId, {
         tabs: getWindow(windowId)!.tabs.map((item) =>
           item.id === tab.id ? { ...item, dirty: false } : item,
@@ -2194,6 +2206,7 @@ async function checkActiveForExternalChange(
     markDirty: () => {
       const current = getWindow(windowId);
       if (!current) return;
+      cleanText.forget(tab.id);
       patchWindow(windowId, {
         tabs: current.tabs.map((item) =>
           item.id === tab.id ? { ...item, dirty: true } : item,
@@ -2308,6 +2321,7 @@ function openDraft(draft: DraftRecord): void {
       const current = getWindow(found.windowId)!;
       patchWindow(found.windowId, { tabs: current.tabs.map((tab) => tab.id === found.tab.id ? { ...tab, dirty: true } : tab) });
       recoveredDraftIds.set(found.tab.id, draft.id);
+      cleanText.forget(found.tab.id);
       renderAll();
       return;
     }
@@ -2320,6 +2334,7 @@ function openDraft(draft: DraftRecord): void {
   const windowState = getWindow(preferredWindowId)!;
   if (windowState.activeTabId) {
     recoveredDraftIds.set(windowState.activeTabId, draft.id);
+    cleanText.forget(windowState.activeTabId);
     patchWindow(preferredWindowId, {
       tabs: windowState.tabs.map((item) =>
         item.id === windowState.activeTabId
