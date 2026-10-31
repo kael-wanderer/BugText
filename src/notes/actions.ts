@@ -72,7 +72,7 @@ export function createOrganizeActions(host: OrganizeHost) {
       await manualSnapshot(task.path, source.text, "Before task inbox edit", true);
       if (host.getFolder() !== folder) throw new Error("The folder changed. Reopen the task inbox.");
       if (!host.apply(source, change)) throw new Error("This note changed. Refresh the tasks list and try again.");
-      host.index.onFileChanged(task.path, source.text.slice(0, change.from) + change.insert + source.text.slice(change.to));
+      host.index.onFileChanged(task.path, source.text.slice(0, change.from) + change.insert + source.text.slice(change.to), false);
     },
   });
   return { extractSelection, showTasks, newTypedNote: () => showNoteTypeSheet(host, false), applyNoteType: () => showNoteTypeSheet(host, true) };

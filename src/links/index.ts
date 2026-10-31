@@ -43,6 +43,8 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   let ready = false;
   let building: Promise<void> | null = null;
   let notes = new Map<string, IndexedNote>();
+  let savedSources = new Map<string, string>();
+  let pendingSaved = new Map<string, string | null>();
   let pending = new Map<string, string | null>();
   let skipped: string[] = [];
   let stamps: Record<string, string> = {};
@@ -62,7 +64,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
   function setFolder(next: string | null) {
     if (folder === next) return;
     backlinksDirty = true;
-    generation++; folder = next; ready = false; building = null; notes = new Map(); pending = new Map(); skipped = []; stamps = {}; walked = 0; capped = false; refreshing = false; versions.clear(); notify();
+    generation++; folder = next; ready = false; building = null; notes = new Map(); savedSources = new Map(); pendingSaved = new Map(); pending = new Map(); skipped = []; stamps = {}; walked = 0; capped = false; refreshing = false; versions.clear(); notify();
   }
   async function ensure(next = folder): Promise<void> {
     setFolder(next);
@@ -76,7 +78,10 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         stamps = result.stamps ?? {};
         walked = result.walked ?? 0; capped = result.capped ?? false;
         backlinksDirty = true;
-        notes = new Map(result.notes.map((note) => [note.path, withProperties(note)])); skipped = result.skipped;
+        notes = new Map(result.notes.map((note) => [note.path, withProperties(note)]));
+        savedSources = new Map(result.notes.map(note => [note.path, note.source]));
+        for (const [path, text] of pendingSaved) { if (text === null) savedSources.delete(path); else savedSources.set(path, text); }
+        pendingSaved.clear(); skipped = result.skipped;
         for (const [path, text] of pending) apply(path, text);
         pending.clear(); ready = true; notify();
       }).finally(() => { if (current === generation) building = null; });
@@ -84,10 +89,15 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     }
     await building;
   }
-  function onFileChanged(path: string, text: string | null) {
+  function onFileChanged(path: string, text: string | null, persisted = true) {
     if (!contains(path)) return;
+    const savedChanged = persisted && (text === null ? savedSources.has(path) : savedSources.get(path) !== text);
+    if (persisted) {
+      if (text === null) savedSources.delete(path); else if (/\.(md|markdown)$/i.test(path)) savedSources.set(path, text);
+      if (building) pendingSaved.set(path, text);
+    }
     if (!/\.(md|markdown)$/i.test(path) && !notes.has(path)) return;
-    if (ready && (text === null ? !notes.has(path) : notes.get(path)?.source === text)) return;
+    if (ready && (text === null ? !notes.has(path) : notes.get(path)?.source === text)) { if (savedChanged) notify(); return; }
     versions.set(path, (versions.get(path) ?? 0) + 1);
     if (building) pending.set(path, text);
     if (ready) { apply(path, text); notify(); }
@@ -113,6 +123,9 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
         const next = result.stamps ?? {};
         let changed = false;
         const removed = result.removed ?? Object.keys(stamps).filter(path => !(path in next));
+        for (const path of removed) if (versions.get(path) === before.get(path)) savedSources.delete(path);
+        for (const note of result.notes) if (versions.get(note.path) === before.get(note.path)) savedSources.set(note.path, note.source);
+        for (const path of result.skipped) if (versions.get(path) === before.get(path)) savedSources.delete(path);
         for (const path of removed) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
         for (const note of result.notes) if (versions.get(note.path) === before.get(note.path) && notes.get(note.path)?.source !== note.source) { notes.set(note.path, withProperties(note)); changed = true; }
         for (const path of result.skipped) if (versions.get(path) === before.get(path)) changed = notes.delete(path) || changed;
@@ -155,6 +168,7 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     },
     notes: () => [...notes.values()],
     get: (path: string) => notes.get(path),
+    savedSource: (path: string) => savedSources.get(path),
     get folder() { return folder; },
     get ready() { return ready; },
     get skipped() { return skipped; },

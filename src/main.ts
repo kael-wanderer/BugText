@@ -3167,7 +3167,7 @@ function getReplaceFlow() {
       const editor = editorForTab(found.tab.id);
       return { text: editor.getText(found.tab.id), apply: changes => {
         editor.applyChanges(found.tab.id, changes);
-        const text = editor.getText(found.tab.id); workspaceIndex.onFileChanged(path, text); linkIndex.onFileChanged(path, text);
+        const text = editor.getText(found.tab.id); workspaceIndex.onFileChanged(path, text); linkIndex.onFileChanged(path, text, false);
       } };
     },
     read: path => invoke<string>("read_file", { path }),

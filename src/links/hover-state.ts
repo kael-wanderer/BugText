@@ -15,8 +15,8 @@ export function cardStateForPath(index: LinkIndex, path: string, anchor?: string
   if (!index.ready) return { kind: "indexing" };
   const relative = path.slice(prefix.length), title = relative.split("/").pop()!.replace(/\.(md|markdown)$/i, "");
   if (index.skipped.includes(path)) return { kind: "unavailable", title, relative };
-  const note = index.get(path); if (!note) return { kind: "missing", title, relative };
-  const excerpt = noteExcerpt(note.source, anchor);
+  const source = index.savedSource(path); if (source === undefined) return { kind: "missing", title, relative };
+  const excerpt = noteExcerpt(source, anchor);
   return anchor && !excerpt.headingFound ? { kind: "heading-missing", title, relative, heading: anchor, excerpt } : { kind: "excerpt", title, relative, excerpt };
 }
 export function cardStateForTarget(index: LinkIndex, target: string, fromPath: string): CardState | null {

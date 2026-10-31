@@ -58,6 +58,7 @@ export function createHoverCard(doc: Document = document) {
     attach(el: HTMLElement, state: () => CardState | null, mode: "pointer" | "focus") {
       const modes = attached.get(el) ?? {}; modes[mode] = state; attached.set(el, modes);
     },
+    detach(el: HTMLElement) { attached.delete(el); hide(); },
     hide,
     refresh() { if (anchor && currentState && !card.hidden) show(anchor, currentState); },
     dispose() { hide(); cleanup.forEach(fn => fn()); card.remove(); },

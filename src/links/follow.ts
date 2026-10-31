@@ -4,10 +4,14 @@ import { headingAnchors, noteLinks } from "./parse";
 import { markdownOutline } from "../outline";
 import { resolveLink } from "./resolve";
 import type { LinkIndex } from "./index";
+import type { createHoverCard } from "./hover-card";
+import { cardStateForTarget } from "./hover-state";
 
 export type LinkContext = { path: string; text: string; folder: string | null };
 type Services = {
   index: LinkIndex;
+  hoverPreview?: () => boolean;
+  hoverCard?: ReturnType<typeof createHoverCard>;
   context: (id: string) => LinkContext | null;
   open: (path: string, other: boolean) => Promise<void>;
   jump: (line: number) => void;
@@ -73,6 +77,15 @@ export function bindPreviewLinks(host: HTMLElement, context: () => LinkContext |
     const current = context();
     if (current) void followLink(anchor.getAttribute("href") ?? "", current, event.metaKey || event.ctrlKey || event.button === 1);
   };
+  const attached = new Set<HTMLElement>();
+  const attachHover = (event: Event) => {
+    const anchor = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+    if (!anchor || !host.contains(anchor) || !services?.hoverCard) return;
+    const card = services.hoverCard; for (const old of attached) if (!host.contains(old)) { card.detach(old); attached.delete(old); } attached.add(anchor);
+    const state = () => { const current = context(); const s = services; return current && s?.hoverPreview?.() ? cardStateForTarget(s.index, anchor.getAttribute("href") ?? "", current.path) : null; };
+    card.attach(anchor, state, "pointer"); card.attach(anchor, state, "focus");
+  };
+  host.addEventListener("pointerover", attachHover); host.addEventListener("focusin", attachHover);
   host.addEventListener("click", click);
   host.addEventListener("auxclick", click);
   const decorate = () => {
@@ -87,12 +100,13 @@ export function bindPreviewLinks(host: HTMLElement, context: () => LinkContext |
       const target = a.getAttribute("href");
       const broken = outgoing.find((link) => link.target === target || encodeURI(link.target) === target)?.broken;
       a.classList.toggle("broken-note-link", Boolean(broken));
-      if (broken) a.title = broken;
+      if (broken && !services?.hoverPreview?.()) a.title = broken;
       else if (a.title === "Note not found" || a.title === "Heading not found") a.removeAttribute("title");
     });
   };
   const observer = new MutationObserver(decorate);
   observer.observe(host, { childList: true, subtree: true });
-  const unsubscribe = services?.index.subscribe(decorate);
-  return () => { observer.disconnect(); unsubscribe?.(); host.removeEventListener("click", click); host.removeEventListener("auxclick", click); };
+  const unsubscribe = services?.index.subscribe(() => { decorate(); services?.hoverCard?.refresh(); });
+  decorate();
+  return () => { observer.disconnect(); unsubscribe?.(); for (const anchor of attached) services?.hoverCard?.detach(anchor); host.removeEventListener("pointerover", attachHover); host.removeEventListener("focusin", attachHover); host.removeEventListener("click", click); host.removeEventListener("auxclick", click); };
 }

@@ -22,3 +22,12 @@ it("decides card states entirely from the index", async () => {
   for (const target of ["https://example.com", "file.pdf#page=2", "image.png", "../../outside.md"]) expect(cardStateForTarget(index, target, "/r/b.md")).toBeNull();
   expect(cardStateForPath(index, "/outside.md")).toBeNull(); expect(scan).not.toHaveBeenCalled(); index.setFolder(null); expect(cardStateForTarget(index, "a.md", "/r/b.md")).toBeNull();
 });
+
+it("uses saved text even when the index receives an unsaved workspace edit", async () => {
+  const index = createLinkIndex(async () => ({ notes: [parseNote("/r/a.md", "saved text")], skipped: [] }));
+  await index.ensure("/r"); index.onFileChanged("/r/a.md", "unsaved text", false);
+  const state = cardStateForPath(index, "/r/a.md");
+  expect(state?.kind).toBe("excerpt"); if (state?.kind === "excerpt") expect(state.excerpt.lines).toEqual(["saved text"]);
+  index.onFileChanged("/r/a.md", "unsaved text");
+  const updated = cardStateForPath(index, "/r/a.md"); if (updated?.kind === "excerpt") expect(updated.excerpt.lines).toEqual(["unsaved text"]);
+});
