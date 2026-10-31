@@ -1,3 +1,7 @@
+import { createFirstRunHint } from "./empty-states/first-run";
+import { createOnboarding } from "./empty-states/onboarding";
+import { shouldShowHint } from "./empty-states/rules";
+import { keyHint } from "./empty-states/key-hint";
 import { readFileBytes } from "./file-bytes";
 import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
@@ -269,6 +273,13 @@ function updateOutline(force = false): void {
   if (view) outlineView.setActive(view.navigationLine());
 }
 let currentSettings = parseSettings("{}");
+let openingDocuments = 1; // Startup restore may open a document asynchronously.
+let firstRunHint: ReturnType<typeof createFirstRunHint> | null = null;
+const onboarding = createOnboarding({ get: () => currentSettings, set: settings => { currentSettings = settings; }, write: writeSettings, toast: showToast, refresh: refreshFirstRunHint });
+function refreshFirstRunHint(): void {
+  firstRunHint?.update(shouldShowHint({ dismissed: onboarding.dismissed(), folder: getState().folder, tabCount: getState().windows.reduce((n, w) => n + w.tabs.length, 0), loading: openingDocuments > 0, settingsOpen: document.body.classList.contains("settings-active"), recoveryOpen: !!document.querySelector(".recovery-scrim") }));
+}
+function markOnboarded(): void { onboarding.mark(); }
 let settingsPath = "";
 let aiSettingsPath = "";
 let aiSettingsMigrationReady = false;
@@ -494,11 +505,10 @@ function broadcastSettingsChange(file: SettingsFile): void {
   void emit(SETTINGS_CHANGED_EVENT, { file, from: nativeWindowLabel }).catch(() => {});
 }
 
-function writeSettings(next: Settings): void {
-  if (!settingsPath) return;
-  void writeFile(settingsPath, JSON.stringify(next, null, 2))
-    .then(() => { syncMcpEnabled(); broadcastSettingsChange("settings"); })
-    .catch(() => {});
+function writeSettings(next: Settings): Promise<void> {
+  if (!settingsPath) return Promise.reject(new Error("Settings unavailable"));
+  return writeFile(settingsPath, JSON.stringify(next, null, 2))
+    .then(() => { syncMcpEnabled(); broadcastSettingsChange("settings"); });
 }
 
 function writeAISettings(next: AISettings): void {
@@ -528,6 +538,7 @@ async function loadSettings(): Promise<void> {
     currentSettings = parseSettings("{}");
   }
   applySettings(currentSettings);
+  refreshFirstRunHint();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
@@ -627,6 +638,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       if (!next) return;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       currentSettings = next;
+      refreshFirstRunHint();
       applySettings(currentSettings);
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -705,7 +717,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   if (themeChanged) renderAll();
-  writeSettings(settings);
+  void writeSettings(settings).catch(() => {});
 }
 
 function saveAISettingsFromPanel(settings: AISettings): void {
@@ -1195,6 +1207,7 @@ const indexRender = createFrameCoalescer(renderAll);
 linkIndex.subscribe(() => indexRender.request());
 
 function renderAll(): void {
+  refreshFirstRunHint();
   indexRender.cancel();
   diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
@@ -1558,6 +1571,8 @@ async function doOpenPath(
   forceNewTab = false,
   confinedFolder?: string | null,
 ): Promise<void> {
+  openingDocuments++; refreshFirstRunHint();
+  try {
   const recent = loadRecent();
   saveRecent({ ...recent, files: addRecent(recent.files, path) });
   if (isPdfFile(path)) {
@@ -1572,6 +1587,7 @@ async function doOpenPath(
     if (confinedFolder) showToast("Could not open note.");
     else await showOpenError(error);
   }
+  } finally { openingDocuments--; refreshFirstRunHint(); }
 }
 
 type ExplorerDropTarget = {
@@ -1768,6 +1784,7 @@ async function initNativeFileDrop(): Promise<void> {
 }
 
 async function doOpen(): Promise<void> {
+  openingDocuments++; refreshFirstRunHint();
   try {
     const result = await openFile();
     if (result) {
@@ -1783,7 +1800,7 @@ async function doOpen(): Promise<void> {
     }
   } catch (error) {
     await showOpenError(error);
-  }
+  } finally { openingDocuments--; refreshFirstRunHint(); }
 }
 
 function openPdf(windowId: string, path: string): void {
@@ -1813,7 +1830,7 @@ const templateActions = createTemplateActions({
   setLastUsed: (lastUsed) => {
     if (lastUsed === currentSettings.templates.lastUsed) return;
     currentSettings = { ...currentSettings, templates: { ...currentSettings.templates, lastUsed } };
-    writeSettings(currentSettings);
+    void writeSettings(currentSettings).catch(() => {});
   },
   refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
   revealInExplorer: revealExplorerPath,
@@ -1886,7 +1903,7 @@ async function doSave(saveAs = false): Promise<boolean> {
   const text = view.editor.getText(t.id);
   const binding: SaveBinding = { windowId: getState().activeWindowId, tabId: t.id, path: t.path, revision: view.editor.revision(t.id) };
   try {
-    return await runSerialized(`tab:${t.id}`, async (queuedTab) => {
+    const saved = await runSerialized(`tab:${t.id}`, async (queuedTab) => {
     const latest = getState().windows.flatMap((window) => window.tabs).find((tab) => tab.id === t.id);
     if (queuedTab && !saveAs && latest && !latest.dirty && editorForTab(t.id).revision(t.id) === binding.revision) return true;
     let target = saveAs ? null : (latest?.path ?? t.path);
@@ -1970,6 +1987,8 @@ async function doSave(saveAs = false): Promise<boolean> {
     return true;
     });
     });
+    if (saved) markOnboarded();
+    return saved;
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     await message(text, { title: "Save file", kind: "error" });
@@ -2496,7 +2515,7 @@ function persistCurrentSettings(): void {
   setTableFormatting(currentSettings.tables.formatOnEdit);
   requestWindowMeasure();
   syncViewMenu();
-  writeSettings(currentSettings);
+  void writeSettings(currentSettings).catch(() => {});
   settingsScreen.refresh();
 }
 
@@ -3028,6 +3047,14 @@ const settingsScreen = createSettingsScreen(
   },
   [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
 );
+firstRunHint = createFirstRunHint(document.getElementById("first-run-hint")!, {
+  openFolder: openFolderDialog, newNote: newDoc, showShortcuts: () => settingsScreen.open("shortcuts"), dismiss: markOnboarded, keymap: () => currentSettings.keymap,
+});
+new MutationObserver(() => refreshFirstRunHint()).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+new MutationObserver(records => {
+  if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => node instanceof HTMLElement && (node.matches(".recovery-scrim") || !!node.querySelector(".recovery-scrim"))))) refreshFirstRunHint();
+}).observe(document.getElementById("app")!, { childList: true, subtree: true });
+refreshFirstRunHint();
 onSettingsSynced = () => settingsScreen.refresh();
 void listenScoped<typeof mcpStatus>("bugtext://mcp-status", ({ payload }) => {
   mcpStatus = payload;
@@ -3289,6 +3316,11 @@ initExplorer(
   (path) => void doOpenPath(path),
   handleExplorerPathChange,
   {
+    onOpenFile: () => void doOpen(),
+    onNewNote: newDoc,
+    onNewFromTemplateRoot: () => templateActions.newFromTemplate(),
+    onDailyNote: () => void openDailyNote(),
+    keyHint: id => keyHint(id, currentSettings.keymap),
     onBeforePathChange: async () => {
       const folder = getState().folder;
       renameNotes = [];
@@ -3382,6 +3414,7 @@ subscribe(() => {
   refreshStatusBar();
   const s = getState();
   if (s.folder !== indexedFolder) {
+    if (!indexedFolder && s.folder) markOnboarded();
     indexedFolder = s.folder;
     largeFolder = false;
     setExplorerNotice(null);
@@ -3427,6 +3460,19 @@ window.setInterval(() => {
   largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
   void refreshRunner.request(tickKind({ large: largeFolder, focused: nativeFocused, now: Date.now(), lastFullAt }), "timer");
 }, BASE_MS);
+
+function openFolderDialog(): void {
+  return void pickFolder().then(async (directory) => {
+        if (!directory) return;
+        await openFolder(directory);
+        const recentItems = loadRecent();
+        saveRecent({
+          ...recentItems,
+          folders: addRecent(recentItems.folders, directory),
+        });
+        await refreshFileList();
+      });
+}
 
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;
@@ -3477,16 +3523,7 @@ listenScoped<string>("menu", (event) => {
     case "file.open":
       return void doOpen();
     case "file.open_folder":
-      return void pickFolder().then(async (directory) => {
-        if (!directory) return;
-        await openFolder(directory);
-        const recentItems = loadRecent();
-        saveRecent({
-          ...recentItems,
-          folders: addRecent(recentItems.folders, directory),
-        });
-        await refreshFileList();
-      });
+      return openFolderDialog();
     case "file.save":
       return void doSave(false);
     case "file.save_as":
@@ -3891,7 +3928,7 @@ void listenScoped<string>("open-path", (event) => {
 void initNativeFileDrop().catch((error) => {
   console.warn("Native file drag and drop unavailable:", error);
 });
-void boot();
+void boot().finally(() => { openingDocuments--; refreshFirstRunHint(); });
 
 window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
   if (currentSettings.theme === "system") { applySettings(currentSettings); renderAll(); }
