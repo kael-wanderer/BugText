@@ -3,11 +3,11 @@ import { placeCard } from "./hover-position";
 export function createHoverCard(doc: Document = document) {
   const old = doc.getElementById("link-hover-card"); old?.remove();
   const card = doc.createElement("div"); card.id = "link-hover-card"; card.className = "link-hover-card"; card.setAttribute("role", "tooltip"); card.hidden = true; doc.body.append(card);
+  let pendingElement: HTMLElement | null = null;
   let anchor: HTMLElement | null = null, currentState: (() => CardState | null) | null = null;
   let showTimer: ReturnType<typeof setTimeout> | null = null, hideTimer: ReturnType<typeof setTimeout> | null = null;
-  const cleanup: (() => void)[] = [];
   const attached = new WeakMap<HTMLElement, { pointer?: () => CardState | null; focus?: () => CardState | null }>();
-  const cancelShow = () => { if (showTimer !== null) clearTimeout(showTimer); showTimer = null; };
+  const cancelShow = () => { if (showTimer !== null) clearTimeout(showTimer); showTimer = null; pendingElement = null; };
   const cancelHide = () => { if (hideTimer !== null) clearTimeout(hideTimer); hideTimer = null; };
   function hide() { cancelShow(); cancelHide(); anchor?.removeAttribute("aria-describedby"); anchor = null; currentState = null; card.hidden = true; card.replaceChildren(); }
   function render(state: CardState) {
@@ -39,7 +39,7 @@ export function createHoverCard(doc: Document = document) {
   const onOver = (event: Event) => {
     const e = event as PointerEvent; if (card.contains(e.target as Node)) { cancelHide(); return; }
     const found = find(e.target, "pointer"); if (!found || (e.relatedTarget instanceof Node && found.el.contains(e.relatedTarget))) return;
-    cancelHide(); cancelShow(); showTimer = setTimeout(() => show(found.el, found.state), 400);
+    cancelHide(); cancelShow(); pendingElement = found.el; showTimer = setTimeout(() => show(found.el, found.state), 400);
   };
   const onOut = (event: Event) => {
     const e = event as PointerEvent;
@@ -51,16 +51,26 @@ export function createHoverCard(doc: Document = document) {
   const onBlur = (event: Event) => { if (find(event.target, "focus")) laterHide(); };
   const onKey = (event: Event) => { const e = event as KeyboardEvent; if (e.key === "Escape" && anchor && (e.target === anchor || anchor.contains(e.target as Node))) { hide(); e.preventDefault(); e.stopPropagation(); } };
   const onClick = () => hide(), onScroll = () => hide();
-  for (const [name, handler, capture] of [["pointerover", onOver, false], ["pointerout", onOut, false], ["focusin", onFocus, false], ["focusout", onBlur, false], ["keydown", onKey, false], ["click", onClick, false], ["scroll", onScroll, true]] as const) {
-    doc.addEventListener(name, handler, capture); cleanup.push(() => doc.removeEventListener(name, handler, capture));
+  const listeners = [["pointerover", onOver, false], ["pointerout", onOut, false], ["focusin", onFocus, false], ["focusout", onBlur, false], ["keydown", onKey, false], ["click", onClick, false], ["scroll", onScroll, true]] as const;
+  let enabled = false;
+  function setEnabled(value: boolean) {
+    if (enabled === value) return;
+    enabled = value;
+    for (const [name, handler, capture] of listeners) {
+      if (value) doc.addEventListener(name, handler, capture); else doc.removeEventListener(name, handler, capture);
+    }
+    if (!value) hide();
   }
+  setEnabled(true);
   return {
     attach(el: HTMLElement, state: () => CardState | null, mode: "pointer" | "focus") {
       const modes = attached.get(el) ?? {}; modes[mode] = state; attached.set(el, modes);
     },
-    detach(el: HTMLElement) { attached.delete(el); hide(); },
+    setEnabled,
+    detach(el: HTMLElement) { attached.delete(el); if (anchor === el || pendingElement === el) hide(); },
+    hideWithin(host: HTMLElement) { if ((anchor && host.contains(anchor)) || (pendingElement && host.contains(pendingElement))) hide(); },
     hide,
     refresh() { if (anchor && currentState && !card.hidden) show(anchor, currentState); },
-    dispose() { hide(); cleanup.forEach(fn => fn()); card.remove(); },
+    dispose() { setEnabled(false); card.remove(); },
   };
 }

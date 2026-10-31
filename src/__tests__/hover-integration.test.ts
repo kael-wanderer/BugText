@@ -27,3 +27,16 @@ it("previews both Links sections and hides on rerender", async () => {
   for (const row of rows) { row.dispatchEvent(new MouseEvent("pointerover", { bubbles: true })); vi.advanceTimersByTime(400); expect(tip.hidden).toBe(false); card.hide(); }
   rows[0].dispatchEvent(new MouseEvent("pointerover", { bubbles: true })); vi.advanceTimersByTime(400); panel.render(); expect(tip.hidden).toBe(true); card.dispose();
 });
+
+it("updates an indexing tooltip when the scan finishes and hides on folder change", async () => {
+  vi.useFakeTimers(); let finish!: (value: { notes: ReturnType<typeof parseNote>[]; skipped: string[] }) => void;
+  const index = createLinkIndex(() => new Promise(resolve => { finish = resolve; })); index.setFolder("/r");
+  const card = createHoverCard(); configureLinks({ index, hoverCard: card, hoverPreview: () => true, context: () => null, open: vi.fn(), jump: vi.fn(), read: vi.fn(), create: vi.fn(), toast: vi.fn() });
+  const host = document.createElement("div"); host.innerHTML = '<a href="b.md">B</a>'; document.body.append(host);
+  const dispose = bindPreviewLinks(host, () => ({ path: "/r/a.md", folder: "/r", text: "[B](b.md)" }));
+  await Promise.resolve(); await Promise.resolve();
+  host.querySelector("a")!.dispatchEvent(new MouseEvent("pointerover", { bubbles: true })); vi.advanceTimersByTime(400);
+  const tip = document.getElementById("link-hover-card")!; expect(tip.textContent).toContain("Indexing notes");
+  finish({ notes: [parseNote("/r/b.md", "saved")], skipped: [] }); await Promise.resolve(); await Promise.resolve();
+  expect(tip.textContent).toContain("saved"); index.setFolder("/other"); expect(tip.hidden).toBe(true); dispose(); card.dispose();
+});

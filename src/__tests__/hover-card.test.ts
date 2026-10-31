@@ -24,3 +24,10 @@ it("delays pointer previews, preserves them on card entry, and hides with Escape
   link.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); expect(tip.hidden).toBe(true); expect(document.activeElement).toBe(link);
   expect(document.querySelectorAll("#link-hover-card")).toHaveLength(1); card.dispose();
 });
+
+it("removes its listeners when disabled", () => {
+  vi.useFakeTimers(); const card = createHoverCard(), link = document.createElement("button"); document.body.append(link);
+  card.attach(link, () => ({ kind: "indexing" }), "pointer"); card.setEnabled(false);
+  link.dispatchEvent(new MouseEvent("pointerover", { bubbles: true })); vi.advanceTimersByTime(400);
+  expect(document.getElementById("link-hover-card")!.hidden).toBe(true); card.dispose();
+});

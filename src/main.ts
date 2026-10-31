@@ -30,7 +30,8 @@ import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
-import { configureLinks, followEditorLink, followLink } from "./links/follow";
+import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
+import { createHoverCard } from "./links/hover-card";
 import { createLinkIndex, compactKnown, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
 import { createFrameCoalescer } from "./render-coalescer";
@@ -235,6 +236,7 @@ const listenScoped: typeof listen = currentNativeWindow
 const isPrimaryNativeWindow = nativeWindowLabel === "main";
 const startupUi = isPrimaryNativeWindow ? loadState() : freshState();
 let ui = { ...startupUi, aiVisible: false };
+const hoverCard = createHoverCard();
 let outlineKey = "";
 const outlineView = createOutlineView(document.getElementById("outline-panel")!, (line) => activeView().jumpToLine(line), () => activeView().editor.focus(), (tab) => {
   ui = { ...ui, outlineTab: tab }; persistUiState();
@@ -249,7 +251,7 @@ const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
   const context = tab && linkContext(tab.id);
   if (context) void followLink(target, context);
-});
+}, { card: hoverCard, enabled: () => currentSettings.links.hoverPreview });
 // The Filter panel loads the first time its tab opens, which keeps it out of the startup bundle.
 let filterPanel: Promise<{ show(on: boolean): Promise<void> }> | null = null;
 let savedViews: SavedViewStore | undefined;
@@ -552,6 +554,7 @@ async function loadSettings(): Promise<void> {
   } catch {
     currentSettings = parseSettings("{}");
   }
+  hoverCard.setEnabled(currentSettings.links.hoverPreview);
   applySettings(currentSettings);
   refreshFirstRunHint();
   refreshStatusBar();
@@ -652,7 +655,9 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const next = tryParseSettings(raw.contents);
       if (!next) return;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
+      const hoverChanged = next.links.hoverPreview !== currentSettings.links.hoverPreview;
       currentSettings = next;
+      if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       refreshFirstRunHint();
       applySettings(currentSettings);
       refreshStatusBar();
@@ -721,8 +726,10 @@ function openAISettings(): void {
 }
 
 function saveSettingsFromPanel(settings: Settings): void {
+  const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   currentSettings = settings;
+  if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
   applySettings(currentSettings);
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -1970,6 +1977,7 @@ async function doSave(saveAs = false): Promise<boolean> {
     if (target === settingsPath) {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
+      if (currentSettings.links.hoverPreview !== previous.links.hoverPreview) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       applySettings(currentSettings);
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -2389,8 +2397,12 @@ function handleExplorerPathChange(from: string, to: string | null): void {
   for (const note of linkIndex.notes()) {
     const path = to ? movedPath(note.path, from, to) : note.path;
     if (note.path === from || note.path.startsWith(from + "/")) {
+      const saved = linkIndex.savedSource(note.path);
       linkIndex.onFileRemoved(note.path);
-      if (to) linkIndex.onFileChanged(path, note.source);
+      if (to) {
+        if (saved !== undefined) linkIndex.onFileChanged(path, saved);
+        if (saved !== note.source) linkIndex.onFileChanged(path, note.source, false);
+      }
     }
   }
 
@@ -3394,6 +3406,7 @@ function linkContext(id: string) {
 }
 configureLinks({
   index: linkIndex,
+  hoverCard, hoverPreview: () => currentSettings.links.hoverPreview,
   context: linkContext,
   open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
   jump: (line) => activeView().jumpToLine(line),

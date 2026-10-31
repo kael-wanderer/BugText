@@ -75,6 +75,7 @@ export const editingPage: SettingsPage = {
       row("show-status-bar", "Show status bar", "Also in View ▸ Show Status Bar.", toggle("Show status bar", settings.showStatusBar, (showStatusBar) => deps.onSettingsChange({ ...deps.getSettings(), showStatusBar }))),
       row("sync-scroll", "Sync scroll", "Keep editor and preview in the same section.", toggle("Sync scroll", settings.syncScroll, (syncScroll) => deps.onSettingsChange({ ...deps.getSettings(), syncScroll }))),
       caption("Links"),
+      row("links-hover-preview", "Preview links on hover", "Show a short preview of linked notes.", toggle("Preview links on hover", settings.links.hoverPreview, hoverPreview => deps.onSettingsChange({ ...deps.getSettings(), links: { ...deps.getSettings().links, hoverPreview } }))),
       row("links-complete", "Suggest notes while typing links", "After ]( in Markdown notes.",
         toggle("Suggest notes while typing links", settings.links.complete, (complete) => {
           const current = deps.getSettings(); deps.onSettingsChange({ ...current, links: { ...current.links, complete } });

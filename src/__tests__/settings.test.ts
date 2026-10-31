@@ -207,3 +207,9 @@ it("validates and round trips focus and typewriter settings", () => {
   const settings = parseSettings('{"focus":{"width":"wide"},"editor":{"typewriterScrolling":true}}');
   expect(parseSettings(JSON.stringify(settings)).focus.width).toBe("wide"); expect(parseSettings(JSON.stringify(settings)).editor.typewriterScrolling).toBe(true);
 });
+
+it("defaults hover previews on and preserves explicit false", () => {
+  expect(parseSettings("{}").links.hoverPreview).toBe(true);
+  expect(parseSettings('{"links":{"hoverPreview":"no"}}').links.hoverPreview).toBe(true);
+  const off = parseSettings('{"links":{"hoverPreview":false}}'); expect(parseSettings(JSON.stringify(off)).links.hoverPreview).toBe(false);
+});

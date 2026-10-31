@@ -21,6 +21,8 @@ type Services = {
   toast: (text: string, action?: { label: string; run: () => void }) => void;
 };
 let services: Services | null = null;
+const decorators = new Set<() => void>();
+export function refreshPreviewLinks(): void { decorators.forEach(decorate => decorate()); }
 export function configureLinks(next: Services) { services = next; }
 export function linkAt(text: string, position: number) {
   return noteLinks(text).find((link) => {
@@ -106,7 +108,8 @@ export function bindPreviewLinks(host: HTMLElement, context: () => LinkContext |
   };
   const observer = new MutationObserver(decorate);
   observer.observe(host, { childList: true, subtree: true });
-  const unsubscribe = services?.index.subscribe(() => { decorate(); services?.hoverCard?.refresh(); });
-  decorate();
-  return () => { observer.disconnect(); unsubscribe?.(); for (const anchor of attached) services?.hoverCard?.detach(anchor); host.removeEventListener("pointerover", attachHover); host.removeEventListener("focusin", attachHover); host.removeEventListener("click", click); host.removeEventListener("auxclick", click); };
+  let previousFolder = services?.index.folder;
+  const unsubscribe = services?.index.subscribe(() => { if (services?.index.folder !== previousFolder) { previousFolder = services?.index.folder; services?.hoverCard?.hide(); } else services?.hoverCard?.refresh(); decorate(); });
+  decorators.add(decorate); decorate();
+  return () => { decorators.delete(decorate); observer.disconnect(); unsubscribe?.(); for (const anchor of attached) services?.hoverCard?.detach(anchor); host.removeEventListener("pointerover", attachHover); host.removeEventListener("focusin", attachHover); host.removeEventListener("click", click); host.removeEventListener("auxclick", click); };
 }

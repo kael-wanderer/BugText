@@ -77,7 +77,7 @@ export type Settings = {
   workspaceContextK: number;
   appIcon: AppIconId;
   images: ImageSettings;
-  links: { complete: boolean; onRename: "ask" | "never" };
+  links: { complete: boolean; onRename: "ask" | "never"; hoverPreview: boolean };
   tables: TableSettings;
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
@@ -117,7 +117,7 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceContextK: 5,
   appIcon: DEFAULT_APP_ICON,
   images: { folder: "assets", pasteName: "note", dropMode: "copy" },
-  links: { complete: true, onRename: "ask" },
+  links: { complete: true, onRename: "ask", hoverPreview: true },
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
   onboarding: { hintDismissed: true },
@@ -353,5 +353,5 @@ export function applySettings(settings: Settings): void {
 
 function parseLinks(value: unknown): Settings["links"] {
   const data = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  return { complete: typeof data.complete === "boolean" ? data.complete : true, onRename: data.onRename === "never" ? "never" : "ask" };
+  return { complete: typeof data.complete === "boolean" ? data.complete : true, onRename: data.onRename === "never" ? "never" : "ask", hoverPreview: data.hoverPreview !== false };
 }

@@ -45,8 +45,8 @@ describe("note links", () => {
 
 describe("link settings", () => {
   it("uses per-field fallbacks and round trips valid preferences", () => {
-    expect(parseSettings('{"links":{"complete":false,"onRename":"invalid"}}').links).toEqual({ complete: false, onRename: "ask" });
-    expect(parseSettings('{"links":{"complete":"no","onRename":"never"}}').links).toEqual({ complete: true, onRename: "never" });
-    expect(parseSettings('{"links":null}').links).toEqual({ complete: true, onRename: "ask" });
+    expect(parseSettings('{"links":{"complete":false,"onRename":"invalid"}}').links).toEqual({ complete: false, onRename: "ask", hoverPreview: true });
+    expect(parseSettings('{"links":{"complete":"no","onRename":"never"}}').links).toEqual({ complete: true, onRename: "never", hoverPreview: true });
+    expect(parseSettings('{"links":null}').links).toEqual({ complete: true, onRename: "ask", hoverPreview: true });
   });
 });

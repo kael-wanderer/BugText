@@ -6,7 +6,7 @@ export function createLinksPanel(host: HTMLElement, index: LinkIndex, current: (
   let active = false;
   function render() {
     if (!active) return;
-    hover?.card.hide();
+    hover?.card.hideWithin(host);
     host.replaceChildren();
     if (!index.folder) { host.append(node("p", "No folder open — links between notes need a folder.", "outline-empty")); return; }
     if (!index.ready) { host.append(node("p", "Indexing notes…", "outline-empty")); return; }

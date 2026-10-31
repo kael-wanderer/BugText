@@ -58,3 +58,12 @@ it("leaves small-folder notices hidden and treats hostile names as text", async 
   await createLinksPanel(host, index, () => ({ path: hostile, text: "" }), () => {}, () => {}).show(true);
   expect(host.textContent).not.toContain("Indexed the first"); expect(host.querySelector("img")).toBeNull();
 });
+
+it("changes the hover-preview setting from Editing", async () => {
+  const { editingPage } = await import("../settings-screen/page-editing");
+  let settings = parseSettings("{}"); const host = document.createElement("div");
+  editingPage.render(host, { getSettings: () => settings, onSettingsChange: (next: Settings) => { settings = next; } } as unknown as ScreenDeps);
+  const row = host.querySelector('[data-setting="links-hover-preview"]')!;
+  const toggle = row.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  toggle.checked = false; toggle.dispatchEvent(new Event("change")); expect(settings.links.hoverPreview).toBe(false);
+});
