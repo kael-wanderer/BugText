@@ -126,6 +126,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Fixed
 
+- Close link previews when the rendered document changes.
 - A pending preview refresh no longer replaces the newly selected tab's preview.
 - Outline no longer drops a heading that has an HTML comment on the same line.
 - Heading search ignores fenced code, front matter, comments and indented code, and recognizes setext headings.

@@ -106,7 +106,7 @@ export function bindPreviewLinks(host: HTMLElement, context: () => LinkContext |
       else if (a.title === "Note not found" || a.title === "Heading not found") a.removeAttribute("title");
     });
   };
-  const observer = new MutationObserver(decorate);
+  const observer = new MutationObserver(() => { services?.hoverCard?.hide(); decorate(); });
   observer.observe(host, { childList: true, subtree: true });
   let previousFolder = services?.index.folder;
   const unsubscribe = services?.index.subscribe(() => { if (services?.index.folder !== previousFolder) { previousFolder = services?.index.folder; services?.hoverCard?.hide(); } else services?.hoverCard?.refresh(); decorate(); });

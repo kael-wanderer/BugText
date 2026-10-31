@@ -40,3 +40,13 @@ it("updates an indexing tooltip when the scan finishes and hides on folder chang
   finish({ notes: [parseNote("/r/b.md", "saved")], skipped: [] }); await Promise.resolve(); await Promise.resolve();
   expect(tip.textContent).toContain("saved"); index.setFolder("/other"); expect(tip.hidden).toBe(true); dispose(); card.dispose();
 });
+
+it("hides a preview card when the rendered document is replaced", async () => {
+  vi.useFakeTimers(); const index = createLinkIndex(async () => ({ notes: [parseNote("/r/b.md", "saved")], skipped: [] })); await index.ensure("/r");
+  const card = createHoverCard(); configureLinks({ index, hoverCard: card, hoverPreview: () => true, context: () => null, open: vi.fn(), jump: vi.fn(), read: vi.fn(), create: vi.fn(), toast: vi.fn() });
+  const host = document.createElement("div"); host.innerHTML = '<a href="b.md">B</a>'; document.body.append(host);
+  const dispose = bindPreviewLinks(host, () => ({ path: "/r/a.md", folder: "/r", text: "[B](b.md)" }));
+  host.querySelector("a")!.dispatchEvent(new MouseEvent("pointerover", { bubbles: true })); vi.advanceTimersByTime(400);
+  const tip = document.getElementById("link-hover-card")!; expect(tip.hidden).toBe(false);
+  host.replaceChildren(); await Promise.resolve(); expect(tip.hidden).toBe(true); dispose(); card.dispose();
+});
