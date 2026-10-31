@@ -6,7 +6,7 @@ import { KEYMAP_COMMANDS } from "../keymap";
 export type AiSubPage = "use-for" | "context" | "actions" | "local-cli" | "api" | "mcp";
 
 export type SettingsPageId =
-  "general" | "editing" | "export" | "theme" | "shortcuts" | "ai";
+  "general" | "editing" | "export" | "git" | "theme" | "shortcuts" | "ai";
 
 export const SETTINGS_PAGES: ReadonlyArray<{
   id: SettingsPageId;
@@ -26,6 +26,7 @@ export const SETTINGS_PAGES: ReadonlyArray<{
       "wrap wrapping column soft lines",
   },
   { id: "export", label: "Export", keywords: "presets tools pandoc typst pdf word" },
+  { id: "git", label: "Git", keywords: "source control backup sync version path" },
   {
     id: "theme",
     label: "Themes",
@@ -48,6 +49,7 @@ export const PAGE_LEDES: Record<SettingsPageId, string> = {
   general: "Typography, startup and updates.",
   editing: "How lines wrap, how links and tables behave, where pasted images go, and where templates and quick notes live.",
   export: "Tools and presets for PDF and Word export.",
+  git: "Source Control and installed Git.",
   theme: "The colours the app itself is drawn in.",
   shortcuts:
     "Click a shortcut, then press the new keys. Backspace clears it, Esc cancels.",
@@ -68,6 +70,9 @@ export function shortcutEntryId(commandId: string): string {
 }
 
 export const SETTING_ENTRIES: SettingEntry[] = [
+  { id: "git.path", page: "git", label: "Git path", keywords: "git executable" },
+  { id: "git.version", page: "git", label: "Git version", keywords: "git version" },
+  { id: "git.show", page: "git", label: "Show Source Control", keywords: "sidebar git" },
   { id: "export-preset", page: "export", label: "Export preset", keywords: "presets" },
   { id: "export-page-size", page: "export", label: "Page size", keywords: "paper pdf" },
   { id: "export-margins", page: "export", label: "Margins", keywords: "page pdf mm" },

@@ -36,6 +36,12 @@ it("asks before saving a dirty checked file; cancel does nothing and acceptance 
   await runGitAction(req("commit"), "/repo", d); expect(d.save).toHaveBeenCalledWith("/repo/sub/dirty.md");
   expect(d.save.mock.invocationCallOrder[0]).toBeLessThan(d.invoke.mock.invocationCallOrder[0]);
 });
+it("treats a checked untracked directory as containing its dirty tabs", async () => {
+  const d = fixture(); const request = req("commit"); request.paths = ["nested/"];
+  d.tabsInFolder.mockImplementation((folder: string) => [{ path: "/repo/sub/nested/new.md", dirty: true, text: "draft" }].filter(t => !folder || t.path.startsWith(`${folder}/`)));
+  d.confirmSave.mockResolvedValueOnce(false);
+  expect(await runGitAction(request, "/repo", d)).toBeNull(); expect(d.confirmSave).toHaveBeenCalledWith(1); expect(d.invoke).not.toHaveBeenCalled();
+});
 it("save and commit confirmation sheet calls the selected button", async () => {
   const host = document.createElement("div"); const panel = createGitPanel(host, { repo: vi.fn(), status: vi.fn(), diff: vi.fn(), action: vi.fn(), cancel: vi.fn() });
   const cancelled = panel.confirmSave(1); expect(host.textContent).toContain("Save 1 file before committing?");

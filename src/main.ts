@@ -1,3 +1,10 @@
+import "./git/git.css";
+import { gitRepo, gitStatus, gitDiff, gitAction, gitCancel } from "./git/api";
+import { createGitPanel, type GitPanelControl } from "./git/panel";
+import { runGitAction } from "./git/flow";
+import { gitPaletteItems } from "./git/palette";
+import type { GitRepoInfo } from "./git/model";
+import type { GuardDeps } from "./ai/agent-run-guard";
 import { createFocusMode } from "./focus/controller";
 import { isFocusEligible, escapeExitsFocus } from "./focus/rules";
 import { createFirstRunHint } from "./empty-states/first-run";
@@ -681,7 +688,9 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       if (!next) return;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       const hoverChanged = next.links.hoverPreview !== currentSettings.links.hoverPreview;
+      const gitVisibilityChanged = next.git.showSourceControl !== currentSettings.git.showSourceControl;
       currentSettings = next;
+      if (gitVisibilityChanged) void refreshGitAvailability();
       if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       refreshFirstRunHint();
       applySettings(currentSettings);
@@ -753,7 +762,9 @@ function openAISettings(): void {
 function saveSettingsFromPanel(settings: Settings): void {
   const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
+  const gitVisibilityChanged = settings.git.showSourceControl !== currentSettings.git.showSourceControl;
   currentSettings = settings;
+  if (gitVisibilityChanged) void refreshGitAvailability();
   if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
   applySettings(currentSettings);
   refreshStatusBar();
@@ -786,6 +797,7 @@ function commandItems(): PaletteItem[] {
 
   const recent = loadRecent();
   return [
+    ...gitPaletteItems(gitAvailable, openGitControl),
     command("show_table_view", "Show Table View", () => { void showTableView(); }),
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
@@ -1865,6 +1877,7 @@ function openPdf(windowId: string, path: string): void {
 }
 
 function afterDiskWrite(path: string): void {
+  if (getState().folder && path.startsWith(getState().folder!.replace(/[\\/]$/, "") + "/")) void gitPanel.refresh();
   void invoke<string>("read_file", { path }).then((text) => {
     workspaceIndex.onFileChanged(path, text);
     linkIndex.onFileChanged(path, text);
@@ -1914,6 +1927,7 @@ function newDoc(): void {
 }
 
 async function finishBoundSave(binding: SaveBinding, target: string): Promise<void> {
+  if (getState().folder && target.startsWith(getState().folder!.replace(/[\\/]$/, "") + "/")) void gitPanel.refresh();
   const windowState = getState().windows.find((item) => item.tabs.some((tab) => tab.id === binding.tabId));
   const tab = windowState?.tabs.find((item) => item.id === binding.tabId);
   const view = windowState && views.get(windowState.id);
@@ -2002,6 +2016,7 @@ async function doSave(saveAs = false): Promise<boolean> {
     if (target === settingsPath) {
       const previous = currentSettings;
       currentSettings = tryParseSettings(text) ?? previous;
+      if (currentSettings.git.showSourceControl !== previous.git.showSourceControl) void refreshGitAvailability();
       if (currentSettings.links.hoverPreview !== previous.links.hoverPreview) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       applySettings(currentSettings);
       refreshStatusBar();
@@ -2821,15 +2836,7 @@ function editReviewDeps(actionLabel: string): EditReviewDeps {
   };
 }
 
-function buildAIPanel(): void {
-  const panelReview = editReviewDeps("AI edit");
-  aiPanel = createAIPanel(aiPanelElement, {
-    workspaceIndex,
-    getSettings: () => currentAISettings,
-    onSettingsChange: saveAISettingsFromPanel,
-    getClis: () => cliInfos,
-    getModelsCache: () => modelsCache,
-    guard: {
+const gitGuard: GuardDeps = {
       tabsInFolder: (folder) => {
         const prefix = folder.replace(/[\\/]$/, "") + "/";
         return getState().windows.flatMap((windowState) => {
@@ -2855,7 +2862,17 @@ function buildAIPanel(): void {
           }
         }
       },
-    },
+};
+
+function buildAIPanel(): void {
+  const panelReview = editReviewDeps("AI edit");
+  aiPanel = createAIPanel(aiPanelElement, {
+    workspaceIndex,
+    getSettings: () => currentAISettings,
+    onSettingsChange: saveAISettingsFromPanel,
+    getClis: () => cliInfos,
+    getModelsCache: () => modelsCache,
+    guard: gitGuard,
     onNewNote: (text) => {
       const windowId = getState().activeWindowId;
       openInWindow(windowId, { path: null, name: "Untitled", text });
@@ -3109,7 +3126,7 @@ const settingsScreen = createSettingsScreen(
     setDockIcon: (id) => invoke<void>("set_dock_icon", { id }),
     isMac,
   },
-  [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
+  [{ id: "general", async render(host, deps) { const { generalPage } = await import("./settings-screen/page-general"); await generalPage.render(host, deps); } }, { id: "editing", async render(host, deps) { const { editingPage } = await import("./settings-screen/page-editing"); await editingPage.render(host, deps); } }, { id: "export", async render(host, deps) { const { exportPage } = await import("./settings-screen/page-export"); await exportPage.render(host, deps); } }, { id: "git", async render(host, deps) { const { gitPage } = await import("./settings-screen/page-git"); await gitPage.render(host, deps); } }, { id: "theme", async render(host, deps) { const { themePage } = await import("./settings-screen/page-theme"); await themePage.render(host, deps); } }, shortcutsPage, aiPage],
 );
 firstRunHint = createFirstRunHint(document.getElementById("first-run-hint")!, {
   openFolder: openFolderDialog, newNote: newDoc, showShortcuts: () => settingsScreen.open("shortcuts"), dismiss: markOnboarded, keymap: () => currentSettings.keymap,
@@ -3246,7 +3263,67 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
   },
 });
 
+let gitAvailable = false;
+let gitInfo: GitRepoInfo | null = null;
+let gitAvailabilityGeneration = 0;
+const gitButton = document.getElementById("ab-git")!;
+const gitHost = document.getElementById("git-panel")!;
+const gitPanel = createGitPanel(gitHost, {
+  repo: gitRepo,
+  status: async folder => {
+    const status = await gitStatus(folder);
+    if (folder === getState().folder) gitButton.classList.toggle("has-changes", status.total > 0);
+    return status;
+  },
+  diff: gitDiff,
+  action: async req => {
+    const suffix = gitInfo?.subfolder;
+    const root = suffix ? req.folder.replace(/[\\/]$/, "").slice(0, -(suffix.length + 1)) || "/" : req.folder;
+    return runGitAction(req, root, {
+      ...gitGuard,
+      invoke: gitAction,
+      save: async path => {
+        const found = findTabByPath(getState().windows, path);
+        if (!found) return false;
+        const oldWindow = getState().activeWindowId;
+        const oldTab = getState().windows.find(w => w.id === oldWindow)?.activeTabId;
+        activateTab(found.windowId, found.tab.id, false);
+        try { return await doSave(); }
+        finally { if (oldTab && getState().windows.some(w => w.id === oldWindow && w.tabs.some(t => t.id === oldTab))) activateTab(oldWindow, oldTab, false); }
+      },
+      confirmSave: count => gitPanel.confirmSave(count),
+      refresh: async () => {},
+    });
+  },
+  cancel: gitCancel,
+  openFile: (folder, path) => { void doOpenPath(`${folder.replace(/[\\/]$/, "")}/${path}`); },
+});
+async function refreshGitAvailability(): Promise<void> {
+  const folder = getState().folder, generation = ++gitAvailabilityGeneration;
+  gitInfo = null; gitAvailable = false; gitButton.hidden = true;
+  if (!folder || !currentSettings.git.showSourceControl) { setGitActive(false); return; }
+  try {
+    const info = await gitRepo(folder);
+    if (generation !== gitAvailabilityGeneration || folder !== getState().folder) return;
+    gitInfo = info; gitAvailable = info.in_repo; gitButton.hidden = !gitAvailable;
+    if (gitAvailable) { gitPanel.setFolder(folder); void gitPanel.refresh(); }
+    else setGitActive(false);
+  } catch { if (generation === gitAvailabilityGeneration) setGitActive(false); }
+}
+function setGitActive(on: boolean): void {
+  on = on && gitAvailable && currentSettings.git.showSourceControl;
+  if (on && document.body.classList.contains("search-active")) setSearchActive(false);
+  document.body.classList.toggle("git-active", on); gitHost.hidden = !on;
+  gitButton.classList.toggle("active", on); gitButton.setAttribute("aria-pressed", String(on));
+  if (on) { showExplorerColumn(); void gitPanel.refresh(); }
+  requestWindowMeasure();
+}
+function openGitControl(control: GitPanelControl): void {
+  if (!gitAvailable) return;
+  settingsScreen.close(); setGitActive(true); gitPanel.focus(control);
+}
 function setSearchActive(on: boolean): void {
+  if (on && document.body.classList.contains("git-active")) setGitActive(false);
   document.body.classList.toggle("search-active", on);
   const button = document.getElementById("ab-search")!;
   button.classList.toggle("active", on);
@@ -3275,7 +3352,7 @@ function toggleSearch(): void {
 }
 
 initActivityBar(
-  requestWindowMeasure,
+  () => { if (document.body.classList.contains("git-active")) setGitActive(false); requestWindowMeasure(); },
   () => {
     // Leaving settings through a panel button shows that panel, never hides it.
     if (!settingsScreen.isOpen()) return toggleSearch();
@@ -3289,7 +3366,10 @@ initActivityBar(
     setAIVisible(true);
   },
   openExportMenu,
+  () => { if (settingsScreen.isOpen()) settingsScreen.close(); setGitActive(!document.body.classList.contains("git-active")); },
 );
+
+void refreshGitAvailability();
 
 function applySidebarView(): void {
   const outline = ui.sidebarView === "outline";
@@ -3301,6 +3381,7 @@ function applySidebarView(): void {
   document.getElementById("ab-explorer")!.setAttribute("aria-pressed", String(!outline && getState().explorerVisible));
 }
 document.getElementById("ab-outline")!.addEventListener("click", () => {
+  if (document.body.classList.contains("git-active")) setGitActive(false);
   if (settingsScreen.isOpen()) settingsScreen.close();
   if (document.body.classList.contains("search-active")) setSearchActive(false);
   const hide = ui.sidebarView === "outline" && getState().explorerVisible;
@@ -3481,6 +3562,7 @@ subscribe(() => {
   if (s.folder !== indexedFolder) {
     if (!indexedFolder && s.folder) markOnboarded();
     indexedFolder = s.folder;
+    gitPanel.setFolder(null); void refreshGitAvailability();
     largeFolder = false;
     setExplorerNotice(null);
     bookmarkActions.refresh();
@@ -3509,6 +3591,7 @@ subscribe(() => {
 
 const refreshOnFocus = createFocusDeduper(() => {
   nativeFocused = true;
+  if (gitAvailable) void gitPanel.refresh();
   void refreshRunner.request("full", "focus");
   void checkActiveForExternalChange(getState().activeWindowId);
 });
@@ -3628,6 +3711,8 @@ listenScoped<string>("menu", (event) => {
       ui = { ...ui, sidebarView: "outline", outlineTab: "links" };
       showExplorerColumn(); applySidebarView(); outlineView.selectTab("links"); updateOutline(true);
       return;
+    case "view.source_control":
+      settingsScreen.close(); setGitActive(!document.body.classList.contains("git-active")); return;
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
@@ -3716,6 +3801,7 @@ const appKeyActions: Record<string, () => void> = {
   "go.back": () => travelHistory("back"),
   "go.forward": () => travelHistory("forward"),
   "palette.open": () => palette.open(),
+  "view.source_control": () => setGitActive(!document.body.classList.contains("git-active")),
   "search.find_in_files": () => toggleSearch(),
   "search.replace_in_folder": () => { setSearchActive(true); searchPanel.focusReplace(); },
   "file.daily_note": () => void openDailyNote(),
@@ -3943,6 +4029,7 @@ async function restoreWindows(): Promise<void> {
 async function boot(): Promise<void> {
   await refreshPinnedMenu();
   await loadSettings();
+  await refreshGitAvailability();
   await refreshMcpStatus();
   reportWindow();
   // The Dock forgets a custom icon on quit; re-apply it (app-wide, idempotent).

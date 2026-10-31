@@ -42,6 +42,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Source Control checks dirty files inside selected untracked folders before committing.
 - Reduced large-folder refresh request size by sending note paths relative to the open folder.
 - Avoided redundant workbench renders while unchanged open files are checked.
 - Reduced repeated folder refresh, backlink, graph layout and AI index work; file reads run off the native main thread and PDFs transfer as raw bytes.

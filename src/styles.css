@@ -3612,3 +3612,11 @@ body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; 
 .mentions-group { display: grid; gap: 4px; padding: 8px 0; }
 .mentions-group small { color: var(--text-muted); }
 .mentions .link-panel-row strong { color: var(--accent); }
+
+body.git-active #explorer, body.git-active #outline-panel { display: none; }
+body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidden; pointer-events: none; }
+#git-panel { grid-area: explorer; overflow: hidden; }
+#ab-git { position: relative; }
+#ab-git.has-changes::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); bottom: 5px; right: 5px; }
+
+#ab-git[hidden] { display: none; }

@@ -16,7 +16,7 @@ export async function runGitAction(req: GitActionRequest, repoFolder: string, de
   if (req.action === "commit") {
     const prefix = req.folder.replace(/[\\/]$/, "") + "/";
     const paths = new Set(req.paths.map(path => prefix + path));
-    const dirty = tabs.filter(tab => tab.dirty && paths.has(tab.path));
+    const dirty = tabs.filter(tab => tab.dirty && [...paths].some(path => tab.path === path || (path.endsWith("/") && tab.path.startsWith(path))));
     if (dirty.length) {
       if (!await deps.confirmSave(dirty.length)) return null;
       for (const tab of dirty) if (!await deps.save(tab.path)) throw new Error("Save failed");

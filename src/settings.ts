@@ -54,6 +54,7 @@ export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 
 export type Settings = {
   export: ExportSettings;
+  git: { showSourceControl: boolean };
   mcp: { enabled: boolean };
   theme: ThemeName;
   darkTheme: DarkThemeName;
@@ -95,6 +96,7 @@ export const FOCUS_WIDTHS = { narrow: 560, standard: 680, wide: 880 } as const;
 
 export const DEFAULT_SETTINGS: Settings = {
   export: parsePresets(undefined),
+  git: { showSourceControl: true },
   mcp: { enabled: false },
   theme: "dark",
   darkTheme: "dark",
@@ -182,6 +184,7 @@ function defaults(): Settings {
     focus: { ...DEFAULT_SETTINGS.focus },
     editor: { ...DEFAULT_SETTINGS.editor },
     export: parsePresets(undefined),
+    git: { ...DEFAULT_SETTINGS.git },
   };
 }
 
@@ -271,6 +274,7 @@ export function parseSettings(raw: string): Settings {
 
   return {
     export: parsePresets(data.export),
+    git: { showSourceControl: (data.git as { showSourceControl?: unknown } | undefined)?.showSourceControl !== false },
     mcp: { enabled: (data.mcp as { enabled?: unknown } | undefined)?.enabled === true },
     theme,
     darkTheme: (() => {

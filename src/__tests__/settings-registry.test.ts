@@ -12,6 +12,7 @@ describe("settings registry", () => {
       "general",
       "editing",
       "export",
+      "git",
       "theme",
       "shortcuts",
       "ai",

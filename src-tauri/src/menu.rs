@@ -231,6 +231,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let links_panel = MenuItemBuilder::with_id("view.links_panel", "Links").accelerator("CmdOrCtrl+Alt+Shift+O").build(app)?;
     let filter_panel = MenuItemBuilder::with_id("view.filter_panel", "Filter").accelerator("CmdOrCtrl+Alt+Shift+F").build(app)?;
+    let source_control = MenuItemBuilder::with_id("view.source_control", "Source Control").accelerator("Ctrl+Shift+G").build(app)?;
     let outline = MenuItemBuilder::with_id("view.outline", "Outline").accelerator("CmdOrCtrl+Alt+O").build(app)?;
     let status_bar = CheckMenuItemBuilder::with_id("view.status_bar", "Show Status Bar").checked(true).build(app)?;
     let focus_mode = CheckMenuItemBuilder::with_id("view.focus_mode", "Focus Mode").accelerator("Ctrl+Cmd+Z").build(app)?;
@@ -306,6 +307,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let view_menu = SubmenuBuilder::new(app, "View")
         .item(&toggle_explorer)
         .item(&outline)
+        .item(&source_control)
         .item(&links_panel)
         .item(&filter_panel)
         .item(&sync_scroll)

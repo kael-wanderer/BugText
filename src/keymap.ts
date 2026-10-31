@@ -57,6 +57,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "edit.open_link", label: "Open Link", category: "Edit", default: "", scope: "menu" },
   { id: "view.filter_panel", label: "Filter", category: "View", default: "CmdOrCtrl+Alt+Shift+F", scope: "menu" },
   { id: "view.links_panel", label: "Links", category: "View", default: "CmdOrCtrl+Alt+Shift+O", scope: "menu" },
+  { id: "view.source_control", label: "Source Control", category: "View", default: "Ctrl+Shift+G", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
   { id: "view.status_bar", label: "Show Status Bar", category: "View", default: "", scope: "menu" },
   { id: "view.focus_mode", label: "Focus Mode", category: "View", default: "Ctrl+Cmd+Z", scope: "menu" },
