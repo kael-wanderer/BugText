@@ -78,3 +78,14 @@ describe("rename links", () => {
     expect(follow).toHaveBeenCalledWith("p.pdf#page=2"); expect(jump).toHaveBeenCalledTimes(1);
   });
 });
+
+it("uses mention review copy and applies only checked edits", async () => {
+  const source = "target target target";
+  const edits = [0, 7, 14].map(from => ({ from, to: from + 6, insert: "[target](target.md)", line: 1, before: "target", inside: false, checked: true }));
+  const deps = writer(source);
+  const promise = showRenameReview([{ path: "/r/a.md", source, edits }], folder, deps, vi.fn(), { title: "Link mentions?", intro: "Choose the mentions to link.", outsideHeading: "Mentions in a.md", insideHeading: "", cancel: "Don't Link", apply: n => `Link ${n} mention${n === 1 ? "" : "s"}`, snapshotNote: "Recovery first" });
+  const sheet = document.querySelector(".link-rename-review")!; expect(sheet.textContent).toContain("Link mentions?"); expect(sheet.textContent).toContain("Don't Link");
+  const boxes = sheet.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'); boxes[0].checked = false; boxes[0].dispatchEvent(new Event("change"));
+  const button = [...sheet.querySelectorAll("button")].find(b => b.textContent === "Link 2 mentions")!; button.click(); await promise;
+  expect(deps.write).toHaveBeenCalledWith("/r/a.md", "target [target](target.md) [target](target.md)", source);
+});

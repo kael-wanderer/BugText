@@ -1,25 +1,27 @@
 import { node } from "./insert-picker";
 import { applyRename, type NoteEdits, type RenameWriter } from "./rename-plan";
-export function showRenameReview(plans: NoteEdits[], folder: string, deps: RenameWriter, report: (text: string) => void): Promise<void> {
+export type ReviewTexts = { title: string; intro: string; outsideHeading: string; insideHeading: string; cancel: string; apply(n: number): string; snapshotNote: string };
+const defaultTexts: ReviewTexts = { title: "Update links?", intro: "The note has moved. Choose the links to update.", outsideHeading: "Links to this note", insideHeading: "Links inside the moved note", cancel: "Don't Update", apply: n => `Update ${n} link${n === 1 ? "" : "s"}`, snapshotNote: "Closed notes get a Recovery snapshot first." };
+export function showRenameReview(plans: NoteEdits[], folder: string, deps: RenameWriter, report: (text: string) => void, texts: ReviewTexts = defaultTexts): Promise<void> {
   if (!plans.length) return Promise.resolve();
   return new Promise((resolve) => {
     const previous = document.activeElement as HTMLElement | null;
     const scrim = node("div", undefined, "recovery-scrim link-rename-review");
     const sheet = node("section", undefined, "recovery-sheet");
-    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", "Update links?");
-    const head = node("header"); head.append(node("h3", "Update links?"));
-    const intro = node("p", "The note has moved. Choose the links to update.", "link-review-intro");
+    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", texts.title);
+    const head = node("header"); head.append(node("h3", texts.title));
+    const intro = node("p", texts.intro, "link-review-intro");
     const foot = node("footer");
-    const cancel = node("button", "Don't Update"), apply = node("button");
-    foot.append(node("span", "Closed notes get a Recovery snapshot first."), cancel, apply);
+    const cancel = node("button", texts.cancel), apply = node("button");
+    foot.append(node("span", texts.snapshotNote), cancel, apply);
     const close = () => { scrim.remove(); previous?.focus(); resolve(); };
     cancel.onclick = close;
-    const count = () => { const n = plans.reduce((sum, p) => sum + p.edits.filter((e) => e.checked).length, 0); apply.textContent = `Update ${n} link${n === 1 ? "" : "s"}`; apply.disabled = n === 0; };
+    const count = () => { const n = plans.reduce((sum, p) => sum + p.edits.filter((e) => e.checked).length, 0); apply.textContent = texts.apply(n); apply.disabled = n === 0; };
     sheet.append(head, intro);
     for (const inside of [false, true]) {
       const group = plans.filter((p) => p.edits.some((e) => e.inside === inside));
       if (!group.length) continue;
-      sheet.append(node("h4", inside ? "Links inside the moved note" : "Links to this note", "link-review-intro"));
+      sheet.append(node("h4", inside ? texts.insideHeading : texts.outsideHeading, "link-review-intro"));
       for (const plan of group) {
         const section = node("section", undefined, "link-review-note");
         section.append(node("strong", plan.path.slice(folder.length + 1)));

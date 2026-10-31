@@ -2467,7 +2467,10 @@ function handleExplorerPathChange(from: string, to: string | null): void {
 
   syncExplorerActivePath();
   renderAll();
-  if (folder && plans.length) void showRenameReview(plans, folder, {
+  if (folder && plans.length) void showRenameReview(plans, folder, noteLinkWriter(folder, "Before updating note links"), showToast);
+}
+function noteLinkWriter(folder: string, snapshotLabel: string): import("./links/rename-plan").RenameWriter {
+  return {
     findOpen: (path) => {
       const found = findTabByPath(getState().windows, path);
       if (!found) return null;
@@ -2475,13 +2478,13 @@ function handleExplorerPathChange(from: string, to: string | null): void {
       return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes) };
     },
     read: (path) => invoke<string>("read_file", { path }),
-    snapshot: (path, text) => manualSnapshot(path, text, "Before updating note links", true),
+    snapshot: (path, text) => manualSnapshot(path, text, snapshotLabel, true),
     write: async (path, contents, expected) => {
       if (getState().folder !== folder) throw new Error("Folder changed");
       await invoke("write_file_atomic", { path, contents, folder, expected });
       linkIndex.onFileChanged(path, contents);
     },
-  }, showToast);
+  };
 }
 
 function setMode(windowId: string, mode: ViewMode): void {
