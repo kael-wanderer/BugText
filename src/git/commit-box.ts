@@ -12,8 +12,8 @@ export function createSaveAndCommitSheet(count: number, onSave: () => void, onCa
   const scrim = document.createElement("div"); scrim.className = "recovery-scrim";
   const sheet = document.createElement("section"); sheet.className = "recovery-sheet git-confirm";
   sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", "Save before committing");
-  const head = document.createElement("header"), heading = document.createElement("h3"); heading.textContent = "Save before committing"; head.append(heading);
-  const prompt = document.createElement("p"); prompt.className = "link-review-intro"; prompt.textContent = `Save ${count} ${count === 1 ? "file" : "files"} before committing?`;
+  const head = document.createElement("header"), heading = document.createElement("h3"); heading.textContent = `Save ${count} ${count === 1 ? "file" : "files"} before committing?`; head.append(heading);
+  const prompt = document.createElement("p"); prompt.className = "link-review-intro"; prompt.textContent = "Unsaved changes in checked files are saved first, then included in the commit.";
   const foot = document.createElement("footer"), spacer = document.createElement("span");
   const cancel = document.createElement("button"); cancel.type = "button"; cancel.textContent = "Cancel"; cancel.addEventListener("click", onCancel);
   const save = document.createElement("button"); save.type = "button"; save.textContent = "Save and Commit"; save.addEventListener("click", onSave);
