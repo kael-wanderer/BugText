@@ -581,8 +581,8 @@ export function createWindowView(
     editor.setLivePreview(h.livePreviewEnabled?.() ?? false);
     queueMicrotask(refreshContextAction);
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
-    tableHost.hidden = !active?.tableView;
-    if (active?.tableView) h.renderTable?.(tableHost);
+    tableHost.hidden = !active?.tableView || graphShown;
+    if (!tableHost.hidden) h.renderTable?.(tableHost);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
@@ -675,7 +675,7 @@ export function createWindowView(
       name.className = "tab-name";
       name.textContent = t.name;
       const detectedTabIcon = fileIcon(t.path ?? t.name, false);
-      const tabIconType =
+      const tabIconType = t.tableView ? "table" :
         detectedTabIcon === "file"
           ? fileLanguageInfo(t.path ?? t.name).icon
           : detectedTabIcon;

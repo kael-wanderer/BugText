@@ -356,7 +356,7 @@ function refreshStatusBar(): void {
   const editor = windowState ? views.get(windowState.id)?.editor : undefined;
   statusBar.update({
     enabled: currentSettings.showStatusBar,
-    pathOrName: tab && editor ? tab.path ?? tab.name : null,
+    pathOrName: tab && editor && !tab.tableView ? tab.path ?? tab.name : null,
     cursor: editor?.cursorPosition() ?? { line: 1, column: 1 },
     selection: editor?.getSelection().text ?? "",
     words: tab ? statusWordCounts.get(tab.id) ?? 0 : 0,

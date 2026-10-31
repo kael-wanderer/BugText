@@ -4,6 +4,10 @@ import "./table-view.css";
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, text = ""): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag); el.textContent = text; return el;
 }
+function relativePath(path: string, root: string): string {
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
 export function createTableSurface(host: HTMLElement, open: (path: string) => void) {
   let notes: IndexedNote[] = [], folder: string | null = null;
   let limit = 500, expanded = false, sort: Column | null = null, descending = false, selected = 0;
@@ -31,7 +35,8 @@ export function createTableSurface(host: HTMLElement, open: (path: string) => vo
       const row = node("tr"); row.tabIndex = i === selected ? 0 : -1;
       row.setAttribute("aria-selected", String(i === selected));
       for (const col of visibleColumns) {
-        const cell = node("td", valueText(cellValue(note, col)));
+        const value = col.base === "path" ? relativePath(note.path, folder!) : cellValue(note, col);
+        const cell = node("td", valueText(value));
         if (col.base === "title" && note.propertyError) cell.append(node("small", ` — line ${note.propertyError.line}: ${note.propertyError.message}`));
         row.append(cell);
       }
@@ -44,7 +49,13 @@ export function createTableSurface(host: HTMLElement, open: (path: string) => vo
       body.append(row);
     }
     head.append(header); table.append(head, body); host.append(table);
-    if (notes.length > limit) { const more = node("button", `Show more (${Math.min(limit, notes.length)} of ${notes.length})`); more.onclick = () => { limit += 500; render(); }; host.append(more); }
+    if (notes.length > limit) { const more = node("button", `Show more (${Math.min(limit, notes.length)} of ${notes.length})`); more.onclick = () => { limit += 500; render(); host.scrollTop = 0; }; host.append(more); }
   }
-  return { update(next: IndexedNote[], root: string | null) { notes = next; folder = root; render(); } };
+  return {
+    update(next: IndexedNote[], root: string | null) {
+      // Index refreshes re-send unchanged notes; rebuilding would lose scroll and selection.
+      if (root === folder && next.length === notes.length && next.every((note, i) => note === notes[i])) return;
+      notes = next; folder = root; render();
+    },
+  };
 }

@@ -40,8 +40,27 @@ describe("property table", () => {
     createTableSurface(host, () => {}).update(matchingNotes(notes, filter), "/notes");
     const elapsed = performance.now() - start; console.log(`Table 2000-note model + 500 DOM rows: ${elapsed.toFixed(2)} ms`);
     expect(elapsed).toBeLessThan(2000); expect(host.querySelectorAll("tbody tr")).toHaveLength(500);
+    host.scrollTop = 400;
     Array.from(host.querySelectorAll("button")).find(b => b.textContent?.startsWith("Show more"))!.click();
+    expect(host.scrollTop).toBe(0);
     expect(host.querySelectorAll("tbody tr")).toHaveLength(500);
-    expect(host.querySelector("tbody")!.textContent).toContain("/notes/500.md");
+    expect(host.querySelector("tbody")!.textContent).toContain("500.md");
+  });
+  it("keeps the rendered table when an index refresh brings the same notes", () => {
+    const host = document.createElement("div");
+    const notes = [note("/notes/a.md", { x: 1 }), note("/notes/b.md", { x: 2 })];
+    const table = createTableSurface(host, () => {});
+    table.update(notes, "/notes");
+    const before = host.querySelector("table");
+    table.update([...notes], "/notes");
+    expect(host.querySelector("table")).toBe(before);
+    table.update([notes[0], note("/notes/b.md", { x: 3 })], "/notes");
+    expect(host.querySelector("table")).not.toBe(before);
+  });
+  it("shows paths relative to the open folder", () => {
+    const host = document.createElement("div");
+    createTableSurface(host, () => {}).update([note("/notes/sub/a.md")], "/notes");
+    const cells = Array.from(host.querySelectorAll("tbody td")).map(td => td.textContent);
+    expect(cells).toContain("sub/a.md"); expect(cells).not.toContain("/notes/sub/a.md");
   });
 });

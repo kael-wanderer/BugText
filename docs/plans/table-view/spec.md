@@ -39,3 +39,11 @@ This measures DOM construction, not browser layout/paint. CI uses a 2,000 ms cei
 The implementation pages through batches (rather than accumulating rows) to maintain
 the strict maximum of 500 mounted rows at any time. This interprets Show more as next
 batch. No other scope changes. Full native visual acceptance remains unverified.
+
+Native check (2026-10-31, display 2, 623-note fixture): Filter button and palette open
+the tab; numeric and path sorting both directions; ↑/↓/Enter opens line 1; More columns;
+Show more to rows 501–623; invalid YAML row shows its line and blank cells; hostile values
+render as text; ⌘S is a no-op. Fixed during the check: index auto-refresh rebuilt the
+table (lost scroll/selection), squeezed one-letter columns, absolute paths, Markdown
+status bar/icon on the table tab, table rendering under an open graph, sticky-header gap,
+and Show more keeping the old scroll position.
