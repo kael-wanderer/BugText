@@ -22,6 +22,10 @@ function node<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", tex
 function button(text: string, click: () => void): HTMLButtonElement {
   const el = node("button", "", text); el.type = "button"; el.addEventListener("click", click); return el;
 }
+/** Commit button text: no count when nothing is checked. */
+export function commitLabel(count: number): string {
+  return count ? `Commit ${count} ${count === 1 ? "file" : "files"}` : "Commit";
+}
 export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
   let folder: string | null = null, generation = 0, state: GitStatus | null = null, info: GitRepoInfo | null = null;
   let selected: string | null = null, checked = new Set<string>(), known = new Set<string>(), busy = false, request: GitActionRequest | null = null;
@@ -54,11 +58,11 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     const current = state;
     if (!current) { box.commit.disabled = pull.disabled = push.disabled = fetch.disabled = true; merge.hidden = cancel.hidden = true; return; }
     const controls = buttonState(current, { message: box.message.value, checked: checked.size, busy });
-    box.commit.disabled = !controls.commit; box.commit.textContent = current.merging ? "Commit merge" : `Commit ${checked.size} ${checked.size === 1 ? "file" : "files"}`;
+    box.commit.disabled = !controls.commit; box.commit.textContent = current.merging ? "Commit merge" : commitLabel(checked.size);
     pull.disabled = !controls.pull; push.disabled = !controls.push; push.title = controls.pushHint; fetch.disabled = !controls.fetch;
     merge.hidden = !showMerge; merge.disabled = busy || current.merging;
     cancel.hidden = !request || !["fetch", "pull", "push"].includes(request.action);
-    renderConflictBanner(banner, groupEntries(current).conflicted.length, current.entries.some(e => e.path === selected && e.group === "conflicted"), busy, () => { if (selected) void run("resolve", [selected]); }, () => { void run("abort"); });
+    renderConflictBanner(banner, groupEntries(current).conflicted.length, current.entries.some(e => e.path === selected && e.group === "conflicted"), busy, () => { if (selected) void run("resolve", [selected]); }, () => { void run("abort"); }, deps.openFile ? () => { if (folder && selected) deps.openFile!(folder, selected); } : undefined);
     for (const checkbox of list.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) checkbox.disabled = controls.checkboxesLocked;
   }
   async function select(path: string) {
@@ -81,7 +85,7 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
         const row = node("div", "git-file");
         const check = node("input"); check.type = "checkbox"; check.checked = checked.has(entry.path); check.setAttribute("aria-label", `Include ${entry.path}`);
         check.onchange = () => { if (check.checked) checked.add(entry.path); else checked.delete(entry.path); updateControls(); };
-        const file = button(entry.path, () => { void select(entry.path); }); file.className = "git-file-name"; file.title = entry.orig_path ? `Renamed from ${entry.orig_path}` : entry.path;
+        const file = button(entry.path, () => { void select(entry.path); }); file.className = "git-file-name"; file.title = `${entry.orig_path ? `Renamed from ${entry.orig_path}` : entry.path} · Double-click to open`;
         file.ondblclick = () => { if (folder) deps.openFile?.(folder, entry.path); };
         row.append(check, file, node("span", `git-badge git-badge-${entry.badge}`, entry.badge)); group.append(row);
       }

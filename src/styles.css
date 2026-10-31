@@ -866,7 +866,8 @@ body.settings-active #search-panel,
 body.settings-active #explorer-resize,
 body.settings-active #editorarea,
 body.settings-active #ai-resize,
-body.settings-active #ai-panel {
+body.settings-active #ai-panel,
+body.settings-active .status-bar {
   visibility: hidden;
   pointer-events: none;
 }
@@ -3509,7 +3510,10 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .search-replace-toggle { background: none; border: 0; color: var(--muted); cursor: pointer; }
 .search-replace-fields:not([hidden]) { display: grid; gap: 6px; margin: 0 12px 8px; }
 .search-replace-fields .search-input { width: 100%; box-sizing: border-box; }
-.search-preview-replace { cursor: pointer; }
+.search-preview-replace, .empty-state button { font: inherit; font-size: 12px; padding: 4px 10px; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
+.search-preview-replace:hover:not(:disabled), .empty-state button:hover { border-color: var(--accent); }
+.search-preview-replace:disabled { color: var(--muted); cursor: default; }
+.empty-state button.primary { color: var(--bg-editor); background: var(--accent); border-color: var(--accent); }
 .search-snippet del { color: var(--error, #c45b50); }
 .search-snippet ins { color: var(--accent); text-decoration: none; }
 
@@ -3585,7 +3589,7 @@ a.broken-note-link { color: var(--error, #c45b50); text-decoration: underline do
 .explorer-notice { padding: 8px 12px; color: var(--muted); }
 .empty-state { display: grid; gap: 8px; padding: 16px; color: var(--muted); }
 .empty-state p { margin: 0; }
-.empty-state button { text-align: left; }
+.empty-state button { text-align: left; justify-self: start; }
 .empty-state kbd, #explorer-empty kbd, #first-run-hint kbd { margin-left: 8px; opacity: .75; }
 #first-run-hint { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 #first-run-hint[hidden] { display: none; }
@@ -3611,7 +3615,7 @@ body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; 
 .link-hover-card p { margin: 4px 0; overflow-wrap: anywhere; }
 .link-hover-path, .link-hover-footer { color: var(--muted); font-size: .9em; }
 
-.mentions { border-top: 1px solid var(--border); margin-top: 8px; padding-top: 4px; }
+.mentions { margin-top: 8px; padding-top: 4px; }
 .mentions summary { cursor: pointer; font-size: 11px; color: var(--muted); text-transform: uppercase; margin: 8px 4px; }
 .mentions-group { display: grid; gap: 2px; padding: 6px 4px; }
 .mentions-group > strong { font-size: 12px; }

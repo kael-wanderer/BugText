@@ -81,6 +81,16 @@ describe("Git panel", () => {
     const activeMark = [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Mark resolved")!;
     expect(activeMark.disabled).toBe(false); activeMark.click(); expect(deps.action).toHaveBeenCalledWith(expect.objectContaining({ action: "resolve", paths: ["conflict.md"] }));
   });
+  it("opens the selected conflicted file from the conflict banner", async () => {
+    vi.useFakeTimers(); const s = base(); s.merging = true;
+    const host = document.createElement("div"); const openFile = vi.fn();
+    const panel = createGitPanel(host, { repo: vi.fn(async () => ({ in_repo: true, repo_name: "notes", subfolder: "", root: "/repo" })), status: vi.fn(async () => s), diff: vi.fn(async () => diff), action: vi.fn(async () => result), cancel: vi.fn(async () => {}), openFile });
+    panel.setFolder("/notes"); await flush();
+    const open = () => [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Open file")!;
+    expect(open().disabled).toBe(true);
+    [...host.querySelectorAll<HTMLButtonElement>(".git-file-name")].find(b => b.textContent === "conflict.md")!.click();
+    open().click(); expect(openFile).toHaveBeenCalledWith("/notes", "conflict.md");
+  });
   it("keeps an action's error visible after the status refresh that follows it", async () => {
     vi.useFakeTimers(); const s = base(); s.merging = true;
     const action = vi.fn(async () => { throw { kind: "markers", log: [] }; });
@@ -133,4 +143,11 @@ describe("Git panel", () => {
     expect(sheet.querySelector("[role=dialog]")?.getAttribute("aria-modal")).toBe("true"); expect(document.activeElement?.textContent).toBe("Close");
     sheet.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(sheet.isConnected).toBe(false);
   });
+});
+
+it("labels the Commit button without a zero count", async () => {
+  const { commitLabel } = await import("../git/panel");
+  expect(commitLabel(0)).toBe("Commit");
+  expect(commitLabel(1)).toBe("Commit 1 file");
+  expect(commitLabel(3)).toBe("Commit 3 files");
 });

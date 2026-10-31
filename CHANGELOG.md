@@ -43,6 +43,11 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").
+- Unlinked Mentions no longer draws a second divider above its heading.
+- Source Control: the Commit button says "Commit" instead of "Commit 0 files" when nothing is checked, and the conflict banner offers Open file for the selected conflicted file.
+- The status bar no longer shows through at the bottom of the Settings screen.
+- Search: Preview replace and the empty-result buttons use the panel's button style, and an empty result no longer repeats "No results".
 - Undoing back to the saved text marks the tab saved again and drops its recovery draft; it stayed marked unsaved.
 - Shortcut hints list modifiers in the standard macOS order (⌃⌥⇧⌘), e.g. ⇧⌘D instead of ⌘⇧D.
 - Search: the result count now matches the list when Files to include/exclude hide some results.

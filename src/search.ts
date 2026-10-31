@@ -174,6 +174,8 @@ export function createSearchPanel(
     }
     if ((state.phase === "done" || state.phase === "stopped") && query.length >= 2 && groups.size === 0) {
       results.append(searchEmpty(query, replaceOpen && !!(include.value.trim() || exclude.value.trim()), () => { include.value = ""; exclude.value = ""; void run(); }, () => { input.value = ""; cancel(); state = new SearchRun(); render(""); }));
+      // The empty state already says there are no matches.
+      if (state.phase === "done") status.textContent = "";
     }
     results.scrollTop = scrollTop;
     if (selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {

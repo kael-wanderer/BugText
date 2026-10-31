@@ -104,5 +104,6 @@ it("counts only the results the file filters keep", async () => {
   host.querySelector<HTMLInputElement>(".search-include")!.value = "*.txt";
   input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush(); await flush();
   expect(host.textContent).toContain("narrowing this search");
-  expect(host.textContent).toContain("No results"); expect(host.textContent).not.toContain("1 result in 1 file");
+  expect(host.textContent).not.toContain("1 result in 1 file");
+  expect(host.textContent).not.toContain("No results"); // the empty state says it once
 });
