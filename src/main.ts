@@ -27,6 +27,7 @@ import { configureLinks, followEditorLink, followLink } from "./links/follow";
 import { createLinkIndex, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
 import { createFrameCoalescer } from "./render-coalescer";
+import { createRefreshRunner, createFocusDeduper } from "./workspace-refresh";
 import { createOutlineView } from "./outline-view";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
@@ -2156,26 +2157,21 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
   renderAll();
 }
 
-let autoRefreshRunning = false;
-
-async function refreshWorkspaceFromDisk(force = false): Promise<void> {
-  if (autoRefreshRunning && !force) return;
-  autoRefreshRunning = true;
-  const tick = diagnostics.begin(force ? "manual" : "timer", "full");
+const refreshRunner = createRefreshRunner(async (kind, reason) => {
+  const tick = diagnostics.begin(reason, kind);
   try {
-    const walkStart = performance.now();
-    if (getState().folder) {
-      await refreshExpandedDirs().catch(() => {});
-      await refreshFileList();
+    if (kind === "full") {
+      const walkStart = performance.now();
+      if (getState().folder) {
+        await refreshExpandedDirs().catch(() => {});
+        await refreshFileList();
+      }
+      tick.walkMs = performance.now() - walkStart;
+      await linkIndex.refresh().catch(() => {});
     }
-    tick.walkMs = performance.now() - walkStart;
-    await linkIndex.refresh().catch(() => {});
     await refreshCleanOpenFilesFromDisk();
-  } finally {
-    diagnostics.end();
-    autoRefreshRunning = false;
-  }
-}
+  } finally { diagnostics.end(); }
+});
 
 function openRecoveryReview(restoreAll = false): void {
   void showRecoveryReview({
@@ -3304,7 +3300,7 @@ initExplorer(
       if (getState().explorerVisible) document.getElementById("ab-explorer")!.click();
     },
     onToggleLineNumbers: () => toggleLineNumbers(),
-    onRefresh: () => void refreshWorkspaceFromDisk(true),
+    onRefresh: () => void refreshRunner.request("full", "manual"),
     isShowingHidden: () => currentSettings.showHiddenFiles,
     onToggleHidden: () =>
       saveSettingsFromPanel({ ...currentSettings, showHiddenFiles: !currentSettings.showHiddenFiles }),
@@ -3394,10 +3390,10 @@ subscribe(() => {
   scheduleWindowReport();
 });
 
-function refreshOnFocus(): void {
-  void refreshWorkspaceFromDisk(true);
+const refreshOnFocus = createFocusDeduper(() => {
+  void refreshRunner.request("full", "focus");
   void checkActiveForExternalChange(getState().activeWindowId);
-}
+});
 
 window.addEventListener("focus", refreshOnFocus);
 // The webview does not always get a DOM focus event when the app regains
@@ -3407,7 +3403,7 @@ void currentNativeWindow?.onFocusChanged(({ payload: focused }) => {
 });
 
 window.setInterval(() => {
-  void refreshWorkspaceFromDisk();
+  void refreshRunner.request("full", "timer");
 }, AUTO_REFRESH_MS);
 
 listenScoped<string>("menu", (event) => {
