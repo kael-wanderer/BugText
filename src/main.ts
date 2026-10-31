@@ -110,7 +110,7 @@ import { clearPdfEditDraft, hasPdfEditDraft } from "./pdfview";
 import {
   applySettings,
   DEFAULT_APP_ICON,
-  DEFAULT_SETTINGS_JSON,
+  FRESH_SETTINGS_JSON,
   normalizeThemeName,
   parseSettings,
   tryParseSettings,
@@ -521,7 +521,7 @@ function writeAISettings(next: AISettings): void {
 
 async function loadSettings(): Promise<void> {
   try {
-    const file = await getSettingsFile(DEFAULT_SETTINGS_JSON);
+    const file = await getSettingsFile(FRESH_SETTINGS_JSON);
     settingsPath = file.path;
     currentSettings = parseSettings(file.contents);
   } catch {
@@ -622,7 +622,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
     if (file === "ai-actions") {
       await reloadActions();
     } else if (file === "settings") {
-      const raw = await getSettingsFile(DEFAULT_SETTINGS_JSON);
+      const raw = await getSettingsFile(FRESH_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;

@@ -81,6 +81,7 @@ export type Settings = {
   tables: TableSettings;
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
+  onboarding: { hintDismissed: boolean };
 };
 
 export const THEME_OPTIONS: ReadonlyArray<{ id: ThemeName; label: string }> = [
@@ -115,10 +116,12 @@ export const DEFAULT_SETTINGS: Settings = {
   links: { complete: true, onRename: "ask" },
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
+  onboarding: { hintDismissed: true },
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
 export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
+export const FRESH_SETTINGS_JSON = JSON.stringify({ ...DEFAULT_SETTINGS, onboarding: { hintDismissed: false } }, null, 2);
 
 export function normalizeThemeName(value: unknown): ThemeName | null {
   if (typeof value !== "string") return null;
@@ -169,6 +172,7 @@ function defaults(): Settings {
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
     performance: { ...DEFAULT_SETTINGS.performance },
+    onboarding: { ...DEFAULT_SETTINGS.onboarding },
     export: parsePresets(undefined),
   };
 }
@@ -304,6 +308,7 @@ export function parseSettings(raw: string): Settings {
     tables: parseTables(data.tables),
     templates: parseTemplates(data.templates),
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
+    onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
   };
 }
 
