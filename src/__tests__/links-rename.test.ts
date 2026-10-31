@@ -89,3 +89,12 @@ it("uses mention review copy and applies only checked edits", async () => {
   const button = [...sheet.querySelectorAll("button")].find(b => b.textContent === "Link 2 mentions")!; button.click(); await promise;
   expect(deps.write).toHaveBeenCalledWith("/r/a.md", "target [target](target.md) [target](target.md)", source);
 });
+
+it("rejects traversal and outside paths before touching an open or closed note", async () => {
+  const source = "target", deps = writer(source);
+  for (const path of ["/r/../outside.md", "/outside.md", "/r/sub/../../outside.md"]) {
+    const skipped = await applyRename([{ path, source, edits: [{ from: 0, to: 6, before: "target", insert: "linked", line: 1, inside: false, checked: true }] }], "/r", deps);
+    expect(skipped).toBe(1);
+  }
+  expect(deps.findOpen).not.toHaveBeenCalled(); expect(deps.read).not.toHaveBeenCalled(); expect(deps.write).not.toHaveBeenCalled();
+});

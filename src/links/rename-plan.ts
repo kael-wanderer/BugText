@@ -49,7 +49,9 @@ export async function applyRename(plans: NoteEdits[], folder: string, deps: Rena
   for (const plan of plans) {
     const edits = plan.edits.filter((e) => e.checked);
     if (!edits.length) continue;
-    if (!plan.path.startsWith(folder.replace(/\/$/, "") + "/")) { skipped++; continue; }
+    const root = folder.replace(/\\/g, "/").replace(/\/+$/, "");
+    const path = plan.path.replace(/\\/g, "/");
+    if (!path.startsWith((root || "") + "/") || path.split("/").some(part => part === "." || part === "..")) { skipped++; continue; }
     const open = deps.findOpen(plan.path);
     if (open) {
       if (open.text !== plan.source) { skipped++; continue; }
