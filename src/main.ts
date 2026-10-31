@@ -1,3 +1,4 @@
+import { readFileBytes } from "./file-bytes";
 import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
@@ -1996,10 +1997,10 @@ function snapshotActiveDocument(): void {
   const tab = activeMeta();
   if (!tab?.path) return;
   if (isPdfFile(tab.path)) {
-    void invoke<number[]>("read_file_bytes", { path: tab.path }).then((bytes) =>
+    void readFileBytes(tab.path).then((bytes) =>
       manualBinarySnapshot(
         tab.path!,
-        new Uint8Array(bytes),
+        bytes,
         "Manual PDF snapshot",
       ),
     ).catch(() => {});
@@ -2274,7 +2275,7 @@ function captureImages(notePath: string | null) {
   if (!notePath) return undefined;
   return {
     notePath,
-    read: async (path: string) => new Uint8Array(await invoke<number[]>("read_file_bytes", { path })),
+    read: async (path: string) => await readFileBytes(path),
   };
 }
 

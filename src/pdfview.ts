@@ -1,3 +1,4 @@
+import { readFileBytes } from "./file-bytes";
 import { invoke } from "@tauri-apps/api/core";
 import { readPdfDraft, writePdfDraft } from "./pdf-draft-store";
 import type { AnnotationStore } from "./pdf-annotations/store";
@@ -199,7 +200,7 @@ type PdfPageView = {
 // Saving reads system fonts for text the standard PDF fonts cannot encode.
 const loadSystemFontBytes: PdfFontBytesLoader = async (fontPath) => {
   try {
-    return new Uint8Array(await invoke<number[]>("read_file_bytes", { path: fontPath }));
+    return await readFileBytes(fontPath);
   } catch {
     return null;
   }
@@ -605,11 +606,11 @@ export async function renderPdf(
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
   ensureCurrent();
-  const bytes = await invoke<number[]>("read_file_bytes", { path });
-  const sourceDigest = await pdfSourceDigest(new Uint8Array(bytes));
+  const bytes = await readFileBytes(path);
+  const sourceDigest = await pdfSourceDigest(bytes);
   ensureCurrent();
   const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(bytes),
+    data: bytes,
   });
   const document = await loadingTask.promise;
   const [{ AnnotationStore }, { createAnnotationLayer }, { createAnnotationController }, { createAnnotationsPanel }] = await Promise.all([
@@ -722,7 +723,7 @@ export async function renderPdf(
       setStatus("Choose a PNG or JPEG image");
       return;
     }
-    const imageBytes = await invoke<number[]>("read_file_bytes", { path: imagePath });
+    const imageBytes = Array.from(await readFileBytes(imagePath));
     if (!imageBytes.length) {
       setStatus("The selected image is empty");
       return;
@@ -2414,7 +2415,7 @@ export async function renderPdf(
     if (!hasPdfEdits(editDocument)) return;
     let onDisk: Uint8Array;
     try {
-      onDisk = new Uint8Array(await invoke<number[]>("read_file_bytes", { path }));
+      onDisk = await readFileBytes(path);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error), { sticky: true });
       return;
@@ -2530,7 +2531,7 @@ export async function renderPdf(
     checkedStamp = stamp;
     let onDisk: Uint8Array;
     try {
-      onDisk = new Uint8Array(await invoke<number[]>("read_file_bytes", { path }));
+      onDisk = await readFileBytes(path);
     } catch {
       return;
     }

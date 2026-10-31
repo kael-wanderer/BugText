@@ -151,6 +151,13 @@ mod search_tests {
     use super::{search_pattern, SearchOptions};
 
     #[test]
+    fn binary_read_preserves_bytes() {
+        let path = std::env::temp_dir().join(format!("bugtext-bytes-{}", std::process::id()));
+        std::fs::write(&path, [0u8, 1, 255]).unwrap();
+        assert_eq!(super::read_file_bytes_inner(path.to_string_lossy().into_owned()).unwrap(), vec![0, 1, 255]);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn search_options_control_case_word_and_regex_matching() {
         let whole = search_pattern(
             "cat",
@@ -576,7 +583,12 @@ fn read_file_inner(path: String, folder: Option<String>) -> Result<String, Strin
 }
 
 #[tauri::command]
-pub fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || read_file_bytes_inner(path))
+        .await.map_err(|_| "File read failed")??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+fn read_file_bytes_inner(path: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|error| error.to_string())
 }
 
