@@ -52,6 +52,7 @@ beforeEach(() => {
   };
   deps = {
     workspaceIndex: {
+      chunkCount: 0,
       query: vi.fn().mockResolvedValue([]),
       queryScored: vi.fn().mockResolvedValue([]),
       reset: vi.fn(),
