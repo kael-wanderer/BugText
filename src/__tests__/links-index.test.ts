@@ -1,6 +1,6 @@
 import { loadProperties } from "../properties/loader";
 await loadProperties();
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import fixtures from "../../src-tauri/tests/fixtures/links/cases.json";
 import { createLinkIndex, parseNote, type LinkScan } from "../links/index";
 import { noteLinks } from "../links/parse";
@@ -91,4 +91,25 @@ it("drops an old folder's refresh without notifying", async () => {
   finish({ notes: [parseNote("/a/stale.md", "old")], stamps: { "/a/stale.md": "1" }, skipped: [] });
   await refresh;
   expect(notifications).toBe(0); expect(index.notes()).toEqual([]);
+});
+
+
+it("prunes version entries when their stamps disappear", async () => {
+  const path = "/r/prune-version.md";
+  let result: LinkScan = { notes: [parseNote(path, "initial")], stamps: { [path]: "1" }, skipped: [] };
+  const index = createLinkIndex(async () => result);
+  await index.ensure("/r");
+  const originalSet = Map.prototype.set;
+  let versions: Map<unknown, unknown> | undefined;
+  const spy = vi.spyOn(Map.prototype, "set").mockImplementation(function (this: Map<unknown, unknown>, key: unknown, value: unknown) {
+    if (!versions && key === path && typeof value === "number") versions = this;
+    return originalSet.call(this, key, value);
+  });
+  try {
+    index.onFileChanged(path, "changed");
+    expect(versions?.has(path)).toBe(true);
+    result = { notes: [], stamps: {}, skipped: [] };
+    await index.refresh();
+    expect(versions?.has(path)).toBe(false);
+  } finally { spy.mockRestore(); }
 });
