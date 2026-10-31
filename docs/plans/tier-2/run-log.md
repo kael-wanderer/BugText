@@ -35,3 +35,14 @@ Branch `feat/empty-states` from `feat/s8-large-workspace` (`fbd4a3e`). Base: 184
 - `f5d1916` feat(onboarding): first-run hint in empty windows — 188 files, 1,002 tests; TypeScript passed. A session-only dismissal guard avoids repeated writes after failure; startup restore counts as loading.
 
 Empty-states final checks: 188 frontend files, 1,002 tests; TypeScript and production build passed. The existing main-chunk warning remains (847.18 kB, versus S8 842.92 kB). Native checks: first launch and restart after dismissal; folder-open/save persistence; cross-window broadcast; loading, Settings and recovery suppression; keyboard and visual appearance.
+
+## Focus and typewriter
+
+Branch `feat/focus-zen` from `feat/empty-states` (`7b0fb88`). Base: 188 files, 1,002 tests; TypeScript passed.
+- `b4f91f1` feat(focus): focus and typewriter commands and settings — 188 files, 1,004 tests; TypeScript passed; Rust 151 passed, 1 ignored; clippy passed.
+- `7fa38d5` feat(editor): typewriter scrolling — 189 files, 1,005 tests; TypeScript passed.
+- `830b33e` feat(focus): focus mode controller — 190 files, 1,008 tests; TypeScript passed.
+- Focus wiring updates the existing shortcut test harness with an inactive Focus dependency because the listener now checks Focus before dispatch. Test intent is unchanged.
+- `b53d94d` feat(focus): wire focus mode and typewriter into the app — 190 files, 1,010 tests; TypeScript passed. The captured view is restored only if its original tab and native window remain active, preventing a selection being applied to another document. Full native view-preservation and menu dispatch checks remain outstanding.
+
+Focus final checks: 190 frontend files, 1,010 tests; TypeScript and production build passed. The existing main-chunk warning remains (851.10 kB). Native checks are listed in focus-zen/results.md.

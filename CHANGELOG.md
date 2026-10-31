@@ -95,6 +95,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 
 ### Added
 
+- Focus mode (⌃⌘Z or Esc to exit) centers Markdown and text editing, with configurable column width and optional typewriter scrolling.
 - Empty Explorer and search states offer relevant actions, and a dismissible first-run hint helps new users start a note or open a folder.
 - Checklists: `- [ ]` items show as checkboxes in the preview. Clicking one (or Space
   on a focused box) ticks the item in the source as one undo step, without moving the
