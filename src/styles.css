@@ -3606,3 +3606,9 @@ body.focus-active .workbench { grid-template-columns: 0 0 0 minmax(0, 1fr) 0 0; 
 .link-hover-card[hidden] { display: none; }
 .link-hover-card p { margin: 4px 0; overflow-wrap: anywhere; }
 .link-hover-path, .link-hover-footer { color: var(--muted); font-size: .9em; }
+
+.mentions { border-top: 1px solid var(--border); padding-top: 8px; }
+.mentions summary { cursor: pointer; }
+.mentions-group { display: grid; gap: 4px; padding: 8px 0; }
+.mentions-group small { color: var(--text-muted); }
+.mentions .link-panel-row strong { color: var(--accent); }
