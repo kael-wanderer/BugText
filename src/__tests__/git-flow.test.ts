@@ -43,11 +43,17 @@ it("treats a checked untracked directory as containing its dirty tabs", async ()
   d.confirmSave.mockResolvedValueOnce(false);
   expect(await runGitAction(request, ROOTS, d)).toBeNull(); expect(d.confirmSave).toHaveBeenCalledWith(1); expect(d.invoke).not.toHaveBeenCalled();
 });
-it("save and commit confirmation sheet calls the selected button", async () => {
+it("save and commit confirmation is a modal sheet that calls the selected button", async () => {
   const host = document.createElement("div"); const panel = createGitPanel(host, { repo: vi.fn(), status: vi.fn(), diff: vi.fn(), action: vi.fn(), cancel: vi.fn() });
-  const cancelled = panel.confirmSave(1); expect(host.textContent).toContain("Save 1 file before committing?");
-  [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Cancel" && b.closest('[role=dialog]'))!.click(); expect(await cancelled).toBe(false);
-  const accepted = panel.confirmSave(1); [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Save and Commit")!.click(); expect(await accepted).toBe(true);
+  const dialog = () => document.querySelector<HTMLElement>('[role=dialog][aria-label="Save before committing"]');
+  const button = (label: string) => [...dialog()!.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === label)!;
+  const cancelled = panel.confirmSave(1);
+  expect(dialog()?.getAttribute("aria-modal")).toBe("true"); expect(dialog()!.textContent).toContain("Save 1 file before committing?");
+  expect(document.activeElement).toBe(button("Save and Commit"));
+  button("Cancel").click(); expect(await cancelled).toBe(false); expect(dialog()).toBeNull();
+  const escaped = panel.confirmSave(2); expect(dialog()!.textContent).toContain("Save 2 files before committing?");
+  dialog()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); expect(await escaped).toBe(false); expect(dialog()).toBeNull();
+  const accepted = panel.confirmSave(1); button("Save and Commit").click(); expect(await accepted).toBe(true); expect(dialog()).toBeNull();
 });
 it("the running action's cancel button passes its request id", async () => {
   vi.useFakeTimers();

@@ -153,8 +153,8 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     return new Promise(resolve => {
       const sheet = createSaveAndCommitSheet(count, () => finish(true), () => finish(false));
       function finish(accepted: boolean) { sheet.remove(); resolve(accepted); }
-      host.append(sheet);
-      sheet.querySelector<HTMLButtonElement>("button")?.focus();
+      document.body.append(sheet);
+      [...sheet.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Save and Commit")?.focus();
     });
   }
   render();

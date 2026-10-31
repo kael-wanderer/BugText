@@ -28,3 +28,4 @@
 .git-diff-meta { color: var(--muted); }
 .git-sheet { position: absolute; inset: 10%; z-index: 10; overflow: auto; padding: 16px; color: var(--text); background: var(--bg-elev); border: 1px solid var(--border); box-shadow: 0 4px 18px var(--border); }
 .git-sheet pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.git-confirm { width: min(420px, 100%); }
