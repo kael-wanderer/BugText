@@ -25,3 +25,13 @@ Choices: fixture data uses deterministic synthetic text. No later plan has start
 S8 final checks: 184 frontend files, 992 tests passed; TypeScript passed. Rust: 151 passed, 1 ignored; clippy passed. Production build passed. The main chunk warning already existed on `main` (835.94 kB baseline, 842.92 kB after S8); no new warning category was introduced.
 
 Native S8 checks: 20 idle ticks and 5 ms JS budget; exactly one render per external edit and one full refresh on focus; two real windows and 3 s clean-tab reload; typing scan/backlink counts and p95; 50 MB PDF first-page timing; Off mode, dirty tabs, and 300 notes with cap notice. Pre-change native idle/PDF timings were not captured, so the relative timing target cannot be verified from this run. The unchanged link scan reads all candidate note files to preserve unreadable/invalid-UTF-8 reporting; this raises its measured disk time even though its response is small. The simulated timer test does not exercise the real native windows.
+
+## Empty states
+
+Branch `feat/empty-states` from `feat/s8-large-workspace` (`fbd4a3e`). Base: 184 files, 992 tests; TypeScript passed.
+- `8dbc9ef` feat(onboarding): first-run setting and rules — 185 files, 994 tests; TypeScript passed.
+- `5198b5f` feat(empty-states): empty-state and search builders — 186 files, 996 tests; TypeScript passed.
+- `e119f8b` feat(empty-states): explorer and folder search states — 187 files, 999 tests; TypeScript passed.
+- `f5d1916` feat(onboarding): first-run hint in empty windows — 188 files, 1,002 tests; TypeScript passed. A session-only dismissal guard avoids repeated writes after failure; startup restore counts as loading.
+
+Empty-states final checks: 188 frontend files, 1,002 tests; TypeScript and production build passed. The existing main-chunk warning remains (847.18 kB, versus S8 842.92 kB). Native checks: first launch and restart after dismissal; folder-open/save persistence; cross-window broadcast; loading, Settings and recovery suppression; keyboard and visual appearance.
