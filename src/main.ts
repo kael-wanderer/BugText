@@ -1235,6 +1235,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   v.setLineNumbersFlag(ui.lineNumbers);
   v.editor.setSoftWrapMode(currentSettings.softWrapMode, currentSettings.wrapColumn);
   v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
+  v.editor.setSpellCheck(currentSettings.editor.spellCheck);
   v.editor.setLineNumbers(ui.lineNumbers);
   views.set(windowId, v);
   return v;
@@ -2584,6 +2585,7 @@ function applySoftWrap(): void {
   else document.body.style.removeProperty("--guide-width");
   for (const v of views.values()) {
     v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
+    v.editor.setSpellCheck(currentSettings.editor.spellCheck);
     v.editor.setSoftWrapMode(
       currentSettings.softWrapMode,
       currentSettings.wrapColumn,

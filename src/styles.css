@@ -3637,3 +3637,5 @@ body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidd
 #ab-git.has-changes::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); bottom: 5px; right: 5px; }
 
 #ab-git[hidden] { display: none; }
+
+.cm-misspelled { text-decoration: underline wavy var(--error, #c45b50); text-decoration-skip-ink: none; text-underline-offset: 3px; }
