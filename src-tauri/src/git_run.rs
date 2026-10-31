@@ -329,14 +329,19 @@ mod tests {
             let start = Instant::now();
             std::thread::scope(|scope| {
                 let handle = scope.spawn(|| run_command(&spec, cmd));
-                while !pidfile.exists() && start.elapsed() < Duration::from_secs(2) {
+                let pid: u32 = loop {
+                    if let Some(pid) = std::fs::read_to_string(&pidfile)
+                        .ok()
+                        .and_then(|text| text.trim().parse().ok())
+                    {
+                        break pid;
+                    }
+                    assert!(
+                        start.elapsed() < Duration::from_secs(2),
+                        "grandchild pid not written"
+                    );
                     std::thread::sleep(Duration::from_millis(10));
-                }
-                let pid: u32 = std::fs::read_to_string(&pidfile)
-                    .unwrap()
-                    .trim()
-                    .parse()
-                    .unwrap();
+                };
                 if cancel_run {
                     cancel(&runs, "tree");
                 }
