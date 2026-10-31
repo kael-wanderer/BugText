@@ -91,6 +91,13 @@ describe("Git panel", () => {
     expect(deps.status.mock.calls.length).toBeGreaterThan(1);
     expect(host.textContent).toContain(ERROR_TEXT.markers);
   });
+  it("reloads the selected file's diff when status refreshes", async () => {
+    vi.useFakeTimers(); const { host, panel, deps } = make(base()); await flush();
+    [...host.querySelectorAll<HTMLButtonElement>(".git-file-name")].find(b => b.textContent === "changed.md")!.click(); await flush();
+    deps.diff.mockResolvedValue({ lines: [{ kind: "add", text: "fresh text" }], binary: false, truncated: false });
+    void panel.refresh(); await flush(); await flush();
+    expect(host.querySelector(".git-diff-body")?.textContent).toContain("fresh text");
+  });
   it("invokes abort only when its conflict control is clicked", async () => {
     vi.useFakeTimers(); const s = base(); s.merging = true;
     const { host, deps } = make(s); await flush();

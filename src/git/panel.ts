@@ -62,7 +62,8 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
     for (const checkbox of list.querySelectorAll<HTMLInputElement>("input[type=checkbox]")) checkbox.disabled = controls.checkboxesLocked;
   }
   async function select(path: string) {
-    selected = path; diffTitle.textContent = path; diffBody.replaceChildren(); updateControls();
+    if (selected !== path) diffBody.replaceChildren();
+    selected = path; diffTitle.textContent = path; updateControls();
     const activeFolder = folder, token = generation;
     if (!activeFolder) return;
     try { const result = await deps.diff(activeFolder, path); if (folder === activeFolder && generation === token && selected === path) renderGitDiff(diffBody, result); }
@@ -105,6 +106,7 @@ export function createGitPanel(host: HTMLElement, deps: GitPanelDeps) {
       known = nextPaths; state = next; error.textContent = "";
       if (selected && !nextPaths.has(selected)) { selected = null; diffTitle.textContent = ""; diffBody.replaceChildren(); }
       render();
+      if (selected) void select(selected);
     } catch (e) { if (token === generation) { state = null; render(); showError(e); } }
   }
   async function drain() {

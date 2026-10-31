@@ -43,6 +43,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- The Source Control diff for the selected file updates after Git actions and refreshes; it kept showing the earlier content, such as conflict markers already resolved.
 - Source Control error messages (for example conflict markers left in a file, sign-in or network failures) stay visible; they disappeared about a second after appearing.
 - The Source Control conflict banner says the merge stopped; it said "Pull stopped" although only Merge can produce conflicts.
 - The Save before committing prompt is a centered dialog sized to its text, with Esc to cancel; it no longer covers most of the window as an unstyled panel.
