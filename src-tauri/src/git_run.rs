@@ -125,6 +125,9 @@ fn drain(mut input: impl Read, cap: usize, tail: bool) -> Vec<u8> {
     output
 }
 pub fn run(spec: RunSpec<'_>) -> RunOutput {
+    run_command(&spec, command(&spec))
+}
+fn run_command(spec: &RunSpec<'_>, mut command: Command) -> RunOutput {
     let failed = || RunOutput {
         exit: None,
         stdout: vec![],
@@ -132,7 +135,7 @@ pub fn run(spec: RunSpec<'_>) -> RunOutput {
         timed_out: false,
         cancelled: false,
     };
-    let Ok(mut child) = command(&spec).spawn() else {
+    let Ok(mut child) = command.spawn() else {
         return failed();
     };
     let flag = Arc::new(AtomicBool::new(false));
@@ -260,6 +263,97 @@ mod tests {
                 .unwrap(),
             dir.canonicalize().unwrap()
         );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn inherited_hostile_git_environment_is_cleared() {
+        const CHILD: &str = "BUGTEXT_HOSTILE_ENV_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            environment_is_allowlisted_and_git_dir_is_ignored();
+            return;
+        }
+        let status = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "git_run::tests::inherited_hostile_git_environment_is_cleared",
+            ])
+            .env(CHILD, "1")
+            .env("GIT_DIR", "/nonexistent")
+            .env("GIT_WORK_TREE", "/nonexistent")
+            .env("GIT_ASKPASS", "/bin/false")
+            .env("GIT_CONFIG_COUNT", "1")
+            .env("GIT_CONFIG_KEY_0", "alias.rev-parse")
+            .env("GIT_CONFIG_VALUE_0", "!false")
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_and_cancel_kill_grandchild() {
+        let dir = std::env::temp_dir().join(format!("bugtext-git-tree-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let env = RunEnv {
+            home: dir.clone(),
+            path: "/usr/bin:/bin".into(),
+            tmpdir: dir.clone(),
+            ssh_auth_sock: None,
+            user: None,
+            logname: None,
+            lang: None,
+        };
+        let runs = GitRuns::default();
+        for cancel_run in [false, true] {
+            let pidfile = dir.join("pid");
+            let _ = std::fs::remove_file(&pidfile);
+            let spec = RunSpec {
+                git: Path::new("/bin/sh"),
+                repo_root: &dir,
+                args: vec![],
+                stdin: None,
+                timeout: Duration::from_millis(if cancel_run { 5000 } else { 500 }),
+                request_id: Some("tree"),
+                env: &env,
+                runs: &runs,
+            };
+            let mut cmd = Command::new("/bin/sh");
+            cmd.arg("-c")
+                .arg(r#"/bin/sleep 30 & echo $! > "$1"; wait"#)
+                .arg("test")
+                .arg(&pidfile)
+                .stdin(Stdio::null())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .process_group(0);
+            let start = Instant::now();
+            std::thread::scope(|scope| {
+                let handle = scope.spawn(|| run_command(&spec, cmd));
+                while !pidfile.exists() && start.elapsed() < Duration::from_secs(2) {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                let pid: u32 = std::fs::read_to_string(&pidfile)
+                    .unwrap()
+                    .trim()
+                    .parse()
+                    .unwrap();
+                if cancel_run {
+                    cancel(&runs, "tree");
+                }
+                let out = handle.join().unwrap();
+                assert!(if cancel_run {
+                    out.cancelled
+                } else {
+                    out.timed_out
+                });
+                assert!(start.elapsed() < Duration::from_secs(3));
+                assert!(!Command::new("/bin/kill")
+                    .args(["-0", &pid.to_string()])
+                    .status()
+                    .unwrap()
+                    .success());
+            });
+        }
         std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]

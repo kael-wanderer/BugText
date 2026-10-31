@@ -79,3 +79,5 @@ Branch `feat/s9-git-sync` from `feat/unlinked-mentions` (`d44b1f6`). Base: 197 f
 - `b94afdc` test(git): cover timeout and cancellation — Rust 156 passed, 1 ignored; clippy passed; frontend 197 files, 1,034 tests; TypeScript passed. Timeout and cancellation are exercised against a local stalled HTTP listener.
 - `ea1f162` feat(git): add argument and status parsers — partial Task 2 only; frontend 197 files, 1,034 tests; TypeScript passed; Rust 159 passed, 1 ignored; clippy passed. Repository resolution, confined paths, status/diff commands and the remaining Task 2 tests are still required. Do not treat Task 2 as complete.
 - `5d6a50f` feat(git): confine repository paths — partial Task 2; frontend 197 files, 1,034 tests; TypeScript passed; Rust 160 passed, 1 ignored; clippy passed. Status and diff commands, integration fixtures, and remaining tests are not yet implemented.
+
+- Task 1 follow-up: process-group grandchildren are checked on timeout and cancellation; a separate test process supplies hostile Git environment variables. Frontend 197 files, 1,034 tests; TypeScript passed; Rust 162 passed, 1 ignored; clippy passed.
