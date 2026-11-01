@@ -1,0 +1,16 @@
+// @vitest-environment jsdom
+import { expect, it, vi } from "vitest";
+import { showBulkSheet, showBulkDetails } from "../table-view/bulk-sheet";
+import type { IndexedNote } from "../links/index";
+const notes = Array.from({ length: 6 }, (_, i) => ({ path: `/notes/${i}.md`, properties: { x: "old" } }) as unknown as IndexedNote);
+it("reviews five notes and cancel writes nothing", () => {
+  const apply = vi.fn(); showBulkSheet({ notes, keys: ["x"], kindFor: () => "text", onApply: apply, onResult: vi.fn() });
+  const key = document.querySelector<HTMLInputElement>('input[aria-label="Property"]')!, value = document.querySelector<HTMLInputElement>('input[aria-label="Value"]')!; key.value = "x"; value.value = "new";
+  Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Review…")!.click();
+  expect(document.body.textContent).toContain("0.md: old → new"); expect(document.body.textContent).not.toContain("5.md: old");
+  Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Cancel")!.click(); expect(apply).not.toHaveBeenCalled();
+});
+it("renders skipped paths and reasons as text", () => {
+  showBulkDetails([{ path: "/notes/<img>.md", reason: "Changed on disk." }], "/notes");
+  expect(document.body.textContent).toContain("<img>.md — Changed on disk."); expect(document.querySelector("img")).toBeNull(); document.querySelector(".recovery-scrim")!.remove();
+});

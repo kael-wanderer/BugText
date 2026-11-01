@@ -2,6 +2,7 @@ import type { IndexedNote } from "../links/index";
 import { cellValue, columnsFor, sortNotes, valueText, type Column } from "./model";
 import { columnKind, editableCell, validColumnKey } from "./cells";
 import { createCellEditor } from "./cell-editor";
+import { showBulkDetails, showBulkSheet } from "./bulk-sheet";
 import type { Skip, TableEdit } from "./edits";
 import "./table-view.css";
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, text = ""): HTMLElementTagNameMap[K] { const el = document.createElement(tag); el.textContent = text; return el; }
@@ -18,8 +19,10 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
     if (!folder) { host.append(node("p", "Open a folder to view notes in a table.")); return; }
     if (!notes.length) { host.append(node("p", "No notes match the current Filter.")); return; }
     const columns = columnsFor(notes); for (const key of added) if (!columns.some(c => c.key === key)) columns.push({ key, label: key });
+    const rowsForPage = () => (sort ? sortNotes(notes, sort, descending) : notes).slice(limit - 500, limit);
     const toolbar = node("div"); toolbar.className = "table-toolbar";
     toolbar.append(node("span", selected.size ? `${selected.size} selected` : `${notes.length} matching notes`), node("span", "Double-click a cell to edit · Space selects"));
+    if (selected.size) { const bulk = node("button", "Set property…"); bulk.onclick = () => { const chosen = rowsForPage().filter(n => selected.has(n.path)); showBulkSheet({ notes: chosen, keys: deps.folderKeys(), kindFor: key => columnKind(notes, key), onApply: edit => deps.edit(chosen, edit), onResult: result => { render(); const toast = node("div", `Updated ${result.changed.length} notes${result.skipped.length ? ` · ${result.skipped.length} skipped` : ""}`); if (result.skipped.length) { const details = node("button", "Details"); details.onclick = () => showBulkDetails(result.skipped, folder!); toast.append(details); } host.prepend(toast); } }); }; toolbar.append(bulk); }
     const add = node("button", "+ Column"); add.onclick = () => {
       const input = node("input"); input.placeholder = "New key…"; input.setAttribute("list", "table-column-keys");
       const list = node("datalist"); list.id = "table-column-keys"; for (const key of deps.folderKeys().filter(k => !columns.some(c => c.key === k))) { const option = node("option"); option.value = key; list.append(option); }
@@ -31,7 +34,7 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
     if (columns.length === 3) host.append(node("p", "No notes with properties."));
     if (columns.length > 15 && !expanded) { const more = node("button", "More columns"); more.onclick = () => { expanded = true; render(); }; host.append(more); }
     const visible = (expanded ? columns : columns.slice(0, 15)).filter(c => !hidden.has(identity(c)));
-    const rows = (sort ? sortNotes(notes, sort, descending) : notes).slice(limit - 500, limit);
+    const rows = rowsForPage();
     const table = node("table"), head = node("thead"), header = node("tr"), body = node("tbody"), selectHead = node("th"), all = node("input");
     all.type = "checkbox"; all.setAttribute("aria-label", "Select all on page"); all.checked = rows.length > 0 && rows.every(n => selected.has(n.path)); all.onchange = () => { for (const n of rows) all.checked ? selected.add(n.path) : selected.delete(n.path); render(); }; selectHead.append(all); header.append(selectHead);
     for (const col of visible) {
