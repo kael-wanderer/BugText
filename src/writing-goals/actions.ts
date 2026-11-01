@@ -5,8 +5,11 @@ import type { SessionState } from "./session";
 
 type Note = { source: string; markdown: boolean; current(): boolean; apply(edit: PropertyEdit): void };
 type Actions = { note: Note | null; session: SessionState | null; readingTime: boolean; update(session: number | null | "keep", readingTime: boolean): void };
+let closeOpen: (() => void) | null = null;
 export function showGoals(anchor: HTMLElement, options: Actions): void {
-  openGoalPopover({ anchor, note: options.note, session: options.session, readingTime: options.readingTime,
+  // A second click on the goal item closes the open popover instead of stacking another.
+  if (closeOpen && document.querySelector(".goal-popover")) { closeOpen(); closeOpen = null; return; }
+  closeOpen = openGoalPopover({ anchor, note: options.note, session: options.session, readingTime: options.readingTime,
     apply(result) {
       if (result.noteEdit) {
         if (!options.note?.current()) return false;

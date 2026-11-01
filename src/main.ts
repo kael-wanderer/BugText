@@ -1,4 +1,5 @@
-import type { NoteGoal } from "./writing-goals/note-goal";
+import { bodyWords, readNoteGoal, type NoteGoal } from "./writing-goals/note-goal";
+import { createStatusBar } from "./status-bar/view";
 import { createSessionTracker, crossed } from "./writing-goals/session";
 import { reachedToast } from "./writing-goals/labels";
 import { countWords } from "./status-bar/model";
@@ -442,14 +443,10 @@ const focusMode = createFocusMode({
   restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
   onChange: () => { requestWindowMeasure(); syncViewMenu(); if (document.body.classList.contains("focus-active")) void ensureFocusPill(); refreshStatusBar(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
 });
-let statusBar: ReturnType<typeof import("./status-bar/view").createStatusBar> | undefined;
-void import("./status-bar/view").then(({ createStatusBar }) => {
-  statusBar = createStatusBar(document.getElementById("app")!, () => {
-    if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
-    activeView().editor.openGoToLine();
-  }, openDiagnostics, anchor => { void openGoals(anchor); });
-  refreshStatusBar();
-});
+const statusBar = createStatusBar(document.getElementById("app")!, () => {
+  if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
+  activeView().editor.openGoToLine();
+}, openDiagnostics, anchor => { void openGoals(anchor); });
 
 function openDiagnostics(): void {
   showDiagnosticsSheet(document.getElementById("app")!, { diagnostics, copy: writeClipboardText });
@@ -461,7 +458,7 @@ function refreshStatusBar(): void {
   const noteData = tab ? noteGoals.get(tab.id) : undefined;
   const noteGoal = noteData?.goal.kind === "set" ? { goal: noteData.goal.goal, words: noteData.words } : null;
   const session = writingSession.state();
-  statusBar?.update({
+  statusBar.update({
     enabled: currentSettings.showStatusBar,
     pathOrName: tab && editor && !tab.tableView ? tab.path ?? tab.name : null,
     cursor: editor?.cursorPosition() ?? { line: 1, column: 1 },
@@ -1071,10 +1068,7 @@ const handlers = {
   onWordCount: (tabId: string, count: number, text: string) => {
     statusWordCounts.set(tabId, count);
     const tab = getState().windows.flatMap(w => w.tabs).find(t => t.id === tabId);
-    if (tab && isMarkdownFile(tab.path ?? tab.name)) void import("./writing-goals/note-goal").then(({ readNoteGoal, bodyWords }) => {
-      if (editorForTab(tabId).getText(tabId) !== text) return;
-      noteGoals.set(tabId, { goal: readNoteGoal(text), words: bodyWords(text) }); refreshStatusBar();
-    }).catch(() => {});
+    if (tab && isMarkdownFile(tab.path ?? tab.name)) noteGoals.set(tabId, { goal: readNoteGoal(text), words: bodyWords(text) });
     else noteGoals.delete(tabId);
     writingSession.observe(tabId, count);
     if (focusMode.active() && activeMeta()?.id === tabId) focusPills.get(getState().activeWindowId)?.typing();
@@ -1423,6 +1417,7 @@ function renderAll(): void {
   diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
+  for (const id of noteGoals.keys()) if (!openIds.has(id)) noteGoals.delete(id);
   refreshStatusBar();
   for (const w of getState().windows) {
     const name = `Table: ${basename(getState().folder ?? "No folder")}`;

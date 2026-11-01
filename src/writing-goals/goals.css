@@ -8,10 +8,10 @@
 .goal-popover > label:not(.goal-reading-time) { display: grid; gap: 5px; margin-bottom: 12px; }
 .goal-popover input[type=number] { width: 100%; box-sizing: border-box; }
 .goal-popover small { color: var(--muted); }
-.goal-popover .goal-error { color: var(--accent); }
+.goal-popover .goal-error { color: var(--error, #c45b50); }
 .goal-reading-time { display: flex; align-items: center; gap: 6px; }
 .goal-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.pane-editor { position: relative; }
+body.focus-active .window.active .pane-editor { position: relative; }
 .goal-pill { position: absolute; right: 20px; bottom: 20px; z-index: 5; display: flex; align-items: center; gap: 6px; padding: 6px 10px; color: var(--muted); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 20px; transition: opacity .2s; }
 .goal-pill[hidden] { display: none; }
 .goal-pill.typing { opacity: .4; }
