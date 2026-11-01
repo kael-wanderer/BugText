@@ -32,7 +32,7 @@ describe("property table", () => {
     expect(host.textContent).toContain("line 3: Invalid YAML properties");
     expect(host.textContent).not.toContain("must stay blank");
     expect(host.textContent).toContain(html); expect(host.querySelector("img")).toBeNull();
-    host.querySelector("tbody tr")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); expect(opened).toBe("bad.md");
+    host.querySelector<HTMLButtonElement>("tbody .table-title")!.click(); expect(opened).toBe("bad.md");
   });
   it("builds 2000 notes and renders a bounded first batch", () => {
     const notes = Array.from({ length: 2000 }, (_, i) => note(`/notes/${i}.md`, { status: "active", count: i, date: "2026-10-29" }));
@@ -62,5 +62,30 @@ describe("property table", () => {
     createTableSurface(host, () => {}).update([note("/notes/sub/a.md")], "/notes");
     const cells = Array.from(host.querySelectorAll("tbody td")).map(td => td.textContent);
     expect(cells).toContain("sub/a.md"); expect(cells).not.toContain("/notes/sub/a.md");
+  });
+});
+
+describe("editable table", () => {
+  it("edits a cell and rejects invalid numbers", async () => {
+    const host = document.createElement("div"), edits: unknown[] = [];
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => [], edit: async (n, e) => { edits.push([n, e]); return { changed: [], skipped: [] }; } });
+    surface.update([note("/notes/a.md", { count: 1 })], "/notes");
+    const cell = host.querySelectorAll("tbody td")[4] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const input = cell.querySelector("input")!; input.value = "bad"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(cell.textContent).toContain("Enter a number."); expect(edits).toHaveLength(0);
+    input.value = "2"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await Promise.resolve(); expect(edits).toHaveLength(1);
+  });
+  it("selects rows and hides and restores columns", () => {
+    const host = document.createElement("div"); const surface = createTableSurface(host, () => {});
+    surface.update([note("/notes/a.md", { x: 1 })], "/notes");
+    host.querySelector<HTMLInputElement>('input[aria-label="Select row"]')!.click(); expect(host.textContent).toContain("1 selected");
+    host.querySelector<HTMLButtonElement>('button[aria-label="Column menu: x"]')!.click();
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Hide column")!.click();
+    expect(host.textContent).toContain("Hidden (1)");
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Hidden (1)")!.click();
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "x")!.click();
+    expect(host.querySelector('button[aria-label="Column menu: x"]')).not.toBeNull();
   });
 });
