@@ -271,6 +271,11 @@ re-matching after external moves. Highlights draw beneath the text layer. Copy Q
 rewrites links when pasted into a Markdown note, `#page` links return to the PDF, and
 the annotations panel exports Markdown to a note or the clipboard.
 
+PDF page organization keeps an undoable page plan in memory and loads its grid,
+PDF inspection and writer on demand. In-place saves check the source digest and
+create a Recovery snapshot and backup before writing; annotation pages and rectangles
+are remapped. Copy and extraction write separately and leave the source untouched.
+
 Update checks read `https://kael.io.vn/projects/bugtext/latest.json`
 (`{version, release_url}`), fetched in Rust (`update_feed.rs`, the host sends no
 CORS headers). A newer semantic version offers to open the `https` release page in

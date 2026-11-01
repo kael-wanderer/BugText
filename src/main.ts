@@ -848,6 +848,7 @@ function commandItems(): PaletteItem[] {
     command("file.save_workspace", "Save Workspace As…", saveWorkspace),
     command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
+    command("pdf.organize_pages", "PDF: Organize Pages", () => { if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages."); }),
     command("close", "Close Tab", () => {
       if (activeView().closeGraph()) return;
       const windowState = activeWindow();
@@ -1105,6 +1106,7 @@ const noteImages = createNoteImages({
 async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
   const w = getWindow(windowId);
   if (!w) return;
+  if (w.activeTabId && tabIds.includes(w.activeTabId) && !(await views.get(windowId)?.requestPdfOrganizerClose())) return;
 
   const toClose = new Set<string>();
   for (const tabId of tabIds) {
@@ -1497,7 +1499,13 @@ function activeMeta(): TabMeta | undefined {
   return w.tabs.find((t) => t.id === w.activeTabId);
 }
 
-function activateTab(windowId: string, tabId: string, recordNavigation = true): void {
+function activateTab(windowId: string, tabId: string, recordNavigation = true, organizerAccepted = false): void {
+  const view = views.get(windowId);
+  if (!organizerAccepted && getWindow(windowId)?.activeTabId === tabId && view?.hasPdfOrganizer()) return;
+  if (!organizerAccepted && getWindow(windowId)?.activeTabId !== tabId && view?.hasPdfOrganizer()) {
+    void view.requestPdfOrganizerClose().then(accepted => { if (accepted) activateTab(windowId, tabId, recordNavigation, true); });
+    return;
+  }
   views.get(windowId)?.hideGraph();
   const target = getWindow(windowId)?.tabs.find(tab => tab.id === tabId);
   if (recordNavigation && target?.path && !isPdfFile(target.path)) {
@@ -1526,7 +1534,12 @@ function activateTab(windowId: string, tabId: string, recordNavigation = true): 
   void checkActiveForExternalChange(windowId);
 }
 
-function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true, forceNewTab = false): void {
+function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true, forceNewTab = false, organizerAccepted = false): void {
+  const view = views.get(windowId);
+  if (!organizerAccepted && view?.hasPdfOrganizer()) {
+    void view.requestPdfOrganizerClose().then(accepted => { if (accepted) openInWindow(windowId, opts, recordNavigation, forceNewTab, true); });
+    return;
+  }
   // Every document-opening path ends here: leave settings so the tab is visible.
   settingsScreen.close();
   if (opts.path && !forceNewTab) {
@@ -1586,6 +1599,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   const w = getWindow(windowId)!;
   const t = w.tabs.find((x) => x.id === tabId);
   if (!t) return true;
+  if (w.activeTabId === tabId && !(await views.get(windowId)?.requestPdfOrganizerClose())) return false;
 
   if (t.dirty) {
     const approved = await confirm(`Discard unsaved changes to "${t.name}"?`, {
@@ -1912,6 +1926,10 @@ async function initNativeFileDrop(): Promise<void> {
     }
 
     const point = dropPoint(event.payload.position);
+    const organizerTarget = (document.elementFromPoint(point.x, point.y) as HTMLElement | null)?.closest(".pdf-organizer");
+    if (organizerTarget && views.get(windowAt(point))?.organizerDrop(event.payload.paths, point)) {
+      clearDropHighlight(); cancelDropExpansion(); return;
+    }
     const onAIPanel = (
       document.elementFromPoint(point.x, point.y) as HTMLElement | null
     )?.closest("#ai-panel");
@@ -3826,6 +3844,9 @@ listenScoped<string>("menu", (event) => {
       return void workspaceController.close();
     case "file.recover":
       return openRecoveryReview();
+    case "pdf.organize_pages":
+      if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages.");
+      return;
     case "file.close": {
       if (activeView().closeGraph()) return;
       const w = activeWindow();
@@ -3954,6 +3975,7 @@ const appKeyActions: Record<string, () => void> = {
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
   "ai.quick.outline": () => runQuickActionById("ai.quick.outline"),
   "file.recover": () => openRecoveryReview(),
+  "pdf.organize_pages": () => { if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages."); },
   "file.close": () => {
     if (activeView().closeGraph()) return;
     const w = activeWindow();

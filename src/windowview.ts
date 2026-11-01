@@ -119,6 +119,10 @@ export type WindowView = {
   setLivePreviewFlag: (on: boolean) => void;
   openPdfPage: (page: number, annotation?: string) => void;
   annotationCommand: (command: "panel" | "copy") => boolean;
+  hasPdfOrganizer: () => boolean;
+  requestPdfOrganizerClose: () => Promise<boolean>;
+  organizePdfPages: () => boolean;
+  organizerDrop: (paths: string[], point: { x: number; y: number }) => boolean;
   savePdf: () => boolean;
   savePdfAs: () => boolean;
   /** Toggles Edit PDF when a PDF is open; false otherwise. */
@@ -1178,6 +1182,10 @@ export function createWindowView(
         if (annotation) { pdfFind.flashAnnotation(annotation); pendingAnnotation = undefined; }
       }
     },
+    hasPdfOrganizer: () => !!pdfFind?.hasOrganizer(),
+    requestPdfOrganizerClose: () => pdfFind?.requestOrganizerClose() ?? Promise.resolve(true),
+    organizePdfPages: () => { if (!isPdfFile(previewPathOrName) || !pdfFind) return false; pdfFind.openOrganizer(); return true; },
+    organizerDrop: (paths, point) => pdfFind?.organizerDrop(paths, point) ?? false,
     annotationCommand: (command) => {
       if (!isPdfFile(previewPathOrName) || !pdfFind) return false;
       previewPane.dispatchEvent(new Event(command === "panel" ? PDF_ANNOTATIONS_EVENT : PDF_COPY_QUOTE_EVENT));

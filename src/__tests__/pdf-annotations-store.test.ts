@@ -23,6 +23,12 @@ function setup(initial?: AnnotationDocument) {
 }
 const doc: AnnotationDocument = { version: 1, path: "/old.pdf", digest: "old", pages: 1, revision: 1, annotations: [item] };
 describe("annotation store", () => {
+  it("replaces annotations, page count and digest", async () => {
+    const s = setup(doc); const store = await AnnotationStore.load("/old.pdf", "old", 1, () => {}, s.io, "one");
+    await store.replaceAll({ digest: "new", pages: 3, annotations: [{ ...item, page: 2 }] });
+    expect(s.files.get("/old.pdf")).toMatchObject({ digest: "new", pages: 3, annotations: [{ ...item, page: 2 }] });
+    expect(store.changed).toBe(false);
+  });
   it("adopts a digest match and forgets its old entry", async () => {
     const s = setup(doc); const store = await AnnotationStore.load("/new.pdf", "old", 1, () => {}, s.io, "one");
     expect(store.document.annotations).toEqual([item]); expect(s.io.forget).toHaveBeenCalledWith("/old.pdf");

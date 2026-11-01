@@ -11,6 +11,7 @@ export type PdfPanel = "annotations" | "replace" | "review" | "proof" | "ocr" | 
 export type PdfToolbarCommand =
   | "annotations"
   | "pages"
+  | "organize"
   | "page-prev"
   | "page-next"
   | "zoom-in"
@@ -357,6 +358,7 @@ export function createPdfToolbar(
   const findItem = menuItem("find", "Find in PDF", "⌘F");
   findItem.element.classList.add("pdf-tb-narrow-only");
   const ocrItem = menuItem("ocr", "Recognize Text…");
+  const organizeItem = menuItem("organize", "Organize Pages…");
   const ocrReviewItem = menuItem("ocr-review", "Review OCR Text");
   const proofItem = menuItem("proof", "Check Text Edits");
   const supportItem = menuItem("support", "Editing Support");
@@ -380,6 +382,7 @@ export function createPdfToolbar(
     findItem,
     ...narrowZoom,
     narrowSeparator,
+    organizeItem,
     ocrItem,
     ocrReviewItem,
     separator(),

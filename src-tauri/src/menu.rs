@@ -123,6 +123,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .items(&[&switch_workspace, &save_workspace, &close_workspace])
         .build()?;
     let recover = MenuItemBuilder::with_id("file.recover", "Recover Unsaved Documents…").build(app)?;
+    let organize_pdf = MenuItemBuilder::with_id("pdf.organize_pages", "Organize PDF Pages…").build(app)?;
     let close = MenuItemBuilder::with_id("file.close", "Close Tab")
         .accelerator("CmdOrCtrl+W")
         .build(app)?;
@@ -169,6 +170,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&add_bookmark)
         .item(&show_bookmarks)
         .item(&export)
+        .item(&organize_pdf)
         .separator()
         .item(&close)
         .build()?;

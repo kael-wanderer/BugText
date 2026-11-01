@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- PDF page organization with reorder, rotation, deletion, insertion, extraction, and Recovery-backed in-place saves.
 - Citations from BibTeX and CSL JSON, with insertion and completion, styled preview references, and Pandoc citation export.
 - Table view property editing, column controls and reviewed bulk changes with Recovery snapshots.
 - macOS spelling feedback in Markdown and plain text, with suggestions, session ignore, dictionary learning and a setting in Editing.
@@ -46,6 +47,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Re-selecting a PDF tab no longer discards an open page organization plan.
 - Spell checking no longer underlines entire lines when macOS returns language-detection results.
 - Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").
 - Unlinked Mentions no longer draws a second divider above its heading.
