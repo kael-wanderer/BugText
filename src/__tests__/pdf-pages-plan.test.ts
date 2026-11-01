@@ -5,7 +5,8 @@ describe("page plans", () => {
     const start = initialPlan(5); const end = movePages(start, ["self:1", "self:3"], 5);
     expect(end.pages.map(p => p.index)).toEqual([0, 2, 4, 1, 3]);
     expect(movePages(end, ["self:1", "self:3"], 0).pages.map(p => p.index)).toEqual([1, 3, 0, 2, 4]);
-    expect(changeSummary(end, 5).moved).toBe(4);
+    expect(changeSummary(end, 5).moved).toBe(2);
+    expect(changeSummary(movePages(initialPlan(10), ["self:7"], 4), 10).moved).toBe(1);
   });
   it("rotates, refuses deleting all pages, and supports undo and redo", () => {
     const start = initialPlan(2); let next = start;

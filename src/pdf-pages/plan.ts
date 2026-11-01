@@ -37,8 +37,14 @@ export function isChanged(plan: PagePlan): boolean {
   return plan.pages.length !== plan.selfCount || plan.pages.some((p, i) => p.source !== "self" || p.index !== i || p.rotation !== 0);
 }
 export function changeSummary(plan: PagePlan, selfCount: number): { moved: number; rotated: number; deleted: number; inserted: number } {
-  const self = plan.pages.filter(p => p.source === "self"); const sorted = [...self].sort((a, b) => a.index - b.index);
-  return { moved: self.filter((p, i) => p.index !== sorted[i].index).length, rotated: plan.pages.filter(p => p.rotation !== 0).length, deleted: selfCount - self.length, inserted: plan.pages.length - self.length };
+  const self = plan.pages.filter(p => p.source === "self");
+  const tails: number[] = [];
+  for (const page of self) {
+    let lo = 0, hi = tails.length;
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (tails[mid] < page.index) lo = mid + 1; else hi = mid; }
+    tails[lo] = page.index;
+  }
+  return { moved: self.length - tails.length, rotated: plan.pages.filter(p => p.rotation !== 0).length, deleted: selfCount - self.length, inserted: plan.pages.length - self.length };
 }
 export type History = { past: PagePlan[]; present: PagePlan; future: PagePlan[] };
 export function historyPush(h: History, next: PagePlan): History { return next === h.present ? h : { past: [...h.past, h.present], present: next, future: [] }; }
