@@ -51,3 +51,11 @@ malformed files (unit tests only).
 - Spell checking: macOS returned an orthography result spanning the masked line even when spelling was requested. The native bridge now filters for spelling results; native re-check pending.
 
 Automated verification: TypeScript check passed; Vitest 1,131 tests passed; Cargo 181 tests passed, 3 ignored. The index chunk is 905.15 kB.
+
+## Native re-check — 2026-11-01 (after eb6b7cb…04b728a)
+
+Passed: picker styled (sheet width, padded search field, muted footer, clear active row, ↓ moves it);
+cursor lands after the inserted citation and the insert is one undo step; the spell underline on the
+inline-code line is gone; preview reference lines read "Newport, Cal. 2016." and
+"Ong, Mei, Jin Park, and Luis Diaz. 2020.". IEEE grouping "[2], [3]" and "1 key not found" are covered by
+unit tests and were not re-checked natively.
