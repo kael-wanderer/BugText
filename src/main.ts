@@ -443,6 +443,28 @@ const focusMode = createFocusMode({
   restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
   onChange: () => { requestWindowMeasure(); syncViewMenu(); if (document.body.classList.contains("focus-active")) void ensureFocusPill(); refreshStatusBar(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
 });
+let presentController: ReturnType<typeof import("./present/controller").createPresentController> | null = null;
+async function present(fromCursor: boolean): Promise<void> {
+  if (presentController?.active()) { if (!fromCursor) await presentController.leave(); return; }
+  if (!presentController) {
+    const { createPresentController } = await import("./present/controller");
+    presentController = createPresentController({
+      host: document.body,
+      text: () => { const tab = activeMeta(); return tab && !tab.tableView && isMarkdownFile(tab.path ?? tab.name) && !activeView().graphActive() ? activeView().editor.getText(tab.id) : null; },
+      notePath: () => activeMeta()?.path ?? null,
+      cursorLine: () => { const tab = activeMeta(); if (!tab) return 1; const editor = activeView().editor; return editor.getText(tab.id).slice(0, editor.cursorOffset(tab.id)).split("\n").length; },
+      capture: () => { focusMode.exit(); settingsScreen.close(); const view = activeView(); view.captureReadingPosition(); return { view, windowId: getState().activeWindowId, tabId: activeMeta()?.id }; },
+      restore: snapshot => { const place = snapshot as { view: WindowView; windowId: string; tabId: string }; if (getState().activeWindowId === place.windowId && activeMeta()?.id === place.tabId) void place.view.restoreReadingPosition(); },
+      isFullscreen: () => currentNativeWindow?.isFullscreen() ?? Promise.resolve(false),
+      setFullscreen: on => currentNativeWindow?.setFullscreen(on) ?? Promise.resolve(),
+      theme: () => isLightTheme(currentSettings.theme) ? "light" : "dark",
+      notesSize: () => currentSettings.presentation.notesSize,
+      saveNotesSize: notesSize => saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, notesSize } }),
+      openPresenter: () => {}, closePresenter: () => {}, publish: () => {}, toast: showToast,
+    });
+  }
+  await presentController.start(fromCursor);
+}
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();
@@ -892,6 +914,8 @@ function commandItems(): PaletteItem[] {
     command("edit.show_tasks", "Tasks in Folder", () => withOrganize((actions) => actions.showTasks())),
     command("edit.writing_goal", "Set Writing Goal…", () => void openGoals(goalAnchor())),
     command("edit.clear_writing_goals", "Clear Writing Goals", () => void clearWritingGoals()),
+    command("view.present", "Present", () => void present(false)),
+    command("view.present_here", "Present from Current Slide", () => void present(true)),
     command("view.live_preview", "Toggle Live Preview", toggleLivePreview),
     command("ai.new_chat", "AI: New chat", newAIChat),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
@@ -1082,6 +1106,7 @@ const handlers = {
     setState({ activeWindowId: wid });
     void doSave(false);
   },
+  onPresent: (wid: string) => { setState({ activeWindowId: wid }); void present(false); },
   onOpen: (wid: string) => {
     setState({ activeWindowId: wid });
     void doOpen();
@@ -3862,6 +3887,7 @@ function openFolderDialog(): void {
 listenScoped<string>("menu", (event) => {
   const wid = getState().activeWindowId;
   const id = event.payload;
+  if (presentController?.active() && id !== "view.present" && id !== "view.present_here") return;
   if (id.startsWith("workspace.open:")) {
     const workspaceId = id.slice("workspace.open:".length);
     void loadWorkspaces(workspacesIO(nativeWindowLabel)).then(result => {
@@ -3888,6 +3914,8 @@ listenScoped<string>("menu", (event) => {
     return setMenuTheme(id.slice("view.theme.".length));
   }
   switch (id) {
+    case "view.present": return void present(false);
+    case "view.present_here": return void present(true);
     case "view.focus_mode": return focusMode.toggle();
     case "edit.spell_check": currentSettings = { ...currentSettings, editor: { ...currentSettings.editor, spellCheck: !currentSettings.editor.spellCheck } }; persistCurrentSettings(); return;
     case "view.typewriter": currentSettings = { ...currentSettings, editor: { ...currentSettings.editor, typewriterScrolling: !currentSettings.editor.typewriterScrolling } }; persistCurrentSettings(); return;
