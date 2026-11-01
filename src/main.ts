@@ -1501,6 +1501,7 @@ function activeMeta(): TabMeta | undefined {
 
 function activateTab(windowId: string, tabId: string, recordNavigation = true, organizerAccepted = false): void {
   const view = views.get(windowId);
+  if (!organizerAccepted && getWindow(windowId)?.activeTabId === tabId && view?.hasPdfOrganizer()) return;
   if (!organizerAccepted && getWindow(windowId)?.activeTabId !== tabId && view?.hasPdfOrganizer()) {
     void view.requestPdfOrganizerClose().then(accepted => { if (accepted) activateTab(windowId, tabId, recordNavigation, true); });
     return;
