@@ -456,6 +456,7 @@ function refreshStatusBar(): void {
     dirty: tab?.dirty ?? false,
     recovered: tab ? recoveredDraftIds.has(tab.id) : false,
     largeFolder,
+    readingTime: currentSettings.writingGoals.readingTime, noteGoal: null, session: null,
   });
   focusMode.sync();
 }

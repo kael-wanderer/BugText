@@ -1,0 +1,6 @@
+.goal-ring { flex: none; transform: rotate(-90deg); }
+.goal-ring circle { fill: none; stroke-width: 2; }
+.goal-ring .track { stroke: var(--border); }
+.goal-ring .progress { stroke: var(--muted); }
+.status-bar .done { color: var(--accent); font-weight: 600; }
+.status-bar .done .progress { stroke: var(--accent); }
