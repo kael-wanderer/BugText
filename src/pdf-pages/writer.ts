@@ -1,4 +1,4 @@
-import { degrees, PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFObject, PDFString } from "pdf-lib";
+import { degrees, PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFObject, PDFRef, PDFStream, PDFString } from "pdf-lib";
 import type { PagePlan, PlanPage } from "./plan";
 
 export type Pruned = { bookmarks: number; links: number; fields: number };
@@ -120,24 +120,67 @@ async function loadSources(selfBytes: Uint8Array, plan: PagePlan): Promise<Map<s
 function rotate(page: ReturnType<PDFDocument["getPage"]>, entry: PlanPage): void {
   page.setRotation(degrees(((page.getRotation().angle + entry.rotation) % 360 + 360) % 360));
 }
+// Links whose target page is not in the result would keep that page's objects alive, and a
+// copied widget's /P still names its source page; both are fixed against the final page tree.
+function repairPageReferences(doc: PDFDocument): void {
+  const pages = doc.getPages(); const inTree = new Set(pages.map(p => p.ref.toString()));
+  for (const page of pages) {
+    const annots = page.node.lookupMaybe(PDFName.of("Annots"), PDFArray); if (!annots) continue;
+    for (let i = annots.size() - 1; i >= 0; i--) {
+      const annot = doc.context.lookup(annots.get(i));
+      if (!(annot instanceof PDFDict)) continue;
+      if (annot.get(PDFName.of("P"))) annot.set(PDFName.of("P"), page.ref);
+      if (annot.lookupMaybe(PDFName.of("Subtype"), PDFName) !== PDFName.of("Link")) continue;
+      const action = annot.lookupMaybe(PDFName.of("A"), PDFDict);
+      const dest = annot.get(PDFName.of("Dest")) ?? (action?.lookupMaybe(PDFName.of("S"), PDFName) === PDFName.of("GoTo") ? action.get(PDFName.of("D")) : undefined);
+      const target = dest ? doc.context.lookup(dest) : undefined;
+      if (target instanceof PDFArray && target.size() > 0 && target.get(0) instanceof PDFRef && !inTree.has(target.get(0).toString())) annots.remove(i);
+    }
+  }
+}
+// pdf-lib writes every object it loaded; removed pages (and old object streams holding them)
+// must not survive in the file, so anything unreachable from the trailer is dropped.
+function dropUnreachable(doc: PDFDocument): void {
+  const context = doc.context; const seen = new Set<string>();
+  const { Root, Info, Encrypt, ID } = context.trailerInfo;
+  const stack: PDFObject[] = [Root, Info, Encrypt, ID].filter((o): o is PDFObject => !!o);
+  while (stack.length) {
+    const object = stack.pop()!;
+    if (object instanceof PDFRef) {
+      const key = object.toString(); if (seen.has(key)) continue; seen.add(key);
+      const value = context.lookup(object); if (value) stack.push(value);
+    } else if (object instanceof PDFDict) for (const [, value] of object.entries()) stack.push(value);
+    else if (object instanceof PDFArray) for (let i = 0; i < object.size(); i++) stack.push(object.get(i));
+    else if (object instanceof PDFStream) stack.push(object.dict);
+  }
+  for (const [ref] of context.enumerateIndirectObjects()) if (!seen.has(ref.toString())) context.delete(ref);
+}
 export async function countPruned(selfBytes: Uint8Array, plan: PagePlan): Promise<Pruned> {
   return prune(await PDFDocument.load(selfBytes, { updateMetadata: false }), plan);
 }
 export async function buildOrganizedPdf(selfBytes: Uint8Array, plan: PagePlan): Promise<{ bytes: Uint8Array; pruned: Pruned }> {
   const sources = await loadSources(selfBytes, plan); const doc = sources.get("self")!;
   const pruned = prune(doc, plan); const original = doc.getPages();
-  const ordered = await Promise.all(plan.pages.map(async entry => {
-    const page = entry.source === "self" ? original[entry.index] : (await doc.copyPages(sources.get(entry.source)!, [entry.index]))[0];
+  // One copy per inserted file, so links between its pages stay on the copied pages.
+  const copied = new Map<string, Map<number, ReturnType<PDFDocument["getPage"]>>>();
+  for (const [id, source] of sources) if (id !== "self") {
+    const indexes = [...new Set(plan.pages.filter(p => p.source === id).map(p => p.index))];
+    const pages = await doc.copyPages(source, indexes);
+    copied.set(id, new Map(indexes.map((index, i) => [index, pages[i]])));
+  }
+  const ordered = plan.pages.map(entry => {
+    const page = entry.source === "self" ? original[entry.index] : copied.get(entry.source)?.get(entry.index);
     if (!page) throw new Error("Invalid page index"); rotate(page, entry); return page;
-  }));
+  });
   for (let i = doc.getPageCount() - 1; i >= 0; i--) doc.removePage(i);
   ordered.forEach((page, i) => doc.insertPage(i, page));
+  repairPageReferences(doc);
+  dropUnreachable(doc);
   return { bytes: await doc.save({ useObjectStreams: true, updateFieldAppearances: false }), pruned };
 }
+/** The chosen pages as their own PDF: the same build with every other page removed. */
 export async function extractPages(selfBytes: Uint8Array, plan: PagePlan, keys: string[]): Promise<Uint8Array> {
   const selected = new Set(keys); const entries = plan.pages.filter(p => selected.has(p.key));
   if (!entries.length) throw new Error("No pages selected");
-  const sources = await loadSources(selfBytes, { ...plan, pages: entries }); const output = await PDFDocument.create();
-  for (const entry of entries) { const [page] = await output.copyPages(sources.get(entry.source)!, [entry.index]); rotate(page, entry); output.addPage(page); }
-  return output.save({ useObjectStreams: true });
+  return (await buildOrganizedPdf(selfBytes, { ...plan, pages: entries })).bytes;
 }

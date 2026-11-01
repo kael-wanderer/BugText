@@ -4,6 +4,14 @@ import { initialPlan, movePages, rotatePages, deletePages, insertPages } from ".
 import { buildOrganizedPdf, countPruned, extractPages } from "../pdf-pages/writer";
 import { inspectPdf } from "../pdf-pages/inspect";
 const N = PDFName.of;
+async function markers(bytes: Uint8Array): Promise<number[]> {
+  const doc = await PDFDocument.load(bytes); const found: number[] = [];
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    const dict = object instanceof PDFDict ? object : undefined;
+    const marker = dict?.lookupMaybe(N("BugTestMarker"), PDFNumber); if (marker) found.push(marker.asNumber());
+  }
+  return found.sort((a, b) => a - b);
+}
 async function fixture() {
   const doc = await PDFDocument.create();
   const pages = Array.from({ length: 10 }, (_, i) => { const page = doc.addPage([300 + i, 400]); page.node.set(N("BugTestMarker"), PDFNumber.of(i)); return page; });
@@ -43,6 +51,18 @@ describe("PDF page writer", () => {
     expect(titles).toEqual(["Page 0", "Page 1", "Page 2", "Page 3", "child", "Page 6", "Page 7", "Page 8", "Page 9"]);
     expect(output.getPage(1).node.lookup(N("Annots"), PDFArray).size()).toBe(0);
     expect(output.catalog.lookup(N("AcroForm"), PDFDict).lookup(N("Fields"), PDFArray).size()).toBe(0);
+  });
+  it("leaves no objects of deleted pages in the saved file", async () => {
+    const { bytes } = await fixture();
+    const plan = deletePages(initialPlan(10), ["self:4", "self:5"]); if ("error" in plan) throw new Error(plan.error);
+    expect(await markers((await buildOrganizedPdf(bytes, plan)).bytes)).toEqual([0, 1, 2, 3, 6, 7, 8, 9]);
+  });
+  it("extracts only the chosen pages, not pages their links point to", async () => {
+    const { bytes } = await fixture();
+    // Page 0 links to page 4 and page 5 holds a form field: neither may come along.
+    const output = await extractPages(bytes, initialPlan(10), ["self:0", "self:5"]);
+    expect(await markers(output)).toEqual([0, 5]);
+    expect((await PDFDocument.load(output)).getPage(0).node.lookupMaybe(N("Annots"), PDFArray)?.size() ?? 0).toBe(0);
   });
   it("extracts selected pages in plan order with rotation", async () => {
     const { bytes } = await fixture(); let plan = rotatePages(initialPlan(10), ["self:4"], 90);
