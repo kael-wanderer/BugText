@@ -50,7 +50,7 @@ export function showExportSheet(options: SheetOptions): Promise<SheetResult> {
       if (citations?.hasCitations && citations.status === "error") row("!", "Bibliography could not be read.");
       if (citations?.hasCitations && citations.status === "ok") {
         if (citations.cited.length) row("✓", `Citations: ${citations.cited.length} cited · ${citations.styleLabel}`);
-        if (citations.missing.length) row("!", `${citations.missing.length} keys not found: ${citations.missing.slice(0, 5).join(", ")}${citations.missing.length > 5 ? "…" : ""}`);
+        if (citations.missing.length) row("!", `${citations.missing.length} ${citations.missing.length === 1 ? "key" : "keys"} not found: ${citations.missing.slice(0, 5).join(", ")}${citations.missing.length > 5 ? "…" : ""}`);
       }
       if (options.missing.length) {
         const count = options.missing.length; const line = row("!", `${count} image${count === 1 ? "" : "s"} could not be found`);

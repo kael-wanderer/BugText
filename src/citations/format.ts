@@ -41,15 +41,36 @@ export function inText(items: CitationItem[], style: CitationStyle, bare: boolea
     return `${prefix ? `${prefix} ` : ""}${content}`;
   });
   if (bare && style !== "ieee" && items[0]?.entry && !items[0].suppress) return parts.join("; ");
-  return style === "ieee" ? `[${parts.join("; ")}]` : `(${parts.join("; ")})`;
+  return style === "ieee" ? `[${parts.join("], [")}]` : `(${parts.join("; ")})`;
 }
+function givenFirst(name: string): string {
+  const [family, ...given] = name.split(",");
+  return given.length ? `${given.join(",").trim()} ${family.trim()}` : name.trim();
+}
+function ieeeName(name: string): string {
+  const [family, ...given] = name.split(",");
+  if (!given.length) return family.trim();
+  const initials = given.join(" ").trim().split(/\s+/).filter(Boolean).map(part => `${part[0].toUpperCase()}.`).join(" ");
+  return `${initials} ${family.trim()}`;
+}
+function authorList(names: string[]): string {
+  if (names.length < 2) return names[0] || "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+function period(value: string): string { return value && !/[.?]$/.test(value) ? `${value}.` : value; }
 export function referenceLine(entry: Entry, style: CitationStyle): string {
   const full = entry.authorsFull;
+  const year = entry.year || "n.d.";
+  if (style === "ieee") {
+    const fields = [authorList(full.map(ieeeName)), entry.title, entry.container, year].filter(Boolean);
+    return period(fields.join(", "));
+  }
   const authors = style === "apa" && full.length > 1
     ? `${full.slice(0, -1).join(", ")}, & ${full[full.length - 1]}`
-    : full.join(", ");
-  const year = entry.year || "n.d.";
-  return [authors, style === "apa" ? `(${year}).` : `${year}.`, entry.title ? `${entry.title}.` : "", entry.container ? `${entry.container}.` : ""].filter(Boolean).join(" ");
+    : style === "chicago" && full.length === 2 ? `${full[0]}, and ${givenFirst(full[1])}`
+    : style === "chicago" ? authorList(full.map((name, i) => i ? givenFirst(name) : name)) : full.join(", ");
+  return [style === "apa" ? authors : period(authors), style === "apa" ? `(${year}).` : period(year), period(entry.title), period(entry.container)].filter(Boolean).join(" ");
 }
 export function sortForStyle(keys: string[], entries: Map<string, Entry>, style: CitationStyle): string[] {
   return style === "ieee" ? [...keys] : [...keys].sort((a, b) => (entries.get(a)?.authorsFull[0] || entries.get(a)?.title || a).localeCompare(entries.get(b)?.authorsFull[0] || entries.get(b)?.title || b) || a.localeCompare(b));
