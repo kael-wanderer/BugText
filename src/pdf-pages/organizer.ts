@@ -17,13 +17,13 @@ export function createOrganizer(doc: Document, deps: OrganizerDeps): Organizer {
   element.className = "pdf-organizer"; toolbar.className = "pdf-organizer-toolbar"; grid.className = "pdf-organizer-grid"; status.className = "pdf-organizer-status";
   toolbar.setAttribute("role", "toolbar"); toolbar.setAttribute("aria-label", "Organize pages"); grid.setAttribute("role", "listbox"); grid.setAttribute("aria-label", "Pages"); grid.setAttribute("aria-multiselectable", "true"); message.setAttribute("role", "status");
   const counter = make("span"); status.append(counter, message); element.append(toolbar, grid, status);
-  let history: History = { past: [], present: initialPlan(deps.selfCount), future: [] }; let selected = new Set<string>(); let focus = 0, anchor = 0, dragging: string[] = []; let busy = false, destroyed = false;
+  let history: History = { past: [], present: initialPlan(deps.selfCount), future: [] }; let selected = new Set<string>(); let focus = 0, anchor = 0, dragging: string[] = [], suppressClick = false; let busy = false, destroyed = false;
   const thumbs = createThumbs(async key => { const page = history.present.pages.find(p => p.key === key); if (!page) return null; const source = page.source === "self" ? "self" : history.present.inserts.get(page.source); return source ? deps.thumb(source, page.index, 120) : null; });
   const keys = () => history.present.pages.filter(p => selected.has(p.key)).map(p => p.key);
   function notify(text: string) { message.textContent = text; }
   function apply(plan: PagePlan) { history = historyPush(history, plan); selected = new Set(keys()); render(); }
   function action(fn: () => void) { if (!deps.readOnly && !busy) fn(); }
-  function move(delta: number) { const indices = history.present.pages.flatMap((p, i) => selected.has(p.key) ? [i] : []); if (!indices.length) return; apply(movePages(history.present, keys(), delta < 0 ? indices[0] - 1 : indices[indices.length - 1] + 2)); }
+  function move(delta: number) { const indices = history.present.pages.flatMap((p, i) => selected.has(p.key) ? [i] : []); if (!indices.length) return; const next = movePages(history.present, keys(), delta < 0 ? indices[0] - 1 : indices[indices.length - 1] + 2); focus = Math.max(0, next.pages.findIndex(p => selected.has(p.key)) + (delta < 0 ? 0 : indices.length - 1)); apply(next); }
   function rotate(delta: 90 | -90) { apply(rotatePages(history.present, keys(), delta)); }
   function remove() { const next = deletePages(history.present, keys()); if ("error" in next) notify(next.error); else { apply(next); selected.clear(); render(); } }
   async function add(paths: string[], index: number) {
@@ -56,7 +56,7 @@ export function createOrganizer(doc: Document, deps: OrganizerDeps): Organizer {
   ];
   button("Close", () => { void close(); });
   const copy = button("Save as Copy…", () => { if (!deps.readOnly) void deps.saveCopy(history.present); });
-  const saveButton = button("Save", () => { void (async () => { if (await save()) deps.close(); })(); });
+  const saveButton = button("Save", () => { void (async () => { if (await save()) deps.close(); })(); }, () => !isChanged(history.present));
   controls.push(copy, saveButton);
   function select(index: number, meta: boolean, shift: boolean) {
     const pages = history.present.pages; if (shift) { selected.clear(); for (let i = Math.min(anchor, index); i <= Math.max(anchor, index); i++) selected.add(pages[i].key); }
@@ -64,8 +64,40 @@ export function createOrganizer(doc: Document, deps: OrganizerDeps): Organizer {
     else { selected = new Set([pages[index].key]); anchor = index; }
     focus = index; render(true);
   }
+  // Pointer-driven drag: in the app's webview an HTML5 drag becomes a native file drag that
+  // never reaches the page, so the whole gesture stays in pointer events.
+  function dropIndexAt(x: number, y: number): number | null {
+    const hit = (doc.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>(".pdf-organizer-slot, .pdf-organizer-tail");
+    if (!hit || !grid.contains(hit)) return null;
+    const index = Number(hit.dataset.index); if (hit.classList.contains("pdf-organizer-tail")) return index;
+    const box = hit.getBoundingClientRect(); return x > box.left + box.width / 2 ? index + 1 : index;
+  }
+  function markDrop(index: number | null) {
+    grid.querySelectorAll(".drop-before").forEach(el => el.classList.remove("drop-before"));
+    if (index !== null) grid.querySelector(`[data-index="${index}"]`)?.classList.add("drop-before");
+  }
+  function startDrag(down: PointerEvent, key: string) {
+    if (down.button !== 0 || deps.readOnly || busy || down.metaKey || down.ctrlKey || down.shiftKey) return;
+    let started = false, target: number | null = null;
+    const moveHandler = (e: PointerEvent) => {
+      if (!started && Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 6) return;
+      if (!started) { started = true; if (!selected.has(key)) { selected = new Set([key]); render(); } dragging = keys(); grid.classList.add("dragging"); }
+      target = dropIndexAt(e.clientX, e.clientY); markDrop(target);
+    };
+    const end = (e: PointerEvent) => {
+      doc.removeEventListener("pointermove", moveHandler); doc.removeEventListener("pointerup", end); doc.removeEventListener("pointercancel", end);
+      if (!started) return;
+      suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+      grid.classList.remove("dragging"); markDrop(null);
+      const moving = dragging; dragging = [];
+      if (e.type === "pointerup" && target !== null && moving.length) action(() => apply(movePages(history.present, moving, target!)));
+    };
+    doc.addEventListener("pointermove", moveHandler); doc.addEventListener("pointerup", end); doc.addEventListener("pointercancel", end);
+  }
   function render(restoreFocus = false) {
     if (destroyed) return;
+    // Rebuilding the grid drops the focused thumbnail; keep keyboard work going after each edit.
+    if (grid.contains(doc.activeElement)) restoreFocus = true;
     focus = Math.max(0, Math.min(focus, history.present.pages.length - 1));
     selected = new Set(keys()); grid.replaceChildren();
     for (const [i, page] of history.present.pages.entries()) {
@@ -74,21 +106,17 @@ export function createOrganizer(doc: Document, deps: OrganizerDeps): Organizer {
       preview.setAttribute("role", "option"); preview.setAttribute("aria-selected", String(selected.has(page.key))); preview.tabIndex = i === focus ? 0 : -1;
       const insert = page.source === "self" ? null : history.present.inserts.get(page.source);
       preview.setAttribute("aria-label", `Page ${i + 1}, ${insert ? `from ${insert.name}` : `original page ${page.index + 1}`}${page.rotation ? `, rotated ${page.rotation}°` : ""}`);
-      preview.draggable = !deps.readOnly; wrap.style.transform = `rotate(${page.rotation}deg)`; if (page.rotation % 180) preview.classList.add("landscape");
+      wrap.style.transform = `rotate(${page.rotation}deg)`; if (page.rotation % 180) preview.classList.add("landscape");
       preview.append(wrap); slot.append(preview); thumbs.observe(wrap, page.key);
       label.textContent = `${i + 1}${!insert && page.index !== i ? ` (was ${page.index + 1})` : ""}`; slot.append(label);
       if (page.rotation) { const badge = make("span", `${page.rotation}°`); badge.className = "pdf-organizer-badge"; slot.append(badge); }
       if (insert) { const badge = make("span", insert.name); badge.className = "pdf-organizer-source"; badge.title = insert.path; slot.append(badge); }
-      preview.onclick = e => select(i, e.metaKey || e.ctrlKey, e.shiftKey);
-      preview.ondragstart = e => { if (!selected.has(page.key)) { selected = new Set([page.key]); } dragging = keys(); e.dataTransfer?.setData("text/plain", "pages"); };
-      slot.ondragover = e => { e.preventDefault(); slot.classList.add("drop-before"); };
-      slot.ondragleave = () => slot.classList.remove("drop-before");
-      slot.ondrop = e => { e.preventDefault(); slot.classList.remove("drop-before"); if (dragging.length) action(() => apply(movePages(history.present, dragging, i))); dragging = []; };
+      preview.onclick = e => { if (suppressClick) { suppressClick = false; return; } select(i, e.metaKey || e.ctrlKey, e.shiftKey); };
+      preview.addEventListener("pointerdown", e => startDrag(e as PointerEvent, page.key));
       grid.append(slot);
     }
     const tail = make("div"); tail.className = "pdf-organizer-tail"; tail.dataset.index = String(history.present.pages.length);
-    tail.ondragover = e => { e.preventDefault(); tail.classList.add("drop-before"); }; tail.ondragleave = () => tail.classList.remove("drop-before");
-    tail.ondrop = e => { e.preventDefault(); tail.classList.remove("drop-before"); if (dragging.length) action(() => apply(movePages(history.present, dragging, history.present.pages.length))); dragging = []; }; grid.append(tail);
+    grid.append(tail);
     counter.textContent = `${history.present.pages.length} pages · ${selected.size} selected · ${history.past.length} ${history.past.length === 1 ? "change" : "changes"}`;
     if (deps.readOnly) notify(deps.readOnly);
     for (const control of controls) control.el.disabled = !!deps.readOnly || control.disabled();

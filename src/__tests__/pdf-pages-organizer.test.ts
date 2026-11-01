@@ -30,3 +30,29 @@ it("renders inserted names as text and rejects non-PDF drops", async () => {
 it("disables edits in read-only mode", () => {
   const { organizer } = setup("Encrypted"); expect(button(organizer.element, "Save").disabled).toBe(true); expect(button(organizer.element, "Extract…").disabled).toBe(true); expect(organizer.element.textContent).toContain("Encrypted"); organizer.destroy();
 });
+it("keeps keyboard focus on the moved page and enables Save only after a change", () => {
+  const { organizer } = setup(); expect(button(organizer.element, "Save").disabled).toBe(true);
+  options(organizer.element)[1].focus(); options(organizer.element)[1].click();
+  document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, altKey: true, key: "ArrowLeft" }));
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("Page 1, original page 2");
+  document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, metaKey: true, key: "]" }));
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("Page 1, original page 2, rotated 90°");
+  expect(button(organizer.element, "Save").disabled).toBe(false); organizer.destroy();
+});
+it("reorders pages by pointer drag without HTML5 drag and drop", () => {
+  // jsdom has no PointerEvent; a MouseEvent carries the same fields the organizer reads.
+  const PointerEvent = MouseEvent;
+  const { organizer } = setup(); const items = options(organizer.element);
+  expect(items[0].draggable).toBe(false);
+  // The grid re-renders when the drag starts, so the hit test must return the live slot.
+  document.elementFromPoint = () => {
+    const target = organizer.element.querySelector<HTMLElement>('[data-index="3"]')!;
+    target.getBoundingClientRect = () => ({ left: 0, width: 100, top: 0, height: 100, right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}) });
+    return target;
+  };
+  items[0].dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+  document.dispatchEvent(new PointerEvent("pointermove", { clientX: 20, clientY: 20 }));
+  document.dispatchEvent(new PointerEvent("pointerup", { clientX: 20, clientY: 20 }));
+  expect(options(organizer.element).map(o => o.getAttribute("aria-label"))[2]).toBe("Page 3, original page 1");
+  organizer.destroy();
+});
