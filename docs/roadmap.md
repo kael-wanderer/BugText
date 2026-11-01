@@ -177,14 +177,15 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 
 - ✅ Daily note (⇧⌘D).
 - ✅ Status bar.
-- 🔜 Empty states and first-run hint.
-- 🔜 Hover preview on links.
-- 🔜 Focus / zen mode and typewriter scrolling.
-- 🔜 Unlinked mentions.
+- ✅ Empty states and first-run hint.
+- ✅ Hover preview on links.
+- ✅ Focus / zen mode and typewriter scrolling.
+- ✅ Unlinked mentions.
 
 ### Tier 3 features
 
 - ✅ Table view over properties.
+- ✅ Table view editing: cell edits, row selection, reviewed bulk changes, hide and add columns.
 - ✅ Graph view.
-- 🔜 Citations.
-- 🔜 Spell check.
+- ✅ Citations: Pandoc-style keys, BibTeX/CSL JSON bibliography, Insert Citation (⌥⌘K) and completion, preview with References, PDF/DOCX export through citeproc (Chicago, APA, IEEE).
+- ✅ Spell check: system dictionary underlines, suggestions, Ignore and Learn.

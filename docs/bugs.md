@@ -44,6 +44,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-036 | 2026-10-27 | Export / PDF | Major | — | PDF export fails on Mermaid diagrams: Typst cannot find the SVG Pandoc wrote (doubled temp path) | fixed (0.3.5) |
 | BUG-037 | 2026-10-27 | Editor / external changes | Major | — | An edit made just as BugText regains focus could be replaced by the file on disk | fixed (unreleased) |
 | BUG-038 | 2026-10-27 | Export / PNG, SVG | Major | — | Image export of a Markdown note failed with images, or came out blank | fixed (unreleased) |
+| BUG-039 | 2026-11-01 | Editor / Spell check | Minor | — | Spell check underlined whole lines of correctly spelled text | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -282,6 +283,20 @@ table and a detail block below. Reference the failing test-case ID.
 - **Notes:** Three causes, all older than M4: the capture SVG embedded `body.innerHTML`, which is HTML (`<img …>`), not XML, so the SVG image failed to load; the slide "artboard" detection took a Mermaid diagram as the page size; and the exported page kept the renderer's off-screen `position: fixed; left: -10000px`, which Pandoc ignores but the capture draws.
 - **Fix:** Serialize foreignObject content with `XMLSerializer`; skip artboard detection for Markdown captures; drop the render-only style before serializing.
 - **Status:** fixed (unreleased). Remote https images still show alt text in captures (an SVG image cannot fetch remote files).
+
+### BUG-039 — Spell check underlined whole lines
+
+- **Feature / test case:** Editor / Spell check
+- **Severity:** Minor
+- **Environment:** macOS, citations branch native check (before 922a5cb)
+- **Steps to reproduce:**
+  1. Turn on Edit ▸ Check Spelling While Typing.
+  2. Type a correctly spelled paragraph (for example a citation line).
+- **Expected:** Only misspelled words are underlined.
+- **Actual:** The whole line was underlined.
+- **Notes:** `NSSpellChecker` text checking also returns an orthography result covering the whole range; it was treated as a misspelling.
+- **Fix:** Keep only results of type `NSTextCheckingType::Spelling` (b476f78, merged in 922a5cb).
+- **Status:** fixed (unreleased).
 
 ### BUG-000 (example — delete me)
 
