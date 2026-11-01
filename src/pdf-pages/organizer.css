@@ -1,0 +1,12 @@
+.pdf-organizer{display:flex;flex-direction:column;min-height:0;flex:1;color:var(--fg);background:var(--bg);font-size:var(--ui-size,13px)}
+.pdf-organizer-toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px;border-bottom:1px solid var(--border)}
+.pdf-organizer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));align-content:start;gap:18px;padding:18px;overflow:auto;min-height:0;flex:1}
+.pdf-organizer-slot{position:relative;display:grid;justify-items:center;gap:6px;min-width:0}
+.pdf-organizer-preview{display:grid;place-items:center;width:120px;height:155px;background:white;border:2px solid transparent;border-radius:3px;box-shadow:0 1px 4px #0003;cursor:grab}
+.pdf-organizer-preview[aria-selected="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.pdf-organizer-preview.landscape{width:135px;height:125px}
+.pdf-organizer-thumb{width:120px;transition:transform .18s ease}.pdf-organizer-thumb canvas{display:block;width:100%;height:auto}
+.pdf-organizer-badge,.pdf-organizer-source{font-size:.85em;color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-organizer-tail{min-height:100px}.pdf-organizer-slot.drop-before:before,.pdf-organizer-tail.drop-before:before{content:"";position:absolute;left:-8px;top:0;bottom:0;width:3px;background:var(--accent)}.pdf-organizer-tail{position:relative}
+.pdf-organizer-status{display:flex;justify-content:space-between;gap:12px;padding:6px 12px;border-top:1px solid var(--border);color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.pdf-organizer-thumb{transition:none}}
