@@ -304,3 +304,10 @@ Check Spelling While Typing control the feature.
 Writing goals use a `word_goal` note property read by a YAML-free scanner. Session
 goals are per native window and live only in memory; reloads rebase their counts.
 The goal popover and property writer load lazily and edit through the active editor.
+
+Presentation mode snapshots a Markdown note when started. It splits at standalone
+`---` breaks outside frontmatter and fenced code, or at headings when no break is
+present; `present_split` can select rule or heading levels. `<!-- notes: … -->`
+comments supply plain-text speaker notes. The slide overlay stays in the note's
+window; `presenter.html` is a separate entry with only event and close permissions.
+The running snapshot does not receive live updates.
