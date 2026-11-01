@@ -1,3 +1,4 @@
+import { spellExtension, misspellingAt, refreshSpelling } from "./spell/extension";
 import { typewriterExtension } from "./editor-typewriter";
 import { cursorPosition } from "./status-bar/model";
 import { applyPropertyEdit } from "./properties/write";
@@ -83,6 +84,9 @@ export type EditorHandle = {
   setText(text: string): void;
   setTextFor(id: string, text: string): void;
   setTypewriter(on: boolean): void;
+  setSpellCheck(on: boolean): void;
+  misspellingAtPoint(x: number, y: number): { from: number; to: number; word: string } | null;
+  refreshSpelling(): void;
   setSoftWrap(on: boolean): void;
   setSoftWrapMode(mode: SoftWrapMode, column: number): void;
   setLineNumbers(on: boolean): void;
@@ -246,6 +250,9 @@ export function createEditor(
   const livePreviewExt = (): Extension => (livePreviewModule ? livePreviewModule.livePreviewExtension() : []);
   const live = new Compartment();
   const typewriter = new Compartment();
+  const spell = new Compartment();
+  let spellOn = true;
+  const spellFor = (kind: EditorDocumentKind | undefined): Extension => spellOn && (kind === "markdown" || kind === "plain") ? spellExtension(kind) : [];
   let typewriterOn = false;
   const kinds = new Map<string, EditorDocumentKind>();
 
@@ -272,6 +279,8 @@ export function createEditor(
   ): Extension[] => [
     gutter.of(lineNums ? lineNumbers() : []),
     typewriter.of(typewriterOn ? typewriterExtension() : []),
+    spell.of(spellFor(kind)),
+    EditorView.contentAttributes.of({ spellcheck: "false", autocorrect: "off", autocapitalize: "off" }),
     live.of(livePreview && kind === "markdown" ? livePreviewExt() : []),
     history(),
     drawSelection(),
@@ -334,6 +343,7 @@ export function createEditor(
       effects: [
         wrap.reconfigure(wrapExtension()),
         typewriter.reconfigure(typewriterOn ? typewriterExtension() : []),
+        spell.reconfigure(spellFor(activeId ? kinds.get(activeId) : undefined)),
         gutter.reconfigure(lineNums ? lineNumbers() : []),
         live.reconfigure(livePreview && activeId && kinds.get(activeId) === "markdown" ? livePreviewExt() : []),
       ],
@@ -375,7 +385,7 @@ export function createEditor(
       kinds.set(id, kind);
       if (id === activeId) {
         view.dispatch({
-          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : [])],
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : []), spell.reconfigure(spellFor(kind))],
         });
         return;
       }
@@ -384,7 +394,7 @@ export function createEditor(
       states.set(
         id,
         state.update({
-          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : [])],
+          effects: [language.reconfigure(languageExtension(kind, id)), live.reconfigure(livePreview && kind === "markdown" ? livePreviewExt() : []), spell.reconfigure(spellFor(kind))],
         }).state,
       );
     },
@@ -505,6 +515,9 @@ export function createEditor(
       states.set(id, transaction.state);
       if (transaction.docChanged) changed(id, transaction.state.doc.toString());
     },
+    setSpellCheck(on) { if (spellOn !== on) { spellOn = on; reapplyToggles(); } },
+    misspellingAtPoint(x, y) { const pos = view.posAtCoords({ x, y }); return pos === null ? null : misspellingAt(view.state, pos); },
+    refreshSpelling() { refreshSpelling(view); },
     setTypewriter(on) {
       if (typewriterOn === on) return;
       typewriterOn = on; reapplyToggles();

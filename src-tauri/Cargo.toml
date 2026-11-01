@@ -35,5 +35,5 @@ rustls = { version = "0.23", default-features = false, features = ["ring"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSMenu", "NSMenuItem", "NSResponder"] }
-objc2-foundation = { version = "0.3", features = ["NSData", "NSString"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSMenu", "NSMenuItem", "NSResponder", "NSSpellChecker"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSString", "NSRange", "NSArray", "NSTextCheckingResult", "NSOrthography", "NSDictionary"] }

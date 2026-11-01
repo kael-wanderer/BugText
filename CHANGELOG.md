@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- macOS spelling feedback in Markdown and plain text, with suggestions, session ignore, dictionary learning and a setting in Editing.
 - Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.
 - The Links tab finds unlinked mentions and lets you review and link them, with Recovery snapshots for closed notes.
 - Large folders refresh less often while preserving open-file checks; Settings ▸ General controls the mode and performance diagnostics are available from the status bar and command palette.

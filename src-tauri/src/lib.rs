@@ -35,6 +35,7 @@ mod mcp_paths;
 mod mcp_protocol;
 mod mcp_server;
 mod menu;
+mod spell;
 mod native_windows;
 mod pdf_drafts;
 mod pdf_annotations;
@@ -115,6 +116,7 @@ fn sync_view_menu(
     sync_scroll: bool,
     show_status_bar: bool,
     typewriter: bool,
+    spell_check: bool,
     focus_mode: bool,
 ) {
     let set = |id: String, on: bool| {
@@ -141,6 +143,7 @@ fn sync_view_menu(
     set("view.sync_scroll".into(), sync_scroll);
     set("view.status_bar".into(), show_status_bar);
     set("view.typewriter".into(), typewriter);
+    set("edit.spell_check".into(), spell_check);
     set("view.focus_mode".into(), focus_mode);
 }
 
@@ -238,6 +241,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            spell::spell_check,
+            spell::spell_suggest,
+            spell::spell_ignore,
+            spell::spell_learn,
             git_action::git_action,
             git::git_repo,
             git::git_status,

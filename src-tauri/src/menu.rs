@@ -208,6 +208,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&table_item("table.delete", "Delete Table")?)
         .build()?;
+    let spell_check = CheckMenuItemBuilder::with_id("edit.spell_check", "Check Spelling While Typing").checked(true).build(app)?;
     let edit_menu = SubmenuBuilder::new(app, "Edit")
         .undo()
         .redo()
@@ -224,6 +225,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&extract_note)
         .item(&show_tasks)
         .item(&table_menu)
+        .separator()
+        .item(&spell_check)
         .build()?;
 
     let toggle_explorer = MenuItemBuilder::with_id("view.toggle_explorer", "Show/Hide Explorer")
