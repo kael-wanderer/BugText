@@ -15,3 +15,14 @@ Acceptance mapping (native checks are still pending):
 11. Native: on display 2 inspect underline appearance in light and dark, right-click suggestions, Learn persistence and setting/menu synchronization.
 
 The startup index chunk grew from 881.33 kB to 886.89 kB (5.56 kB).
+
+## Native checks (2026-11-01, display 2)
+
+- Passed (dark/Nord): underlines on prose and link text; none in front matter, inline code, link target, bare URL, `$math$` or fenced code.
+- Passed: right-click menu shows suggestions, Ignore Spelling, Learn Spelling, then AI; choosing a suggestion replaces the word.
+- Passed (owner, built app): ⌘N, type "The recieve word.", choose "receive", one ⌘Z restores only the word. An earlier merged-undo result came from the test tool pasting twice.
+- Not a bug: the bare start pane (no tab) has no spell check, same as live preview.
+- Passed (built app): Ignore removes the word in every open note and returns after restart; Learn persists across restart (macOS stores it in the AppleSpell group container); test word unlearned afterwards.
+- Passed: Edit menu toggle off removes underlines, clears the check and writes `spellCheck: false`; the Settings switch reflects it; turning it on in Settings restores the menu check and underlines.
+- Passed: underlines readable in Light and GitHub Light; a PDF tab shows no underlines; "No Guesses Found" shows for a nonsense word.
+- Not run: palette/search input regression and 5,000-line typing (background input stopped reaching the window).
