@@ -3,7 +3,7 @@ import { findFrontMatter, readProperties } from "./parse";
 
 export type PropertyEdit = { from: number; to: number; insert: string };
 
-function validKey(key: string): boolean {
+export function validKey(key: string): boolean {
   return key.trim() === key && !!key && !/[\r\n]/.test(key) && !key.startsWith(":");
 }
 function validValue(value: unknown): boolean {
