@@ -46,6 +46,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Spell checking no longer underlines entire lines when macOS returns language-detection results.
 - Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").
 - Unlinked Mentions no longer draws a second divider above its heading.
 - Source Control: the Commit button says "Commit" instead of "Commit 0 files" when nothing is checked, and the conflict banner offers Open file for the selected conflicted file.
