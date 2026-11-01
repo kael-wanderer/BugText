@@ -2,6 +2,7 @@
 .goal-ring circle { fill: none; stroke-width: 2; }
 .goal-ring .track { stroke: var(--border); }
 .goal-ring .progress { stroke: var(--muted); }
+.status-bar button:has(> .goal-ring) { display: inline-flex; align-items: center; gap: 6px; }
 .status-bar .done { color: var(--accent); font-weight: 600; }
 .status-bar .done .progress { stroke: var(--accent); }
 .goal-popover { position: fixed; z-index: 1000; width: min(300px, calc(100vw - 16px)); box-sizing: border-box; padding: 16px; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 30px #0004; }

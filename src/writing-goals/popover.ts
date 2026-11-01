@@ -43,7 +43,9 @@ export function openGoalPopover(options: GoalPopoverOptions): () => void {
   document.body.append(panel);
   const rect = options.anchor.getBoundingClientRect(), box = panel.getBoundingClientRect();
   panel.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - box.width - 8))}px`;
-  panel.style.top = `${Math.max(8, rect.top - box.height - 8)}px`;
+  // Anchor by the bottom edge so error lines grow the panel upward, away from the anchor.
+  if (rect.top - box.height - 8 >= 8) panel.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+  else panel.style.top = "8px";
   let closed = false;
   function close(): void { if (closed) return; closed = true; document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", key, true); panel.remove(); options.anchor.focus(); }
   function outside(event: Event): void { if (!panel.contains(event.target as Node) && !options.anchor.contains(event.target as Node)) close(); }
