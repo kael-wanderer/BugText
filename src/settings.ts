@@ -72,6 +72,7 @@ export type Settings = {
   syncScroll: boolean;
   showStatusBar: boolean;
   writingGoals: { readingTime: boolean };
+  presentation: { notesSize: number; presenterWindow: { x: number; y: number; width: number; height: number } | null };
   main: ZoneSettings;
   sub: ZoneSettings;
   keymap: Record<string, string>;
@@ -114,6 +115,7 @@ export const DEFAULT_SETTINGS: Settings = {
   syncScroll: false,
   showStatusBar: true,
   writingGoals: { readingTime: false },
+  presentation: { notesSize: 20, presenterWindow: null },
   main: { font: "", size: 15 },
   sub: { font: "", size: 15 },
   keymap: {},
@@ -241,6 +243,14 @@ export function tryParseSettings(raw: string): Settings | null {
   return parseSettings(raw);
 }
 
+function parsePresentation(raw: unknown): Settings["presentation"] {
+  const value = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+  const notesSize = typeof value.notesSize === "number" && Number.isFinite(value.notesSize) ? Math.max(14, Math.min(32, value.notesSize)) : 20;
+  const rect = value.presenterWindow && typeof value.presenterWindow === "object" ? value.presenterWindow as Record<string, unknown> : null;
+  const valid = rect && [rect.x, rect.y, rect.width, rect.height].every(n => typeof n === "number" && Number.isFinite(n)) && (rect.width as number) > 0 && (rect.height as number) > 0;
+  return { notesSize, presenterWindow: valid ? { x: rect.x as number, y: rect.y as number, width: rect.width as number, height: rect.height as number } : null };
+}
+
 export function parseSettings(raw: string): Settings {
   let data: Record<string, unknown>;
   try {
@@ -300,6 +310,7 @@ export function parseSettings(raw: string): Settings {
     wrapColumn,
     syncScroll: data.syncScroll === true,
     showStatusBar: data.showStatusBar !== false,
+    presentation: parsePresentation(data.presentation),
     writingGoals: { readingTime: (data.writingGoals as { readingTime?: unknown } | undefined)?.readingTime === true },
     explorer: parseZone(data.explorer, DEFAULT_SETTINGS.explorer),
     // Missing means an older file: keep showing everything, as before the setting.

@@ -84,6 +84,7 @@ export type WindowHandlers = {
   onPdfEditDirtyChange: (windowId: string, tabId: string, dirty: boolean) => void;
   onSave: (windowId: string) => void;
   onOpen: (windowId: string) => void;
+  onPresent?: (windowId: string) => void;
   onThemeChange: (theme: ThemeName) => void;
   getTheme: () => ThemeName;
   getCitationStyle?: () => "chicago" | "apa" | "ieee";
@@ -157,6 +158,7 @@ export function createWindowView(
           <button class="wt-btn wt-preview-reset" data-preview-zoom="reset" type="button" title="Reset preview zoom (⌘0)">100%</button>
           <button class="wt-btn wt-preview-zoom" data-preview-zoom="in" type="button" title="Zoom preview in (⌘+)">+</button>
         </div>
+        <button class="wt-btn wt-present" type="button" title="Present">Present</button>
         <button class="wt-btn wt-icon wt-lines" type="button" title="Line numbers">${glyphs.lineNumbers}</button>
         ${
           isMain
@@ -381,6 +383,7 @@ export function createWindowView(
   root.querySelectorAll<HTMLElement>("[data-mode]").forEach((btn) =>
     btn.addEventListener("click", () => h.onSetMode(windowId, btn.dataset.mode as ViewMode))
   );
+  root.querySelector(".wt-present")!.addEventListener("click", () => h.onPresent?.(windowId));
   root.querySelector(".wt-lines")!.addEventListener("click", () => h.onToggleLineNumbers());
   root.querySelector(".wt-sub")?.addEventListener("click", () => h.onToggleSub());
   root.querySelector(".wt-subclose")?.addEventListener("click", () => h.onToggleSub());
@@ -592,6 +595,7 @@ export function createWindowView(
     if (!tableHost.hidden) h.renderTable?.(tableHost);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
+    root.querySelector<HTMLElement>(".wt-present")!.hidden = !markdownCard;
     if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
       cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card?.reset();
     }

@@ -19,7 +19,7 @@ pub fn remember_focus(app: &AppHandle, label: &str) {
 pub fn focused_window(app: &AppHandle) -> Option<WebviewWindow> {
     app.webview_windows()
         .into_values()
-        .find(|window| window.is_focused().unwrap_or(false))
+        .find(|window| window.label() != "presenter" && window.is_focused().unwrap_or(false))
         .or_else(|| {
             let label = app
                 .try_state::<FocusedWindowState>()?

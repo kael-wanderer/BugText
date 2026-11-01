@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Presentation mode: present a Markdown note as slides (⇧⌘P), with speaker notes, laser pointer, black screen and a presenter window.
 - Writing goals: a word target per note (`word_goal` property) or per session, with progress in the status bar and focus mode.
 - PDF page organization with reorder, rotation, deletion, insertion, extraction, and Recovery-backed in-place saves.
 - Citations from BibTeX and CSL JSON, with insertion and completion, styled preview references, and Pandoc citation export.
