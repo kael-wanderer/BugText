@@ -16,3 +16,12 @@ it("shows empty and generic error states and closes on Escape", () => {
   document.querySelector("input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   showCitationPicker({ result: { status: "none" }, insert: vi.fn() }); expect(document.body.textContent).toContain("No bibliography found.");
 });
+it("moves the active row with the arrow keys", () => {
+  const result: LibraryResult = { status: "ok", library: { path: "/references.bib", entries: new Map([["x", entry("x", "First")], ["y", entry("y", "Second")]]) } };
+  showCitationPicker({ result, insert: vi.fn() });
+  const input = document.querySelector("input")!;
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+  const rows = document.querySelectorAll(".citation-row");
+  expect(rows[0].classList.contains("active")).toBe(false);
+  expect(rows[1].classList.contains("active")).toBe(true);
+});
