@@ -1,3 +1,4 @@
+import { citationCompletionSource } from "../citations/complete";
 import { startCompletion, autocompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { markdownOutline } from "../outline";
 import { scanMarkdownLines } from "../markdown-blocks";
@@ -44,4 +45,4 @@ export function completionSource(id: string) {
     return { from, filter: false, options: rankItems(raw, s.index.notes(), (n) => n.path.slice(s.index.folder!.length + 1)).slice(0, 100).map((n) => ({ label: n.path.split("/").pop()!, detail: detail ?? n.path.slice(s.index.folder!.length + 1), apply: formatLinkTarget(note.path, n.path) + suffix })) };
   };
 }
-export const linkCompletion = (id: string) => autocompletion({ override: [completionSource(id)] });
+export const linkCompletion = (id: string) => autocompletion({ override: [completionSource(id), citationCompletionSource(id)] });

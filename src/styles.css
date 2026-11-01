@@ -3646,3 +3646,5 @@ body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidd
 .bugtext-references ul { list-style: none; padding: 0; }
 .bugtext-references ul li { padding-left: 2em; text-indent: -2em; }
 .bugtext-ref-flash { background: color-mix(in srgb, var(--accent) 20%, var(--bg-elev)); }
+.citation-picker .outline-row { display: grid; gap: 2px; text-align: left; }
+.citation-picker .outline-row small { opacity: .75; }

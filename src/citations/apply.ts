@@ -1,7 +1,7 @@
 import type { CitationStyle, LibraryResult } from "./csl-json";
-import { inText, parseSource, referenceLine, sortForStyle } from "./format";
 
-export function applyCitations(host: HTMLElement, result: LibraryResult, style: CitationStyle, options: { references: boolean; onJump?: (key: string) => void }): { cited: string[]; missing: string[] } {
+export async function applyCitations(host: HTMLElement, result: LibraryResult, style: CitationStyle, options: { references: boolean; onJump?: (key: string) => void }): Promise<{ cited: string[]; missing: string[] }> {
+  const { inText, parseSource, referenceLine, sortForStyle } = await import("./format");
   const cited: string[] = [], missing: string[] = [];
   const numbers = new Map<string, number>();
   const number = (key: string) => { if (!numbers.has(key)) numbers.set(key, numbers.size + 1); return numbers.get(key)!; };

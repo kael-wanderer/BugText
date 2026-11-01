@@ -889,7 +889,8 @@ export function createWindowView(
           };
           const result = await library.libraryFor(notePath, text, folder, deps);
           if (token !== previewRenderToken) return;
-          apply.applyCitations(article, result, h.getCitationStyle?.() ?? "chicago", { references: true });
+          await apply.applyCitations(article, result, h.getCitationStyle?.() ?? "chicago", { references: true });
+          if (token !== previewRenderToken) return;
           const recheck = async (): Promise<void> => {
             if (token !== previewRenderToken) return;
             if (getWindow(windowId)?.mode !== "editor") {

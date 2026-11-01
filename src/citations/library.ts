@@ -1,7 +1,6 @@
 import { readProperties } from "../properties/parse";
 import { parentPath } from "../paths";
-import { parseBibtex } from "./bibtex";
-import { parseCslJson, type Library, type LibraryResult } from "./csl-json";
+import type { Library, LibraryResult } from "./csl-json";
 
 export type LibraryDeps = { stat(path: string): Promise<{ mtimeMs: number; size: number } | null>; read(path: string, folder: string): Promise<string> };
 const cache = new Map<string, { mtimeMs: number; size: number; at: number; library: Library }>();
@@ -33,7 +32,7 @@ export async function libraryFor(notePath: string | null, text: string, folder: 
       if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) { cached.at = now; return { status: "ok", library: cached.library }; }
       const contents = await deps.read(path, folder);
       if (new TextEncoder().encode(contents).length > limit) return { status: "error" };
-      const entries = /\.bib$/i.test(path) ? parseBibtex(contents) : parseCslJson(contents);
+      const entries = /\.bib$/i.test(path) ? (await import("./bibtex")).parseBibtex(contents) : (await import("./csl-json")).parseCslJson(contents);
       const library = { path, entries: new Map(entries.map(entry => [entry.key, entry])) };
       cache.set(path, { ...stat, at: now, library });
       return { status: "ok", library };

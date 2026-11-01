@@ -40,6 +40,7 @@ import { applyRename } from "./links/rename-plan";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
+import { configureCitationCompletion } from "./citations/complete";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
@@ -1467,6 +1468,24 @@ function insertNoteLink(): void {
       if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the link again."); return; }
       editor.applyChanges(tab.id, [{ from: selection.from, to: selection.to, insert: text }]);
     },
+  });
+}
+
+async function loadCitationLibrary(path: string | null, text: string) {
+  const { libraryFor } = await import("./citations/library");
+  return libraryFor(path, text, getState().folder, {
+    stat: path => invoke<{ mtimeMs: number; size: number }>("file_stat", { path }).catch(() => null),
+    read: (path, folder) => invoke<string>("read_file", { path, folder }),
+  });
+}
+function insertCitation(): void {
+  const tab = activeMeta(); if (!tab || !isMarkdownFile(tab.path ?? tab.name)) return;
+  const editor = activeView().editor; const text = editor.getText(tab.id); const selection = editor.getSelection(); const revision = editor.revision(tab.id);
+  void Promise.all([import("./citations/picker"), loadCitationLibrary(tab.path, text)]).then(([picker, result]) => {
+    picker.showCitationPicker({ result, insert: key => {
+      if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the citation again."); return; }
+      editor.applyChanges(tab.id, [picker.citationInsertion(text, selection.from, selection.to, key)], { isolate: true });
+    } });
   });
 }
 
@@ -3612,6 +3631,13 @@ initExplorer(
   },
 );
 
+configureCitationCompletion({
+  enabled: () => currentSettings.links.complete,
+  load: async (id, text) => {
+    const tab = getState().windows.flatMap(w => w.tabs).find(t => t.id === id);
+    return loadCitationLibrary(tab?.path ?? null, text);
+  },
+});
 configureLinkCompletion({
   index: linkIndex,
   context: (id) => {
@@ -3828,6 +3854,7 @@ listenScoped<string>("menu", (event) => {
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
+    case "edit.insert_citation": return insertCitation();
     case "edit.open_link": {
       const tab = activeMeta();
       if (tab) followEditorLink(tab.id, activeView().editor.getText(tab.id), activeView().editor.getSelection().from);
