@@ -848,6 +848,7 @@ function commandItems(): PaletteItem[] {
     command("file.save_workspace", "Save Workspace As…", saveWorkspace),
     command("file.close_workspace", "Close Workspace", () => void workspaceController.close()),
     command("recover", "Recover unsaved documents", () => openRecoveryReview()),
+    command("pdf.organize_pages", "PDF: Organize Pages", () => { if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages."); }),
     command("close", "Close Tab", () => {
       if (activeView().closeGraph()) return;
       const windowState = activeWindow();
@@ -1924,6 +1925,10 @@ async function initNativeFileDrop(): Promise<void> {
     }
 
     const point = dropPoint(event.payload.position);
+    const organizerTarget = (document.elementFromPoint(point.x, point.y) as HTMLElement | null)?.closest(".pdf-organizer");
+    if (organizerTarget && views.get(windowAt(point))?.organizerDrop(event.payload.paths, point)) {
+      clearDropHighlight(); cancelDropExpansion(); return;
+    }
     const onAIPanel = (
       document.elementFromPoint(point.x, point.y) as HTMLElement | null
     )?.closest("#ai-panel");
@@ -3838,6 +3843,9 @@ listenScoped<string>("menu", (event) => {
       return void workspaceController.close();
     case "file.recover":
       return openRecoveryReview();
+    case "pdf.organize_pages":
+      if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages.");
+      return;
     case "file.close": {
       if (activeView().closeGraph()) return;
       const w = activeWindow();
@@ -3966,6 +3974,7 @@ const appKeyActions: Record<string, () => void> = {
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
   "ai.quick.outline": () => runQuickActionById("ai.quick.outline"),
   "file.recover": () => openRecoveryReview(),
+  "pdf.organize_pages": () => { if (!activeView().organizePdfPages()) showToast("Open a PDF to organize its pages."); },
   "file.close": () => {
     if (activeView().closeGraph()) return;
     const w = activeWindow();

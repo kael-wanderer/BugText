@@ -78,6 +78,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   // H highlights within the PDF view; it is intentionally not a global accelerator.
   { id: "pdf.copy_quote", label: "PDF: Copy Quote", category: "PDF", default: "CmdOrCtrl+Alt+C", scope: "app" },
   { id: "pdf.annotations", label: "PDF: Annotations", category: "PDF", default: "CmdOrCtrl+Shift+A", scope: "app" },
+  { id: "pdf.organize_pages", label: "PDF: Organize Pages", category: "PDF", default: "", scope: "menu" },
   { id: "palette.open", label: "Command Palette", category: "App", default: "CmdOrCtrl+K", scope: "app" },
   { id: "search.replace_in_folder", label: "Replace in Folder", category: "App", default: "CmdOrCtrl+Alt+F", scope: "app" },
   { id: "search.find_in_files", label: "Find in Folder", category: "App", default: "CmdOrCtrl+Shift+F", scope: "app" },
