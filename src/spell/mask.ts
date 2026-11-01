@@ -5,11 +5,12 @@ import { findFrontMatter } from "../properties/frontmatter";
 export const EXCLUDED_NODES = ["FencedCode", "CodeBlock", "InlineCode", "URL", "Autolink", "HTMLTag", "HTMLBlock", "Comment", "CommentBlock", "ProcessingInstruction", "LinkReference"] as const;
 const excluded = new Set<string>(EXCLUDED_NODES);
 
-export function spellMask(state: EditorState, from: number, to: number, kind: "markdown" | "plain"): string {
+export function spellMask(state: EditorState, from: number, to: number, kind: "markdown" | "plain"): string | null {
   const source = state.doc.sliceString(from, to);
   if (kind === "plain") return source;
   const tree = ensureSyntaxTree(state, to, 50);
-  if (!tree) return source.replace(/[^\n]/g, " ");
+  // Parser not caught up yet: the caller retries rather than caching a blank mask.
+  if (!tree) return null;
   const chars = source.split("");
   const mask = (start: number, end: number) => {
     for (let i = Math.max(from, start); i < Math.min(to, end); i++) if (chars[i - from] !== "\n") chars[i - from] = " ";

@@ -54,7 +54,9 @@ export function spellExtension(kind: "markdown" | "plain", checker: (text: strin
       const first = Math.max(1, state.doc.lineAt(this.view.viewport.from).number - 50);
       const last = Math.min(state.doc.lines, state.doc.lineAt(this.view.viewport.to).number + 50);
       const from = state.doc.line(first).from, to = state.doc.line(last).to;
-      const lines = spellMask(state, from, to, kind).split("\n");
+      const masked = spellMask(state, from, to, kind);
+      if (masked === null) { if (generation === this.generation) this.schedule(); return; }
+      const lines = masked.split("\n");
       const pending: { text: string; offset: number }[] = [];
       const seen = new Set<string>(); let size = 0;
       for (const line of lines) {

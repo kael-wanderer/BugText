@@ -9,7 +9,7 @@ const state = (doc: string) => EditorState.create({ doc, extensions: markdown() 
 describe("spell masking", () => {
   it("preserves offsets and checks prose and link text only", () => {
     const doc = '---\ntitle: recieve\n---\nrecieve [recieve](docs/recieve.md)\n```\nrecieve\n```\n\n    recieve\n\n`recieve` https://recieve.example <span title="recieve"> <!-- recieve -->\n$recieve$\n$$\nrecieve\n$$\ncosts $5 and $6';
-    const result = spellMask(state(doc), 0, doc.length, "markdown");
+    const result = spellMask(state(doc), 0, doc.length, "markdown")!;
     expect(result.length).toBe(doc.length);
     expect(result.match(/recieve/g)).toHaveLength(2);
     expect(result).toContain("costs $5 and $6");

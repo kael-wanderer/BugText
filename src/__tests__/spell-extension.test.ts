@@ -47,3 +47,12 @@ it("does not repopulate a cleared cache with an in-flight result", async () => {
   await tick(); spellCache.clear(); finish([[0, 7]]); await Promise.resolve();
   expect(spellCache.get("recieve")).toBeUndefined(); expect(view.dom.querySelector(".cm-misspelled")).toBeNull(); view.destroy();
 });
+
+it("does not cache lines from a failed check", async () => {
+  vi.useFakeTimers();
+  const flaky = vi.fn().mockRejectedValueOnce(new Error("failed")).mockImplementation(checker);
+  const view = new EditorView({ state: EditorState.create({ doc: "recieve", extensions: spellExtension("plain", flaky) }), parent: document.body });
+  await tick(); expect(spellCache.get("recieve")).toBeUndefined();
+  view.dispatch({ selection: { anchor: 1 } }); await tick();
+  expect(view.dom.querySelectorAll(".cm-misspelled")).toHaveLength(1); view.destroy();
+});
