@@ -186,6 +186,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let extract_note = MenuItemBuilder::with_id("edit.extract_note", "Extract Selection to Note…").build(app)?;
     let show_tasks = MenuItemBuilder::with_id("edit.show_tasks", "Tasks in Folder…").build(app)?;
+    let writing_goal = MenuItemBuilder::with_id("edit.writing_goal", "Set Writing Goal…").build(app)?;
     let table_item = |id: &str, label: &str| MenuItemBuilder::with_id(id, label).build(app);
     let align_menu = SubmenuBuilder::new(app, "Align Column")
         .item(&table_item("table.align_left", "Align Column Left")?)
@@ -228,6 +229,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&toggle_task)
         .item(&extract_note)
         .item(&show_tasks)
+        .item(&writing_goal)
         .item(&table_menu)
         .separator()
         .item(&spell_check)

@@ -40,6 +40,8 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "edit.toggle_task", label: "Toggle Task", category: "Edit", default: "CmdOrCtrl+Shift+X", scope: "menu" },
   { id: "edit.extract_note", label: "Extract Selection to Note", category: "Edit", default: "", scope: "menu" },
   { id: "edit.show_tasks", label: "Tasks in Folder", category: "Edit", default: "", scope: "menu" },
+  { id: "edit.writing_goal", label: "Set Writing Goal…", category: "Edit", default: "", scope: "menu" },
+  { id: "edit.clear_writing_goals", label: "Clear Writing Goals", category: "Edit", default: "", scope: "app" },
   { id: "view.live_preview", label: "Toggle Live Preview", category: "View", default: "", scope: "menu" },
   { id: "table.row_above", label: "Insert Row Above", category: "Table", default: "", scope: "menu" },
   { id: "table.row_below", label: "Insert Row Below", category: "Table", default: "CmdOrCtrl+Enter", scope: "menu" },

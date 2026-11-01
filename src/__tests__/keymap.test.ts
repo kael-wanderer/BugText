@@ -152,3 +152,8 @@ it("reserves distinct focus and typewriter shortcuts and matches Option by code"
   expect(conflictingIds({}).size).toBe(0);
   expect(matchAccelerator(key({ key: "†", code: "KeyT", metaKey: true, altKey: true }), "CmdOrCtrl+Alt+T")).toBe(true);
 });
+
+it("registers both writing goal commands", () => {
+  expect(KEYMAP_COMMANDS.find(command => command.id === "edit.writing_goal")).toMatchObject({ scope: "menu", default: "" });
+  expect(KEYMAP_COMMANDS.find(command => command.id === "edit.clear_writing_goals")).toMatchObject({ scope: "app", default: "" });
+});

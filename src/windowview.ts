@@ -60,7 +60,7 @@ export type WindowHandlers = {
   renderTable?: (host: HTMLElement) => void;
   livePreviewEnabled?: () => boolean;
   onStatusChange?: () => void;
-  onWordCount?: (tabId: string, count: number) => void;
+  onWordCount?: (tabId: string, count: number, text: string) => void;
   onKeepTab?: (windowId: string, tabId: string) => void;
   onActivateTab: (windowId: string, tabId: string) => void;
   onCloseTab: (windowId: string, tabId: string) => void;
@@ -718,7 +718,7 @@ export function createWindowView(
     const documentId = getWindow(windowId)?.activeTabId ?? null;
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
-    if (documentId) h.onWordCount?.(documentId, count);
+    if (documentId) h.onWordCount?.(documentId, count, text);
     const place = documentId && documentId === previewDocumentId && getWindow(windowId)?.mode !== "editor"
       ? capturePreviewPlace(previewPane) : null;
     const lineCount = text.split("\n").length;
