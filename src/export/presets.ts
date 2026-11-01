@@ -5,7 +5,7 @@ export type ExportPreset = {
   title: { mode: "none" | "first-heading" | "file-name"; author: string; date: "none" | "export" };
   contents: { toc: boolean; depth: number; numbered: boolean };
 };
-export type ExportSettings = { presets: ExportPreset[]; last: { pdf: string; docx: string } };
+export type ExportSettings = { presets: ExportPreset[]; last: { pdf: string; docx: string }; citationStyle?: "chicago" | "apa" | "ieee" };
 export type ExportFormat = "pdf" | "docx";
 
 const base: ExportPreset = { id: "standard", name: "Standard", builtIn: "standard", page: { size: "a4", marginMm: 25, numbers: "none" }, type: { font: null, sizePt: 11, lineSpacing: 1.15 }, title: { mode: "none", author: "", date: "none" }, contents: { toc: false, depth: 2, numbered: false } };
@@ -27,7 +27,7 @@ function valid(x: unknown): x is ExportPreset {
 export function parsePresets(raw: unknown): ExportSettings {
   const data = object(raw) ? raw : {};
   const last = object(data.last) ? data.last : {};
-  return { ...data, presets: Array.isArray(data.presets) ? data.presets.filter(valid) : [], last: { ...last, pdf: typeof last.pdf === "string" ? last.pdf : "standard", docx: typeof last.docx === "string" ? last.docx : "standard" } };
+  return { ...data, citationStyle: ["chicago", "apa", "ieee"].includes(data.citationStyle) ? data.citationStyle : "chicago", presets: Array.isArray(data.presets) ? data.presets.filter(valid) : [], last: { ...last, pdf: typeof last.pdf === "string" ? last.pdf : "standard", docx: typeof last.docx === "string" ? last.docx : "standard" } };
 }
 export function presetsFor(settings: ExportSettings): ExportPreset[] {
   return [...BUILT_IN_PRESETS.map(p => settings.presets.find(s => s.id === p.id && s.builtIn === p.builtIn) ?? p), ...settings.presets.filter(p => !p.builtIn)];

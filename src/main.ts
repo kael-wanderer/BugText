@@ -694,6 +694,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const raw = await getSettingsFile(FRESH_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
+      const citationChanged = next.export.citationStyle !== currentSettings.export.citationStyle;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       const hoverChanged = next.links.hoverPreview !== currentSettings.links.hoverPreview;
       const gitVisibilityChanged = next.git.showSourceControl !== currentSettings.git.showSourceControl;
@@ -710,6 +711,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       syncViewMenu();
       requestWindowMeasure();
       if (themeChanged) renderAll();
+      if (citationChanged) refreshCitationPreviews();
     } else if (file === "agent") {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
@@ -767,7 +769,15 @@ function openAISettings(): void {
   if (aiSettingsPath) void doOpenPath(aiSettingsPath);
 }
 
+function refreshCitationPreviews(): void {
+  for (const [wid, view] of views) {
+    const window = getWindow(wid); const tab = window?.tabs.find(t => t.id === window.activeTabId);
+    if (tab && isMarkdownFile(tab.path ?? tab.name)) view.renderPreview(view.editor.getText(tab.id), tab.path ?? tab.name);
+  }
+}
+
 function saveSettingsFromPanel(settings: Settings): void {
+  const citationChanged = settings.export.citationStyle !== currentSettings.export.citationStyle;
   const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   const gitVisibilityChanged = settings.git.showSourceControl !== currentSettings.git.showSourceControl;
@@ -783,6 +793,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   if (themeChanged) renderAll();
+  if (citationChanged) refreshCitationPreviews();
   void writeSettings(settings).catch(() => {});
 }
 
@@ -999,6 +1010,7 @@ const handlers = {
   },
   onThemeChange: (theme: ThemeName) => setMenuTheme(theme),
   getTheme: () => currentSettings.theme,
+  getCitationStyle: () => currentSettings.export.citationStyle ?? "chicago",
   onEditorContextMenu: async (wid: string, x: number, y: number) => {
     if (getState().activeWindowId !== wid) {
       const tab = getWindow(wid)?.tabs.find(tab => tab.id === getWindow(wid)?.activeTabId);
@@ -2095,6 +2107,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       if (isMac && currentSettings.appIcon !== previous.appIcon) {
         void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
       }
+      if (currentSettings.export.citationStyle !== previous.export.citationStyle) refreshCitationPreviews();
       if (currentSettings.theme !== previous.theme || currentSettings.darkTheme !== previous.darkTheme || currentSettings.lightTheme !== previous.lightTheme) renderAll();
       broadcastSettingsChange("settings");
     }

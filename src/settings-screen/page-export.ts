@@ -22,7 +22,12 @@ export const exportPage: SettingsPage = {
         if (info && !info.found) controls.append(button("Copy", () => { void deps.exportTools?.copy(`brew install ${name}`); }));
         host.append(row(`export-${name}`, label, null, controls));
       }
-      host.append(button("Check again", () => { void check(true); }), caption("Presets"));
+      host.append(button("Check again", () => { void check(true); }), caption("Citations"));
+      const citationStyle = document.createElement("select"); citationStyle.setAttribute("aria-label", "Citation style");
+      for (const [value, label] of [["chicago", "Chicago author-date"], ["apa", "APA 7th"], ["ieee", "IEEE"]]) { const option = document.createElement("option"); option.value = value; option.textContent = label; citationStyle.append(option); }
+      citationStyle.value = deps.getSettings().export.citationStyle ?? "chicago";
+      citationStyle.onchange = () => { const settings = deps.getSettings(); deps.onSettingsChange({ ...settings, export: { ...settings.export, citationStyle: citationStyle.value as "chicago" | "apa" | "ieee" } }); };
+      host.append(row("export.citationStyle", "Citation style", null, citationStyle), caption("Presets"));
       const settings = deps.getSettings().export; const presets = presetsFor(settings);
       let selected = presets.find(p => p.id === selectedId) ?? presets[0]; selectedId = selected.id;
       const picker = document.createElement("select"); picker.setAttribute("aria-label", "Export preset");

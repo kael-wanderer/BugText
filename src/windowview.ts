@@ -86,6 +86,7 @@ export type WindowHandlers = {
   onOpen: (windowId: string) => void;
   onThemeChange: (theme: ThemeName) => void;
   getTheme: () => ThemeName;
+  getCitationStyle?: () => "chicago" | "apa" | "ieee";
   onEditorContextMenu: (windowId: string, x: number, y: number) => void;
   /** Image files pasted into the editor; true when the paste was taken over. */
   onPasteImages: (windowId: string, tabId: string, files: File[]) => boolean;
@@ -296,6 +297,7 @@ export function createWindowView(
   let htmlPreviewContentSize: { width: number; height: number } | null = null;
   let lastMode: ViewMode | null = null;
   let previewRenderToken = 0;
+  let citationTimer: ReturnType<typeof setTimeout> | undefined;
   const findBar = root.querySelector<HTMLElement>(".preview-find")!;
   const findInput = findBar.querySelector<HTMLInputElement>("input")!;
   const findStatus =
@@ -420,6 +422,7 @@ export function createWindowView(
       if (!tab || !isMarkdownFile(tab.path ?? tab.name) || editor.getText(tab.id) !== source) return false;
       editor.applyPropertyEdit(tab.id, edit);
       clearTimeout(cardTimer);
+      clearTimeout(citationTimer);
       return true;
     }, () => getWindow(windowId)?.activeTabId ?? null);
     card.render();
@@ -707,6 +710,7 @@ export function createWindowView(
     text: string,
     pathOrName: string | null = null,
   ): void {
+    clearTimeout(citationTimer);
     const documentId = getWindow(windowId)?.activeTabId ?? null;
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
@@ -875,6 +879,30 @@ export function createWindowView(
       previewPane.appendChild(article);
       restorePlace();
       const token = previewRenderToken;
+      if (article.querySelector(".bugtext-cite")) {
+        const folder = getState().folder;
+        const notePath = pathOrName?.startsWith("/") ? pathOrName : null;
+        void Promise.all([import("./citations/library"), import("./citations/apply")]).then(async ([library, apply]) => {
+          const deps = {
+            stat: (path: string) => invoke<{ mtimeMs: number; size: number }>("file_stat", { path }).catch(() => null),
+            read: (path: string, folder: string) => invoke<string>("read_file", { path, folder }),
+          };
+          const result = await library.libraryFor(notePath, text, folder, deps);
+          if (token !== previewRenderToken) return;
+          apply.applyCitations(article, result, h.getCitationStyle?.() ?? "chicago", { references: true });
+          const recheck = async (): Promise<void> => {
+            if (token !== previewRenderToken) return;
+            if (getWindow(windowId)?.mode !== "editor") {
+              if (folder !== getState().folder) { renderPreview(text, pathOrName); return; }
+              const next = await library.libraryFor(notePath, text, folder, deps);
+              if (token !== previewRenderToken) return;
+              if (next.status !== result.status || (next.status === "ok" && result.status === "ok" && next.library !== result.library)) { renderPreview(text, pathOrName); return; }
+            }
+            citationTimer = setTimeout(() => { void recheck(); }, 3000);
+          };
+          citationTimer = setTimeout(() => { void recheck(); }, 3000);
+        }).catch(() => {});
+      }
       let restoredScroll = previewPane.scrollTop;
       const restoreIfUnmoved = (): void => {
         if (token !== previewRenderToken || Math.abs(previewPane.scrollTop - restoredScroll) > 1) {
