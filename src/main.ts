@@ -1,3 +1,4 @@
+import { refreshOnCitationStyleChange } from "./settings-screen/citation-refresh";
 import { suggestSpelling, ignoreSpelling, learnSpelling } from "./spell/api";
 import { spellMenuItems, replaceMisspelling } from "./spell/menu";
 import { spellCache } from "./spell/cache";
@@ -778,7 +779,7 @@ function refreshCitationPreviews(): void {
 }
 
 function saveSettingsFromPanel(settings: Settings): void {
-  const citationChanged = settings.export.citationStyle !== currentSettings.export.citationStyle;
+  const previousSettings = currentSettings;
   const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   const gitVisibilityChanged = settings.git.showSourceControl !== currentSettings.git.showSourceControl;
@@ -794,7 +795,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   if (themeChanged) renderAll();
-  if (citationChanged) refreshCitationPreviews();
+  refreshOnCitationStyleChange(previousSettings, settings, refreshCitationPreviews);
   void writeSettings(settings).catch(() => {});
 }
 
