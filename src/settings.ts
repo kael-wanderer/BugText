@@ -71,6 +71,7 @@ export type Settings = {
   showHiddenFiles: boolean;
   syncScroll: boolean;
   showStatusBar: boolean;
+  writingGoals: { readingTime: boolean };
   main: ZoneSettings;
   sub: ZoneSettings;
   keymap: Record<string, string>;
@@ -112,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showHiddenFiles: true,
   syncScroll: false,
   showStatusBar: true,
+  writingGoals: { readingTime: false },
   main: { font: "", size: 15 },
   sub: { font: "", size: 15 },
   keymap: {},
@@ -298,6 +300,7 @@ export function parseSettings(raw: string): Settings {
     wrapColumn,
     syncScroll: data.syncScroll === true,
     showStatusBar: data.showStatusBar !== false,
+    writingGoals: { readingTime: (data.writingGoals as { readingTime?: unknown } | undefined)?.readingTime === true },
     explorer: parseZone(data.explorer, DEFAULT_SETTINGS.explorer),
     // Missing means an older file: keep showing everything, as before the setting.
     showHiddenFiles:

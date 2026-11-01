@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Writing goals: a word target per note (`word_goal` property) or per session, with progress in the status bar and focus mode.
 - PDF page organization with reorder, rotation, deletion, insertion, extraction, and Recovery-backed in-place saves.
 - Citations from BibTeX and CSL JSON, with insertion and completion, styled preview references, and Pandoc citation export.
 - Table view property editing, column controls and reviewed bulk changes with Recovery snapshots.
@@ -14,7 +15,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.
 - The Links tab finds unlinked mentions and lets you review and link them, with Recovery snapshots for closed notes.
 - Large folders refresh less often while preserving open-file checks; Settings ▸ General controls the mode and performance diagnostics are available from the status bar and command palette.
-- A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to toggle reading time; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
+- A status bar follows the focused Markdown or plain-text pane with cursor position, selection counts, document word count, reading time at 230 words per minute, and save/recovery state. Click the cursor to open Go to Line or the count to open writing goals; Settings ▸ Editing and View ▸ Show Status Bar control visibility.
 - Graph view tabs from the command palette: local links and backlinks at depth 1 or 2, folder graphs capped at the 500 most-linked notes, folder/orphan filters, missing targets, keyboard navigation and zoom. Layout runs in a Web Worker with a fixed 300-step budget.
 - Folder-scoped bookmarks capture the current note and line, with a keyboard-accessible list and safe Missing states. Add Bookmark (⌥⌘B), Show Bookmarks (⇧⌥⌘B), and per-window Go Back / Go Forward (⌃⌘Left / Right) are available from the palette and native menus; note navigation retains up to 100 entries.
 - Read-only Table view from Filter and the command palette, with property columns, sorting, keyboard navigation and batches of 500 notes.

@@ -1,3 +1,8 @@
+import { bodyWords, readNoteGoal, type NoteGoal } from "./writing-goals/note-goal";
+import { createStatusBar } from "./status-bar/view";
+import { createSessionTracker, crossed } from "./writing-goals/session";
+import { reachedToast } from "./writing-goals/labels";
+import { countWords } from "./status-bar/model";
 import { refreshOnCitationStyleChange } from "./settings-screen/citation-refresh";
 import { suggestSpelling, ignoreSpelling, learnSpelling } from "./spell/api";
 import { spellMenuItems, replaceMisspelling } from "./spell/menu";
@@ -16,7 +21,6 @@ import { createOnboarding } from "./empty-states/onboarding";
 import { shouldShowHint } from "./empty-states/rules";
 import { keyHint } from "./empty-states/key-hint";
 import { readFileBytes } from "./file-bytes";
-import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
 import { createTableSurface } from "./table-view/surface";
@@ -424,6 +428,10 @@ function spellRefreshAll(): void { refreshAllSpelling(); void emit("bugtext://sp
 void listen("bugtext://spell-changed", refreshAllSpelling);
 
 const statusWordCounts = new Map<string, number>();
+const noteGoals = new Map<string, { goal: NoteGoal; words: number }>();
+const writingSession = createSessionTracker();
+const goalCrossings = new Map<string, number>();
+const focusPills = new Map<string, ReturnType<typeof import("./writing-goals/pill").createFocusPill>>();
 let focusSource: { windowId: string; tabId: string } | null = null;
 function focusOverlayOpen(): boolean {
   return document.body.classList.contains("settings-active") || !!document.querySelector('.recovery-scrim, [aria-modal="true"], #palette:not(.hidden), .preview-find:not(.hidden), .cm-search, .cm-tooltip-autocomplete');
@@ -433,12 +441,12 @@ const focusMode = createFocusMode({
   overlayOpen: focusOverlayOpen,
   captureView: () => { const view = activeView(), tab = activeMeta()!; focusSource = { windowId: getState().activeWindowId, tabId: tab.id }; const selection = view.editor.getSelection(); return { topLine: view.editor.visibleTopLine(), selection: { from: selection.from, to: selection.to } }; },
   restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
-  onChange: () => { requestWindowMeasure(); syncViewMenu(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
+  onChange: () => { requestWindowMeasure(); syncViewMenu(); if (document.body.classList.contains("focus-active")) void ensureFocusPill(); refreshStatusBar(); }, toast: showToast, exitHint: () => keyHint("view.focus_mode", currentSettings.keymap),
 });
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();
-}, openDiagnostics);
+}, openDiagnostics, anchor => { void openGoals(anchor); });
 
 function openDiagnostics(): void {
   showDiagnosticsSheet(document.getElementById("app")!, { diagnostics, copy: writeClipboardText });
@@ -447,6 +455,9 @@ function refreshStatusBar(): void {
   const windowState = getWindow(getState().activeWindowId);
   const tab = windowState?.tabs.find(item => item.id === windowState.activeTabId);
   const editor = windowState ? views.get(windowState.id)?.editor : undefined;
+  const noteData = tab ? noteGoals.get(tab.id) : undefined;
+  const noteGoal = noteData?.goal.kind === "set" ? { goal: noteData.goal.goal, words: noteData.words } : null;
+  const session = writingSession.state();
   statusBar.update({
     enabled: currentSettings.showStatusBar,
     pathOrName: tab && editor && !tab.tableView ? tab.path ?? tab.name : null,
@@ -456,8 +467,62 @@ function refreshStatusBar(): void {
     dirty: tab?.dirty ?? false,
     recovered: tab ? recoveredDraftIds.has(tab.id) : false,
     largeFolder,
+    readingTime: currentSettings.writingGoals.readingTime, noteGoal, session,
   });
   focusMode.sync();
+  if (focusMode.active() && windowState && !focusPills.has(windowState.id)) void ensureFocusPill();
+  for (const [id, pill] of focusPills) {
+    const shown = focusMode.active() && id === windowState?.id;
+    pill.update(shown && noteGoal ? { ...noteGoal, session: false } : shown && session ? { words: session.written, goal: session.goal, session: true } : null);
+  }
+  if (tab && noteGoal && crossed(goalCrossings, `note:${tab.path ?? tab.id}:${noteGoal.goal}`, noteGoal.words, noteGoal.goal)) showToast(reachedToast(noteGoal.goal, false));
+  if (session && crossed(goalCrossings, `session:${session.startedAt}`, session.written, session.goal)) showToast(reachedToast(session.goal, true));
+}
+
+async function ensureFocusPill(): Promise<void> {
+  const id = getState().activeWindowId;
+  if (focusPills.has(id)) return;
+  const { createFocusPill } = await import("./writing-goals/pill");
+  if (focusPills.has(id)) return;
+  const pane = windowsHost.querySelector<HTMLElement>(`.window[data-window-id="${id}"] .pane-editor`);
+  if (pane) { focusPills.set(id, createFocusPill(pane, anchor => void openGoals(anchor))); refreshStatusBar(); }
+}
+function rebaseWritingCount(id: string, text: string): void {
+  const count = countWords(text);
+  writingSession.rebase(id); writingSession.observe(id, count); statusWordCounts.set(id, count);
+}
+function goalAnchor(): HTMLElement {
+  const visible = focusMode.active() ? document.querySelector<HTMLElement>(".goal-pill:not([hidden])") : document.querySelector<HTMLElement>(".status-bar button[aria-label='Writing goals'], .status-bar button:has(.goal-ring)");
+  if (visible) return visible;
+  let fallback = document.getElementById("goal-fallback-anchor");
+  if (!fallback) { fallback = document.createElement("button"); fallback.id = "goal-fallback-anchor"; fallback.style.cssText = "position:fixed;bottom:0;left:50%;width:1px;height:1px;opacity:0"; document.body.append(fallback); }
+  return fallback;
+}
+function goalNote() {
+  const tab = activeMeta(), view = views.get(getState().activeWindowId);
+  if (!tab || !view || tab.tableView || (isPdfFile(tab.path ?? tab.name) || isHtmlFile(tab.path ?? tab.name))) return null;
+  const source = view.editor.getText(tab.id);
+  return { source, markdown: isMarkdownFile(tab.path ?? tab.name),
+    current: () => activeMeta()?.id === tab.id && view.editor.getText(tab.id) === source,
+    apply: (edit: import("./properties/edit").PropertyEdit) => view.editor.applyPropertyEdit(tab.id, edit) };
+}
+async function openGoals(anchor: HTMLElement): Promise<void> {
+  const note = goalNote();
+  const { showGoals } = await import("./writing-goals/actions");
+  showGoals(anchor, { note, session: writingSession.state(), readingTime: currentSettings.writingGoals.readingTime,
+    update(session, readingTime) {
+      if (session === null) writingSession.clear();
+      else if (typeof session === "number") writingSession.start(session, statusWordCounts, Date.now());
+      if (readingTime !== currentSettings.writingGoals.readingTime) saveSettingsFromPanel({ ...currentSettings, writingGoals: { readingTime } });
+      refreshStatusBar();
+    },
+  });
+}
+async function clearWritingGoals(): Promise<void> {
+  const note = goalNote();
+  const { clearGoals } = await import("./writing-goals/actions");
+  if (!clearGoals(note)) { showToast("The note changed. Try again."); return; }
+  writingSession.clear(); refreshStatusBar();
 }
 
 function editorForTab(id: string): WindowView["editor"] {
@@ -825,6 +890,8 @@ function commandItems(): PaletteItem[] {
     command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
     command("edit.extract_note", "Extract Selection to Note", () => withOrganize((actions) => actions.extractSelection())),
     command("edit.show_tasks", "Tasks in Folder", () => withOrganize((actions) => actions.showTasks())),
+    command("edit.writing_goal", "Set Writing Goal…", () => void openGoals(goalAnchor())),
+    command("edit.clear_writing_goals", "Clear Writing Goals", () => void clearWritingGoals()),
     command("view.live_preview", "Toggle Live Preview", toggleLivePreview),
     command("ai.new_chat", "AI: New chat", newAIChat),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
@@ -998,7 +1065,15 @@ const handlers = {
   },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   onStatusChange: refreshStatusBar,
-  onWordCount: (tabId: string, count: number) => { statusWordCounts.set(tabId, count); refreshStatusBar(); },
+  onWordCount: (tabId: string, count: number, text: string) => {
+    statusWordCounts.set(tabId, count);
+    const tab = getState().windows.flatMap(w => w.tabs).find(t => t.id === tabId);
+    if (tab && isMarkdownFile(tab.path ?? tab.name)) noteGoals.set(tabId, { goal: readNoteGoal(text), words: bodyWords(text) });
+    else noteGoals.delete(tabId);
+    writingSession.observe(tabId, count);
+    if (focusMode.active() && activeMeta()?.id === tabId) focusPills.get(getState().activeWindowId)?.typing();
+    refreshStatusBar();
+  },
   syncScrollEnabled: () => currentSettings.syncScroll,
   onDocChange: (wid: string, tid: string, text: string) => onDocChange(wid, tid, text),
   onPdfEditDirtyChange: (wid: string, tid: string, dirty: boolean) =>
@@ -1342,6 +1417,7 @@ function renderAll(): void {
   diagnostics.countRender();
   const openIds = new Set(getState().windows.flatMap(w => w.tabs.map(tab => tab.id)));
   for (const id of statusWordCounts.keys()) if (!openIds.has(id)) statusWordCounts.delete(id);
+  for (const id of noteGoals.keys()) if (!openIds.has(id)) noteGoals.delete(id);
   refreshStatusBar();
   for (const w of getState().windows) {
     const name = `Table: ${basename(getState().folder ?? "No folder")}`;
@@ -2264,6 +2340,7 @@ function showActiveHistory(): void {
     name: tab.name,
     currentText: view.editor.getText(tab.id),
     onRestore: (text) => {
+      rebaseWritingCount(tab.id, text);
       view.editor.setText(text);
       view.renderPreview(text, tab.path!);
     },
@@ -2290,6 +2367,7 @@ async function checkActiveForExternalChange(
       if (isTabDirty(windowId, tab.id) || view.editor.getText(tab.id) !== bufferText) return;
       cleanReloads.add(changeKey);
       try {
+        rebaseWritingCount(tab.id, text);
         view.editor.setTextFor(tab.id, text);
       } finally {
         cleanReloads.delete(changeKey);
@@ -2358,6 +2436,7 @@ async function refreshCleanOpenFilesFromDisk(): Promise<void> {
       const changeKey = `${windowState.id}:${tab.id}`;
       cleanReloads.add(changeKey);
       try {
+        rebaseWritingCount(tab.id, text);
         view.editor.setTextFor(tab.id, text);
         changed = true;
       } finally {
@@ -2420,6 +2499,7 @@ function openDraft(draft: DraftRecord): void {
     if (found) {
       activateTab(found.windowId, found.tab.id);
       const view = views.get(found.windowId)!;
+      rebaseWritingCount(found.tab.id, draft.contents);
       view.editor.setText(draft.contents);
       const current = getWindow(found.windowId)!;
       patchWindow(found.windowId, { tabs: current.tabs.map((tab) => tab.id === found.tab.id ? { ...tab, dirty: true } : tab) });
@@ -3889,6 +3969,7 @@ listenScoped<string>("menu", (event) => {
       return withOrganize((actions) => actions.extractSelection());
     case "edit.show_tasks":
       return withOrganize((actions) => actions.showTasks());
+    case "edit.writing_goal": return void openGoals(goalAnchor());
     case "view.live_preview":
       return toggleLivePreview();
     case "edit.paste_plain":
@@ -3958,6 +4039,7 @@ async function pastePlainText(): Promise<void> {
 // menu's accelerator (which consumes the keystroke first on macOS); these are the
 // JS-only / fallback handlers, all keyed off the resolved keymap so rebinding works.
 const appKeyActions: Record<string, () => void> = {
+  "edit.clear_writing_goals": () => void clearWritingGoals(),
   "file.add_bookmark": () => void bookmarkActions.add(),
   "file.show_bookmarks": () => bookmarkActions.show(),
   "go.back": () => travelHistory("back"),

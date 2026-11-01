@@ -300,3 +300,7 @@ viewport and a margin using a per-line cache; the editor element keeps
 `spellcheck="false"`. Suggestions appear in BugText's context menu. Ignore lasts
 until quit; Learn uses the macOS dictionary. `editor.spellCheck` and Edit ▸
 Check Spelling While Typing control the feature.
+
+Writing goals use a `word_goal` note property read by a YAML-free scanner. Session
+goals are per native window and live only in memory; reloads rebase their counts.
+The goal popover and property writer load lazily and edit through the active editor.

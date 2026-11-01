@@ -22,7 +22,7 @@ it("renders the setting and saves its selected value", () => {
 });
 it("shows the status control only for large folders", () => {
   const host = document.createElement("div"), open = vi.fn(), bar = createStatusBar(host, () => {}, open);
-  const state = { pathOrName: "note.md", enabled: true, cursor: { line: 1, column: 1 }, selection: "", words: 0, dirty: false, recovered: false, largeFolder: false };
+  const state = { pathOrName: "note.md", enabled: true, cursor: { line: 1, column: 1 }, selection: "", words: 0, dirty: false, recovered: false, largeFolder: false, readingTime: false, noteGoal: null, session: null };
   bar.update(state); const button = host.querySelector<HTMLButtonElement>(".status-bar-large")!; expect(button.hidden).toBe(true);
   bar.update({ ...state, largeFolder: true }); expect(button.hidden).toBe(false); button.click(); expect(open).toHaveBeenCalledOnce();
 });

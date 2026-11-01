@@ -221,3 +221,9 @@ it("spell check defaults on and round trips", () => {
   const settings = parseSettings('{"editor":{"spellCheck":false,"typewriterScrolling":true}}');
   expect(parseSettings(JSON.stringify(settings)).editor).toEqual(settings.editor);
 });
+
+it("validates writing goals reading time", () => {
+  expect(parseSettings("{}").writingGoals.readingTime).toBe(false);
+  expect(parseSettings('{"writingGoals":{"readingTime":true}}').writingGoals.readingTime).toBe(true);
+  expect(parseSettings('{"writingGoals":{"readingTime":"yes"}}').writingGoals.readingTime).toBe(false);
+});

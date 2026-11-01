@@ -13,7 +13,7 @@ import { searchSettings } from "../settings-screen/registry";
 
 const note: StatusBarState = {
   pathOrName: "note.md", enabled: true, cursor: { line: 12, column: 4 },
-  selection: "", words: 1204, dirty: false, recovered: false, largeFolder: false,
+  selection: "", words: 1204, dirty: false, recovered: false, largeFolder: false, readingTime: false, noteGoal: null, session: null,
 };
 
 function fixture() {
@@ -69,18 +69,20 @@ describe("status bar public behavior", () => {
     expect(host.textContent).not.toContain("selected");
   });
 
-  it("toggles reading time using 230 wpm and retains the formatted word count", () => {
+  it("shows reading time and opens goals", () => {
+    const host = document.createElement("div"), onGoals = vi.fn();
+    const bar = createStatusBar(host, vi.fn(), vi.fn(), onGoals);
+    bar.update({ ...note, readingTime: true });
+    const button = host.querySelector('[aria-label="Writing goals"]') as HTMLButtonElement;
+    expect(button.textContent).toBe("1,204 words · ≈ 6 min"); button.click(); expect(onGoals).toHaveBeenCalledWith(button);
+  });
+  it("renders note and session goals", () => {
     const { host, bar } = fixture();
-    bar.update(note);
-    const words = host.querySelector('[aria-label="Show reading time"]') as HTMLButtonElement;
-    expect(words.textContent).toBe("1,204 words");
-    words.click();
-    expect(words.textContent).toBe("1,204 words · ≈ 6 min");
-    expect(words.getAttribute("aria-pressed")).toBe("true");
-    bar.update({ ...note, words: 230 });
-    expect(words.textContent).toBe("230 words · ≈ 1 min");
-    words.click();
-    expect(words.textContent).toBe("230 words");
+    bar.update({ ...note, noteGoal: { words: 820, goal: 1500 }, session: { written: 320, goal: 500 } });
+    expect(host.textContent).toContain("820 / 1,500"); expect(host.textContent).toContain("Session 320 / 500");
+    expect(host.querySelectorAll("svg")).toHaveLength(2);
+    bar.update({ ...note, noteGoal: { words: 1512, goal: 1500 } });
+    expect(host.querySelector(".done")?.textContent).toBe("✓ 1,512 / 1,500");
   });
 
   it.each(["file.pdf", "file.html", "script.ts", null])("removes the bar for %s and restores it for Markdown", pathOrName => {
