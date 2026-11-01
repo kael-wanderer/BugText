@@ -32,3 +32,11 @@ describe("table edits", () => {
     expect((await applyTableEdit([note()], { key: "missing", value: undefined }, deps())).skipped).toEqual([]);
   });
 });
+it("writes a mixed batch with snapshots for closed notes", async () => {
+  const d = deps(), apply = vi.fn();
+  const notes = Array.from({ length: 20 }, (_, i) => note(`/folder/${i}.md`));
+  d.findOpen = path => Number(path.split("/").pop()!.split(".")[0]) < 3 ? { text: source, apply } : null;
+  const result = await applyTableEdit(notes, { key: "a", value: "new" }, d);
+  expect(result.changed).toHaveLength(20); expect(result.skipped).toHaveLength(0);
+  expect(apply).toHaveBeenCalledTimes(3); expect(d.snapshot).toHaveBeenCalledTimes(17); expect(d.write).toHaveBeenCalledTimes(17);
+});

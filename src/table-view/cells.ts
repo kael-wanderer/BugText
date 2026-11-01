@@ -28,7 +28,7 @@ export function parseCellInput(kind: CellKind, input: string | string[] | boolea
     return { ok: true, value: values.length ? [...new Set(values)] : undefined };
   }
   const text = String(input);
-  if (!text.trim()) return { ok: true, value: undefined };
+  if (text === "" || (kind === "number" && !text.trim())) return { ok: true, value: undefined };
   if (kind === "number") {
     const value = Number(text.trim());
     return Number.isFinite(value) ? { ok: true, value } : { ok: false, message: "Enter a number." };

@@ -155,6 +155,10 @@ frontmatter through the normal dirty and undo path. Invalid YAML is read-only;
 frontmatter and inline tags share the per-window link index. The Filter sidebar and
 folder search operators query that index for tags, properties, dates and paths.
 
+Table view edits properties through the same writer, with isolated undo for open tabs
+and Recovery snapshots plus checked atomic writes for closed notes. Bulk changes are
+reviewed before writing; hidden columns and row selections are local to the table.
+
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
 sanitizing (`preview-tasks.ts`, never `<input>`) and toggle only the source marker

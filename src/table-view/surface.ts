@@ -43,13 +43,25 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
       button.onclick = () => { descending = current ? !descending : false; sort = col; render(); }; th.append(button);
       if (col.key) { const menu = node("button", " ▾"); menu.setAttribute("aria-label", `Column menu: ${col.label}`); menu.onclick = () => { const hide = node("button", "Hide column"); hide.onclick = () => { hidden.add(col.key!); render(); }; th.append(hide); }; th.append(menu); } header.append(th);
     }
+    let pendingMove: { note: IndexedNote; col: Column } | null = null;
     function moveCell(note: IndexedNote, col: Column, back: boolean) {
       const cells = rows.flatMap(n => visible.filter(c => editableCell(n, c)).map(c => ({ note: n, col: c })));
       const index = cells.findIndex(c => c.note.path === note.path && identity(c.col) === identity(col));
-      const next = cells[index + (back ? -1 : 1)];
-      if (next) { active = { path: next.note.path, key: identity(next.col) }; setTimeout(() => { const r = rows.findIndex(n => n.path === next.note.path), c = visible.indexOf(next.col); const target = host.querySelector<HTMLTableCellElement>(`tbody tr:nth-child(${r + 1}) td:nth-child(${c + 2})`); target?.focus(); }, 0); }
+      pendingMove = cells[index + (back ? -1 : 1)] ?? null;
     }
-    async function apply(note: IndexedNote, col: Column, value: unknown) { editing = false; const result = await deps.edit([note], { key: col.key!, value }); if (result.skipped.length) errors.set(`${note.path}\0${col.key}`, result.skipped[0].reason); else errors.delete(`${note.path}\0${col.key}`); render(); }
+    async function apply(note: IndexedNote, col: Column, value: unknown) {
+      editing = false;
+      const result = await deps.edit([note], { key: col.key!, value });
+      if (result.skipped.length) errors.set(`${note.path}\0${col.key}`, result.skipped[0].reason); else errors.delete(`${note.path}\0${col.key}`);
+      const next = pendingMove; pendingMove = null;
+      if (next) active = { path: next.note.path, key: identity(next.col) };
+      render();
+      if (next) {
+        const row = rows.findIndex(n => n.path === next.note.path), column = visible.indexOf(next.col);
+        const target = host.querySelector<HTMLTableCellElement>(`tbody tr:nth-child(${row + 1}) td:nth-child(${column + 2})`);
+        if (target) { target.focus(); if (columnKind(notes, next.col.key!) !== "checkbox") begin(target, next.note, next.col); }
+      }
+    }
     function begin(cell: HTMLTableCellElement, note: IndexedNote, col: Column) {
       if (!editableCell(note, col) || editing) return;
       const kind = columnKind(notes, col.key!); if (kind === "checkbox") { void apply(note, col, !cellValue(note, col)); return; }
@@ -62,12 +74,12 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
       checkbox.onkeydown = event => { if (event.key === "Escape") { selected.clear(); render(); } };
       checkbox.onclick = event => { if (event.shiftKey && anchor >= 0) { for (let j = Math.min(i, anchor); j <= Math.max(i, anchor); j++) checkbox.checked ? selected.add(rows[j].path) : selected.delete(rows[j].path); } else checkbox.checked ? selected.add(note.path) : selected.delete(note.path); anchor = i; render(); }; selectCell.append(checkbox); row.append(selectCell);
       visible.forEach((col, j) => {
-        const value = col.base === "path" ? relativePath(note.path, folder!) : cellValue(note, col), cell = node("td"); cell.tabIndex = active?.path === note.path && active.key === identity(col) ? 0 : -1;
+        const value = col.base === "path" ? relativePath(note.path, folder!) : cellValue(note, col), cell = node("td"); cell.tabIndex = (active?.path === note.path && active.key === identity(col)) || (!active && i === 0 && j === 0) ? 0 : -1;
         if (col.base === "title") { const button = node("button", valueText(value)); button.className = "table-title"; button.onclick = () => deps.open(note.path); cell.append(button); if (note.propertyError) cell.append(node("small", ` — line ${note.propertyError.line}: ${note.propertyError.message}`)); }
         else if (col.key && !editableCell(note, col) && !note.propertyError) cell.textContent = "Unsupported value";
         else cell.textContent = valueText(value);
         const error = errors.get(`${note.path}\0${col.key}`); if (error) cell.append(node("small", error));
-        cell.onclick = () => { active = { path: note.path, key: identity(col) }; if (col.key && columnKind(notes, col.key) === "checkbox") begin(cell, note, col); };
+        cell.onclick = () => { active = { path: note.path, key: identity(col) }; cell.tabIndex = 0; if (col.key && columnKind(notes, col.key) === "checkbox") begin(cell, note, col); };
         cell.ondblclick = () => begin(cell, note, col);
         cell.onkeydown = event => {
           if (event.key === "Enter") { event.preventDefault(); if (col.base === "title") deps.open(note.path); else begin(cell, note, col); }
@@ -82,7 +94,7 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a" && !editing) { event.preventDefault(); for (const n of rows) selected.add(n.path); render(); }
       else if (event.key === "Escape" && !editing && selected.size) { selected.clear(); render(); }
     };
-    if (notes.length > limit) { const more = node("button", `Show more (${Math.min(limit, notes.length)} of ${notes.length})`); more.onclick = () => { limit += 500; render(); host.scrollTop = 0; }; host.append(more); }
+    if (notes.length > limit) { const more = node("button", `Show more (${Math.min(limit, notes.length)} of ${notes.length})`); more.onclick = () => { selected.clear(); anchor = -1; limit += 500; render(); host.scrollTop = 0; }; host.append(more); }
     host.scrollTop = scroll;
   }
   return { update(next: IndexedNote[], root: string | null) { if (root === folder && next.length === notes.length && next.every((note, i) => note === notes[i])) return; notes = next; folder = root; render(); } };
