@@ -1484,7 +1484,8 @@ function insertCitation(): void {
   void Promise.all([import("./citations/picker"), loadCitationLibrary(tab.path, text)]).then(([picker, result]) => {
     picker.showCitationPicker({ result, insert: key => {
       if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the citation again."); return; }
-      editor.applyChanges(tab.id, [picker.citationInsertion(text, selection.from, selection.to, key)], { isolate: true });
+      const change = picker.citationInsertion(text, selection.from, selection.to, key);
+      editor.applyChanges(tab.id, [change], { isolate: true, cursor: change.from + change.insert.length });
     } });
   });
 }

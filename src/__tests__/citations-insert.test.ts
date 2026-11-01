@@ -26,3 +26,13 @@ it("keeps citation insertion in one undo step", async () => {
   expect(undo({ get state() { return state; }, dispatch: tr => { state = tr.state; } })).toBe(true);
   expect(state.doc.toString()).toBe(original);
 });
+
+it("places the cursor after either citation insertion", async () => {
+  const { agentChangeTransaction } = await import("../editor");
+  for (const [text, pos] of [["hello", 5], ["[@a]", 2]] as const) {
+    const change = citationInsertion(text, pos, pos, "key");
+    const state = agentChangeTransaction(EditorState.create({ doc: text }), [change], { isolate: true, cursor: change.from + change.insert.length }).state;
+    expect(state.selection.main.head).toBe(change.from + change.insert.length);
+    expect(state.sliceDoc(change.from, state.selection.main.head)).toBe(change.insert);
+  }
+});
