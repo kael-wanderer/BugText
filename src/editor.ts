@@ -5,7 +5,7 @@ import { applyPropertyEdit } from "./properties/write";
 import type { PropertyEdit } from "./properties/edit";
 import { linkCompletion } from "./links/complete";
 import { followEditorLink } from "./links/follow";
-import { defaultKeymap, history, historyKeymap, indentWithTab, insertBlankLine } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, isolateHistory, indentWithTab, insertBlankLine } from "@codemirror/commands";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { html } from "@codemirror/lang-html";
@@ -63,7 +63,7 @@ export type EditorHandle = {
   getText(id: string): string;
   revision(id: string): number;
   applyPropertyEdit(id: string, edit: PropertyEdit): void;
-  applyChanges(id: string, changes: { from: number; to: number; insert: string }[]): void;
+  applyChanges(id: string, changes: { from: number; to: number; insert: string }[], options?: { isolate?: boolean }): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
   selectRange(from: number, to: number): void;
@@ -119,10 +119,11 @@ export type PasteTextHandler = (id: string, html: string, text: string, inCode: 
 export function agentChangeTransaction(
   state: EditorState,
   changes: { from: number; to: number; insert: string }[],
+  options?: { isolate?: boolean },
 ): Transaction {
   return state.update({
     changes,
-    annotations: Transaction.userEvent.of("input.agent"),
+    annotations: [Transaction.userEvent.of("input.agent"), ...(options?.isolate ? [isolateHistory.of("full")] : [])],
   });
 }
 
@@ -423,14 +424,14 @@ export function createEditor(
       if (id === activeId) return view.state.doc.toString();
       return states.get(id)?.doc.toString() ?? "";
     },
-    applyChanges(id, changes) {
+    applyChanges(id, changes, options) {
       if (id === activeId) {
-        view.dispatch(agentChangeTransaction(view.state, changes));
+        view.dispatch(agentChangeTransaction(view.state, changes, options));
         return;
       }
       const state = states.get(id);
       if (!state) return;
-      const updated = agentChangeTransaction(state, changes).state;
+      const updated = agentChangeTransaction(state, changes, options).state;
       states.set(id, updated);
       changed(id, updated.doc.toString());
     },

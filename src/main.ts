@@ -1277,7 +1277,39 @@ async function showTableView(): Promise<void> {
 }
 function renderTableSurface(host: HTMLElement): void {
   let surface = tableSurfaces.get(host);
-  if (!surface) { surface = createTableSurface(host, path => { void doOpenPath(path).then(() => activeView().jumpToLine(1)); }); tableSurfaces.set(host, surface); }
+  if (!surface) {
+    surface = createTableSurface(host, {
+      open: path => { void doOpenPath(path).then(() => activeView().jumpToLine(1)); },
+      folderKeys: () => [...new Set(linkIndex.notes().filter(note => !note.propertyError).flatMap(note => Object.keys(note.properties ?? {})))],
+      edit: async (notes, edit) => {
+        const folder = getState().folder;
+        if (!folder) return { changed: [], skipped: notes.map(note => ({ path: note.path, reason: "Outside the open folder." })) };
+        // Loaded on first edit: the writer pulls in the yaml parser, which stays out of the startup chunk.
+        const { applyTableEdit } = await import("./table-view/edits");
+        return applyTableEdit(notes, edit, {
+          folder,
+          findOpen: path => {
+            if (getState().folder !== folder) throw new Error("Folder changed");
+            const found = findTabByPath(getState().windows, path); if (!found) return null;
+            const editor = editorForTab(found.tab.id);
+            return { text: editor.getText(found.tab.id), apply: change => {
+              if (getState().folder !== folder) throw new Error("Folder changed");
+              editor.applyChanges(found.tab.id, [change], { isolate: true });
+              const text = editor.getText(found.tab.id); linkIndex.onFileChanged(path, text, false); workspaceIndex.onFileChanged(path, text);
+            } };
+          },
+          read: path => invoke<string>("read_file", { path }),
+          snapshot: (path, text) => manualSnapshot(path, text, "Before table edit", true),
+          write: async (path, contents, expected) => {
+            if (getState().folder !== folder) throw new Error("Folder changed");
+            await invoke("write_file_atomic", { path, contents, folder, expected });
+            linkIndex.onFileChanged(path, contents); workspaceIndex.onFileChanged(path, contents);
+          },
+        });
+      },
+    });
+    tableSurfaces.set(host, surface);
+  }
   const filter = filterPanelModel();
   surface.update(matchingNotes(linkIndex.notes(), filter), getState().folder);
 }

@@ -1,11 +1,11 @@
 import { isMap, isScalar, parseDocument, stringify } from "yaml";
 import { findFrontMatter, readProperties } from "./parse";
+import { validKey } from "./kind";
+
+export { validKey };
 
 export type PropertyEdit = { from: number; to: number; insert: string };
 
-function validKey(key: string): boolean {
-  return key.trim() === key && !!key && !/[\r\n]/.test(key) && !key.startsWith(":");
-}
 function validValue(value: unknown): boolean {
   return value === null || typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value)) || (Array.isArray(value) && value.every(v => typeof v === "string"));
 }

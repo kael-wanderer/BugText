@@ -21,6 +21,16 @@ describe("editor links integration", () => {
     undo(view); expect(editor.getText("rename")).toBe(source);
     view.destroy(); parent.remove();
   });
+  it("isolates an edit from adjacent typing", () => {
+    const parent = document.createElement("div"); document.body.append(parent);
+    const editor = createEditor(parent, vi.fn()); editor.openState("isolate", "a");
+    const view = EditorView.findFromDOM(parent.querySelector<HTMLElement>(".cm-editor")!)!;
+    view.dispatch({ changes: { from: 1, insert: "b" }, userEvent: "input.type" });
+    editor.applyChanges("isolate", [{ from: 0, to: 1, insert: "x" }], { isolate: true });
+    undo(view); expect(editor.getText("isolate")).toBe("ab");
+    undo(view); expect(editor.getText("isolate")).toBe("a");
+    view.destroy(); parent.remove();
+  });
   it("follows editor command clicks and leaves a plain click for editing", async () => {
     const parent = document.createElement("div"); document.body.append(parent);
     const editor = createEditor(parent, vi.fn()); editor.openState("click", "[a](b.md)");

@@ -32,7 +32,7 @@ describe("property table", () => {
     expect(host.textContent).toContain("line 3: Invalid YAML properties");
     expect(host.textContent).not.toContain("must stay blank");
     expect(host.textContent).toContain(html); expect(host.querySelector("img")).toBeNull();
-    host.querySelector("tbody tr")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); expect(opened).toBe("bad.md");
+    host.querySelector<HTMLButtonElement>("tbody .table-title")!.click(); expect(opened).toBe("bad.md");
   });
   it("builds 2000 notes and renders a bounded first batch", () => {
     const notes = Array.from({ length: 2000 }, (_, i) => note(`/notes/${i}.md`, { status: "active", count: i, date: "2026-10-29" }));
@@ -62,5 +62,54 @@ describe("property table", () => {
     createTableSurface(host, () => {}).update([note("/notes/sub/a.md")], "/notes");
     const cells = Array.from(host.querySelectorAll("tbody td")).map(td => td.textContent);
     expect(cells).toContain("sub/a.md"); expect(cells).not.toContain("/notes/sub/a.md");
+  });
+});
+
+describe("editable table", () => {
+  it("edits a cell and rejects invalid numbers", async () => {
+    const host = document.createElement("div"), edits: unknown[] = [];
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => [], edit: async (n, e) => { edits.push([n, e]); return { changed: [], skipped: [] }; } });
+    surface.update([note("/notes/a.md", { count: 1 })], "/notes");
+    const cell = host.querySelectorAll("tbody td")[4] as HTMLElement;
+    cell.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const input = cell.querySelector("input")!; input.value = "bad"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(cell.textContent).toContain("Enter a number."); expect(edits).toHaveLength(0);
+    input.value = "2"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await Promise.resolve(); expect(edits).toHaveLength(1);
+  });
+  it("selects rows and hides and restores columns", () => {
+    const host = document.createElement("div"); const surface = createTableSurface(host, () => {});
+    surface.update([note("/notes/a.md", { x: 1 })], "/notes");
+    host.querySelector<HTMLInputElement>('input[aria-label="Select row"]')!.click(); expect(host.textContent).toContain("1 selected");
+    host.querySelector<HTMLButtonElement>('button[aria-label="Column menu: x"]')!.click();
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Hide column")!.click();
+    expect(host.textContent).toContain("Hidden (1)");
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Hidden (1)")!.click();
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "x")!.click();
+    expect(host.querySelector('button[aria-label="Column menu: x"]')).not.toBeNull();
+  });
+  it("shows checkbox columns as checkboxes and toggles on click", async () => {
+    const host = document.createElement("div"), edits: unknown[] = [];
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => [], edit: async (_n, e) => { edits.push(e); return { changed: [], skipped: [] }; } });
+    surface.update([note("/notes/a.md", { done: true }), note("/notes/b.md", {})], "/notes");
+    const boxes = host.querySelectorAll<HTMLInputElement>("input.table-check");
+    expect(boxes).toHaveLength(2); expect(boxes[0].checked).toBe(true); expect(boxes[1].checked).toBe(false);
+    (boxes[1].closest("td") as HTMLElement).click(); await Promise.resolve();
+    expect(edits).toEqual([{ key: "done", value: true }]);
+  });
+  it("highlights picked rows and clears the selection after a bulk apply", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => ["x"], edit: async notes => ({ changed: notes.map(n => n.path), skipped: [] }) });
+    surface.update([note("/notes/a.md", { x: "old" }), note("/notes/b.md", { x: "old" })], "/notes");
+    host.querySelector<HTMLInputElement>('input[aria-label="Select row"]')!.click();
+    expect(host.querySelectorAll("tr.table-picked")).toHaveLength(1);
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Set property…")!.click();
+    document.querySelector<HTMLInputElement>('input[aria-label="Property"]')!.value = "x";
+    document.querySelector<HTMLInputElement>('input[aria-label="Value"]')!.value = "new";
+    Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Review…")!.click();
+    Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Apply to 1 note")!.click();
+    await new Promise(r => setTimeout(r, 0));
+    expect(host.querySelectorAll("tr.table-picked")).toHaveLength(0); expect(host.textContent).toContain("2 matching notes");
+    expect(document.querySelector(".app-toast")?.textContent).toBe("Updated 1 note"); host.remove();
   });
 });
