@@ -3,16 +3,9 @@ import { findFrontMatter, type FrontMatter } from "./frontmatter";
 
 export { findFrontMatter, type FrontMatter };
 
-export type PropertyKind = "text" | "list" | "date" | "number" | "checkbox";
-export type ReadResult = { ok: true; props: Record<string, unknown> } | { ok: false; error: string; line: number };
+export { propertyKind, type PropertyKind } from "./kind";
 
-export function propertyKind(value: unknown): PropertyKind {
-  if (Array.isArray(value)) return "list";
-  if (typeof value === "boolean") return "checkbox";
-  if (typeof value === "number") return "number";
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return "date";
-  return "text";
-}
+export type ReadResult = { ok: true; props: Record<string, unknown> } | { ok: false; error: string; line: number };
 
 export function readProperties(source: string): ReadResult | null {
   const front = findFrontMatter(source);

@@ -1,7 +1,6 @@
 import type { IndexedNote } from "../links/index";
-import { validKey } from "../properties/edit";
 import { validDate } from "../properties/filter-query";
-import { propertyKind, type PropertyKind } from "../properties/parse";
+import { propertyKind, validKey, type PropertyKind } from "../properties/kind";
 import type { Column } from "./model";
 
 export type CellKind = PropertyKind;

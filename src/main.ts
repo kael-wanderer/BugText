@@ -19,7 +19,6 @@ import { createStatusBar } from "./status-bar/view";
 import { createBookmarkActions } from "./navigation/actions";
 import { createNavigationController } from "./navigation/controller";
 import { createTableSurface } from "./table-view/surface";
-import { applyTableEdit } from "./table-view/edits";
 import { matchingNotes } from "./table-view/model";
 import { syncPinnedWorkspaces } from "./workspaces/pinned-menu";
 import { startupWorkspace, updateReopen } from "./workspaces/session";
@@ -1285,6 +1284,8 @@ function renderTableSurface(host: HTMLElement): void {
       edit: async (notes, edit) => {
         const folder = getState().folder;
         if (!folder) return { changed: [], skipped: notes.map(note => ({ path: note.path, reason: "Outside the open folder." })) };
+        // Loaded on first edit: the writer pulls in the yaml parser, which stays out of the startup chunk.
+        const { applyTableEdit } = await import("./table-view/edits");
         return applyTableEdit(notes, edit, {
           folder,
           findOpen: path => {
