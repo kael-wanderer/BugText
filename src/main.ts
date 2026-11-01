@@ -1105,6 +1105,7 @@ const noteImages = createNoteImages({
 async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
   const w = getWindow(windowId);
   if (!w) return;
+  if (w.activeTabId && tabIds.includes(w.activeTabId) && !(await views.get(windowId)?.requestPdfOrganizerClose())) return;
 
   const toClose = new Set<string>();
   for (const tabId of tabIds) {
@@ -1497,7 +1498,12 @@ function activeMeta(): TabMeta | undefined {
   return w.tabs.find((t) => t.id === w.activeTabId);
 }
 
-function activateTab(windowId: string, tabId: string, recordNavigation = true): void {
+function activateTab(windowId: string, tabId: string, recordNavigation = true, organizerAccepted = false): void {
+  const view = views.get(windowId);
+  if (!organizerAccepted && getWindow(windowId)?.activeTabId !== tabId && view?.hasPdfOrganizer()) {
+    void view.requestPdfOrganizerClose().then(accepted => { if (accepted) activateTab(windowId, tabId, recordNavigation, true); });
+    return;
+  }
   views.get(windowId)?.hideGraph();
   const target = getWindow(windowId)?.tabs.find(tab => tab.id === tabId);
   if (recordNavigation && target?.path && !isPdfFile(target.path)) {
@@ -1526,7 +1532,12 @@ function activateTab(windowId: string, tabId: string, recordNavigation = true): 
   void checkActiveForExternalChange(windowId);
 }
 
-function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true, forceNewTab = false): void {
+function openInWindow(windowId: string, opts: { path: string | null; name: string; text: string }, recordNavigation = true, forceNewTab = false, organizerAccepted = false): void {
+  const view = views.get(windowId);
+  if (!organizerAccepted && view?.hasPdfOrganizer()) {
+    void view.requestPdfOrganizerClose().then(accepted => { if (accepted) openInWindow(windowId, opts, recordNavigation, forceNewTab, true); });
+    return;
+  }
   // Every document-opening path ends here: leave settings so the tab is visible.
   settingsScreen.close();
   if (opts.path && !forceNewTab) {
@@ -1586,6 +1597,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   const w = getWindow(windowId)!;
   const t = w.tabs.find((x) => x.id === tabId);
   if (!t) return true;
+  if (w.activeTabId === tabId && !(await views.get(windowId)?.requestPdfOrganizerClose())) return false;
 
   if (t.dirty) {
     const approved = await confirm(`Discard unsaved changes to "${t.name}"?`, {

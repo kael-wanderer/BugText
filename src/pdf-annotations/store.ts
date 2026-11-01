@@ -91,6 +91,12 @@ export class AnnotationStore {
     });
   }
   keepDigest(): Promise<void> { return this.mutate((doc) => ({ ...doc, digest: this.digest })); }
+  async replaceAll(next: { digest: string; pages: number; annotations: Annotation[] }): Promise<void> {
+    const previous = this.digest;
+    this.digest = next.digest;
+    try { await this.mutate((doc) => ({ ...doc, ...next })); }
+    catch (error) { this.digest = previous; this.changed = this.document.digest !== this.digest; throw error; }
+  }
   add(items: Annotation[]): Promise<void> { return this.mutate((doc) => ({ ...doc, annotations: [...doc.annotations.filter((a) => !items.some((b) => b.id === a.id)), ...items] })); }
   restore(items: Annotation[]): Promise<void> { return this.add(items); }
   update(id: string, patch: Partial<Annotation>): Promise<void> { return this.mutate((doc) => ({ ...doc, annotations: doc.annotations.map((a) => a.id === id ? { ...a, ...patch, id: a.id } : a) })); }

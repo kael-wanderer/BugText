@@ -7,7 +7,7 @@ import type { Annotation } from "./pdf-annotations/model";
 import type { createAnnotationsPanel as createPanelType } from "./pdf-annotations/panel";
 import { copyQuote } from "./pdf-annotations/quote";
 
-import { confirm, message } from "@tauri-apps/plugin-dialog";
+import { confirm, message, open } from "@tauri-apps/plugin-dialog";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { pickExportPath, pickImagePath } from "./files";
 import {
@@ -87,6 +87,10 @@ import { manualBinarySnapshot } from "./recovery";
 import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
+  openOrganizer(): void;
+  organizerDrop(paths: string[], point: { x: number; y: number }): boolean;
+  hasOrganizer(): boolean;
+  requestOrganizerClose(): Promise<boolean>;
   goToPage(page: number): void;
   flashAnnotation(id: string): void;
   pageCount(): number;
@@ -610,7 +614,7 @@ export async function renderPdf(
   const sourceDigest = await pdfSourceDigest(bytes);
   ensureCurrent();
   const loadingTask = pdfjs.getDocument({
-    data: bytes,
+    data: new Uint8Array(bytes),
   });
   const document = await loadingTask.promise;
   const [{ AnnotationStore }, { createAnnotationLayer }, { createAnnotationController }, { createAnnotationsPanel }] = await Promise.all([
@@ -658,6 +662,8 @@ export async function renderPdf(
   let activeTool: PdfEditTool = "select";
   let selectedOperationId: string | null = null;
   let saving = false;
+  let organizer: import("./pdf-pages/organizer").Organizer | null = null;
+  let disposeOrganizer = (): void => {};
   let currentStyle = { ...DEFAULT_PDF_TEXT_STYLE };
   let currentCoverColor = "#ffffff";
   let currentCoverOpacity = 1;
@@ -1226,11 +1232,15 @@ export async function renderPdf(
     const meta = window.document.createElement("span");
     meta.textContent = `${pages.length} page${pages.length === 1 ? "" : "s"}`;
     const close = window.document.createElement("button");
+    const organize = window.document.createElement("button");
+    organize.type = "button";
+    organize.textContent = "Organize…";
+    organize.addEventListener("click", () => { void openOrganizer(); });
     close.type = "button";
     close.textContent = "×";
     close.title = "Close page thumbnails";
     close.addEventListener("click", closeThumbnailPanel);
-    header.append(title, meta, close);
+    header.append(title, meta, organize, close);
     thumbnailPanel.appendChild(header);
 
     const list = window.document.createElement("div");
@@ -2322,6 +2332,7 @@ export async function renderPdf(
     const actions: Record<string, () => void> = {
       annotations: () => toggleInspector("annotations"),
       pages: openThumbnailPanel,
+      organize: () => { void openOrganizer(); },
       "page-prev": () => goToPage(currentPage - 1),
       "page-next": () => goToPage(currentPage + 1),
       find: () => host.dispatchEvent(new Event(PDF_FIND_EVENT, { bubbles: true })),
@@ -2353,6 +2364,7 @@ export async function renderPdf(
     return true;
   };
   const keyHandler = (event: KeyboardEvent): void => {
+    if (organizer?.element.contains(event.target as Node)) return;
     if (isTextEntryTarget(event.target)) return;
     // The inspector handles its own keys; its buttons must not delete the edit.
     if (inspector.element.contains(event.target as HTMLElement)) return;
@@ -2511,6 +2523,90 @@ export async function renderPdf(
   };
   const saveEditedPdf = (): Promise<void> => withSaveLock(saveToSource);
   const saveEditedPdfAs = (): Promise<void> => withSaveLock(saveCopy);
+  const openOrganizer = async (): Promise<void> => {
+    if (organizer || saving || saveBusy || destroyed) return;
+    const [{ createOrganizer }, { inspectPdf }, { MAX_INSERT_BYTES }, sheets, writer, remap, planModel] = await Promise.all([
+      import("./pdf-pages/organizer"), import("./pdf-pages/inspect"), import("./pdf-pages/plan"),
+      import("./pdf-pages/sheets"), import("./pdf-pages/writer"), import("./pdf-pages/remap"), import("./pdf-pages/plan"),
+    ]);
+    if (organizer || saving || saveBusy || destroyed) return;
+    if (hasPdfEdits(editDocument)) { if (await sheets.pendingEdits() === "save") await saveEditedPdf(); return; }
+    let facts: Awaited<ReturnType<typeof inspectPdf>>;
+    try { facts = await inspectPdf(new Uint8Array(bytes)); }
+    catch (error) { setStatus(error instanceof Error ? error.message : String(error), { sticky: true }); return; }
+    if (organizer || destroyed) return;
+    const insertedDocs = new Map<string, ReturnType<typeof pdfjs.getDocument>>();
+    const closeOrganizer = (): void => {
+      organizer?.destroy(); organizer = null; host.classList.remove("pdf-organizing");
+      insertedDocs.forEach(task => { void task.destroy(); }); insertedDocs.clear(); host.focus({ preventScroll: true });
+    };
+    disposeOrganizer = closeOrganizer;
+    const source = new Uint8Array(bytes);
+    const saveOrganized = async (plan: import("./pdf-pages/plan").PagePlan): Promise<boolean> => {
+      let saved = false;
+      await withSaveLock(async () => {
+        try {
+          const onDisk = await readFileBytes(path);
+          const changedOnDisk = (await pdfSourceDigest(onDisk)) !== sourceDigest;
+          const pruned = await writer.countPruned(source, plan);
+          const mapped = remap.remapAnnotations(annotationStore.document.annotations, plan, pages.map(p => ({ width: p.box.width, height: p.box.height })));
+          if (!await sheets.confirmOrganizedSave({ fileName: path.split(/[/\\]/).pop() ?? path, summary: planModel.changeSummary(plan, pages.length), pages: plan.pages.length, removedHighlights: mapped.removed.length, pruned, signed: facts.signed, changedOnDisk })) return;
+          saving = true; updateToolbarState();
+          await manualBinarySnapshot(path, onDisk, "Before organizing pages");
+          const backupPath = await invoke<string>("backup_file", { path });
+          const output = await writer.buildOrganizedPdf(source, plan);
+          await invoke("save_bytes", { path, bytes: Array.from(output.bytes) });
+          saved = true;
+          let annotationsSaved = true;
+          try { await annotationStore.replaceAll({ digest: await pdfSourceDigest(output.bytes), pages: plan.pages.length, annotations: mapped.kept }); }
+          catch { annotationsSaved = false; setStatus("Pages saved, but highlights could not be updated.", { sticky: true }); }
+          if (annotationsSaved) setStatus(`Saved. Backup: ${backupPath}`, { sticky: true });
+          options?.onReloadRequest?.();
+        } catch (error) { setStatus(error instanceof Error ? error.message : String(error), { sticky: true }); }
+        finally { saving = false; updateToolbarState(); }
+      });
+      return saved;
+    };
+    const separateOutput = async (plan: import("./pdf-pages/plan").PagePlan, keys?: string[]): Promise<void> => {
+      await withSaveLock(async () => {
+        try {
+          const out = await pickExportPath("pdf"); if (!out) return;
+          if (await invoke<boolean>("same_file", { a: path, b: out })) { setStatus(keys ? "Choose a new file name for the extracted pages." : "Choose a new file name for the copy.", { sticky: true }); return; }
+          const output = keys ? await writer.extractPages(source, plan, keys) : (await writer.buildOrganizedPdf(source, plan)).bytes;
+          await invoke("save_bytes", { path: out, bytes: Array.from(output) });
+          setStatus(keys ? `Extracted ${keys.length} pages` : "Copy saved", { sticky: true });
+        } catch (error) { setStatus(error instanceof Error ? error.message : String(error), { sticky: true }); }
+      });
+    };
+    closeThumbnailPanel(); inspector.close({ restoreFocus: false });
+    organizer = createOrganizer(window.document, {
+      selfCount: pages.length, fileName: path.split(/[/\\]/).pop() ?? path,
+      readOnly: facts.encrypted ? "This PDF is encrypted, so its pages cannot be changed." : null,
+      thumb: async (item, index, width) => {
+        if (item === "self") return pages[index]?.snapshot(width) ?? null;
+        let task = insertedDocs.get(item.id);
+        if (!task) { task = pdfjs.getDocument({ data: new Uint8Array(item.bytes) }); insertedDocs.set(item.id, task); }
+        const pdf = await task.promise; const page = await pdf.getPage(index + 1); const viewport = page.getViewport({ scale: 1 });
+        const scaled = page.getViewport({ scale: width / viewport.width }); const canvas = window.document.createElement("canvas");
+        canvas.width = Math.ceil(scaled.width); canvas.height = Math.ceil(scaled.height); const context = canvas.getContext("2d");
+        if (!context) return null; await page.render({ canvasContext: context, viewport: scaled, canvas }).promise; return canvas;
+      },
+      pickInsert: async () => { const result = await open({ multiple: false, filters: [{ name: "PDF", extensions: ["pdf"] }] }); return typeof result === "string" ? result : null; },
+      readInsert: async insertPath => {
+        try {
+          const stat = await invoke<{ size: number }>("file_stat", { path: insertPath });
+          if (stat.size > MAX_INSERT_BYTES) return { error: "That PDF is larger than 200 MB." };
+          const data = await readFileBytes(insertPath); if (data.length > MAX_INSERT_BYTES) return { error: "That PDF is larger than 200 MB." };
+          const info = await inspectPdf(data); if (info.encrypted) return { error: "That PDF is encrypted." };
+          const task = pdfjs.getDocument({ data: new Uint8Array(data) }); try { await task.promise; } finally { await task.destroy(); }
+          return { id: crypto.randomUUID(), name: insertPath.split(/[/\\]/).pop() ?? insertPath, path: insertPath, bytes: data, pageCount: info.pageCount };
+        } catch { return { error: "Could not read that PDF." }; }
+      },
+      save: saveOrganized, saveCopy: plan => separateOutput(plan), extract: (plan, keys) => separateOutput(plan, keys), close: closeOrganizer,
+    });
+    host.classList.add("pdf-organizing"); host.append(organizer.element);
+    organizer.element.querySelector<HTMLElement>('[role="option"]')?.focus();
+  };
   // Another app changed the file: reload a clean view; with unsaved edits, offer a
   // reload (which asks whether to keep them) instead of drawing over new content.
   let diskNotice: HTMLElement | null = null;
@@ -2525,6 +2621,7 @@ export async function renderPdf(
   };
   let checkedStamp = await fileStamp();
   const checkDisk = async (): Promise<void> => {
+    if (organizer) return;
     if (saving || diskNotice) return;
     const stamp = await fileStamp();
     if (!stamp || stamp === checkedStamp) return;
@@ -2842,6 +2939,10 @@ export async function renderPdf(
     host.scrollTop += after.top + fraction * after.height - top;
   };
   return {
+    openOrganizer: () => { void openOrganizer(); },
+    hasOrganizer: () => !!organizer,
+    organizerDrop: (paths, point) => { if (!organizer) return false; organizer.dropFiles(paths, point.x, point.y); return true; },
+    requestOrganizerClose: async () => { if (!organizer) return true; const accepted = await organizer.requestClose(); if (accepted) disposeOrganizer(); return accepted; },
     goToPage,
     flashAnnotation: (id) => annotationLayers.forEach((layer) => layer.flash(id)),
     pageCount: () => pages.length,
@@ -2884,6 +2985,7 @@ export async function renderPdf(
     checkDisk,
     destroy: () => {
       destroyed = true;
+      disposeOrganizer();
       host.removeEventListener(PDF_ANNOTATIONS_EVENT, onAnnotationsShortcut);
       host.removeEventListener(PDF_COPY_QUOTE_EVENT, onCopyQuoteShortcut);
       annotationController.destroy();
