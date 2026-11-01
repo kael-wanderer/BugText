@@ -190,5 +190,5 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 - ✅ Citations: Pandoc-style keys, BibTeX/CSL JSON bibliography, Insert Citation (⌥⌘K) and completion, preview with References, PDF/DOCX export through citeproc (Chicago, APA, IEEE).
 - ✅ Spell check: system dictionary underlines, suggestions, Ignore and Learn.
 - ✅ PDF page organization: reorder, rotate, delete, extract and merge pages, saved as a new copy or in place with a snapshot. Done 2026-11-01.
-- 🔜 Writing goals: optional word target per session or per note, shown in the status bar.
+- ✅ Writing goals: optional word target per session or per note, shown in the status bar. Done 2026-11-01.
 - 🔜 Presentation mode: present a Markdown note as slides split at headings or `---`.
