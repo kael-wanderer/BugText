@@ -58,3 +58,8 @@ tesseract.js (with tesseract.js-core and the eng / vie trained data)
 
 Full license texts are available in each package's distribution under
 node_modules/<package>/ and in the respective Cargo crate sources.
+
+Citation Style Language styles (APA and IEEE)
+Source: https://github.com/citation-style-language/styles
+Commit: aa7ce48481988526d06f08452ea73890813310a1
+License: CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/)

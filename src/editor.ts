@@ -63,7 +63,7 @@ export type EditorHandle = {
   getText(id: string): string;
   revision(id: string): number;
   applyPropertyEdit(id: string, edit: PropertyEdit): void;
-  applyChanges(id: string, changes: { from: number; to: number; insert: string }[], options?: { isolate?: boolean }): void;
+  applyChanges(id: string, changes: { from: number; to: number; insert: string }[], options?: { isolate?: boolean; cursor?: number }): void;
   getSelection(): { from: number; to: number; text: string };
   replaceRange(from: number, to: number, text: string): void;
   selectRange(from: number, to: number): void;
@@ -119,10 +119,11 @@ export type PasteTextHandler = (id: string, html: string, text: string, inCode: 
 export function agentChangeTransaction(
   state: EditorState,
   changes: { from: number; to: number; insert: string }[],
-  options?: { isolate?: boolean },
+  options?: { isolate?: boolean; cursor?: number },
 ): Transaction {
   return state.update({
     changes,
+    selection: options?.cursor === undefined ? undefined : { anchor: options.cursor },
     annotations: [Transaction.userEvent.of("input.agent"), ...(options?.isolate ? [isolateHistory.of("full")] : [])],
   });
 }

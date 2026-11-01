@@ -1,3 +1,4 @@
+import { refreshOnCitationStyleChange } from "./settings-screen/citation-refresh";
 import { suggestSpelling, ignoreSpelling, learnSpelling } from "./spell/api";
 import { spellMenuItems, replaceMisspelling } from "./spell/menu";
 import { spellCache } from "./spell/cache";
@@ -40,6 +41,7 @@ import { applyRename } from "./links/rename-plan";
 import { planRename, movedPath } from "./links/rename-plan";
 import { showRenameReview } from "./links/rename-review";
 import { parseNote, type IndexedNote } from "./links/index";
+import { configureCitationCompletion } from "./citations/complete";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
@@ -694,6 +696,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       const raw = await getSettingsFile(FRESH_SETTINGS_JSON);
       const next = tryParseSettings(raw.contents);
       if (!next) return;
+      const citationChanged = next.export.citationStyle !== currentSettings.export.citationStyle;
       const themeChanged = next.theme !== currentSettings.theme || next.darkTheme !== currentSettings.darkTheme || next.lightTheme !== currentSettings.lightTheme;
       const hoverChanged = next.links.hoverPreview !== currentSettings.links.hoverPreview;
       const gitVisibilityChanged = next.git.showSourceControl !== currentSettings.git.showSourceControl;
@@ -710,6 +713,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       syncViewMenu();
       requestWindowMeasure();
       if (themeChanged) renderAll();
+      if (citationChanged) refreshCitationPreviews();
     } else if (file === "agent") {
       const raw = await getAISettingsFile(DEFAULT_AI_SETTINGS_JSON);
       const next = tryParseAISettings(raw.contents);
@@ -767,7 +771,15 @@ function openAISettings(): void {
   if (aiSettingsPath) void doOpenPath(aiSettingsPath);
 }
 
+function refreshCitationPreviews(): void {
+  for (const [wid, view] of views) {
+    const window = getWindow(wid); const tab = window?.tabs.find(t => t.id === window.activeTabId);
+    if (tab && isMarkdownFile(tab.path ?? tab.name)) view.renderPreview(view.editor.getText(tab.id), tab.path ?? tab.name);
+  }
+}
+
 function saveSettingsFromPanel(settings: Settings): void {
+  const previousSettings = currentSettings;
   const hoverChanged = settings.links.hoverPreview !== currentSettings.links.hoverPreview;
   const themeChanged = settings.theme !== currentSettings.theme || settings.darkTheme !== currentSettings.darkTheme || settings.lightTheme !== currentSettings.lightTheme;
   const gitVisibilityChanged = settings.git.showSourceControl !== currentSettings.git.showSourceControl;
@@ -783,6 +795,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   syncViewMenu();
   requestWindowMeasure();
   if (themeChanged) renderAll();
+  refreshOnCitationStyleChange(previousSettings, settings, refreshCitationPreviews);
   void writeSettings(settings).catch(() => {});
 }
 
@@ -999,6 +1012,7 @@ const handlers = {
   },
   onThemeChange: (theme: ThemeName) => setMenuTheme(theme),
   getTheme: () => currentSettings.theme,
+  getCitationStyle: () => currentSettings.export.citationStyle ?? "chicago",
   onEditorContextMenu: async (wid: string, x: number, y: number) => {
     if (getState().activeWindowId !== wid) {
       const tab = getWindow(wid)?.tabs.find(tab => tab.id === getWindow(wid)?.activeTabId);
@@ -1455,6 +1469,25 @@ function insertNoteLink(): void {
       if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the link again."); return; }
       editor.applyChanges(tab.id, [{ from: selection.from, to: selection.to, insert: text }]);
     },
+  });
+}
+
+async function loadCitationLibrary(path: string | null, text: string) {
+  const { libraryFor } = await import("./citations/library");
+  return libraryFor(path, text, getState().folder, {
+    stat: path => invoke<{ mtimeMs: number; size: number }>("file_stat", { path }).catch(() => null),
+    read: (path, folder) => invoke<string>("read_file", { path, folder }),
+  });
+}
+function insertCitation(): void {
+  const tab = activeMeta(); if (!tab || !isMarkdownFile(tab.path ?? tab.name)) return;
+  const editor = activeView().editor; const text = editor.getText(tab.id); const selection = editor.getSelection(); const revision = editor.revision(tab.id);
+  void Promise.all([import("./citations/picker"), loadCitationLibrary(tab.path, text)]).then(([picker, result]) => {
+    picker.showCitationPicker({ result, insert: key => {
+      if (editor.revision(tab.id) !== revision) { showToast("Note changed; insert the citation again."); return; }
+      const change = picker.citationInsertion(text, selection.from, selection.to, key);
+      editor.applyChanges(tab.id, [change], { isolate: true, cursor: change.from + change.insert.length });
+    } });
   });
 }
 
@@ -2095,6 +2128,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       if (isMac && currentSettings.appIcon !== previous.appIcon) {
         void invoke<void>("set_dock_icon", { id: currentSettings.appIcon }).catch(() => {});
       }
+      if (currentSettings.export.citationStyle !== previous.export.citationStyle) refreshCitationPreviews();
       if (currentSettings.theme !== previous.theme || currentSettings.darkTheme !== previous.darkTheme || currentSettings.lightTheme !== previous.lightTheme) renderAll();
       broadcastSettingsChange("settings");
     }
@@ -2401,6 +2435,20 @@ function exportError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function citationExportContext(tab: { path: string | null }, text: string) {
+  const [{ libraryFor }, { applyExportCitations }, { renderMarkdown }] = await Promise.all([import("./citations/library"), import("./export-render"), import("./preview")]);
+  const folder = getState().folder;
+  const result = await libraryFor(tab.path, text, folder, {
+    stat: path => invoke<{ mtimeMs: number; size: number }>("file_stat", { path }).catch(() => null),
+    read: (path, folder) => invoke<string>("read_file", { path, folder }),
+  });
+  const style = currentSettings.export.citationStyle ?? "chicago";
+  const host = document.createElement("article"); host.innerHTML = renderMarkdown(text);
+  const hasCitations = !!host.querySelector(".bugtext-cite");
+  const counts = await applyExportCitations(host, { result, style, references: false });
+  return { result, style, folder, hasCitations, ...counts };
+}
+
 async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
   const tab = activeMeta();
   if (!tab) return;
@@ -2409,7 +2457,10 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const { missingImages, exportTitle, exportDate, fontAvailable } = await import("./export/checks");
     const text = activeView().editor.getText(tab.id);
     const missing = await missingImages(text, tab.path, path => invoke("file_stat", { path }));
+    const citation = await citationExportContext(tab, text);
+    const styleLabel = { chicago: "Chicago author-date", apa: "APA 7th", ieee: "IEEE" }[citation.style];
     const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
+      citations: { status: citation.result.status, cited: citation.cited, missing: citation.missing, styleLabel, hasCitations: citation.hasCitations },
       diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText });
     if (!choice) return;
     if (choice.action === "edit") { const { selectExportPreset } = await import("./settings-screen/page-export"); selectExportPreset(choice.preset.id); settingsScreen.open("export"); return; }
@@ -2420,6 +2471,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const { buildExportHtml } = await import("./export-render");
     const html = await buildExportHtml(text, {
       rasterizeSvg: kind === "docx", svgAsImage: kind === "pdf",
+      citations: { result: citation.result, style: citation.style, references: false },
       firstHeading: preset.id !== "standard" && preset.title.mode === "first-heading" ? value => { heading = value; } : undefined,
     });
     const standard = preset.id === "standard";
@@ -2428,6 +2480,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const meta = standard ? null : { title: exportTitle(preset.title.mode, heading, tab.path ?? tab.name), author: preset.title.author, date: exportDate(preset.title.date) };
     await invoke(kind === "pdf" ? "export_pdf_html" : "export_docx_html", {
       html, out, resourceDir: tab.path ? dirOf(tab.path) : null, preset: standard ? null : safePreset, meta,
+      citations: citation.result.status === "ok" && citation.cited.length && citation.folder ? { bibliography: citation.result.library.path, folder: citation.folder, style: citation.style } : null,
     });
     saveSettingsFromPanel({ ...currentSettings, export: rememberLast(currentSettings.export, kind, preset.id) });
   } catch (error) {
@@ -2457,8 +2510,9 @@ async function captureActive(): Promise<HTMLCanvasElement> {
     return capture.htmlToCanvas(text);
   }
   const { buildExportHtml } = await import("./export-render");
+  const citation = await citationExportContext(tab, text);
   return capture.htmlToCanvas(
-    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path), citations: { result: citation.result, style: citation.style, references: true } }),
     { artboard: false },
   );
 }
@@ -2471,8 +2525,9 @@ async function activeSvg(): Promise<string> {
   const capture = await import("./capture");
   if (isHtmlFile(name)) return capture.htmlToSvg(text);
   const { buildExportHtml } = await import("./export-render");
+  const citation = await citationExportContext(tab, text);
   return capture.htmlToSvg(
-    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path), citations: { result: citation.result, style: citation.style, references: true } }),
     { artboard: false },
   );
 }
@@ -3578,6 +3633,13 @@ initExplorer(
   },
 );
 
+configureCitationCompletion({
+  enabled: () => currentSettings.links.complete,
+  load: async (id, text) => {
+    const tab = getState().windows.flatMap(w => w.tabs).find(t => t.id === id);
+    return loadCitationLibrary(tab?.path ?? null, text);
+  },
+});
 configureLinkCompletion({
   index: linkIndex,
   context: (id) => {
@@ -3794,6 +3856,7 @@ listenScoped<string>("menu", (event) => {
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
+    case "edit.insert_citation": return insertCitation();
     case "edit.open_link": {
       const tab = activeMeta();
       if (tab) followEditorLink(tab.id, activeView().editor.getText(tab.id), activeView().editor.getSelection().from);

@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Citations from BibTeX and CSL JSON, with insertion and completion, styled preview references, and Pandoc citation export.
 - Table view property editing, column controls and reviewed bulk changes with Recovery snapshots.
 - macOS spelling feedback in Markdown and plain text, with suggestions, session ignore, dictionary learning and a setting in Editing.
 - Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.
@@ -45,6 +46,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Spell checking no longer underlines entire lines when macOS returns language-detection results.
 - Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").
 - Unlinked Mentions no longer draws a second divider above its heading.
 - Source Control: the Commit button says "Commit" instead of "Commit 0 files" when nothing is checked, and the conflict banner offers Open file for the selected conflicted file.

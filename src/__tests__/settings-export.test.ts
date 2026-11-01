@@ -43,3 +43,17 @@ it("edits a user preset in place so the list order stays the same", async () => 
   expect(settings.export.presets[0].page.marginMm).toBe(33);
   host.remove();
 });
+
+it("saves a selected citation style and refreshes previews", async () => {
+  const { refreshOnCitationStyleChange } = await import("../settings-screen/citation-refresh");
+  let settings = parseSettings("{}");
+  const refresh = vi.fn();
+  const save = vi.fn((next: Settings) => { refreshOnCitationStyleChange(settings, next, refresh); settings = next; });
+  const host = document.createElement("div"); document.body.append(host);
+  const deps = { getSettings: () => settings, onSettingsChange: save } as unknown as ScreenDeps;
+  exportPage.render(host, deps);
+  const select = host.querySelector<HTMLSelectElement>('[aria-label="Citation style"]')!;
+  select.value = "ieee"; select.dispatchEvent(new Event("change"));
+  expect(save).toHaveBeenCalledOnce(); expect(settings.export.citationStyle).toBe("ieee"); expect(refresh).toHaveBeenCalledOnce();
+  host.remove();
+});

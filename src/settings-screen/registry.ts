@@ -73,6 +73,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
   { id: "git.path", page: "git", label: "Git path", keywords: "git executable" },
   { id: "git.version", page: "git", label: "Git version", keywords: "git version" },
   { id: "git.show", page: "git", label: "Show Source Control", keywords: "sidebar git" },
+  { id: "export.citationStyle", page: "export", label: "Citation style", keywords: "bibliography references apa ieee chicago" },
   { id: "export-preset", page: "export", label: "Export preset", keywords: "presets" },
   { id: "export-page-size", page: "export", label: "Page size", keywords: "paper pdf" },
   { id: "export-margins", page: "export", label: "Margins", keywords: "page pdf mm" },

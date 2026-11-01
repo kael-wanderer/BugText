@@ -78,6 +78,8 @@ mod native {
         Ok(results
             .to_vec()
             .iter()
+            // The system may include orthography results even for a spelling request.
+            .filter(|result| result.resultType() == NSTextCheckingType::Spelling)
             .map(|result| {
                 let r = result.range();
                 [r.location, r.length]
@@ -140,6 +142,14 @@ mod native {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn orthography_is_not_a_misspelling() {
+        let text = "Code stays literal:                 ";
+        let ranges = super::native::check(text).unwrap();
+        assert!(!ranges.contains(&[0, text.len()]));
+    }
 
     #[test]
     fn word_validation() {

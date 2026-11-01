@@ -56,3 +56,15 @@ it("does not cache lines from a failed check", async () => {
   view.dispatch({ selection: { anchor: 1 } }); await tick();
   expect(view.dom.querySelectorAll(".cm-misspelled")).toHaveLength(1); view.destroy();
 });
+
+it("masks citation code and keeps the native spelling ranges on prose", async () => {
+  vi.useFakeTimers();
+  const doc = "Code stays literal: `[@newport2016]`";
+  // macOS reports an orthography range for the entire masked line, but no spelling ranges.
+  const nativeSpelling = vi.fn(async (_text: string): Promise<[number, number][]> => []);
+  const view = new EditorView({ state: EditorState.create({ doc, extensions: [markdown(), spellExtension("markdown", nativeSpelling)] }), parent: document.body });
+  await tick();
+  expect(nativeSpelling).toHaveBeenCalledOnce();
+  expect(nativeSpelling.mock.calls[0][0]).toBe("Code stays literal: " + " ".repeat("`[@newport2016]`".length));
+  expect(view.dom.querySelector(".cm-misspelled")).toBeNull(); view.destroy();
+});

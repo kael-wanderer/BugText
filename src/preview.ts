@@ -1,3 +1,4 @@
+import { installCitationSyntax } from "./citations/syntax";
 import { headingAnchors } from "./links/parse";
 import { markdownOutline } from "./outline";
 import MarkdownIt from "markdown-it";
@@ -24,6 +25,8 @@ const md = new MarkdownIt({
     return `<pre class="hljs"><code>${md.utils.escapeHtml(code)}</code></pre>`;
   },
 });
+
+installCitationSyntax(md);
 
 // Source maps attach navigation anchors to rendered block elements.
 md.core.ruler.push("source_lines", (state) => {

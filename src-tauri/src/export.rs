@@ -121,6 +121,7 @@ pub fn export_pdf_html(
     resource_dir: Option<String>,
     preset: Option<ExportPreset>,
     meta: Option<ExportMeta>,
+    citations: Option<crate::citations::CitationArgs>,
 ) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let typst = find_typst().ok_or(TYPST_MISSING)?;
@@ -141,6 +142,8 @@ pub fn export_pdf_html(
         "-o".into(),
         out,
     ]);
+    let citation_files = citations.as_ref().map(crate::citations::citation_args).transpose()?;
+    if let Some(files) = &citation_files { args.extend(files.args.clone()); }
     run_with_preset(
         &pandoc,
         &html,
@@ -158,6 +161,7 @@ pub fn export_docx_html(
     resource_dir: Option<String>,
     preset: Option<ExportPreset>,
     meta: Option<ExportMeta>,
+    citations: Option<crate::citations::CitationArgs>,
 ) -> Result<(), String> {
     let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
     let media = std::env::temp_dir().join("bugtext-export-media");
@@ -170,6 +174,8 @@ pub fn export_docx_html(
         "-o".into(),
         out,
     ]);
+    let citation_files = citations.as_ref().map(crate::citations::citation_args).transpose()?;
+    if let Some(files) = &citation_files { args.extend(files.args.clone()); }
     run_with_preset(
         &pandoc,
         &html,

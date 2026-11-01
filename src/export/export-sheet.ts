@@ -6,6 +6,7 @@ export type ExportDiagnostics = { pandoc: ToolDiagnostic; typst: ToolDiagnostic;
 export type SheetResult = { action: "export" | "edit"; preset: ExportPreset; fonts: string[] } | null;
 export type SheetOptions = {
   format: ExportFormat; settings: ExportSettings; missing: string[];
+  citations?: { status: "none" | "ok" | "error"; cited: string[]; missing: string[]; styleLabel: string; hasCitations: boolean };
   diagnostics: (refresh: boolean) => Promise<ExportDiagnostics>; copy: (text: string) => Promise<void>;
 };
 
@@ -45,6 +46,12 @@ export function showExportSheet(options: SheetOptions): Promise<SheetResult> {
       };
       tool("pandoc"); if (options.format === "pdf") tool("typst");
       if (options.format === "pdf" && preset.id !== "standard" && !fontAvailable(preset.type.font, diagnostic.fonts)) row("!", `${preset.type.font} is not installed for Typst. Typst will use its default font.`);
+      const citations = options.citations;
+      if (citations?.hasCitations && citations.status === "error") row("!", "Bibliography could not be read.");
+      if (citations?.hasCitations && citations.status === "ok") {
+        if (citations.cited.length) row("✓", `Citations: ${citations.cited.length} cited · ${citations.styleLabel}`);
+        if (citations.missing.length) row("!", `${citations.missing.length} ${citations.missing.length === 1 ? "key" : "keys"} not found: ${citations.missing.slice(0, 5).join(", ")}${citations.missing.length > 5 ? "…" : ""}`);
+      }
       if (options.missing.length) {
         const count = options.missing.length; const line = row("!", `${count} image${count === 1 ? "" : "s"} could not be found`);
         const toggle = document.createElement("button"); toggle.type = "button"; toggle.textContent = showImages ? "Hide" : "Show"; toggle.onclick = () => { showImages = !showImages; render(); }; line.append(toggle);

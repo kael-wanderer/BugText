@@ -54,6 +54,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "table.format", label: "Format Table", category: "Table", default: "", scope: "menu" },
   { id: "table.delete", label: "Delete Table", category: "Table", default: "", scope: "menu" },
   { id: "view.toggle_explorer", label: "Show/Hide Explorer", category: "View", default: "CmdOrCtrl+B", scope: "menu" },
+  { id: "edit.insert_citation", label: "Insert Citation…", category: "Edit", default: "CmdOrCtrl+Alt+K", scope: "menu" },
   { id: "edit.insert_note_link", label: "Insert Link to Note…", category: "Edit", default: "CmdOrCtrl+Alt+L", scope: "menu" },
   { id: "edit.open_link", label: "Open Link", category: "Edit", default: "", scope: "menu" },
   { id: "view.filter_panel", label: "Filter", category: "View", default: "CmdOrCtrl+Alt+Shift+F", scope: "menu" },

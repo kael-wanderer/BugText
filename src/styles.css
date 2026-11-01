@@ -3639,3 +3639,12 @@ body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidd
 #ab-git[hidden] { display: none; }
 
 .cm-misspelled { text-decoration: underline wavy var(--error, #c45b50); text-decoration-skip-ink: none; text-underline-offset: 3px; }
+
+.bugtext-cite { color: var(--accent, #587acb); text-decoration: underline dotted; cursor: pointer; }
+.bugtext-cite.missing { color: var(--error, #c45b50); }
+.bugtext-references { margin-top: 2em; font-size: .92em; }
+.bugtext-references ul { list-style: none; padding: 0; }
+.bugtext-references ul li { padding-left: 2em; text-indent: -2em; }
+.bugtext-ref-flash { background: color-mix(in srgb, var(--accent) 20%, var(--bg-elev)); }
+.citation-picker .outline-row { display: grid; gap: 2px; text-align: left; }
+.citation-picker .outline-row small { opacity: .75; }
