@@ -18,3 +18,8 @@ it("unwraps citations when no bibliography is available", () => {
   applyCitations(host, { status: "none" }, "chicago", { references: false });
   expect(host.textContent).toBe("[@x]\n"); expect(host.querySelector(".bugtext-cite")).toBeNull();
 });
+it("does not count an unknown bare mention as missing", () => {
+  const host = document.createElement("div"); host.innerHTML = renderMarkdown("@someone and [@missing]");
+  const result = applyCitations(host, { status: "ok", library: { path: "/x", entries: new Map() } }, "chicago", { references: false });
+  expect(result).toEqual({ cited: [], missing: ["missing"] });
+});

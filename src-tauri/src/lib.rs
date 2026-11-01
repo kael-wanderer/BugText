@@ -24,6 +24,7 @@ mod cli_args;
 mod cli_scan;
 mod defaults;
 mod dock_icon;
+mod citations;
 mod export;
 mod files;
 mod replace;

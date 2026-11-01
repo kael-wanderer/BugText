@@ -95,6 +95,11 @@ function promoteHeadings(root: HTMLElement): void {
   }
 }
 
+export async function applyExportCitations(host: HTMLElement, options: { result: import("./citations/csl-json").LibraryResult; style: import("./citations/csl-json").CitationStyle; references: boolean }): Promise<{ cited: string[]; missing: string[] }> {
+  const { applyCitations } = await import("./citations/apply");
+  return applyCitations(host, options.result, options.style, { references: options.references });
+}
+
 export async function buildExportHtml(
   markdown: string,
   options: {
@@ -102,6 +107,7 @@ export async function buildExportHtml(
     firstHeading?: (title: string) => void;
     svgAsImage?: boolean;
     inlineImages?: { notePath: string; read: (path: string) => Promise<Uint8Array> };
+    citations?: { result: import("./citations/csl-json").LibraryResult; style: import("./citations/csl-json").CitationStyle; references: boolean };
   },
 ): Promise<string> {
   const host = document.createElement("article");
@@ -113,6 +119,7 @@ export async function buildExportHtml(
     width: "800px",
   });
   host.innerHTML = renderMarkdown(markdown);
+  if (options.citations) await applyExportCitations(host, options.citations);
   if (options.firstHeading) {
     const heading = Array.from(host.children).find((child) => /^H[1-6]$/.test(child.tagName));
     options.firstHeading(heading?.textContent?.trim() ?? "");

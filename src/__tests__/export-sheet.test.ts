@@ -33,3 +33,12 @@ it("renders preset names as text", async () => {
   expect(document.querySelector("img")).toBeNull();
   document.querySelector("form")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await result;
 });
+it("shows citation counts, missing keys and generic bibliography errors", async () => {
+  const result = showExportSheet({ ...options("pdf"), citations: { status: "ok", cited: ["one"], missing: ["bad<key>"], styleLabel: "APA 7th", hasCitations: true } }); await settle();
+  expect(document.body.textContent).toContain("Citations: 1 cited · APA 7th");
+  expect(document.body.textContent).toContain("1 keys not found: bad<key>"); expect(document.querySelector("key")).toBeNull();
+  document.querySelector("form")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await result;
+  const error = showExportSheet({ ...options("pdf"), citations: { status: "error", cited: [], missing: [], styleLabel: "APA 7th", hasCitations: true } }); await settle();
+  expect(document.body.textContent).toContain("Bibliography could not be read.");
+  document.querySelector("form")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await error;
+});

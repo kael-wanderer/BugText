@@ -2414,6 +2414,20 @@ function exportError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function citationExportContext(tab: { path: string | null }, text: string) {
+  const [{ libraryFor }, { applyExportCitations }, { renderMarkdown }] = await Promise.all([import("./citations/library"), import("./export-render"), import("./preview")]);
+  const folder = getState().folder;
+  const result = await libraryFor(tab.path, text, folder, {
+    stat: path => invoke<{ mtimeMs: number; size: number }>("file_stat", { path }).catch(() => null),
+    read: (path, folder) => invoke<string>("read_file", { path, folder }),
+  });
+  const style = currentSettings.export.citationStyle ?? "chicago";
+  const host = document.createElement("article"); host.innerHTML = renderMarkdown(text);
+  const hasCitations = !!host.querySelector(".bugtext-cite");
+  const counts = await applyExportCitations(host, { result, style, references: false });
+  return { result, style, folder, hasCitations, ...counts };
+}
+
 async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
   const tab = activeMeta();
   if (!tab) return;
@@ -2422,7 +2436,10 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const { missingImages, exportTitle, exportDate, fontAvailable } = await import("./export/checks");
     const text = activeView().editor.getText(tab.id);
     const missing = await missingImages(text, tab.path, path => invoke("file_stat", { path }));
+    const citation = await citationExportContext(tab, text);
+    const styleLabel = { chicago: "Chicago author-date", apa: "APA 7th", ieee: "IEEE" }[citation.style];
     const choice = await showExportSheet({ format: kind, settings: currentSettings.export, missing,
+      citations: { status: citation.result.status, cited: citation.cited, missing: citation.missing, styleLabel, hasCitations: citation.hasCitations },
       diagnostics: refresh => invoke("export_diagnostics", { refresh }), copy: copyText });
     if (!choice) return;
     if (choice.action === "edit") { const { selectExportPreset } = await import("./settings-screen/page-export"); selectExportPreset(choice.preset.id); settingsScreen.open("export"); return; }
@@ -2433,6 +2450,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const { buildExportHtml } = await import("./export-render");
     const html = await buildExportHtml(text, {
       rasterizeSvg: kind === "docx", svgAsImage: kind === "pdf",
+      citations: { result: citation.result, style: citation.style, references: false },
       firstHeading: preset.id !== "standard" && preset.title.mode === "first-heading" ? value => { heading = value; } : undefined,
     });
     const standard = preset.id === "standard";
@@ -2441,6 +2459,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     const meta = standard ? null : { title: exportTitle(preset.title.mode, heading, tab.path ?? tab.name), author: preset.title.author, date: exportDate(preset.title.date) };
     await invoke(kind === "pdf" ? "export_pdf_html" : "export_docx_html", {
       html, out, resourceDir: tab.path ? dirOf(tab.path) : null, preset: standard ? null : safePreset, meta,
+      citations: citation.result.status === "ok" && citation.cited.length && citation.folder ? { bibliography: citation.result.library.path, folder: citation.folder, style: citation.style } : null,
     });
     saveSettingsFromPanel({ ...currentSettings, export: rememberLast(currentSettings.export, kind, preset.id) });
   } catch (error) {
@@ -2470,8 +2489,9 @@ async function captureActive(): Promise<HTMLCanvasElement> {
     return capture.htmlToCanvas(text);
   }
   const { buildExportHtml } = await import("./export-render");
+  const citation = await citationExportContext(tab, text);
   return capture.htmlToCanvas(
-    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path), citations: { result: citation.result, style: citation.style, references: true } }),
     { artboard: false },
   );
 }
@@ -2484,8 +2504,9 @@ async function activeSvg(): Promise<string> {
   const capture = await import("./capture");
   if (isHtmlFile(name)) return capture.htmlToSvg(text);
   const { buildExportHtml } = await import("./export-render");
+  const citation = await citationExportContext(tab, text);
   return capture.htmlToSvg(
-    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path) }),
+    await buildExportHtml(text, { rasterizeSvg: false, inlineImages: captureImages(tab.path), citations: { result: citation.result, style: citation.style, references: true } }),
     { artboard: false },
   );
 }
