@@ -191,4 +191,4 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 - ✅ Spell check: system dictionary underlines, suggestions, Ignore and Learn.
 - ✅ PDF page organization: reorder, rotate, delete, extract and merge pages, saved as a new copy or in place with a snapshot. Done 2026-11-01.
 - ✅ Writing goals: optional word target per session or per note, shown in the status bar. Done 2026-11-01.
-- 🔜 Presentation mode: present a Markdown note as slides split at headings or `---`.
+- ✅ Presentation mode: present a Markdown note as slides split at headings or `---`. Done 2026-11-01.

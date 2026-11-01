@@ -448,6 +448,8 @@ async function present(fromCursor: boolean): Promise<void> {
   if (presentController?.active()) { if (!fromCursor) await presentController.leave(); return; }
   if (!presentController) {
     const { createPresentController } = await import("./present/controller");
+    const savePresentation = (patch: Partial<Settings["presentation"]>) =>
+      saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, ...patch } });
     presentController = createPresentController({
       host: document.body,
       text: () => { const tab = activeMeta(); return tab && !tab.tableView && isMarkdownFile(tab.path ?? tab.name) && !activeView().graphActive() ? activeView().editor.getText(tab.id) : null; },
@@ -457,16 +459,21 @@ async function present(fromCursor: boolean): Promise<void> {
       restore: snapshot => { const place = snapshot as { view: WindowView; windowId: string; tabId: string }; if (getState().activeWindowId === place.windowId && activeMeta()?.id === place.tabId) void place.view.restoreReadingPosition(); },
       isFullscreen: () => currentNativeWindow?.isFullscreen() ?? Promise.resolve(false),
       setFullscreen: on => currentNativeWindow?.setFullscreen(on) ?? Promise.resolve(),
-      theme: () => isLightTheme(currentSettings.theme) ? "light" : "dark",
+      appTone: () => isLightTheme(document.documentElement.dataset.theme ?? currentSettings.theme) ? "light" : "dark",
+      themeName: () => document.documentElement.dataset.theme ?? "dark",
       notesSize: () => currentSettings.presentation.notesSize,
-      saveNotesSize: notesSize => saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, notesSize } }),
-      openPresenter: () => {}, closePresenter: () => {}, publish: () => {}, toast: showToast,
+      saveNotesSize: notesSize => savePresentation({ notesSize }),
       presenterBounds: () => currentSettings.presentation.presenterWindow,
-      savePresenterBounds: presenterWindow => saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, presenterWindow } }),
+      savePresenterBounds: presenterWindow => savePresentation({ presenterWindow }),
+      toast: showToast,
     });
   }
   await presentController.start(fromCursor);
 }
+// One presentation per app: another window starting one makes this one leave.
+void listen<{ owner?: unknown }>("bugtext://presenting-started", ({ payload }) => {
+  if (presentController?.active() && payload?.owner !== presentController.owner()) void presentController.leave();
+});
 const statusBar = createStatusBar(document.getElementById("app")!, () => {
   if (activeWindow().mode === "preview") setMode(getState().activeWindowId, "split");
   activeView().editor.openGoToLine();

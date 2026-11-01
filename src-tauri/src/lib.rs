@@ -234,8 +234,9 @@ pub fn run() {
             if window.label() == "presenter" {
                 if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
                     let owner = window.app_handle().state::<presenter::PresenterOwner>();
-                    if let (Some(label), Ok(pos), Ok(size), Ok(scale)) = (owner.0.lock().ok().and_then(|v| v.clone()), window.outer_position(), window.outer_size(), window.scale_factor()) {
-                        let bounds = presenter::Rect { x: pos.x as f64 / scale, y: pos.y as f64 / scale, width: size.width as f64 / scale, height: size.height as f64 / scale };
+                    let label = owner.0.lock().ok().and_then(|v| v.clone());
+                    let bounds = window.app_handle().get_webview_window("presenter").and_then(|w| presenter::logical_bounds(&w));
+                    if let (Some(label), Some(bounds)) = (label, bounds) {
                         let _ = window.emit_to(label, "bugtext://presenter-command", serde_json::json!({ "closed": bounds }));
                     }
                 }
@@ -245,8 +246,7 @@ pub fn run() {
                 native_windows::remember_focus(window.app_handle(), window.label());
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                let owner = window.app_handle().state::<presenter::PresenterOwner>();
-                if owner.0.lock().ok().and_then(|v| v.clone()).as_deref() == Some(window.label()) { let _ = presenter::close_presenter_window(window.app_handle().clone()); }
+                let _ = presenter::close_presenter_window(window.app_handle().clone(), window.label().to_string());
                 if let Some(state) = window.app_handle().try_state::<workspaces::WorkspaceState>() {
                     workspaces::release_window(&state, window.label());
                 }

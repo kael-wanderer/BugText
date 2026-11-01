@@ -25,22 +25,41 @@ pub fn choose_bounds(owner: Rect, monitors: &[Rect], saved: Option<Rect>) -> Rec
 }
 #[tauri::command]
 pub fn open_presenter_window(app: AppHandle, owner: String, saved: Option<Rect>) -> Result<(), String> {
-    if let Some(existing) = app.get_webview_window("presenter") { existing.set_focus().map_err(|e| e.to_string())?; return Ok(()); }
+    if let Some(existing) = app.get_webview_window("presenter") {
+        // One presentation per app: a presenter window left by another owner now follows this one.
+        *app.state::<PresenterOwner>().0.lock().map_err(|e| e.to_string())? = Some(owner);
+        existing.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
     let window = app.get_webview_window(&owner).ok_or("Owner window is unavailable")?;
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let pos = window.outer_position().map_err(|e| e.to_string())?; let size = window.outer_size().map_err(|e| e.to_string())?;
-    let owner_rect = Rect {x:pos.x as f64/scale,y:pos.y as f64/scale,width:size.width as f64/scale,height:size.height as f64/scale};
+    let owner_rect = logical_bounds(&window).ok_or("Owner window is unavailable")?;
     let monitors: Vec<Rect> = window.available_monitors().map_err(|e| e.to_string())?.iter().map(|m| { let p=m.position(); let s=m.size(); let f=m.scale_factor(); Rect{x:p.x as f64/f,y:p.y as f64/f,width:s.width as f64/f,height:s.height as f64/f} }).collect();
     let bounds = choose_bounds(owner_rect, &monitors, saved);
     *app.state::<PresenterOwner>().0.lock().map_err(|e| e.to_string())? = Some(owner);
     WebviewWindowBuilder::new(&app, "presenter", WebviewUrl::App("presenter.html".into())).title("Presenter — BugText").position(bounds.x,bounds.y).inner_size(bounds.width,bounds.height).min_inner_size(640.0,400.0).build().map_err(|e| e.to_string())?;
     Ok(())
 }
-#[tauri::command]
-pub fn close_presenter_window(app: AppHandle) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window("presenter") { w.close().map_err(|e| e.to_string())?; }
-    Ok(())
+pub fn logical_bounds(window: &tauri::WebviewWindow) -> Option<Rect> {
+    let scale = window.scale_factor().ok()?;
+    let pos = window.outer_position().ok()?;
+    let size = window.outer_size().ok()?;
+    Some(Rect { x: pos.x as f64 / scale, y: pos.y as f64 / scale, width: size.width as f64 / scale, height: size.height as f64 / scale })
 }
+
+/// Closes the presenter window when `owner` opened it and returns its last bounds so the owner can remember them.
+#[tauri::command]
+pub fn close_presenter_window(app: AppHandle, owner: String) -> Option<Rect> {
+    let state = app.state::<PresenterOwner>();
+    let mut current = state.0.lock().ok()?;
+    if current.as_deref() != Some(owner.as_str()) { return None; }
+    *current = None;
+    drop(current);
+    let window = app.get_webview_window("presenter")?;
+    let bounds = logical_bounds(&window);
+    let _ = window.close();
+    bounds
+}
+
 #[cfg(test)]
 mod tests {
  use super::*;
