@@ -23,3 +23,13 @@ it("applies once after confirmation", async () => {
   Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Apply to 6 notes")!.click();
   await Promise.resolve(); expect(apply).toHaveBeenCalledOnce(); expect(apply).toHaveBeenCalledWith({ key: "x", value: "new" }); expect(result).toHaveBeenCalledOnce();
 });
+it("leaves invalid YAML notes out of the confirmation and count", () => {
+  const broken = { path: "/notes/bad.md", properties: null, propertyError: { line: 2, message: "Invalid YAML properties" } } as unknown as IndexedNote;
+  showBulkSheet({ notes: [notes[0], broken], keys: ["x"], kindFor: () => "text", onApply: vi.fn(), onResult: vi.fn() });
+  document.querySelector<HTMLInputElement>('input[aria-label="Property"]')!.value = "x";
+  document.querySelector<HTMLInputElement>('input[aria-label="Value"]')!.value = "new";
+  Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Review…")!.click();
+  expect(document.body.textContent).not.toContain("bad.md:"); expect(document.body.textContent).toContain("1 note has invalid YAML properties and will be skipped.");
+  expect(Array.from(document.querySelectorAll("button")).some(b => b.textContent === "Apply to 1 note")).toBe(true);
+  document.querySelector(".recovery-scrim")!.remove();
+});

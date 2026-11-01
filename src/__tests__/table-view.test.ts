@@ -88,4 +88,28 @@ describe("editable table", () => {
     Array.from(host.querySelectorAll("button")).find(b => b.textContent === "x")!.click();
     expect(host.querySelector('button[aria-label="Column menu: x"]')).not.toBeNull();
   });
+  it("shows checkbox columns as checkboxes and toggles on click", async () => {
+    const host = document.createElement("div"), edits: unknown[] = [];
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => [], edit: async (_n, e) => { edits.push(e); return { changed: [], skipped: [] }; } });
+    surface.update([note("/notes/a.md", { done: true }), note("/notes/b.md", {})], "/notes");
+    const boxes = host.querySelectorAll<HTMLInputElement>("input.table-check");
+    expect(boxes).toHaveLength(2); expect(boxes[0].checked).toBe(true); expect(boxes[1].checked).toBe(false);
+    (boxes[1].closest("td") as HTMLElement).click(); await Promise.resolve();
+    expect(edits).toEqual([{ key: "done", value: true }]);
+  });
+  it("highlights picked rows and clears the selection after a bulk apply", async () => {
+    const host = document.createElement("div"); document.body.append(host);
+    const surface = createTableSurface(host, { open: () => {}, folderKeys: () => ["x"], edit: async notes => ({ changed: notes.map(n => n.path), skipped: [] }) });
+    surface.update([note("/notes/a.md", { x: "old" }), note("/notes/b.md", { x: "old" })], "/notes");
+    host.querySelector<HTMLInputElement>('input[aria-label="Select row"]')!.click();
+    expect(host.querySelectorAll("tr.table-picked")).toHaveLength(1);
+    Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Set property…")!.click();
+    document.querySelector<HTMLInputElement>('input[aria-label="Property"]')!.value = "x";
+    document.querySelector<HTMLInputElement>('input[aria-label="Value"]')!.value = "new";
+    Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Review…")!.click();
+    Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Apply to 1 note")!.click();
+    await new Promise(r => setTimeout(r, 0));
+    expect(host.querySelectorAll("tr.table-picked")).toHaveLength(0); expect(host.textContent).toContain("2 matching notes");
+    expect(document.querySelector(".app-toast")?.textContent).toBe("Updated 1 note"); host.remove();
+  });
 });

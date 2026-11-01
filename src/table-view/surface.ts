@@ -4,6 +4,7 @@ import { columnKind, editableCell, validColumnKey } from "./cells";
 import { createCellEditor } from "./cell-editor";
 import { showBulkDetails, showBulkSheet } from "./bulk-sheet";
 import type { Skip, TableEdit } from "./edits";
+import { showToast } from "../toast";
 import "./table-view.css";
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, text = ""): HTMLElementTagNameMap[K] { const el = document.createElement(tag); el.textContent = text; return el; }
 function relativePath(path: string, root: string): string { const prefix = root.endsWith("/") ? root : `${root}/`; return path.startsWith(prefix) ? path.slice(prefix.length) : path; }
@@ -22,7 +23,13 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
     const rowsForPage = () => (sort ? sortNotes(notes, sort, descending) : notes).slice(limit - 500, limit);
     const toolbar = node("div"); toolbar.className = "table-toolbar";
     toolbar.append(node("span", selected.size ? `${selected.size} selected` : `${notes.length} matching notes`), node("span", "Double-click a cell to edit · Space selects"));
-    if (selected.size) { const bulk = node("button", "Set property…"); bulk.onclick = () => { const chosen = rowsForPage().filter(n => selected.has(n.path)); showBulkSheet({ notes: chosen, keys: deps.folderKeys(), kindFor: key => columnKind(notes, key), onApply: edit => deps.edit(chosen, edit), onResult: result => { render(); const toast = node("div", `Updated ${result.changed.length} notes${result.skipped.length ? ` · ${result.skipped.length} skipped` : ""}`); if (result.skipped.length) { const details = node("button", "Details"); details.onclick = () => showBulkDetails(result.skipped, folder!); toast.append(details); } host.prepend(toast); } }); }; toolbar.append(bulk); }
+    if (selected.size) { const bulk = node("button", "Set property…"); bulk.onclick = () => { const chosen = rowsForPage().filter(n => selected.has(n.path)); showBulkSheet({ notes: chosen, keys: deps.folderKeys(), kindFor: key => columnKind(notes, key), onApply: edit => deps.edit(chosen, edit), onResult: result => {
+      // Clear the selection and report through the app toast: the table re-renders when the index
+      // refreshes after the write, so anything placed inside it would vanish.
+      selected.clear(); anchor = -1; render();
+      const root = folder, text = `Updated ${result.changed.length} ${result.changed.length === 1 ? "note" : "notes"}${result.skipped.length ? ` · ${result.skipped.length} skipped` : ""}`;
+      if (result.skipped.length && root) showToast(text, 8000, { label: "Details", run: () => showBulkDetails(result.skipped, root) }); else showToast(text);
+    } }); }; toolbar.append(bulk); }
     const add = node("button", "+ Column"); add.onclick = () => {
       const input = node("input"); input.placeholder = "New key…"; input.setAttribute("list", "table-column-keys");
       const list = node("datalist"); list.id = "table-column-keys"; for (const key of deps.folderKeys().filter(k => !columns.some(c => c.key === k))) { const option = node("option"); option.value = key; list.append(option); }
@@ -70,13 +77,18 @@ export function createTableSurface(host: HTMLElement, supplied: TableSurfaceDeps
       cell.append(editor.root); editor.focus();
     }
     rows.forEach((note, i) => {
-      const row = node("tr"), selectCell = node("td"), checkbox = node("input"); checkbox.type = "checkbox"; checkbox.checked = selected.has(note.path); checkbox.setAttribute("aria-label", "Select row");
+      const row = node("tr"), selectCell = node("td"), checkbox = node("input"); if (selected.has(note.path)) row.className = "table-picked"; checkbox.type = "checkbox"; checkbox.checked = selected.has(note.path); checkbox.setAttribute("aria-label", "Select row");
       checkbox.onkeydown = event => { if (event.key === "Escape") { selected.clear(); render(); } };
       checkbox.onclick = event => { if (event.shiftKey && anchor >= 0) { for (let j = Math.min(i, anchor); j <= Math.max(i, anchor); j++) checkbox.checked ? selected.add(rows[j].path) : selected.delete(rows[j].path); } else checkbox.checked ? selected.add(note.path) : selected.delete(note.path); anchor = i; render(); }; selectCell.append(checkbox); row.append(selectCell);
       visible.forEach((col, j) => {
         const value = col.base === "path" ? relativePath(note.path, folder!) : cellValue(note, col), cell = node("td"); cell.tabIndex = (active?.path === note.path && active.key === identity(col)) || (!active && i === 0 && j === 0) ? 0 : -1;
         if (col.base === "title") { const button = node("button", valueText(value)); button.className = "table-title"; button.onclick = () => deps.open(note.path); cell.append(button); if (note.propertyError) cell.append(node("small", ` — line ${note.propertyError.line}: ${note.propertyError.message}`)); }
         else if (col.key && !editableCell(note, col) && !note.propertyError) cell.textContent = "Unsupported value";
+        else if (col.key && !note.propertyError && columnKind(notes, col.key) === "checkbox" && (value == null || typeof value === "boolean")) {
+          // Shown as a checkbox; the cell handles the toggle, so the box itself never changes on its own.
+          const box = node("input"); box.type = "checkbox"; box.checked = value === true; box.tabIndex = -1; box.className = "table-check";
+          box.setAttribute("aria-label", `${col.label}: ${value === true ? "checked" : "not checked"}`); box.onclick = event => event.preventDefault(); cell.append(box);
+        }
         else cell.textContent = valueText(value);
         const error = errors.get(`${note.path}\0${col.key}`); if (error) cell.append(node("small", error));
         cell.onclick = () => { active = { path: note.path, key: identity(col) }; cell.tabIndex = 0; if (col.key && columnKind(notes, col.key) === "checkbox") begin(cell, note, col); };
