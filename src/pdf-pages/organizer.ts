@@ -33,7 +33,8 @@ export function createOrganizer(doc: Document, deps: OrganizerDeps): Organizer {
     try { for (const path of paths) {
       const insert = await deps.readInsert(path); if ("error" in insert) { notify(insert.error); continue; }
       if (history.present.pages.length + insert.pageCount > MAX_PLAN_PAGES) { notify("The result would have more than 2,000 pages."); continue; }
-      apply(insertPages(history.present, insert, index)); index += insert.pageCount;
+      const before = new Set(history.present.pages.map(p => p.key)); const next = insertPages(history.present, insert, index);
+      selected = new Set(next.pages.filter(p => !before.has(p.key)).map(p => p.key)); focus = index; apply(next); index += insert.pageCount;
     } } finally { busy = false; render(); }
   }
   async function save(): Promise<boolean> { if (busy || deps.readOnly) return false; busy = true; try { return await deps.save(history.present); } finally { busy = false; } }

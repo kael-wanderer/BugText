@@ -1,6 +1,8 @@
 .pdf-organizer{display:flex;flex-direction:column;min-height:0;flex:1;color:var(--fg);background:var(--bg);font-size:var(--ui-size,13px)}
 .pdf-organizing > .pdf-document,.pdf-organizing .pdf-tb-edit-row{display:none}
-.pdf-organizing > .pdf-organizer{min-height:400px;height:calc(100% - 48px)}
+/* While organizing, the pane is a column: toolbar, then the organizer filling the rest without page scroll. */
+.pdf-organizing{display:flex;flex-direction:column;overflow:hidden}.pdf-organizing > *{flex-shrink:0}
+.pdf-organizing > .pdf-organizer{flex:1 1 auto;min-height:0;min-width:0}
 .pdf-organizer-toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px;border-bottom:1px solid var(--border)}
 .pdf-organizer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));align-content:start;gap:18px;padding:18px;overflow:auto;min-height:0;flex:1}
 .pdf-organizer-slot{position:relative;display:grid;justify-items:center;gap:6px;min-width:0}

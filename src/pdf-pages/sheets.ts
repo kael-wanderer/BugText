@@ -20,12 +20,17 @@ function sheet<T extends string>(title: string, lines: string[], choices: { labe
   });
 }
 const count = (n: number, singular: string, plural = `${singular}s`) => `${n} ${n === 1 ? singular : plural}`;
+const list = (items: string[]) => items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+function pageLine(pages: number, s: Summary): string {
+  const parts = ([["moved", s.moved], ["rotated", s.rotated], ["deleted", s.deleted], ["inserted", s.inserted]] as const).filter(([, n]) => n > 0).map(([word, n]) => `${n} ${word}`);
+  return `${count(pages, "page")}: ${parts.length ? parts.join(", ") : "no page changes"}.`;
+}
 export async function confirmOrganizedSave(options: { fileName: string; summary: Summary; pages: number; removedHighlights: number; pruned: Pruned; signed: boolean; changedOnDisk: boolean }): Promise<boolean> {
   const { summary: s, pruned: p } = options;
-  const lines = [options.changedOnDisk ? "This PDF changed on disk after BugText opened it. Saving replaces the newer file (BugText backs it up first)." : `Save the new page order into ${options.fileName}? BugText saves a Recovery snapshot and a backup copy first.`, `${count(options.pages, "page")}: ${s.moved} moved, ${s.rotated} rotated, ${s.deleted} deleted, ${s.inserted} inserted.`];
+  const lines = [options.changedOnDisk ? "This PDF changed on disk after BugText opened it. Saving replaces the newer file (BugText backs it up first)." : `Save the new page order into ${options.fileName}? BugText saves a Recovery snapshot and a backup copy first.`, pageLine(options.pages, s)];
   if (options.removedHighlights) lines.push(`${count(options.removedHighlights, "highlight")} ${options.removedHighlights === 1 ? "is" : "are"} on deleted pages and will be removed.`);
   const losses = [p.bookmarks && count(p.bookmarks, "bookmark"), p.links && count(p.links, "link"), p.fields && count(p.fields, "form field")].filter(Boolean);
-  if (losses.length) lines.push(`${losses.join(" and ")} point to deleted pages and will be removed.`);
+  if (losses.length) lines.push(`${list(losses as string[])} ${losses.length === 1 && (p.bookmarks + p.links + p.fields) === 1 ? "points" : "point"} to deleted pages and will be removed.`);
   if (options.signed) lines.push("This PDF is digitally signed. Changing its pages invalidates the signature.");
   return (await sheet("Save organized PDF", lines, [{ label: "Cancel", value: "cancel" }, { label: options.changedOnDisk ? "Save Anyway" : "Save", value: "save" }], "cancel")) === "save";
 }

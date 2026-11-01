@@ -24,6 +24,7 @@ it("renders inserted names as text and rejects non-PDF drops", async () => {
   const { organizer } = setup(); button(organizer.element, "Insert from PDF…").click();
   await vi.waitFor(() => expect(organizer.element.textContent).toContain("<img src=x>.pdf"));
   expect(organizer.element.querySelector("img")).toBeNull();
+  expect(organizer.element.textContent).toContain("1 selected"); expect(options(organizer.element).find(o => o.getAttribute("aria-selected") === "true")?.getAttribute("aria-label")).toContain("from <img src=x>.pdf");
   vi.stubGlobal("IntersectionObserver", undefined); document.elementFromPoint = () => organizer.element;
   organizer.dropFiles(["/not.txt"], 0, 0); expect(organizer.element.textContent).toContain("Only PDF files can be inserted."); organizer.destroy(); vi.unstubAllGlobals();
 });

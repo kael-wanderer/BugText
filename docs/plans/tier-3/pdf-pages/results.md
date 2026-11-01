@@ -30,4 +30,4 @@ Test files were generated with pdf-lib: a 10-page report with one bookmark per p
 
 Fixes from this check (commit after this file): thumbnails overflowed their frame and hid the page numbers; Save was enabled with no changes; every edit dropped keyboard focus so the next shortcut did nothing; focus did not follow pages moved with ⌥← / ⌥→; dragging did nothing because HTML5 drags in the app's webview become native file drags (now pointer events, as in Explorer).
 
-Open: the "Saved. Backup: …" status is cleared by the reload after saving (also hides "Pages saved, but highlights could not be updated."); the confirmation lists "0 inserted"; a selection is not moved to newly inserted pages; a horizontal scrollbar line shows under the organizer.
+Fixed after the native check: save messages now use the app toast, which survives the reload; the confirmation omits zero counts ("3 pages: 1 moved, 1 rotated, 1 deleted."); inserted pages become the selection; the organizer fills the tab with a flex layout, so no extra scrollbar line shows (checked again on display 2).

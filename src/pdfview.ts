@@ -84,6 +84,7 @@ import {
 } from "./pdf-proofing";
 import { installReadableStreamAsyncIterator } from "./readable-stream-iter";
 import { manualBinarySnapshot } from "./recovery";
+import { showToast } from "./toast";
 import type { PdfFontBytesLoader } from "./pdf-unicode-fonts";
 
 export type PdfFindHandle = {
@@ -2559,8 +2560,9 @@ export async function renderPdf(
           saved = true;
           let annotationsSaved = true;
           try { await annotationStore.replaceAll({ digest: await pdfSourceDigest(output.bytes), pages: plan.pages.length, annotations: mapped.kept }); }
-          catch { annotationsSaved = false; setStatus("Pages saved, but highlights could not be updated.", { sticky: true }); }
-          if (annotationsSaved) setStatus(`Saved. Backup: ${backupPath}`, { sticky: true });
+          // The view reloads right after, which clears its status line; the app toast survives it.
+          catch { annotationsSaved = false; showToast("Pages saved, but highlights could not be updated.", 10000); }
+          if (annotationsSaved) showToast(`Saved. Backup: ${backupPath.split(/[/\\]/).pop() ?? backupPath}`, 6000);
           options?.onReloadRequest?.();
         } catch (error) { setStatus(error instanceof Error ? error.message : String(error), { sticky: true }); }
         finally { saving = false; updateToolbarState(); }
