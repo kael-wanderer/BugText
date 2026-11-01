@@ -17,3 +17,10 @@ describe("citation formatting", () => {
     expect(sortForStyle(["smith"], new Map([["smith", entry]]), "ieee")).toEqual(["smith"]);
   });
 });
+
+it("requires a citation boundary and formats APA author lists", () => {
+  expect(parseSource("[ask a@b.com]")).toEqual([]);
+  expect(parseSource("[see @valid; -@other]").map(x => x.key)).toEqual(["valid", "other"]);
+  expect(referenceLine({ ...entry, authorsFull: ["Smith, A.", "Lee, B.", "Ong, C."] }, "apa")).toContain("Smith, A., Lee, B., & Ong, C.");
+  expect(referenceLine({ ...entry, authorsFull: ["Smith, A.", "Lee, B."] }, "apa")).toContain("Smith, A., & Lee, B.");
+});

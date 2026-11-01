@@ -21,3 +21,7 @@ describe("bibliography parsers", () => {
     expect(parseBibtex('@book{x,title={First}} @book{x,title={Second}}')).toHaveLength(1);
   });
 });
+
+it("removes formatting commands but retains their content", () => {
+  expect(parseBibtex(String.raw`@book{x,title={A \emph{Study} \textit{x} \LaTeX{}}}`)[0].title).toBe("A Study x LaTeX");
+});

@@ -2,7 +2,10 @@ import type { Entry } from "./csl-json";
 
 const accents: Record<string, string> = { "'": "\u0301", '`': "\u0300", '"': "\u0308", '^': "\u0302", '~': "\u0303", c: "\u0327", '=': "\u0304", '.': "\u0307", u: "\u0306", v: "\u030c", H: "\u030b" };
 function clean(value: string): string {
-  return value.replace(/\\([\x27`"^~c=.uvH])\s*\{?([a-zA-Z])\}?/g, (_, accent: string, letter: string) => (letter + accents[accent]).normalize("NFC"))
+  return value.replace(/\\(?:([\x27`"^~=\.])\s*\{?([a-zA-Z])\}?|([cuvH])(?![A-Za-z])\s*\{?([a-zA-Z])\}?)/g, (_, symbol: string, first: string, command: string, second: string) => ((first || second) + accents[symbol || command]).normalize("NFC"))
+    .replace(/\\([A-Za-z]+)\s*\{\}/g, "$1")
+    .replace(/\\[A-Za-z]+(?=\s*\{)/g, "")
+    .replace(/\\[A-Za-z]+/g, "")
     .replace(/\\([&%_$#{}])/g, "$1").replace(/--/g, "–").replace(/[{}]/g, "").replace(/\s+/g, " ").trim();
 }
 function people(value: string): { authors: string[]; authorsFull: string[] } {

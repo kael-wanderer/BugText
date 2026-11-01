@@ -14,8 +14,9 @@ function citationAt(text: string, pos: number): Match | null {
     const keys: string[] = [];
     for (const part of parts) {
       keyPattern.lastIndex = 0;
-      const match = keyPattern.exec(part);
-      if (!match || keyPattern.exec(part)) return null;
+      let match: RegExpExecArray | null;
+      do { match = keyPattern.exec(part); } while (match && match.index > 0 && !/[\s-]/.test(part[match.index - 1]));
+      if (!match) return null;
       keys.push(match[1] ?? match[2]);
     }
     return { source, keys, bare: false };

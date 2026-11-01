@@ -23,3 +23,9 @@ describe("citation syntax", () => {
     expect(scanCitations('---\nx: "@no"\n---\n[@one; @two] `@no`\n```\n@no\n```\n@three')).toEqual(["one", "two", "three"]);
   });
 });
+
+it("does not interpret an email inside brackets as a citation", () => {
+  expect(renderMarkdown("[ask a@b.com]")).not.toContain("bugtext-cite");
+  expect(renderMarkdown("[see @valid; -@other]")).toContain("bugtext-cite");
+  expect(scanCitations("[ask a@b.com]")).toEqual([]);
+});

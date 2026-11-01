@@ -5,7 +5,7 @@ export function parseSource(source: string): CitationItem[] {
   const bracket = source.startsWith("[");
   const body = bracket ? source.slice(1, -1) : source;
   return (bracket ? body.split(";") : [body]).flatMap((part) => {
-    const match = /(-?)@(?:\{([^}\n]+)\}|([\w](?:[\w:.#$%&+?<>~/-]*[\w])?))/.exec(part);
+    const match = /(?<![^\s-])(-?)@(?:\{([^}\n]+)\}|([\w](?:[\w:.#$%&+?<>~/-]*[\w])?))/.exec(part);
     if (!match) return [];
     let locator = part.slice(match.index + match[0].length).trim();
     if (locator.startsWith(",")) locator = locator.slice(1).trim();
@@ -44,7 +44,10 @@ export function inText(items: CitationItem[], style: CitationStyle, bare: boolea
   return style === "ieee" ? `[${parts.join("; ")}]` : `(${parts.join("; ")})`;
 }
 export function referenceLine(entry: Entry, style: CitationStyle): string {
-  const authors = entry.authorsFull.join(style === "apa" ? ", & " : ", ");
+  const full = entry.authorsFull;
+  const authors = style === "apa" && full.length > 1
+    ? `${full.slice(0, -1).join(", ")}, & ${full[full.length - 1]}`
+    : full.join(", ");
   const year = entry.year || "n.d.";
   return [authors, style === "apa" ? `(${year}).` : `${year}.`, entry.title ? `${entry.title}.` : "", entry.container ? `${entry.container}.` : ""].filter(Boolean).join(" ");
 }
