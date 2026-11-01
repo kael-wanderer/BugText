@@ -461,6 +461,8 @@ async function present(fromCursor: boolean): Promise<void> {
       notesSize: () => currentSettings.presentation.notesSize,
       saveNotesSize: notesSize => saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, notesSize } }),
       openPresenter: () => {}, closePresenter: () => {}, publish: () => {}, toast: showToast,
+      presenterBounds: () => currentSettings.presentation.presenterWindow,
+      savePresenterBounds: presenterWindow => saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, presenterWindow } }),
     });
   }
   await presentController.start(fromCursor);

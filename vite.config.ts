@@ -19,6 +19,7 @@ export default defineConfig(async () => ({
     // on-demand engines to exceed 500 kB.
     chunkSizeWarningLimit: 800,
     rollupOptions: {
+      input: { main: "index.html", presenter: "presenter.html" },
       output: {
         manualChunks(id) {
           if (id.endsWith("/src/search.ts")) return "folder-search";

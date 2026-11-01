@@ -1,6 +1,7 @@
 import { renderMarkdown } from '../preview';
 import { resolvePreviewImages } from '../preview-images';
 import { enhancePreview } from '../render-extras';
+import { enhancePreviewTasks } from '../preview-tasks';
 import { fitScale } from './fit';
 import { createKeyReader, type PresentAction } from './keys';
 import type { Slide } from './split';
@@ -42,6 +43,7 @@ export function createStage(o: StageOptions): { go(action: PresentAction): void;
   function render() {
     content.innerHTML = renderMarkdown(o.slides[index].source);
     content.querySelectorAll('a').forEach(a => { a.tabIndex = -1; });
+    enhancePreviewTasks(content, null);
     resolvePreviewImages(content, o.notePath); void enhancePreview(content).then(fit); count.textContent = `${index + 1} / ${o.slides.length}`;
     updateNotes(); fit();
   }

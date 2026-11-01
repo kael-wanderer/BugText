@@ -38,6 +38,7 @@ mod mcp_server;
 mod menu;
 mod spell;
 mod native_windows;
+mod presenter;
 mod pdf_drafts;
 mod pdf_annotations;
 mod preview;
@@ -203,6 +204,7 @@ pub fn run() {
         .manage(OpenPathState::default())
         .manage(mcp_server::McpState::default())
         .manage(native_windows::FocusedWindowState::default())
+        .manage(presenter::PresenterOwner::default())
         .manage(workspaces::WorkspaceState::default())
         .manage(pinned_workspaces::PinnedState::default())
         .manage(preview::PreviewRoots::default())
@@ -229,10 +231,22 @@ pub fn run() {
             }
         })
         .on_window_event(|window, event| {
+            if window.label() == "presenter" {
+                if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                    let owner = window.app_handle().state::<presenter::PresenterOwner>();
+                    if let (Some(label), Ok(pos), Ok(size), Ok(scale)) = (owner.0.lock().ok().and_then(|v| v.clone()), window.outer_position(), window.outer_size(), window.scale_factor()) {
+                        let bounds = presenter::Rect { x: pos.x as f64 / scale, y: pos.y as f64 / scale, width: size.width as f64 / scale, height: size.height as f64 / scale };
+                        let _ = window.emit_to(label, "bugtext://presenter-command", serde_json::json!({ "closed": bounds }));
+                    }
+                }
+                return;
+            }
             if matches!(event, tauri::WindowEvent::Focused(true)) {
                 native_windows::remember_focus(window.app_handle(), window.label());
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                let owner = window.app_handle().state::<presenter::PresenterOwner>();
+                if owner.0.lock().ok().and_then(|v| v.clone()).as_deref() == Some(window.label()) { let _ = presenter::close_presenter_window(window.app_handle().clone()); }
                 if let Some(state) = window.app_handle().try_state::<workspaces::WorkspaceState>() {
                     workspaces::release_window(&state, window.label());
                 }
@@ -242,6 +256,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            presenter::open_presenter_window,
+            presenter::close_presenter_window,
             spell::spell_check,
             spell::spell_suggest,
             spell::spell_ignore,
