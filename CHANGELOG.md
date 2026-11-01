@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Citations from BibTeX and CSL JSON, with insertion and completion, styled preview references, and Pandoc citation export.
 - Table view property editing, column controls and reviewed bulk changes with Recovery snapshots.
 - macOS spelling feedback in Markdown and plain text, with suggestions, session ignore, dictionary learning and a setting in Editing.
 - Source Control sidebar for explicit Git commits, fast-forward pull, reviewed merge, push, and a redacted Git log.

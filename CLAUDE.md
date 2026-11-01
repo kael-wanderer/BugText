@@ -241,6 +241,13 @@ passes title, author and date as Pandoc `-M` metadata, never raw Typst. Standard
 no preset or metadata and retains the existing arguments. Tool diagnostics report paths
 and versions and cache Typst fonts until Check again.
 
+Citations use a note's `bibliography` property or the open folder's `references.bib` /
+`references.json`. Preview formats Chicago author-date, APA or IEEE; PDF and Word
+exports use Pandoc citeproc with bundled styles and a restricted citation filter.
+The Insert Citation picker and completion load the bibliography lazily, and the
+style is configured in Settings ▸ Export. Bibliography reads are confined to the
+open folder and capped at 5 MB.
+
 The webview runs under a strict CSP (`tauri.conf.json`). Rendered Markdown is
 sanitized (`src/sanitize.ts`) before it reaches `innerHTML`. HTML file previews load
 from `preview://localhost/__bugtext_doc__/<slot>/<version>` (`preview_set_doc`), not
