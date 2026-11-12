@@ -29,8 +29,21 @@ progress.md
 task_plan.md
 .planning/
 
-# Personal planning docs and design assets (kept out of the repo)
-docs/
+# Docs: durable ones are tracked (bugs, roadmap, test cases, results, the user
+# guide). Private planning material stays local.
+docs/design/
+docs/marketing/
+docs/superpowers/
+docs/archive/
+docs/reviews/
+docs/description.md
+docs/open-items.md
+docs/plans/**
+!docs/plans/**/
+!docs/plans/**/results.md
+!docs/plans/*-results.md
+!docs/plans/tier-2/run-log.md
+!docs/plans/table-view/*
 images/*
 # ...except the icons bundled into the app at build time
 !images/agent.png

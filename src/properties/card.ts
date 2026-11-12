@@ -5,9 +5,7 @@ import type { PropertyEdit } from "./edit";
 type Apply = (source: string, edit: PropertyEdit) => boolean;
 
 const expandedTabs = new Set<string>();
-export function transferPropertiesExpansion(from: string, to: string): void {
-  if (expandedTabs.delete(from)) expandedTabs.add(to);
-}
+/** Drops a closed tab's expanded state. Moving a tab between panes keeps its id, so the state follows it. */
 export function forgetPropertiesExpansion(id: string): void { expandedTabs.delete(id); }
 export function propertySummary(props: Record<string, unknown>): string {
   const parts = [props.category, props.status].filter(value => typeof value === "string" && value.trim()).map(String);

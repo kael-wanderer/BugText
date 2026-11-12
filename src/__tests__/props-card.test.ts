@@ -51,3 +51,20 @@ it("starts compact, never writes on toggling and remembers each tab", () => {
   id = "compact-a"; card.reset(); expect(host.querySelectorAll(".properties-row")).toHaveLength(2);
   expect(apply).not.toHaveBeenCalled();
 });
+
+it("keeps expansion per tab and forgets it when the tab closes", async () => {
+  const { forgetPropertiesExpansion } = await import("../properties/card");
+  const host = document.createElement("div");
+  let tabId = "tab-a";
+  const card = createPropertiesCard(host, () => "---\ntags: [one]\n---\n", vi.fn(), undefined, () => tabId);
+  card.render();
+  const toggle = () => host.querySelector<HTMLButtonElement>("[aria-expanded]")!;
+  toggle().click();
+  expect(toggle().getAttribute("aria-expanded")).toBe("true");
+  tabId = "tab-b"; card.render();
+  expect(toggle().getAttribute("aria-expanded")).toBe("false");
+  tabId = "tab-a"; card.render();
+  expect(toggle().getAttribute("aria-expanded")).toBe("true");
+  forgetPropertiesExpansion("tab-a"); card.render();
+  expect(toggle().getAttribute("aria-expanded")).toBe("false");
+});

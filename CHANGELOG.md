@@ -49,6 +49,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Fixed
+- Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.
 - Security: a checked folder write now writes the exact file that was checked, so a link swapped in after the check cannot redirect the write outside the open folder.
 - Security: updated the HTML sanitizer (DOMPurify 3.4.17), Markdown renderer, PDF engine and KaTeX to versions without known advisories.
 - Help guide: the AI and Settings sections now describe the current Chat panel, quick actions and the seven Settings pages.
