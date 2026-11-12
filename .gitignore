@@ -37,6 +37,10 @@ images/*
 !images/screenshots/
 !images/screenshots/bugtext-main.png
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # Local agent tool state
 .impeccable/
 .superpowers/

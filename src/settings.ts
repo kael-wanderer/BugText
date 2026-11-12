@@ -132,7 +132,6 @@ export const DEFAULT_SETTINGS: Settings = {
   templates: { folder: "", defaultFolder: "", dateFormat: "YYYY-MM-DD", quickTarget: "daily", inboxFile: "Inbox.md", lastUsed: "" },
 };
 
-export const DEFAULT_SETTINGS_JSON = JSON.stringify(DEFAULT_SETTINGS, null, 2);
 export const FRESH_SETTINGS_JSON = JSON.stringify({ ...DEFAULT_SETTINGS, onboarding: { hintDismissed: false } }, null, 2);
 
 export function normalizeThemeName(value: unknown): ThemeName | null {

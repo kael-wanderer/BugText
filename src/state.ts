@@ -100,10 +100,3 @@ export function loadSavedKeyIds(): Set<string> {
     return new Set();
   }
 }
-
-export function markKeySaved(id: string, saved: boolean): void {
-  const ids = loadSavedKeyIds();
-  if (saved) ids.add(id);
-  else ids.delete(id);
-  localStorage.setItem(SAVED_KEYS, JSON.stringify([...ids]));
-}

@@ -90,55 +90,56 @@ unsaved edits.
 
 ## AI assistant
 
-Toggle the right-side panel with the activity-bar agent button. It has two tabs:
+Toggle the right-side panel with the activity-bar agent button. The panel is a chat.
 
-- **Chat** — pick an agent and a permission profile. The open document (or your
-  selection) is sent as context. **Enter** sends; **Shift+Enter** inserts a newline.
-  Replies stream in, with Copy, Insert-at-cursor, and Apply-as-diff actions. Attach
-  files with the 📎 button, by dragging files onto the panel, or by typing `@` to
-  mention a file from the open folder. CLI agents read attached files themselves and
-  run in the open folder; HTTP models receive text inline and common image formats as
-  vision inputs. Click **Cancel** to stop a streaming reply. Chat history persists
-  independently in each native window.
-  - **Use workspace context** — when this toggle is on (default), each message also
-    retrieves the most relevant passages from the open folder using a local keyword
-    search (no extra service or key) and lists which files were used. Turn it off for
-    a focused chat. The amount of inline context is capped by the **Max context
-    characters** setting (Settings → AI); oversized context is trimmed,
-    keeping the document/selection first.
-- **Runs** — lists CLI agent runs from this session with their status (running, done,
-  failed, cancelled), a Cancel action for an in-progress run, and the changed-files
-  summary produced after a run in the open folder.
-- **Agent Console** — choose an **Agent command** such as Claude Code, Codex, Pi,
-  Shell, or a custom alias, then choose the **Terminal app** that runs it: Embedded,
-  Apple Terminal, Ghostty, or cmux. Manage commands and the default terminal app under
-  **Settings → AI**. Embedded font/size and live theme settings apply
-  only to the embedded renderer.
-  Drag the divider to resize the panel. With Explorer hidden, Agent Console can use
-  up to 80% of the BugText window while retaining a narrow document workspace.
+- **Engine and model:** the picker at the top chooses what answers: a local coding CLI
+  (Claude Code, Codex CLI or Pi) or an API connection. It is the same choice as
+  **Settings → AI → Use for → Chat**.
+- **Context chips:** *Note/selection* sends the open document or your selection;
+  *Folder search* adds the most relevant passages from the open folder using a local
+  keyword search (no extra service or key). Both start on. Each reply records the
+  context that was sent, with links to the source files.
+- **Sending:** **Enter** sends; **Shift+Enter** inserts a newline. Click **Cancel** to
+  stop a streaming reply.
+- **Attachments:** use the 📎 button, drag files onto the panel, or type `@` to mention
+  a file from the open folder. CLI engines receive the file paths; API connections
+  receive text files inline and skip binary and image files.
+- **Reply actions:** Copy, Insert at cursor, Replace selection (reviewed as a diff
+  first) and Save as new note.
+- **Conversations:** chats are named and kept per folder. Use the switcher at the top
+  of the panel to start, rename, delete or reopen one; a deleted conversation can be
+  brought back for seven days.
 
-Agents, models, and terminals are configured in `agent.json` (open it from
-**Settings → General → Open agent.json**). API keys are stored in the macOS Keychain. HTTP model
-providers can use an OpenAI-compatible endpoint or Anthropic's native Messages API
-(`"api": "anthropic"`); the bundled Anthropic preset uses the native path.
+**Quick actions** (Proofread, Rewrite, Summarize, Generate outline) and your own
+**saved actions** run from the command palette, the editor's AI menu or the panel bar.
+Proofread and Rewrite show a diff to review before anything changes; Summarize and
+Generate outline answer in Chat. Each one can be switched off or given its own engine
+under **Settings → AI → Use for**.
 
-Under **Settings → AI → Models**, use **Test connection** to check a provider's
-saved key, endpoint, and model before starting a chat.
+When a coding CLI runs in the open folder it is sandboxed to that folder. Unsaved tabs
+get a Recovery snapshot first, and afterwards a card lists the files it added, changed
+or deleted. With no folder open, a CLI can only answer.
 
-Document text and attachments are sent as untrusted user context, never as system
-instructions. Edit-mode replies stay bound to the tab and selection that produced
-them: Apply returns to that tab, and refuses if it was closed or changed meanwhile.
+**Settings → AI** has these pages:
 
-**Permission profiles** select which command template a CLI agent runs. The built-in
-profiles are **Ask before doing** and full-access; an agent can define more in
-`agent.json`. A full-access (bypass) profile requires confirmation on every send, is
-not persisted as the default, and BugText starts in **Ask before doing** after launch.
-BugText chooses the command template — the CLI agent still enforces its own permissions.
+- **Use for:** engine, model and effort for Chat and each quick action.
+- **Actions:** your saved actions.
+- **Context:** how many folder-search excerpts to add, the maximum context characters,
+  and files to exclude from AI context.
+- **Local CLI:** detected Claude Code, Codex CLI and Pi installs.
+- **API providers:** connections to Anthropic or OpenAI-compatible endpoints, with
+  model discovery and **Test Connection**. Addresses must use HTTPS, except on this
+  Mac (localhost).
+- **MCP server:** lets a terminal AI client read and edit the open folder through
+  BugText.
+
+API keys are stored in the macOS Keychain, never in `agent.json`. Document text and
+attachments are sent as untrusted user context, never as system instructions.
 
 ## Settings
 
 Open Settings with `⌘,` or **BugText → Settings…** (or the activity-bar gear). It fills
-the window with five pages: General, Editing, Theme, Shortcuts and AI. The search box
+the window with seven pages: General, Editing, Export, Git, Themes, Shortcuts and AI. The search box
 jumps to any setting. Leave with `Esc`, `⌘[`, the Back button, the gear, or `⌘,` again; your
 tabs, unsaved text, cursor and split are exactly as you left them. Changes apply
 immediately and show up in every open window. General has Typography — a size and a
@@ -167,7 +168,7 @@ Settings) lists every command and lets you rebind, reset, or restore defaults.
 | `⌘⇧F` | Find in folder |
 | `⌘B` | Show/hide Explorer |
 | `⌘P` | Show/hide Preview |
-| `⌘E` | Reading View |
+| `⌘E` | Reading View (Edit PDF in a PDF) |
 | `⌘+` / `⌘−` / `⌘0` | Zoom in / out / reset |
 | `Enter` | Send AI chat message (Shift+Enter = newline) |
 
@@ -180,7 +181,8 @@ also shows the file type, cursor line/column, and word count where applicable.
 
 Choose **Help → Check for Updates…** for a manual check. Enable automatic checks
 from Settings → General → Update checks or **Help → Automatically Check for Updates**.
-BugText checks at most once per 24 hours and always asks before installation.
+BugText checks at most once per 24 hours. When a newer version exists it offers to open
+the download page in your browser; it never installs anything itself.
 
 ## Export
 

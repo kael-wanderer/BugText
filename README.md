@@ -77,7 +77,7 @@ panel, a PDF reader, and document export.
   edit notes in BugText's open folders and read the current selection; every edit is
   snapshotted first.
 - **Settings** — a full-window screen (`⌘,` or **BugText → Settings…**) with General,
-  Editing, Theme, Shortcuts and AI pages and a search box, plus raw `settings.json` /
+  Editing, Export, Git, Themes, Shortcuts and AI pages and a search box, plus raw `settings.json` /
   `agent.json` for advanced edits. Changes apply live and sync across windows. General
   includes an app-icon picker that sets the Dock icon.
 - **Updates** — manual checks from Help and optional once-daily automatic checks

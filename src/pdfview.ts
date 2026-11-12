@@ -3018,11 +3018,3 @@ export async function renderPdf(
     },
   };
 }
-
-export function scrollPdfToPage(host: HTMLElement, page: number): boolean {
-  const element = host.querySelector<HTMLElement>(
-    `.pdf-page-wrap[data-page="${page}"]`,
-  );
-  element?.scrollIntoView({ block: "start", behavior: "smooth" });
-  return Boolean(element);
-}

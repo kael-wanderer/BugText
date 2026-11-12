@@ -1,5 +1,4 @@
 import {
-  DEFAULT_PDF_TEXT_STYLE,
   normalizePdfRect,
   type PdfOcrTextBlockOperation,
   type PdfPageBox,
@@ -120,8 +119,3 @@ export async function recognizePdfPageCanvas(
     await worker.terminate();
   }
 }
-
-export const OCR_TEXT_STYLE = {
-  ...DEFAULT_PDF_TEXT_STYLE,
-  opacity: 0,
-};

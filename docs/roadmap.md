@@ -2,9 +2,17 @@
 
 The full picture: where BugText has been and where it's going. Shipped work is
 marked **done**; planned/deferred work is at the bottom. For the live task tracker
-see `docs/tasks.md`; for release notes see `CHANGELOG.md`.
+see `docs/open-items.md`; for release notes see `CHANGELOG.md`.
 
 Legend: ✅ done · 🔜 planned/deferred
+
+> Stages 0–7 are a history of what was built at the time. Some of it was later
+> replaced: the Terminal / Agent Console, permission profiles, `http`/`command`
+> providers and OpenCode support were removed (the AI panel is Chat only, with Local
+> CLI and API providers); the signed updater and the GitHub Actions release pipeline
+> were replaced by a manual DMG build and a version feed; JPG export was dropped;
+> Settings now has seven pages (General, Editing, Export, Git, Themes, Shortcuts, AI).
+> `CHANGELOG.md` is the record of what the app does today.
 
 ---
 

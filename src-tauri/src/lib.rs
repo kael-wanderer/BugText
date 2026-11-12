@@ -5,19 +5,12 @@ mod conversations;
 mod workspaces;
 mod pinned_workspaces;
 mod ai;
-#[allow(dead_code)]
 mod git_run;
-#[allow(dead_code)]
 mod git_args;
-#[allow(dead_code)]
 mod git_status;
-#[allow(dead_code)]
 mod git_repo;
-#[allow(dead_code)]
 mod git_locate;
-#[allow(dead_code)]
 mod git_redact;
-#[allow(dead_code)]
 mod git_errors;
 mod assets;
 mod cli_args;
@@ -293,12 +286,10 @@ pub fn run() {
             dock_icon::set_dock_icon,
             ai::ai_cancel,
             export::export_pdf,
-            export::export_tools,
             export::export_diagnostics,
             export::export_docx,
             export::export_pdf_html,
             export::export_docx_html,
-            export::export_html,
             defaults::set_default_handler,
             defaults::open_default_apps_settings,
             secrets::set_secret,
@@ -313,7 +304,6 @@ pub fn run() {
             files::same_file,
             files::backup_file,
             files::get_initial_file,
-            files::word_count,
             files::list_dir,
             files::create_file,
             files::create_dir,

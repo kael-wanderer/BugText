@@ -23,16 +23,6 @@ function withProperties(note: Pick<IndexedNote, "path" | "source" | "links" | "h
   });
   return { ...note, tags, properties, ...(!result || result.ok ? {} : { propertyError: { line: result.line, message: result.error } }) };
 }
-export function folderTags(index: LinkIndex): Map<string, { name: string; count: number }> {
-  const tags = new Map<string, { name: string; count: number }>();
-  for (const note of index.notes().sort((a, b) => a.path.localeCompare(b.path))) {
-    for (const name of note.tags) {
-      const key = tagKey(name); const existing = tags.get(key);
-      if (existing) existing.count++; else tags.set(key, { name, count: 1 });
-    }
-  }
-  return tags;
-}
 export function compactKnown(folder: string, known: Record<string, string> = {}): Record<string, string> {
   const prefix = folder.replace(/\/$/, "") + "/";
   return Object.fromEntries(Object.entries(known).map(([path, stamp]) => [path.startsWith(prefix) ? path.slice(prefix.length) : path, stamp]));
