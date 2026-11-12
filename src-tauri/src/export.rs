@@ -3,12 +3,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-#[derive(serde::Serialize)]
-pub struct ExportTools {
-    pandoc: bool,
-    typst: bool,
-}
-
 const PANDOC_MISSING: &str = "Pandoc is required for export. Install it with: brew install pandoc";
 const TYPST_MISSING: &str = "Typst is required for PDF export. Install it with: brew install typst";
 const MD_FORMAT: &str = "markdown+task_lists+pipe_tables+grid_tables+multiline_tables+simple_tables+strikeout+footnotes";
@@ -39,14 +33,6 @@ fn find_typst() -> Option<PathBuf> {
         "typst",
         &["/opt/homebrew/bin/typst", "/usr/local/bin/typst"],
     )
-}
-
-#[tauri::command]
-pub fn export_tools() -> ExportTools {
-    ExportTools {
-        pandoc: find_pandoc().is_some(),
-        typst: find_typst().is_some(),
-    }
 }
 
 fn run_pandoc(pandoc: &PathBuf, markdown: &str, args: &[String]) -> Result<(), String> {
@@ -184,19 +170,6 @@ pub fn export_docx_html(
         preset.as_ref(),
         meta.as_ref(),
     )
-}
-
-#[tauri::command]
-pub fn export_html(markdown: String, out: String) -> Result<(), String> {
-    let pandoc = find_pandoc().ok_or(PANDOC_MISSING)?;
-    let args = vec![
-        "--from".into(),
-        MD_FORMAT.into(),
-        "--standalone".into(),
-        "-o".into(),
-        out,
-    ];
-    run_pandoc(&pandoc, &markdown, &args)
 }
 
 fn run_with_preset(
