@@ -221,6 +221,7 @@ import { setTableFormatting } from "./table-keys";
 import { tableCommandFromId, tableMenuItems } from "./table-menu";
 import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
+import { forgetPropertiesExpansion } from "./properties/card";
 
 const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
 const diagnostics = createDiagnostics();
@@ -1242,6 +1243,7 @@ async function closeTabs(windowId: string, tabIds: string[]): Promise<void> {
     }
     view.editor.closeState(id);
     cleanText.forget(id);
+    forgetPropertiesExpansion(id);
   }
 
   const remaining = w.tabs.filter((x) => !toClose.has(x.id));
@@ -1725,6 +1727,7 @@ async function closeTab(windowId: string, tabId: string): Promise<boolean> {
   const next = nextActiveAfterClose(w.tabs, tabId, w.activeTabId);
   views.get(windowId)!.editor.closeState(tabId);
   cleanText.forget(tabId);
+  forgetPropertiesExpansion(tabId);
   patchWindow(windowId, {
     tabs: w.tabs.filter((x) => x.id !== tabId),
     activeTabId: next,
