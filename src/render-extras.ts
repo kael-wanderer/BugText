@@ -12,6 +12,10 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
         // inside <foreignObject>.
         htmlLabels: false,
         flowchart: { htmlLabels: false },
+        // Mermaid 12 defaults to the ELK layout (a 1.5 MB lazy chunk) and the
+        // "neo" look; keep the Mermaid 11 appearance that export was tuned for.
+        layout: "dagre",
+        look: "classic",
       });
       return mermaid;
     });
