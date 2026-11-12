@@ -730,7 +730,13 @@ export async function renderPdf(
       setStatus("Choose a PNG or JPEG image");
       return;
     }
-    const imageBytes = Array.from(await readFileBytes(imagePath));
+    let imageBytes: number[];
+    try {
+      imageBytes = Array.from(await readFileBytes(imagePath));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      return;
+    }
     if (!imageBytes.length) {
       setStatus("The selected image is empty");
       return;
