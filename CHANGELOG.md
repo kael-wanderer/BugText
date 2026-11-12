@@ -58,6 +58,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Help guide: the AI and Settings sections now describe the current Chat panel, quick actions and the seven Settings pages.
 - Removed unused code: the `word_count`, `export_tools` and `export_html` commands and an unused image-to-PDF module.
 - Opening a PDF or other binary file over 500 MB now stops with a "too large to open" message instead of freezing the app.
+- Duplicating, copying (including drag-and-drop from Finder) or trashing a large folder no longer freezes the window: those commands now run off the main thread, and the Explorer ignores repeat duplicate, delete, rename, move or drop actions until the running one finishes (progress cursor meanwhile).
 - Re-selecting a PDF tab no longer discards an open page organization plan.
 - Spell checking no longer underlines entire lines when macOS returns language-detection results.
 - Links panel shows note targets as readable paths ("Meeting Notes.md", not "Meeting%20Notes.md").

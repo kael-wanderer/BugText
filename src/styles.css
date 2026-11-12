@@ -3649,3 +3649,5 @@ body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidd
 .bugtext-ref-flash { background: color-mix(in srgb, var(--accent) 20%, var(--bg-elev)); }
 .citation-picker .outline-row { display: grid; gap: 2px; text-align: left; }
 .citation-picker .outline-row small { opacity: .75; }
+
+body.file-op-busy, body.file-op-busy #explorer * { cursor: progress; }
