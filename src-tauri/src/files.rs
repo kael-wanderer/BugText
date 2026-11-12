@@ -481,10 +481,6 @@ fn strip_key_fields(contents: &str) -> Option<String> {
     }
 }
 
-pub fn count_words(text: &str) -> usize {
-    text.split_whitespace().count()
-}
-
 pub fn create_file_at(path: &str) -> Result<(), String> {
     if Path::new(path).exists() {
         return Err("A file or folder with that name already exists.".into());
@@ -595,13 +591,20 @@ fn read_file_bytes_inner(path: String) -> Result<Vec<u8>, String> {
 /// Write through a temporary sibling, then rename over the target. A symlink is
 /// followed so the link stays a link, and an existing file keeps its permissions.
 pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
-    use std::io::Write;
-
     let requested = Path::new(path);
     let target = match requested.canonicalize() {
         Ok(real) => real,
         Err(_) => requested.to_path_buf(),
     };
+    write_atomic_at(&target, bytes)
+}
+
+/// Writes to `target` exactly as given, without resolving it again. Callers that
+/// have already checked a canonical path use this so the check and the write
+/// refer to the same file.
+fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+
     let parent = target
         .parent()
         .ok_or_else(|| "Invalid file path".to_string())?;
@@ -609,7 +612,7 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
     let name = target
         .file_name()
         .ok_or_else(|| "Invalid file path".to_string())?;
-    let permissions = fs::metadata(&target).ok().map(|meta| meta.permissions());
+    let permissions = fs::metadata(target).ok().map(|meta| meta.permissions());
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -631,7 +634,7 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
         if let Some(permissions) = permissions {
             fs::set_permissions(&temporary, permissions).map_err(|error| error.to_string())?;
         }
-        fs::rename(&temporary, &target).map_err(|error| error.to_string())
+        fs::rename(&temporary, target).map_err(|error| error.to_string())
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -653,6 +656,8 @@ pub fn write_file_atomic(path: String, contents: String, folder: Option<String>,
         if let Some(expected) = expected {
             if fs::read_to_string(&target).map_err(|_| "Note unavailable")? != expected { return Err("Note changed on disk".into()); }
         }
+        // Write the path that was checked, not the one that was passed in.
+        return write_atomic_at(&target, contents.as_bytes());
     }
     write_atomic(&path, contents.as_bytes())
 }
@@ -718,11 +723,6 @@ pub fn get_initial_file() -> Option<String> {
 }
 
 #[tauri::command]
-pub fn word_count(text: String) -> usize {
-    count_words(&text)
-}
-
-#[tauri::command]
 pub fn create_file(path: String) -> Result<(), String> {
     create_file_at(&path)
 }
@@ -784,19 +784,6 @@ pub fn copy_into_folder(source: String, destination_dir: String) -> Result<Strin
 }
 
 #[cfg(test)]
-mod tests {
-    use super::count_words;
-
-    #[test]
-    fn counts_whitespace_separated_words() {
-        assert_eq!(count_words("hello world"), 2);
-        assert_eq!(count_words("  one   two\tthree\n"), 3);
-        assert_eq!(count_words(""), 0);
-        assert_eq!(count_words("   "), 0);
-    }
-}
-
-#[cfg(test)]
 mod atomic_write_tests {
     use super::{save_bytes, save_file, write_file_atomic};
     use std::fs;
@@ -819,6 +806,15 @@ mod atomic_write_tests {
         let elsewhere = std::env::temp_dir().join(format!("bugtext-outside-{}", std::process::id()));
         fs::create_dir_all(&elsewhere).unwrap();
         assert!(write_file_atomic(path.to_string_lossy().into_owned(), "unsafe".into(), Some(elsewhere.to_string_lossy().into_owned()), Some("new".into())).is_err());
+        // A link inside the folder that points outside it is refused, and the
+        // outside file is left alone.
+        let outside = elsewhere.join("outside.md");
+        fs::write(&outside, "keep").unwrap();
+        let link = dir.join("link.md");
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        assert!(write_file_atomic(link.to_string_lossy().into_owned(), "unsafe".into(), Some(dir.to_string_lossy().into_owned()), None).is_err());
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "keep");
+        fs::remove_file(&link).unwrap();
         fs::remove_dir_all(elsewhere).unwrap();
         assert_eq!(fs::read_to_string(&path).unwrap(), "new");
         assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
