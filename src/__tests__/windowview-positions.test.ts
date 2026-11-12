@@ -5,11 +5,11 @@ import { getState, setState } from "../store";
 import { createPositionTracker } from "../workspaces/positions";
 import type { PdfFindHandle } from "../pdfview";
 
-const pdf = vi.hoisted(() => ({ runs: [] as { options: any; resolve: (handle: PdfFindHandle) => void }[] }));
+const pdf = vi.hoisted(() => ({ runs: [] as { options: any; resolve: (handle: PdfFindHandle) => void; reject: (error: unknown) => void }[] }));
 vi.mock("../pdfview", () => ({
   PDF_FIND_EVENT: "pdf-find", PDF_ZOOM_EVENT: "pdf-zoom", PDF_EDIT_EVENT: "pdf-edit",
   PDF_SAVE_AS_EVENT: "pdf-save-as", PDF_SAVE_EVENT: "pdf-save",
-  renderPdf: vi.fn((_host, _path, options) => new Promise(resolve => pdf.runs.push({ options, resolve }))),
+  renderPdf: vi.fn((_host, _path, options) => new Promise((resolve, reject) => pdf.runs.push({ options, resolve, reject }))),
 }));
 vi.mock("../preview", () => ({ renderMarkdown: () => '<p data-line="1">Note</p>' }));
 vi.mock("../render-extras", () => ({ enhancePreview: async () => {} }));
@@ -78,4 +78,12 @@ it("applies a pending PDF page after loading and ignores a superseded PDF's page
   expect(positions.get("1")).toEqual({ page: 5 });
   view.openPdfPage(99);
   expect(currentHandle.goToPage).toHaveBeenLastCalledWith(8);
+});
+
+it("shows the too-large message when the PDF cannot be read", async () => {
+  const { activate } = setup(["/huge.pdf"]);
+  await activate(0, true);
+  pdf.runs[0].reject("huge.pdf is too large to open (limit 500 MB)");
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(document.body.textContent).toContain("huge.pdf is too large to open (limit 500 MB)");
 });

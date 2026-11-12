@@ -158,6 +158,17 @@ mod search_tests {
         std::fs::remove_file(path).unwrap();
     }
     #[test]
+    fn binary_read_refuses_a_file_over_the_limit_and_allows_one_at_it() {
+        let path = std::env::temp_dir().join(format!("bugtext-bytes-cap-{}.pdf", std::process::id()));
+        std::fs::write(&path, [7u8; 10]).unwrap();
+        let p = path.to_string_lossy().into_owned();
+        assert_eq!(super::read_file_bytes_limited(&p, 10).unwrap().len(), 10);
+        let error = super::read_file_bytes_limited(&p, 9).unwrap_err();
+        assert!(error.contains("too large to open") && error.contains("bugtext-bytes-cap-"), "{error}");
+        assert!(!error.contains(&std::env::temp_dir().to_string_lossy().into_owned()), "{error}");
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn search_options_control_case_word_and_regex_matching() {
         let whole = search_pattern(
             "cat",
@@ -584,8 +595,29 @@ pub async fn read_file_bytes(path: String) -> Result<tauri::ipc::Response, Strin
         .await.map_err(|_| "File read failed")??;
     Ok(tauri::ipc::Response::new(bytes))
 }
+/// Largest file `read_file_bytes` hands to the webview. A guard against accidents,
+/// not a tight budget: scanned PDFs can run to hundreds of megabytes.
+const MAX_READ_BYTES: u64 = 500 * 1024 * 1024;
+
 fn read_file_bytes_inner(path: String) -> Result<Vec<u8>, String> {
-    fs::read(&path).map_err(|error| error.to_string())
+    read_file_bytes_limited(&path, MAX_READ_BYTES)
+}
+
+fn read_file_bytes_limited(path: &str, limit: u64) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+
+    let too_large = || {
+        let name = Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "File".into());
+        format!("{name} is too large to open (limit {} MB)", limit / (1024 * 1024))
+    };
+    let file = fs::File::open(path).map_err(|error| error.to_string())?;
+    let size = file.metadata().map_err(|error| error.to_string())?.len();
+    if size > limit { return Err(too_large()); }
+    // The file may grow after the size check; never read past the limit.
+    let mut bytes = Vec::with_capacity(size as usize);
+    file.take(limit.saturating_add(1)).read_to_end(&mut bytes).map_err(|error| error.to_string())?;
+    if bytes.len() as u64 > limit { return Err(too_large()); }
+    Ok(bytes)
 }
 
 /// Write through a temporary sibling, then rename over the target. A symlink is
