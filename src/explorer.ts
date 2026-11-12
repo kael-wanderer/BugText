@@ -16,6 +16,7 @@ import {
   renamePath,
   revealInFinder,
 } from "./filesys";
+import { isFileOpBusy, runExclusiveFileOp } from "./file-op-guard";
 import { joinPath, parentPath } from "./paths";
 import { getState, refreshDir, setState, subscribe } from "./store";
 import {
@@ -281,22 +282,24 @@ export function startRename(path: string, currentName: string): void {
   promptInline(nameCell, currentName, async (name) => {
     const nextPath = joinPath(parentPath(path), name);
     if (nextPath === path) return;
-    await explorerActions.onBeforePathChange?.();
-    await renamePath(path, nextPath);
-    if (activePath === path) {
-      activePath = nextPath;
-    } else if (activePath?.startsWith(`${path}/`) || activePath?.startsWith(`${path}\\`)) {
-      activePath = `${nextPath}${activePath.slice(path.length)}`;
-    }
-    if (
-      comparePath === path ||
-      comparePath?.startsWith(`${path}/`) ||
-      comparePath?.startsWith(`${path}\\`)
-    ) {
-      comparePath = nextPath + comparePath.slice(path.length);
-    }
-    pathChangeCallback(path, nextPath);
-    await refreshDir(parentPath(path));
+    await runExclusiveFileOp(async () => {
+      await explorerActions.onBeforePathChange?.();
+      await renamePath(path, nextPath);
+      if (activePath === path) {
+        activePath = nextPath;
+      } else if (activePath?.startsWith(`${path}/`) || activePath?.startsWith(`${path}\\`)) {
+        activePath = `${nextPath}${activePath.slice(path.length)}`;
+      }
+      if (
+        comparePath === path ||
+        comparePath?.startsWith(`${path}/`) ||
+        comparePath?.startsWith(`${path}\\`)
+      ) {
+        comparePath = nextPath + comparePath.slice(path.length);
+      }
+      pathChangeCallback(path, nextPath);
+      await refreshDir(parentPath(path));
+    });
   });
 }
 
@@ -318,34 +321,37 @@ export function resolveMove(sourcePath: string, targetDir: string): string | nul
 async function moveInto(sourcePath: string, targetDir: string): Promise<void> {
   const nextPath = resolveMove(sourcePath, targetDir);
   if (!nextPath) return;
-  const sourceParent = parentPath(sourcePath);
-  await explorerActions.onBeforePathChange?.();
-  await renamePath(sourcePath, nextPath);
-  if (activePath === sourcePath) {
-    activePath = nextPath;
-  } else if (activePath?.startsWith(`${sourcePath}/`) || activePath?.startsWith(`${sourcePath}\\`)) {
-    activePath = `${nextPath}${activePath.slice(sourcePath.length)}`;
-  }
-  if (
-    comparePath === sourcePath ||
-    comparePath?.startsWith(`${sourcePath}/`) ||
-    comparePath?.startsWith(`${sourcePath}\\`)
-  ) {
-    comparePath = nextPath + comparePath.slice(sourcePath.length);
-  }
-  pathChangeCallback(sourcePath, nextPath);
-  await refreshDir(sourceParent);
-  await refreshDir(targetDir);
+  await runExclusiveFileOp(async () => {
+    const sourceParent = parentPath(sourcePath);
+    await explorerActions.onBeforePathChange?.();
+    await renamePath(sourcePath, nextPath);
+    if (activePath === sourcePath) {
+      activePath = nextPath;
+    } else if (activePath?.startsWith(`${sourcePath}/`) || activePath?.startsWith(`${sourcePath}\\`)) {
+      activePath = `${nextPath}${activePath.slice(sourcePath.length)}`;
+    }
+    if (
+      comparePath === sourcePath ||
+      comparePath?.startsWith(`${sourcePath}/`) ||
+      comparePath?.startsWith(`${sourcePath}\\`)
+    ) {
+      comparePath = nextPath + comparePath.slice(sourcePath.length);
+    }
+    pathChangeCallback(sourcePath, nextPath);
+    await refreshDir(sourceParent);
+    await refreshDir(targetDir);
+  });
 }
 
 async function deleteNode(path: string, name: string): Promise<void> {
+  if (isFileOpBusy()) return;
   const approved = await confirm(`Move "${name}" to the Trash?`, {
     title: "Delete",
     kind: "warning",
   });
   if (!approved) return;
 
-  await runAction(async () => {
+  await runExclusiveFileOp(() => runAction(async () => {
     await deletePath(path);
     if (
       activePath === path ||
@@ -363,7 +369,7 @@ async function deleteNode(path: string, name: string): Promise<void> {
     }
     pathChangeCallback(path, null);
     await refreshDir(parentPath(path));
-  });
+  }));
 }
 
 function rowMenu(node: TreeNode): MenuItem[] {
@@ -420,10 +426,10 @@ function rowMenu(node: TreeNode): MenuItem[] {
       {
         label: "Duplicate",
         action: () => {
-          void runAction(async () => {
+          void runExclusiveFileOp(() => runAction(async () => {
             await duplicatePath(node.path);
             await refreshDir(parentPath(node.path));
-          });
+          }));
         },
       },
       {
@@ -441,10 +447,10 @@ function rowMenu(node: TreeNode): MenuItem[] {
     {
       label: "Duplicate",
       action: () => {
-        void runAction(async () => {
+        void runExclusiveFileOp(() => runAction(async () => {
           await duplicatePath(node.path);
           await refreshDir(parentPath(node.path));
-        });
+        }));
       },
     },
     { label: "Delete", action: () => void deleteNode(node.path, node.name) },

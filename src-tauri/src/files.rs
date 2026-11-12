@@ -737,13 +737,28 @@ pub fn rename_path(from: String, to: String) -> Result<(), String> {
     rename_at(&from, &to)
 }
 
-#[tauri::command]
-pub fn delete_to_trash(path: String) -> Result<(), String> {
-    trash::delete(&path).map_err(|error| error.to_string())
+/// Runs blocking file work on the blocking pool so the window stays responsive.
+async fn off_main<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|_| "File operation failed")?
 }
 
 #[tauri::command]
-pub fn duplicate_path(path: String) -> Result<String, String> {
+pub async fn delete_to_trash(path: String) -> Result<(), String> {
+    off_main(move || delete_to_trash_inner(&path)).await
+}
+fn delete_to_trash_inner(path: &str) -> Result<(), String> {
+    trash::delete(path).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn duplicate_path(path: String) -> Result<String, String> {
+    off_main(move || duplicate_path_inner(path)).await
+}
+fn duplicate_path_inner(path: String) -> Result<String, String> {
     let source = Path::new(&path);
     let directory = source
         .parent()
@@ -778,7 +793,10 @@ pub fn duplicate_path(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn copy_into_folder(source: String, destination_dir: String) -> Result<String, String> {
+pub async fn copy_into_folder(source: String, destination_dir: String) -> Result<String, String> {
+    off_main(move || copy_into_folder_inner(source, destination_dir)).await
+}
+fn copy_into_folder_inner(source: String, destination_dir: String) -> Result<String, String> {
     copy_into_directory(Path::new(&source), Path::new(&destination_dir))
         .map(|path| path.to_string_lossy().into_owned())
 }
@@ -1028,10 +1046,14 @@ mod crud_tests {
 
 #[cfg(test)]
 mod duplicate_tests {
-    use super::{duplicate_path, duplicate_target};
+    use super::{duplicate_path as duplicate_path_async, duplicate_target};
     use std::collections::HashSet;
     use std::fs;
     use std::path::Path;
+
+    fn duplicate_path(path: String) -> Result<String, String> {
+        tauri::async_runtime::block_on(duplicate_path_async(path))
+    }
 
     #[test]
     fn picks_first_free_copy_name() {
@@ -1355,5 +1377,72 @@ mod graph_read_tests {
             assert_eq!(read_file_inner(root.join("escape.md").to_string_lossy().into_owned(), folder).unwrap_err(), "Note unavailable");
         }
         fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod async_file_command_tests {
+    use super::{copy_into_folder, delete_to_trash, duplicate_path};
+    use std::fs;
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("bugtext-async-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn duplicate_path_runs_through_async_entry_and_fails_safely() {
+        let dir = scratch("dup");
+        fs::create_dir_all(dir.join("folder/sub")).unwrap();
+        fs::write(dir.join("folder/sub/a.txt"), "a").unwrap();
+        let copy = tauri::async_runtime::block_on(duplicate_path(dir.join("folder").to_string_lossy().into_owned())).unwrap();
+        assert!(copy.ends_with("folder copy"));
+        assert_eq!(fs::read_to_string(std::path::Path::new(&copy).join("sub/a.txt")).unwrap(), "a");
+        assert!(tauri::async_runtime::block_on(duplicate_path(dir.join("missing.md").to_string_lossy().into_owned())).is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn copy_into_folder_runs_through_async_entry_and_fails_safely() {
+        let dir = scratch("copy");
+        let dest = dir.join("dest");
+        fs::create_dir_all(&dest).unwrap();
+        fs::write(dir.join("n.md"), "note").unwrap();
+        let copied = tauri::async_runtime::block_on(copy_into_folder(
+            dir.join("n.md").to_string_lossy().into_owned(),
+            dest.to_string_lossy().into_owned(),
+        ))
+        .unwrap();
+        assert_eq!(fs::read_to_string(copied).unwrap(), "note");
+        assert!(tauri::async_runtime::block_on(copy_into_folder(
+            dir.join("nope.md").to_string_lossy().into_owned(),
+            dest.to_string_lossy().into_owned(),
+        ))
+        .is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn delete_to_trash_fails_safely_through_async_entry() {
+        let dir = scratch("trash-missing");
+        let missing = dir.join("does-not-exist.txt");
+        assert!(tauri::async_runtime::block_on(delete_to_trash(missing.to_string_lossy().into_owned())).is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    /// Moves a real file to the user's Trash, so it only runs on request:
+    /// `cargo test -- --ignored delete_to_trash`.
+    #[test]
+    #[ignore]
+    fn delete_to_trash_runs_through_async_entry_and_fails_safely() {
+        let dir = scratch("trash");
+        let file = dir.join("bugtext-async-trash-test.txt");
+        fs::write(&file, "x").unwrap();
+        tauri::async_runtime::block_on(delete_to_trash(file.to_string_lossy().into_owned())).unwrap();
+        assert!(!file.exists());
+        assert!(tauri::async_runtime::block_on(delete_to_trash(file.to_string_lossy().into_owned())).is_err());
+        let _ = fs::remove_dir_all(dir);
     }
 }

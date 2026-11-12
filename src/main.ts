@@ -107,6 +107,7 @@ import {
   copyIntoFolder,
   revealInFinder,
 } from "./filesys";
+import { runExclusiveFileOp } from "./file-op-guard";
 import { createPalette, type PaletteItem } from "./palette";
 import { openBinaryHistoryPanel, openHistoryPanel } from "./historyview";
 import { markdownOutline } from "./outline";
@@ -1965,17 +1966,20 @@ async function copyDroppedPaths(
   paths: string[],
   destinationDir: string,
 ): Promise<void> {
-  const failures: string[] = [];
-  for (const source of paths) {
-    try {
-      await copyIntoFolder(source, destinationDir);
-    } catch (error) {
-      failures.push(`${basename(source)}: ${error instanceof Error ? error.message : String(error)}`);
+  const failures = await runExclusiveFileOp(async () => {
+    const failed: string[] = [];
+    for (const source of paths) {
+      try {
+        await copyIntoFolder(source, destinationDir);
+      } catch (error) {
+        failed.push(`${basename(source)}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
-  }
-  await refreshDir(destinationDir);
-  await refreshFileList();
-  if (failures.length > 0) {
+    await refreshDir(destinationDir);
+    await refreshFileList();
+    return failed;
+  });
+  if (failures && failures.length > 0) {
     await message(failures.join("\n"), {
       title: "Copy dropped files",
       kind: "error",
