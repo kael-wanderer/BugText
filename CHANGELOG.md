@@ -48,6 +48,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and restore or discard selected drafts. A launch strip offers Review, Restore all,
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
+### Changed
+- Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
+
 ### Fixed
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.
 - Security: a checked folder write now writes the exact file that was checked, so a link swapped in after the check cannot redirect the write outside the open folder.
