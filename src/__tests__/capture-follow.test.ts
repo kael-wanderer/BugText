@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { captureQuote, findQuote, findQuoteInSource } from "../capture/follow";
+import { findQuote, findQuoteInSource, lineOffset } from "../capture/follow";
+import { captureQuote } from "../capture/link-quote";
 import { configureLinks, followLink } from "../links/follow";
 import { createLinkIndex } from "../links/index";
 
@@ -106,5 +107,13 @@ describe("followLink with a quote", () => {
     expect(s.jump).toHaveBeenCalledWith(1, "sub");
     expect(s.highlight).toHaveBeenCalledWith("text", 1, "sub");
     expect(s.toast).not.toHaveBeenCalled();
+  });
+});
+
+describe("lineOffset", () => {
+  it("finds where a line starts", () => {
+    expect(lineOffset("a\nbc\nd", 1)).toBe(0);
+    expect(lineOffset("a\nbc\nd", 3)).toBe(5);
+    expect(lineOffset("a\nbc", 9)).toBe(4);
   });
 });

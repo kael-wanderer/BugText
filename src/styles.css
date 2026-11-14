@@ -3817,3 +3817,7 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 ::highlight(capture-quote) {
   background-color: color-mix(in srgb, var(--accent) 35%, transparent);
 }
+
+/* Capture: Notes and Add note in the window toolbar. */
+/* Text buttons size to their label; .wt-btn is a 28px icon square. */
+.wt-present, .wt-notes, .wt-addnote { width: auto; padding: 0 6px; white-space: nowrap; }

@@ -186,6 +186,10 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build(app)?;
     let extract_note = MenuItemBuilder::with_id("edit.extract_note", "Extract Selection to Note…").build(app)?;
     let show_tasks = MenuItemBuilder::with_id("edit.show_tasks", "Tasks in Folder…").build(app)?;
+    let capture_excerpt = MenuItemBuilder::with_id("edit.capture_excerpt", "Save Excerpt…")
+        .accelerator("CmdOrCtrl+Shift+E")
+        .build(app)?;
+    let capture_task = MenuItemBuilder::with_id("edit.capture_task", "Task from Selection…").build(app)?;
     let writing_goal = MenuItemBuilder::with_id("edit.writing_goal", "Set Writing Goal…").build(app)?;
     let table_item = |id: &str, label: &str| MenuItemBuilder::with_id(id, label).build(app);
     let align_menu = SubmenuBuilder::new(app, "Align Column")
@@ -228,6 +232,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .separator()
         .item(&toggle_task)
         .item(&extract_note)
+        .item(&capture_excerpt)
+        .item(&capture_task)
         .item(&show_tasks)
         .item(&writing_goal)
         .item(&table_menu)
@@ -248,6 +254,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let review_previous = MenuItemBuilder::with_id("review.previous_change", "Previous Change").build(app)?;
     let status_bar = CheckMenuItemBuilder::with_id("view.status_bar", "Show Status Bar").checked(true).build(app)?;
     let focus_mode = CheckMenuItemBuilder::with_id("view.focus_mode", "Focus Mode").accelerator("Ctrl+Cmd+Z").build(app)?;
+    let companion_note = MenuItemBuilder::with_id("view.companion_note", "Open Notes").build(app)?;
     let present = MenuItemBuilder::with_id("view.present", "Present").accelerator("CmdOrCtrl+Shift+P").build(app)?;
     let present_here = MenuItemBuilder::with_id("view.present_here", "Present from Current Slide").accelerator("CmdOrCtrl+Alt+Shift+P").build(app)?;
     let typewriter = CheckMenuItemBuilder::with_id("view.typewriter", "Typewriter Scrolling").accelerator("CmdOrCtrl+Alt+T").build(app)?;
@@ -332,6 +339,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&sync_scroll)
         .item(&status_bar)
         .item(&focus_mode)
+        .item(&companion_note)
         .item(&present)
         .item(&present_here)
         .item(&typewriter)

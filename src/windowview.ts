@@ -98,6 +98,10 @@ export type WindowHandlers = WindowViewHooks & {
   onSave: (windowId: string) => void;
   onOpen: (windowId: string) => void;
   onPresent?: (windowId: string) => void;
+  /** Label of the Notes button for a document, or null to hide it. */
+  notesLabel?: (path: string) => string | null;
+  onNotes?: (windowId: string) => void;
+  onAddNote?: (windowId: string) => void;
   onThemeChange: (theme: ThemeName) => void;
   getTheme: () => ThemeName;
   getCitationStyle?: () => "chicago" | "apa" | "ieee";
@@ -148,6 +152,10 @@ export type WindowView = {
   reviewHost: HTMLElement;
   /** The reading view's scroll container. */
   previewElement: HTMLElement;
+  /** The editor pane, for reading where a selection sits. */
+  editorElement: HTMLElement;
+  /** Re-reads the Notes button label for the active document. */
+  refreshNotes: () => void;
 };
 
 export { countWords } from "./status-bar/model";
@@ -208,6 +216,8 @@ export function createWindowView(
           <button class="wt-btn wt-preview-zoom" data-preview-zoom="in" type="button" title="Zoom preview in (⌘+)">+</button>
         </div>
         <button class="wt-btn wt-present" type="button" title="Present">Present</button>
+        <button class="wt-btn wt-notes" type="button" title="Open the notes on this document" hidden>Notes</button>
+        <button class="wt-btn wt-addnote" type="button" title="Add a note on this page" hidden>Add note</button>
         <button class="wt-btn wt-icon wt-lines" type="button" title="Line numbers">${glyphs.lineNumbers}</button>
         ${
           isMain
@@ -434,6 +444,18 @@ export function createWindowView(
     btn.addEventListener("click", () => h.onSetMode(windowId, btn.dataset.mode as ViewMode))
   );
   root.querySelector(".wt-present")!.addEventListener("click", () => h.onPresent?.(windowId));
+  root.querySelector(".wt-notes")!.addEventListener("click", () => h.onNotes?.(windowId));
+  root.querySelector(".wt-addnote")!.addEventListener("click", () => h.onAddNote?.(windowId));
+  function refreshNotes(): void {
+    const notesButton = root.querySelector<HTMLButtonElement>(".wt-notes")!;
+    const addNoteButton = root.querySelector<HTMLButtonElement>(".wt-addnote")!;
+    const w = getWindow(windowId);
+    const path = w?.tabs.find((tab) => tab.id === w.activeTabId)?.path ?? null;
+    const label = path ? h.notesLabel?.(path) ?? null : null;
+    notesButton.hidden = label === null;
+    if (label !== null) notesButton.textContent = label;
+    addNoteButton.hidden = label === null || !isHtmlFile(path);
+  }
   root.querySelector(".wt-lines")!.addEventListener("click", () => h.onToggleLineNumbers());
   root.querySelector(".wt-sub")?.addEventListener("click", () => h.onToggleSub());
   root.querySelector(".wt-subclose")?.addEventListener("click", () => h.onToggleSub());
@@ -647,6 +669,7 @@ export function createWindowView(
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     root.querySelector<HTMLElement>(".wt-present")!.hidden = !markdownCard;
+    refreshNotes();
     if (cardTab !== (active?.id ?? null) || cardMarkdown !== markdownCard) {
       cardTab = active?.id ?? null; cardMarkdown = markdownCard; clearTimeout(cardTimer); card?.reset();
     }
@@ -1217,6 +1240,8 @@ export function createWindowView(
   return {
     reviewHost: root.querySelector<HTMLElement>(".review-bar")!,
     previewElement: previewPane,
+    editorElement: editorPane,
+    refreshNotes,
     showGraph, hideGraph, closeGraph, graphActive: () => graphShown,
     id: windowId,
     activateDocument,

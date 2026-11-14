@@ -6,7 +6,7 @@ import { resolveLink } from "./resolve";
 import type { LinkIndex } from "./index";
 import type { createHoverCard } from "./hover-card";
 import { cardStateForTarget } from "./hover-state";
-import { captureQuote } from "../capture/follow";
+import { captureQuote } from "../capture/link-quote";
 
 export type LinkContext = { path: string; text: string; folder: string | null };
 type Services = {

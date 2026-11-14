@@ -1,33 +1,7 @@
-// The way back from a saved excerpt or task: read the quote a capture link carries,
-// find it again in the source note, and show it.
+// The way back from a saved excerpt or task: find the quote again in the source note
+// and show it. Loads when a capture link is followed.
 
 const BLOCKS = "p,li,blockquote,h1,h2,h3,h4,h5,h6,pre,td,th,dd,dt,figcaption";
-
-function textBefore(container: Node, anchor: Node): string {
-  const range = container.ownerDocument!.createRange();
-  range.setStart(container, 0);
-  range.setEndBefore(anchor);
-  return range.toString();
-}
-
-/** The quote a capture link points at, or null for any other link. */
-export function captureQuote(anchor: HTMLAnchorElement): string | null {
-  const quote = anchor.closest("blockquote");
-  if (quote) {
-    const before = textBefore(quote, anchor);
-    const lastBreak = before.lastIndexOf("\n");
-    const after = (quote.textContent ?? "").slice(before.length + (anchor.textContent ?? "").length);
-    if (lastBreak < 0 || !before.slice(lastBreak + 1).startsWith("— ") || after.trim().includes("\n")) return null;
-    const text = before.slice(0, lastBreak).trim();
-    return text || null;
-  }
-  const item = anchor.closest("li");
-  if (item && anchor.textContent === "source" && item.classList.contains("task")) {
-    const text = textBefore(item, anchor).replace(/\s*\($/, "").replace(/^\s*\[[ xX]\]\s*/, "").trim();
-    return text || null;
-  }
-  return null;
-}
 
 const squash = (text: string): string => text.replace(/\s+/g, " ").trim();
 
@@ -113,4 +87,15 @@ export function showQuote(pane: HTMLElement, range: Range): void {
   const selection = pane.ownerDocument.getSelection();
   selection?.removeAllRanges();
   selection?.addRange(range);
+}
+
+/** Offset of the start of 1-based `line` in `text` (the end of the text past its last line). */
+export function lineOffset(text: string, line: number): number {
+  let offset = 0;
+  for (let at = 1; at < line; at++) {
+    const next = text.indexOf("\n", offset);
+    if (next < 0) return text.length;
+    offset = next + 1;
+  }
+  return offset;
 }

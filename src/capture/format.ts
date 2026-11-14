@@ -4,6 +4,8 @@
 import { markdownOutline } from "../outline";
 import { formatLinkTarget, headingAnchors } from "../links/parse";
 
+export { companionPath } from "./paths";
+
 export type SourceRef = { title: string; heading: string | null; anchor: string | null };
 
 const fileName = (path: string): string => path.replace(/\\/g, "/").split("/").pop() ?? path;
@@ -50,14 +52,6 @@ export function excerptBlock(quote: string, label: string, target: string, date:
 /** `- [ ] <text> ([source](<target>))`; newlines in `text` become spaces. */
 export function taskLine(text: string, target: string): string {
   return `- [ ] ${text.replace(/\s+/g, " ").trim()} ([source](${target}))\n`;
-}
-
-/** "<dir>/<stem>.notes.md" beside the source; null for a path that already ends in ".notes.md". */
-export function companionPath(sourcePath: string): string | null {
-  const path = sourcePath.replace(/\\/g, "/");
-  if (/\.notes\.md$/i.test(path)) return null;
-  const slash = path.lastIndexOf("/");
-  return `${path.slice(0, slash + 1)}${stem(path)}.notes.md`;
 }
 
 /** Starter text of a new companion note. */
