@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { fenceBody, fixMermaidAction, stripCodeFence } from "../ai/fix-mermaid";
+import { fenceBody, fixMermaidAction, stripCodeFence, fixTarget, DIAGRAM_CHANGED } from "../ai/fix-mermaid";
 const DOC = "# T\n\n```mermaid\ngraph TD\n  A-->B\n```\n\nafter\n";
 
 it("finds the body between the fences", () => {
@@ -37,4 +37,37 @@ it("removes every triple quote from parser errors before quoting them", () => {
   const action = fixMermaidAction('Bad """token""" and """""" end');
   expect(action.instruction.match(/"""/g)).toHaveLength(2);
   expect(action.instruction).toContain('Bad token and  end');
+});
+
+const NESTED = "Fix with AI works only on a diagram that is not inside a list or quote.";
+it("accepts a matching top-level diagram body", () => {
+  expect(fixTarget(DOC, 3, "graph TD\n  A-->B")).toEqual({ ok: true, from: 16, to: 33, body: "graph TD\n  A-->B\n" });
+});
+it("finds the original source line after frontmatter", () => {
+  const text = "---\ntitle: Test\n---\n\n```mermaid\ngraph TD\n```";
+  const result = fixTarget(text, 5, "graph TD");
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(text.slice(result.from, result.to)).toBe("graph TD\n");
+});
+it.each([1, 99])("refuses a missing fence at line %s", (line) => {
+  expect(fixTarget(DOC, line, "graph TD")).toEqual({ ok: false, message: DIAGRAM_CHANGED });
+});
+it("refuses a changed body before considering an empty body", () => {
+  expect(fixTarget(DOC, 3, "old source")).toEqual({ ok: false, message: DIAGRAM_CHANGED });
+  expect(fixTarget("```mermaid\n\n```", 1, "old source")).toEqual({ ok: false, message: DIAGRAM_CHANGED });
+});
+it.each(["", " \t\n"])("refuses an unchanged empty diagram (%j)", (body) => {
+  expect(fixTarget(`\`\`\`mermaid\n${body}\n\`\`\``, 1, body)).toEqual({ ok: false, message: "This diagram is empty. Add diagram source first." });
+});
+it.each([" ```mermaid", "\t```mermaid", "> ```mermaid"])("refuses nested fences before comparing their bodies (%j)", (opening) => {
+  expect(fixTarget(`${opening}\ngraph TD\n\`\`\``, 1, "different source")).toEqual({ ok: false, message: NESTED });
+});
+it("refuses a diagram inside a list item", () => {
+  expect(fixTarget("- item\n\n  ```mermaid\n  graph TD\n  ```", 3, "graph TD")).toEqual({ ok: false, message: NESTED });
+});
+it("refuses a diagram inside a blockquote", () => {
+  expect(fixTarget("> ```mermaid\n> graph TD\n> ```", 1, "graph TD")).toEqual({ ok: false, message: NESTED });
+});
+it.each(["", " \t\n", "Here:\n```mermaid\n \t\n```\nDone."])("recognizes an empty AI diagram reply (%j)", (reply) => {
+  expect(stripCodeFence(reply)).toBe("");
 });

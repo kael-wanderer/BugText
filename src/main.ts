@@ -37,7 +37,7 @@ import { captureLayout, sessionLayout, type WorkspaceLayout } from "./workspaces
 import { createPositionTracker } from "./workspaces/positions";
 import { restoreLayout } from "./workspaces/restore";
 import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
-import { fenceBody, fixMermaidAction, stripCodeFence, DIAGRAM_CHANGED } from "./ai/fix-mermaid";
+import { fixTarget, fixMermaidAction, stripCodeFence, DIAGRAM_CHANGED } from "./ai/fix-mermaid";
 import { actionEngine, runnableActions } from "./ai/actions";
 import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
@@ -3273,16 +3273,18 @@ function fixMermaid(windowId: string, tabId: string, line: number, code: string,
   const editor = views.get(windowId)?.editor;
   if (!tab || !editor) { showToast(DIAGRAM_CHANGED); return; }
   const text = editor.getText(tabId);
-  const range = fenceBody(text, line);
-  if (!range) { showToast(DIAGRAM_CHANGED); return; }
-  if (!range.body.trim()) { showToast("This diagram is empty. Add diagram source first."); return; }
-  if (range.body.trim() !== code.trim()) { showToast(DIAGRAM_CHANGED); return; }
+  const range = fixTarget(text, line, code);
+  if (!range.ok) { showToast(range.message); return; }
   setAIVisible(true);
   const shared = quickActionDeps("Fix diagram");
   void aiPanel!.runAction(fixMermaidAction(error), {
     ...shared,
     getDoc: () => ({ path: tab.path, text, selection: range.body, windowId, tabId, from: range.from, to: range.to }),
-    reviewEdit: (base, reply, binding) => shared.reviewEdit(base, matchEdges(base, stripCodeFence(reply.trim())), binding),
+    reviewEdit: (base, reply, binding) => {
+      const diagram = stripCodeFence(reply);
+      if (!diagram.trim()) { showToast("The AI returned no diagram."); return; }
+      shared.reviewEdit(base, matchEdges(base, diagram), binding);
+    },
   });
 }
 

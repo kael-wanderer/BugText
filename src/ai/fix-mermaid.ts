@@ -19,6 +19,19 @@ export function fenceBody(text: string, fenceLine: number): { from: number; to: 
   return null;
 }
 
+export type FixTarget = { ok: true; from: number; to: number; body: string } | { ok: false; message: string };
+
+export function fixTarget(text: string, line: number, code: string): FixTarget {
+  const opening = text.split("\n")[line - 1] ?? "";
+  if (/^[\s>]/u.test(opening)) {
+    return { ok: false, message: "Fix with AI works only on a diagram that is not inside a list or quote." };
+  }
+  const range = fenceBody(text, line);
+  if (!range || range.body.trim() !== code.trim()) return { ok: false, message: DIAGRAM_CHANGED };
+  if (!range.body.trim()) return { ok: false, message: "This diagram is empty. Add diagram source first." };
+  return { ok: true, ...range };
+}
+
 export function fixMermaidAction(error: string): RunnableAction {
   return {
     id: "ai.fix.mermaid", name: "Fix diagram", result: "edit", input: "selection-or-note",
