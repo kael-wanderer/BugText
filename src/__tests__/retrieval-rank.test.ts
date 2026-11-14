@@ -72,3 +72,13 @@ it("finds a Vietnamese note from a query typed without accents", () => {
   expect(retrieve(index, "thiết kế", 1)[0].path).toBe("a.md");
   expect(retrieve(index, "…", 1)).toEqual([]);
 });
+
+it("keeps Devanagari combining marks without creating a folded word", () => {
+  expect(tokenize("हिन्दी")).toEqual(["हिन्दी"]);
+});
+it("keeps a Thai word as one token", () => {
+  expect(tokenize("ภาษาไทย")).toEqual(["ภาษาไทย"]);
+});
+it("does not fold Cyrillic marks", () => {
+  expect(tokenize("ёлка")).toEqual(["ёлка"]);
+});

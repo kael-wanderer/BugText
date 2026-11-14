@@ -15,8 +15,9 @@ const B = 0.75;
 
 export function tokenize(text: string): string[] {
   const tokens: string[] = [];
-  for (const token of text.normalize("NFC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) {
+  for (const token of text.normalize("NFC").toLowerCase().match(/[\p{L}\p{N}\p{M}]+/gu) ?? []) {
     tokens.push(token);
+    if (!/^[\p{Script=Latin}\p{M}\p{N}]+$/u.test(token)) continue;
     const folded = token.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
     if (folded !== token) tokens.push(folded);
   }
