@@ -1,4 +1,5 @@
 import { countWords } from "./status-bar/model";
+import { revealScroll } from "./tab-reveal";
 import { createGraphView } from "./graph/view";
 import { createGraphTab } from "./graph/tab";
 import type { LinkIndex } from "./links/index";
@@ -708,6 +709,8 @@ export function createWindowView(
     wsLanguageLabel.textContent = language.label;
     themeSelect.value = h.getTheme();
     // tabs
+    const tabScroll = tabbarEl.scrollLeft;
+    let activeTabEl: HTMLElement | null = null;
     tabbarEl.innerHTML = "";
     tabbarEl.classList.toggle("empty", w.tabs.length === 0);
     for (const t of w.tabs) {
@@ -758,6 +761,13 @@ export function createWindowView(
       }
       tab.append(dot, tabIcon, name, close);
       tabbarEl.appendChild(tab);
+      if (t.id === w.activeTabId) activeTabEl = tab;
+    }
+    // Rebuilding resets the strip's scroll; restore it, then bring the active tab into view.
+    tabbarEl.scrollLeft = tabScroll;
+    if (activeTabEl) {
+      const left = activeTabEl.getBoundingClientRect().left - tabbarEl.getBoundingClientRect().left + tabbarEl.scrollLeft;
+      tabbarEl.scrollLeft = revealScroll(tabbarEl.scrollLeft, tabbarEl.clientWidth, left, activeTabEl.offsetWidth);
     }
     if (graphView) {
       const center = active?.path && isMarkdownFile(active.path) ? active.path : null;

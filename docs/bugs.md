@@ -46,6 +46,11 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-038 | 2026-10-27 | Export / PNG, SVG | Major | — | Image export of a Markdown note failed with images, or came out blank | fixed (unreleased) |
 | BUG-039 | 2026-11-01 | Editor / Spell check | Minor | — | Spell check underlined whole lines of correctly spelled text | fixed (unreleased) |
 | BUG-040 | 2026-11-14 | Preview / Mermaid | Minor | — | A diagram with a syntax error left Mermaid's error graphic below the window and pushed the layout | fixed (unreleased) |
+| BUG-041 | 2026-11-14 | Tabs | Minor | REV runs (28-review-queue) | With more tabs than fit, the tab strip showed the first tabs while a later note was open; the active tab was scrolled out of view | fixed (unreleased) |
+| BUG-042 | 2026-11-14 | Windows | Major | REV-16 (28-review-queue) | A second window did not close from its close button | fixed (unreleased) |
+| BUG-043 | 2026-11-14 | Windows | Minor | REV-16 (28-review-queue) | New windows open on the primary display, not on the display of the window they came from | open |
+| BUG-044 | 2026-11-14 | Review queue | Minor | REV-08 (28-review-queue) | Hovering a queue row shows its buttons inside the row, which makes it taller and moves the rows below | open |
+| BUG-045 | 2026-11-14 | AI panel / run card | Minor | REV-03 (28-review-queue) | The "+ new-file" line in a run's changed-files card is dark green on the dark panel and hard to read | open |
 
 > Delete the example row once real bugs are logged.
 
@@ -339,3 +344,71 @@ Copy this template for each new bug:
 - **Notes:** A failed `mermaid.render` leaves its temporary element in `document.body`.
 - **Fix:** `suppressErrorRendering: true`, and `enhancePreview` removes the two per-render element ids after each render (9095602, merged in dbc0f67).
 - **Status:** fixed (unreleased).
+
+### BUG-041 — Tab strip hid the active tab
+
+- **Feature / test case:** Tabs (seen during the review-queue manual run, docs/test-cases/28-review-queue.md)
+- **Severity:** Minor
+- **Environment:** macOS, release build of main (a62b10b)
+- **Steps to reproduce:**
+  1. Open a folder and open eight notes as kept tabs in a window whose tab strip is narrow (sidebar open, split view).
+  2. Look at the tab strip while the last note is open.
+- **Expected:** The active tab is visible.
+- **Actual:** The strip showed the first one or two tabs; the open note's tab was off to the right, so the strip looked like another note was open.
+- **Notes:** Every render rebuilt the strip with `innerHTML = ""`, which resets its horizontal scroll to 0, and nothing scrolled the active tab into view.
+- **Fix:** The render keeps the strip's scroll position and then scrolls just enough to show the whole active tab (`revealScroll` in `src/tab-reveal.ts`).
+- **Status:** fixed (unreleased).
+
+### BUG-042 — Second window would not close
+
+- **Feature / test case:** Native windows (seen during REV-16, docs/test-cases/28-review-queue.md)
+- **Severity:** Major
+- **Environment:** macOS, release build of main (a62b10b)
+- **Steps to reproduce:**
+  1. File ▸ New Window (⇧⌘N).
+  2. Click the new window's red close button.
+- **Expected:** The window closes.
+- **Actual:** Nothing happens; the window stays until the app quits.
+- **Notes:** Secondary windows register `onCloseRequested` so a window closed by hand is not reopened at startup. With a handler registered, Tauri closes the window from JavaScript with `destroy()`, which needs `core:window:allow-destroy`; `core:default` does not grant it, so the call was refused.
+- **Fix:** New capability `secondary-window.json` grants `core:window:allow-destroy` to `window-*` only; the main window, which has no close handler, does not get it.
+- **Status:** fixed (unreleased).
+
+### BUG-043 — New windows open on the primary display
+
+- **Feature / test case:** Native windows (seen during REV-16)
+- **Severity:** Minor
+- **Environment:** macOS with two displays, release build of main (a62b10b)
+- **Steps to reproduce:**
+  1. Put the BugText window on the second display.
+  2. File ▸ New Window (⇧⌘N).
+- **Expected:** The new window opens on the display of the window it came from.
+- **Actual:** It opens on the primary display, at (730, 323) in screen points.
+- **Notes:** Not investigated.
+- **Status:** open.
+
+### BUG-044 — Hovering a review queue row moves the rows below
+
+- **Feature / test case:** Review queue sidebar (REV-08)
+- **Severity:** Minor
+- **Environment:** macOS, release build of main
+- **Steps to reproduce:**
+  1. Have two or more notes in the Review sidebar.
+  2. Move the pointer over the first row.
+- **Expected:** The row shows Mark reviewed, Later and Dismiss without the list moving.
+- **Actual:** The buttons appear inside the row on a new line, the row grows, and every row below moves down; moving the pointer down the list keeps reflowing it, and a click aimed at a row can land on a different one.
+- **Notes:** Not investigated.
+- **Status:** open.
+
+### BUG-045 — Low-contrast new-file line on the AI run card
+
+- **Feature / test case:** AI panel run card (REV-03)
+- **Severity:** Minor
+- **Environment:** macOS, release build of main, Nord theme
+- **Steps to reproduce:**
+  1. Ask the AI panel's coding CLI to create a note.
+  2. Look at the run's "Changed N files" card.
+- **Expected:** Every file line is readable.
+- **Actual:** The "+ <file>" line for a created file is dark green on the dark panel and barely readable; the "~ <file>" line for an edited file is fine.
+- **Notes:** Not investigated.
+- **Status:** open.
+
