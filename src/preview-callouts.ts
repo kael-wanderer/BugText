@@ -10,12 +10,19 @@ export function installCallouts(md: MarkdownIt): void {
       if (tokens[i].type !== "blockquote_open" || tokens[i + 1].type !== "paragraph_open" || tokens[i + 2].type !== "inline") continue;
       const inline = tokens[i + 2];
       const [first, ...body] = inline.content.split("\n");
-      const marker = /^\[!(note|tip|important|warning|caution)\][ \t]*(.*)$/i.exec(first);
+      const marker = /^\[!(note|tip|important|warning|caution)\](?:[ \t]+(.*))?$/i.exec(first);
       if (!marker) continue;
       const type = marker[1].toLowerCase();
       tokens[i].attrJoin("class", `callout callout-${type}`);
       inline.content = body.join("\n");
       if (!inline.content) tokens.splice(i + 1, 3);
+      else {
+        for (const token of [tokens[i + 1], inline]) {
+          if (!token.map) continue;
+          const [start, end] = token.map;
+          token.map = start + 1 < end ? [start + 1, end] : null;
+        }
+      }
       const open = new state.Token("paragraph_open", "p", 1);
       open.block = true;
       open.attrSet("class", "callout-title");

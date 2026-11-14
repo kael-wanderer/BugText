@@ -38,3 +38,24 @@ it("sanitizes a title", () => {
   const html = renderMarkdown('> [!NOTE] <img src=x onerror="evil()">\n> x');
   expect(html).not.toContain("onerror");
 });
+it("requires whitespace between a callout marker and a custom title", () => {
+  const ordinary = renderMarkdown("> [!note]body");
+  expect(ordinary).not.toContain("callout");
+  expect(ordinary).toContain("[!note]body");
+  expect(renderMarkdown("> [!note] body")).toContain('<p class="callout-title">body</p>');
+  expect(renderMarkdown("> [!note]")).toContain('<p class="callout-title">Note</p>');
+});
+it("maps the callout body to the line after the marker", () => {
+  expect(renderMarkdown("> [!note]\n> a")).toContain('<p data-line="2">a</p>');
+});
+it("renders a list inside a callout without losing its source lines", () => {
+  const root = document.createElement("div");
+  root.innerHTML = renderMarkdown("> [!note]\n>\n> - First\n> - Second");
+  expect(root.querySelectorAll("blockquote.callout ul li")).toHaveLength(2);
+  expect(root.querySelector("ul")!.getAttribute("data-line")).toBe("3");
+});
+it("keeps the following paragraph's correct source line", () => {
+  const html = renderMarkdown("> [!note]\n> a\n\nAfter");
+  expect(html).toContain('<p data-line="2">a</p>');
+  expect(html).toContain('<p data-line="4">After</p>');
+});
