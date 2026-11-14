@@ -488,7 +488,11 @@ pub async fn review_close(folder: String) -> Result<(), String> {
 
 type Summary = Option<(State, Option<u32>, Option<u32>)>;
 
-pub(crate) struct Ticket { root: PathBuf, relative: String, existed: bool, before: Summary }
+pub(crate) struct Ticket {
+    root: PathBuf, relative: String, existed: bool, before: Summary,
+    /// The record's reviewed and current digests just before the write.
+    pre_reviewed: Option<String>, pre_current: Option<String>,
+}
 
 fn summary(record: Option<&Record>) -> Summary { record.map(|r| (state(r), r.added, r.removed)) }
 
@@ -539,7 +543,9 @@ pub(crate) fn before_write(target: &Path) -> Option<Ticket> {
             let _ = persist(active);
         }
     }
-    Some(Ticket { root, relative, existed, before })
+    let record = active.index.records.get(&relative);
+    let (pre_reviewed, pre_current) = (record.and_then(|r| r.reviewed.clone()), record.map(|r| r.current.clone()));
+    Some(Ticket { root, relative, existed, before, pre_reviewed, pre_current })
 }
 
 /// Called after BugText's write succeeded. Never fails. Reading and diffing happen
@@ -568,6 +574,18 @@ pub(crate) fn after_write(ticket: Option<Ticket>) {
             }
         };
         let hint = take_hint(active, path, now);
+        let at_lock = summary(active.index.records.get(path));
+        // A scan may have seen our own write before this hook ran and recorded it as an
+        // outside change. If the note was Reviewed before the write and nothing has
+        // reviewed it since, undo that so the write counts as the owner's.
+        let was_reviewed = ticket.pre_reviewed.is_some() && ticket.pre_reviewed == ticket.pre_current;
+        if hint.is_none() && was_reviewed {
+            if let Some(record) = active.index.records.get_mut(path) {
+                if record.reviewed == ticket.pre_reviewed {
+                    if let Some(current) = &ticket.pre_current { record.current = current.clone(); }
+                }
+            }
+        }
         let mut blob = false;
         match (active.index.records.get_mut(path), hint) {
             (Some(record), Some(route)) => outside_change_counted(record, &seen, counted, route, now),
@@ -581,7 +599,7 @@ pub(crate) fn after_write(ticket: Option<Ticket>) {
         }
         let _ = persist(active);
         let after = summary(active.index.records.get(path));
-        let snapshot = (!ticket.existed || after != ticket.before).then(|| snapshot(&active.name, active));
+        let snapshot = (!ticket.existed || after != ticket.before || after != at_lock).then(|| snapshot(&active.name, active));
         (snapshot, blob.then(|| active.dir.clone()))
     };
     // Blobs are named by digest and kept while a record refers to them, so writing
@@ -980,5 +998,26 @@ mod review_fix_tests {
         let reader = |r: &Path, rel: &str| { close_at(&folder); read_seen(r, rel) };
         let _ = scan_at(&e.config, &e.f(), &["a.md".to_string()], &[], now_ms(), &reader);
         assert!(!global().lock().unwrap().folders.contains_key(&root(&e)));
+    }
+}
+
+#[cfg(test)]
+mod owner_race_tests {
+    use super::tests::{env, item};
+    use super::*;
+
+    #[test] fn scan_between_write_and_after_write_still_ends_reviewed() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"]);
+        let target = e.folder.canonicalize().unwrap().join("a.md");
+        let ticket = before_write(&target);
+        assert!(ticket.is_some());
+        write_atomic_raw(&target, b"owner typed this").unwrap();
+        let s = e.scan(&["a.md"]);
+        assert!(item(&s, "a.md").is_some(), "the scan saw the write first");
+        after_write(ticket);
+        let s = e.scan(&["a.md"]);
+        assert!(s.items.is_empty(), "{:?}", s.items);
     }
 }
