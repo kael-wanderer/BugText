@@ -22,8 +22,19 @@ it("builds an edit action that carries the error as quoted data", () => {
   expect(action.instruction).toContain("Parse error on line 2:");
   expect(action.instruction.length).toBeLessThan(1200);
 });
-it("strips one wrapping fence from a reply", () => {
+it("extracts the first fenced block even with surrounding prose", () => {
   expect(stripCodeFence("```mermaid\ngraph TD\n  A-->B\n```")).toBe("graph TD\n  A-->B");
   expect(stripCodeFence("graph TD\n  A-->B")).toBe("graph TD\n  A-->B");
-  expect(stripCodeFence("Here:\n```\nx\n```")).toBe("Here:\n```\nx\n```");
+  expect(stripCodeFence("Here:\n```mermaid\ngraph TD\n```\nDone.")).toBe("graph TD");
+});
+it("trims an unfenced reply", () => {
+  expect(stripCodeFence(" \n graph TD\n  A-->B \n")).toBe("graph TD\n  A-->B");
+});
+it("extracts only the first fenced block", () => {
+  expect(stripCodeFence("Before\n~~~mermaid\ngraph TD\n~~~\n```\nsecond\n```")).toBe("graph TD");
+});
+it("removes every triple quote from parser errors before quoting them", () => {
+  const action = fixMermaidAction('Bad """token""" and """""" end');
+  expect(action.instruction.match(/"""/g)).toHaveLength(2);
+  expect(action.instruction).toContain('Bad token and  end');
 });
