@@ -45,6 +45,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-037 | 2026-10-27 | Editor / external changes | Major | — | An edit made just as BugText regains focus could be replaced by the file on disk | fixed (unreleased) |
 | BUG-038 | 2026-10-27 | Export / PNG, SVG | Major | — | Image export of a Markdown note failed with images, or came out blank | fixed (unreleased) |
 | BUG-039 | 2026-11-01 | Editor / Spell check | Minor | — | Spell check underlined whole lines of correctly spelled text | fixed (unreleased) |
+| BUG-040 | 2026-11-14 | Preview / Mermaid | Minor | — | A diagram with a syntax error left Mermaid's error graphic below the window and pushed the layout | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -324,3 +325,17 @@ Copy this template for each new bug:
 - **Actual:**
 - **Notes:**
 -->
+
+### BUG-040 — Broken Mermaid diagram left an error graphic below the window
+
+- **Feature / test case:** Preview / Mermaid (docs/test-cases/27-reading-pack.md)
+- **Severity:** Minor
+- **Environment:** macOS, release build of the reading pack branch (before 9095602); the same code was on main
+- **Steps to reproduce:**
+  1. Open a note with a Mermaid block that has a syntax error.
+  2. Type in the note so the preview re-renders a few times.
+- **Expected:** The error shows inside the preview only.
+- **Actual:** A large "Syntax error in text" graphic appeared below the app, one more per re-render; the page scrolled and clipped the header and status bar. The graphics stayed after switching notes.
+- **Notes:** A failed `mermaid.render` leaves its temporary element in `document.body`.
+- **Fix:** `suppressErrorRendering: true`, and `enhancePreview` removes the two per-render element ids after each render (9095602, merged in dbc0f67).
+- **Status:** fixed (unreleased).
