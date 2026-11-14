@@ -496,7 +496,10 @@ pub fn create_file_at(path: &str) -> Result<(), String> {
     if Path::new(path).exists() {
         return Err("A file or folder with that name already exists.".into());
     }
-    fs::write(path, "").map_err(|error| error.to_string())
+    let ticket = crate::review_store::before_write(Path::new(path));
+    fs::write(path, "").map_err(|error| error.to_string())?;
+    crate::review_store::after_write(ticket, b"");
+    Ok(())
 }
 
 pub fn create_dir_at(path: &str) -> Result<(), String> {
@@ -634,7 +637,16 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
 /// Writes to `target` exactly as given, without resolving it again. Callers that
 /// have already checked a canonical path use this so the check and the write
 /// refer to the same file.
-fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
+    let ticket = crate::review_store::before_write(target);
+    write_atomic_raw(target, bytes)?;
+    crate::review_store::after_write(ticket, bytes);
+    Ok(())
+}
+
+/// The atomic write itself, with no review bookkeeping. The review store writes
+/// its own files through this so it never re-enters its own write hook.
+pub(crate) fn write_atomic_raw(target: &Path, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
 
     let parent = target

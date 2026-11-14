@@ -134,6 +134,7 @@ pub fn create_file_exclusive_at(
             format!("{stem} {number}.md")
         };
         let target = dir.join(name);
+        let ticket = crate::review_store::before_write(&target);
         match fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -145,6 +146,8 @@ pub fn create_file_exclusive_at(
                     let _ = fs::remove_file(&target);
                     return Err("Could not write the file.".into());
                 }
+                drop(file);
+                crate::review_store::after_write(ticket, contents.as_bytes());
                 return Ok(target.to_string_lossy().into_owned());
             }
             Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,

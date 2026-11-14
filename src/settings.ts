@@ -84,6 +84,7 @@ export type Settings = {
   tables: TableSettings;
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
+  review: { track: boolean };
   onboarding: { hintDismissed: boolean };
   focus: { width: "narrow" | "standard" | "wide" };
   editor: { typewriterScrolling: boolean; spellCheck: boolean };
@@ -126,6 +127,7 @@ export const DEFAULT_SETTINGS: Settings = {
   links: { complete: true, onRename: "ask", hoverPreview: true },
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
+  review: { track: true },
   onboarding: { hintDismissed: true },
   focus: { width: "standard" },
   editor: { typewriterScrolling: false, spellCheck: true },
@@ -183,6 +185,7 @@ function defaults(): Settings {
     tables: { ...DEFAULT_SETTINGS.tables },
     templates: { ...DEFAULT_SETTINGS.templates },
     performance: { ...DEFAULT_SETTINGS.performance },
+    review: { ...DEFAULT_SETTINGS.review },
     onboarding: { ...DEFAULT_SETTINGS.onboarding },
     focus: { ...DEFAULT_SETTINGS.focus },
     editor: { ...DEFAULT_SETTINGS.editor },
@@ -333,6 +336,7 @@ export function parseSettings(raw: string): Settings {
     tables: parseTables(data.tables),
     templates: parseTemplates(data.templates),
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
+    review: { track: (data.review as { track?: unknown } | undefined)?.track !== false },
     onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
     focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },
     editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true, spellCheck: (data.editor as { spellCheck?: unknown } | undefined)?.spellCheck !== false },

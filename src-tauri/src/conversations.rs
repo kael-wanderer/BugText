@@ -18,7 +18,7 @@ fn now() -> u64 {
 fn valid(id: &str) -> bool {
     !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
-fn folder_id(folder: Option<&str>) -> Result<String, String> {
+pub(crate) fn folder_id(folder: Option<&str>) -> Result<String, String> {
     let Some(folder) = folder else {
         return Ok("no-folder".into());
     };

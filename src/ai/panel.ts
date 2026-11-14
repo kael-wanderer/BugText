@@ -75,6 +75,14 @@ export type AIPanelDeps = {
   beforeApply?: (binding: EditBinding) => void | Promise<void>;
   onInsert(text: string): void;
   onOpenChangedFile(dir: string, relativePath: string): void;
+  /** A coding CLI run that may write files in `dir` is starting. */
+  onRunStarted?(dir: string): void;
+  /** The run ended; `paths` (relative to `dir`) were added or modified. Called once per started run. */
+  onRunChanged?(dir: string, paths: string[]): void | Promise<void>;
+  /** Notes in the review queue now. */
+  reviewQueued?(): number;
+  /** Opens the Review sidebar. */
+  onReviewChanges?(): void;
   onClose(): void;
   getSendAccelerator(): string;
   getWorkingDir(): string | null;
@@ -405,7 +413,7 @@ export function createAIPanel(
     );
     return actions;
   }
-  function changedCard(folder: string, diff: FolderDiff): void {
+  function changedCard(folder: string, diff: FolderDiff, scanned?: void | Promise<void>): void {
     const total =
       diff.added.length + diff.modified.length + diff.deleted.length;
     if (!total) return;
@@ -432,6 +440,13 @@ export function createAIPanel(
         card.append(file);
       }
     messagesElement.append(card);
+    // Offered only once the run's changes are in the review queue.
+    if (deps.onReviewChanges && deps.reviewQueued) {
+      void Promise.resolve(scanned).then(() => {
+        if (!deps.reviewQueued?.()) return;
+        card.append(button("Review changes", () => deps.onReviewChanges?.(), "ai-run-review"));
+      }).catch(() => {});
+    }
   }
   async function send(): Promise<void> {
     await historyReady;
@@ -565,6 +580,7 @@ export function createAIPanel(
       if (runDir && row.engine.kind === "cli") {
         await beforeAgentRun(runDir, row.engine.tool, deps.guard);
         before = await captureFolderState(runDir);
+        deps.onRunStarted?.(runDir);
       }
       if (request.signal.aborted)
         throw new DOMException("AI request cancelled.", "AbortError");
@@ -633,7 +649,9 @@ export function createAIPanel(
           const after = await captureFolderState(runDir);
           const diff = diffFolderState(before, after);
           workspaceIndex.reset();
-          changedCard(runDir, diff);
+          const scanned = deps.onRunChanged?.(runDir, [...diff.added, ...diff.modified]);
+          before = null;
+          changedCard(runDir, diff, scanned);
           await afterAgentRun(
             [...diff.added, ...diff.modified, ...diff.deleted].map(
               (path) => `${runDir.replace(/\/$/, "")}/${path}`,
@@ -646,6 +664,7 @@ export function createAIPanel(
             "Could not refresh files changed by the coding agent.",
           );
         }
+        if (before) deps.onRunChanged?.(runDir, []);
       }
       activeRequest = null;
       switcher.refreshState();

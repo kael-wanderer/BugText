@@ -523,10 +523,12 @@ pub fn create_link_note(folder: String, path: String) -> Result<(), String> {
     if !parent.starts_with(root) {
         return Err("Note outside folder".into());
     }
+    let ticket = crate::review_store::before_write(Path::new(&path));
     fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&path)
-        .map(|_| ())
-        .map_err(|_| "Could not create note".into())
+        .map_err(|_| "Could not create note")?;
+    crate::review_store::after_write(ticket, b"");
+    Ok(())
 }

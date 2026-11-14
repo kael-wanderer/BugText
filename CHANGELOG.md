@@ -7,6 +7,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Review bar Show diff compares the note with the version you reviewed, and Explain changes asks the Summarize engine for a summary of the changes grouped by section. A coding CLI run that changed notes offers Review changes in its summary card.
+- Review bar: a queued note opened in Reading view shows what changed since you reviewed it, marks the changed blocks and Outline sections, and offers Previous / Next change, Later and Mark reviewed. View menu: Mark as Reviewed, Next Change, Previous Change.
+- Review sidebar: notes changed outside your own editing are listed under Changed, New and Later with when, how much and by what route, with Mark reviewed, Later, Dismiss and Mark All Reviewed. The Review button shows a count and Explorer marks queued notes with a dot. View ▸ Show Review Queue opens it.
+- Review queue tracking: BugText records which notes in the open folder were changed by a coding CLI run, an MCP client or another app since you last reviewed them. Your own saves count as reviewed. Settings ▸ General ▸ Review queue turns it off.
 - A diagram that fails to render shows the error, a Show source toggle and Fix with AI, which proposes a corrected diagram in the usual diff review.
 - Diagram Fullscreen: opens the diagram over its note window with wheel zoom and drag to pan; Esc closes.
 - Diagrams show a toolbar on hover: zoom out, zoom in, Fit, Copy as PNG and Copy as SVG.
@@ -58,6 +62,9 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Review: the margin mark beside a changed one-line paragraph now runs the full height of the block instead of a few pixels.
+- Review: a note that another tool replaces while BugText is saving it is no longer recorded as reviewed with the other tool's content.
+- Review: a new note's line count no longer counts the final newline as an extra line, so an empty note shows +0 and a one-line note +1.
 - A diagram with a syntax error no longer leaves Mermaid's error graphic below the window, which pushed the layout on every re-render.
 - Folder search for AI context now matches Vietnamese and other accented words, with or without their accents.
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.

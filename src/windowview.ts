@@ -58,6 +58,8 @@ import {
 } from "./preview-find";
 
 export type WindowViewHooks = {
+  /** The reading view finished drawing a Markdown or HTML document. */
+  onPreviewRendered?: (windowId: string) => void;
   canFixMermaid?: () => boolean;
   onFixMermaid?: (windowId: string, tabId: string, line: number, code: string, error: string) => void;
 };
@@ -141,6 +143,10 @@ export type WindowView = {
   /** Re-checks the shown PDF against the file on disk. */
   checkPdfDisk: () => Promise<void>;
   openFind: () => boolean;
+  /** Host for the review bar, above the panes. */
+  reviewHost: HTMLElement;
+  /** The reading view's scroll container. */
+  previewElement: HTMLElement;
 };
 
 export { countWords } from "./status-bar/model";
@@ -209,6 +215,7 @@ export function createWindowView(
         }
       </div>
     </div>
+    <div class="review-bar" role="region" aria-label="Review" hidden></div>
     <div class="window-panes">
       <div class="pane pane-editor">
         <div class="format-toolbar" role="toolbar" aria-label="Markdown formatting">
@@ -915,6 +922,7 @@ export function createWindowView(
       previewPane.appendChild(canvas);
       previewFrame = frame;
       previewCanvas = canvas;
+      h.onPreviewRendered?.(windowId);
     } else {
       const article = document.createElement("article");
       article.className = "doc";
@@ -988,6 +996,7 @@ export function createWindowView(
         }
         restoreIfUnmoved();
       });
+      h.onPreviewRendered?.(windowId);
       h.onNavigation(windowId);
     }
   }
@@ -1196,6 +1205,8 @@ export function createWindowView(
   });
 
   return {
+    reviewHost: root.querySelector<HTMLElement>(".review-bar")!,
+    previewElement: previewPane,
     showGraph, hideGraph, closeGraph, graphActive: () => graphShown,
     id: windowId,
     activateDocument,

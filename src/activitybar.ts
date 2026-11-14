@@ -8,6 +8,7 @@ export function initActivityBar(
   onAI: () => void = () => {},
   onExport: (x: number, y: number) => void = () => {},
   onGit: () => void = () => {},
+  onReview: () => void = () => {},
 ): void {
   const explorerButton = document.getElementById("ab-explorer")!;
   explorerButton.innerHTML = glyphs.explorer;
@@ -19,6 +20,16 @@ export function initActivityBar(
 
   const gitButton = document.getElementById("ab-git");
   if (gitButton) { gitButton.innerHTML = glyphs.git; gitButton.addEventListener("click", onGit); }
+
+  const reviewButton = document.getElementById("ab-review");
+  if (reviewButton) {
+    reviewButton.innerHTML = glyphs.review;
+    const badge = document.createElement("span");
+    badge.className = "ab-badge";
+    badge.hidden = true;
+    reviewButton.append(badge);
+    reviewButton.addEventListener("click", onReview);
+  }
 
   const aiButton = document.getElementById("ab-ai")!;
   aiButton.innerHTML = glyphs.ai;
@@ -49,4 +60,14 @@ export function initActivityBar(
     applyVisibility(explorerVisible);
     onLayoutChange();
   });
+}
+
+/** Count of notes to review on the Review button; Later items are not counted. */
+export function setReviewBadge(count: number): void {
+  const button = document.getElementById("ab-review");
+  const badge = button?.querySelector<HTMLElement>(".ab-badge");
+  if (!button || !badge) return;
+  badge.hidden = count === 0;
+  badge.textContent = count > 99 ? "99+" : String(count);
+  button.setAttribute("aria-label", count ? `Review, ${count} to review` : "Review");
 }

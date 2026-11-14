@@ -57,6 +57,15 @@ export function isDotName(name: string): boolean {
   return name.startsWith(".");
 }
 
+let reviewPaths: ReadonlySet<string> = new Set();
+
+/** Absolute paths of notes in the review queue; their rows get a dot. */
+export function setExplorerReviewPaths(paths: ReadonlySet<string>): void {
+  const same = paths.size === reviewPaths.size && [...paths].every(p => reviewPaths.has(p));
+  reviewPaths = paths;
+  if (!same) render();
+}
+
 export function setExplorerActivePath(path: string | null): void {
   activePath = path;
   render();
@@ -540,7 +549,7 @@ function createRow(node: TreeNode, depth: number): HTMLElement {
   const row = document.createElement("div");
   row.className = `tree-row${node.path === activePath ? " active" : ""}${
     node.path === comparePath ? " compare-selected" : ""
-  }`;
+  }${reviewPaths.has(node.path) ? " review-queued" : ""}`;
   row.style.setProperty("--depth", String(depth));
   row.dataset.path = node.path;
   row.dataset.depth = String(depth);
