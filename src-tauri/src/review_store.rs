@@ -144,8 +144,15 @@ pub(crate) fn read_seen(root: &Path, relative: &str) -> Option<Seen> {
     if !path.starts_with(&root) { return None; }
     let meta = fs::metadata(&path).ok()?;
     if !meta.is_file() { return None; }
+    let hex = |hash: &[u8]| hash.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    if meta.len() > TEXT_LIMIT {
+        // Digest only: stream it rather than holding a large file in memory.
+        let mut hasher = Sha256::new();
+        let size = std::io::copy(&mut fs::File::open(&path).ok()?, &mut hasher).ok()?;
+        return Some(Seen { digest: hex(&hasher.finalize()), text: None, mtime_ms: mtime_ms(&meta), size });
+    }
     let bytes = fs::read(&path).ok()?;
-    let digest = Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let digest = hex(&Sha256::digest(&bytes));
     let size = bytes.len() as u64;
     let text = if size <= TEXT_LIMIT { String::from_utf8(bytes).ok() } else { None };
     Some(Seen { digest, text, mtime_ms: mtime_ms(&meta), size })
@@ -821,6 +828,14 @@ mod tests {
         let r = e.mark("reviewed", &refs);
         assert!(r.stale.is_empty() && r.snapshot.items.is_empty());
         assert!(e.blobs().is_empty());
+    }
+    #[test] fn large_files_hash_the_same_when_streamed() {
+        let e = env();
+        let body = vec![b'z'; 2_500_000];
+        e.put("big.md", &body);
+        let seen = read_seen(&e.folder, "big.md").unwrap();
+        let expected: String = Sha256::digest(&body).iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!((seen.digest, seen.size, seen.text.is_none()), (expected, 2_500_000, true));
     }
     #[test] fn unreferenced_blobs_are_removed() {
         let e = env();
