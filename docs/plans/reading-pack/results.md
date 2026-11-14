@@ -245,3 +245,65 @@ remains unverified in the real webview; its fallback is still conditional on an
 owner-reported paste failure. No Rust, capabilities, shared AI runner, sanitizer
 allow-list, dependency or bundleVersion changes were made. No merge, push or tag
 was performed.
+
+
+## Agent-run release webview checks
+
+The owner subsequently authorized the agent to perform native checks. These results
+supersede the earlier blanket statement that runtime checks were not performed.
+Tested commit `9828164` on macOS using a fresh release `.app`, on display 2,
+with the production CSP. A temporary Tauri config changed only product name,
+identifier and initial window placement/size, isolating the test profile from the
+installed BugText app. No source, Rust, capabilities or bundleVersion was changed.
+The build completed successfully (frontend 11.31s, native 20.40s).
+
+Fresh automated checks also passed: `npx tsc --noEmit` and `npm run test`, with
+**245 files / 1,275 tests**, in 4.93s. Log:
+`/tmp/bugtext-reading-pack-gui-tests/automated-tests.log`.
+
+| Case | Observed release result |
+| --- | --- |
+| READ-01 | Visually inspected all five labelled callouts in Dark and Light, custom inline-bold title, title-only note, unknown marker and ordinary outer quote with marked inner callout. These rendered as expected. The later-line marker variant was not separately exercised in the native app. |
+| READ-02 | A reference jumped past a colliding `fn-1` heading to the footnote list; its return arrow restored the reference. Two definitions and repeated reference numbers rendered, and missing references stayed literal. The malicious image/script definition produced an image-not-found placeholder without an alert. Every individual reference/return-arrow combination was not clicked. |
+| READ-03 | Native clipboard text was exactly `const a = 1 < 2;` followed by a newline. Long-line scrolling, rapid feedback resets and clipboard refusal were not exercised manually. |
+| READ-04 | Inline zoom buttons, fullscreen in Main and Sub, wheel zoom, drag pan, Close and Escape worked. The overlay remained within its pane. A clean same-note file refresh retained the clone. Escape/Close restored opener focus when the app was foreground. Fit, same-note typing from another pane and reduced-motion settings were not separately verified. |
+| READ-04B | **Copy as PNG succeeded in the actual release webview.** Preview.app New from Clipboard opened a complete white-background image. Clipboard PNG was 392 × 327 / 7,912 bytes. After two inline zoom-ins, PNG had the same dimensions and identical SHA-256: `8d0a8290a0dd384c2a87f56ac5096d032624859a1aee0ee0d6e394996f78390f`. A 180-edge diagram showed “The diagram is too large to copy as an image.” Clipboard refusal was not forced. No native clipboard fallback was applied. |
+| READ-04C | SVG copied after inline zoom parsed as an SVG document with the SVG namespace, `viewBox="0 0 196 163.1875"`, width `100%`, and empty inline style. A separate viewer-open check and clipboard-refusal branch remain unverified. |
+| READ-05 | Used a loopback-only mock OpenAI-compatible provider with synthetic text. Captured request contained only the broken diagram in `<document>` plus parser-error/instruction text, without surrounding note or folder context. Prose around a fenced reply was stripped from the diff. Accept changed only the body between the existing fences, marked the note unsaved, and one Undo restored it. An 8-second delayed reply followed by a note edit refused Accept with “The document changed since this reply — regenerate.” |
+| READ-05B | With no Rewrite engine configured, the error/source toggle remained and Fix with AI was absent. |
+| READ-05C | The sub-300ms stale-preview click race was not reliably reachable through the native automation. Automated `fixTarget` tests cover changed source and shifted opening lines. |
+| READ-05D | With an engine configured, a whitespace-only Mermaid fence had an error/source card without Fix with AI. The empty-body handler and old-button race were not triggered manually. |
+| READ-05E | Indented list and blockquote fences each showed the specified refusal toast without adding an AI request. A prose-wrapped fenced reply produced the body-only diff. An empty fenced reply showed “The AI returned no diagram.” with no diff controls. |
+| READ-06 | Captured release-app chat requests for `thiet ke dong bo`, `thiết kế`, NFD `tiếng`, and `duong` each included the saved Vietnamese note as folder-search context. `… — !!` included zero retrieval context blocks. No external AI service or key was used. |
+| READ-07 | Exported PDF and DOCX through the native export sheet (Pandoc 3.11, Typst 0.15.1). Inspected both PDF pages and the DOCX Quick Look rendering: bold quote labels, code, diagram and footnote text remained readable; controls and return arrows were absent. DOCX XML had zero hyperlinks and an embedded PNG diagram. The intentionally missing malicious-image fixture produced the expected preflight warning. PNG/SVG whole-note image capture remains unchecked. |
+| READ-08 | The presentation subtree rendered callouts, code, footnotes and valid Mermaid, with a plain message for the failed diagram; it contained no copy button, Mermaid toolbar or interactive error-card controls. |
+| READ-04D | Foreground Tab cycled Zoom out → Zoom in → Fit → Close → Zoom out; Shift+Tab wrapped back to Close. Escape closed the overlay. Opening another note closed it. Same-note clean file refresh retained it. Native tab-close, preview-hide, pane-destruction and pending-import race checks remain incomplete; native accelerator delivery did not establish their outcomes. |
+
+### Release finding
+
+**Unresolved: Mermaid leaves its own error graphic outside the custom card.**
+Opening a note with invalid Mermaid also inserts a large “Syntax error in text”
+Mermaid graphic below the app layout. Re-rendering adds further graphics, and the
+outer document scrolls, clipping the app header/status layout. The graphics remain
+after switching to a valid note. This is visible release behavior, separate from
+the custom card (whose literal source toggle and AI controls behaved correctly).
+The render call in `src/render-extras.ts` catches the rejection but does not clean
+up Mermaid's temporary error-render element. No production fix was made during
+this test-only pass.
+
+Evidence and generated artifacts are under
+`/tmp/bugtext-reading-pack-gui-tests/`: `release-error-overflow.png`,
+`preview-paste.png`, `copied-diagram.png`, `copied-after-zoom.png`,
+`copied-diagram.svg`, `reading-pack-test.pdf`, `pdf-page1.png`, `pdf-page2.png`,
+`reading-pack-test.docx`, `reading-pack-test.docx.png`, `requests.jsonl`, and
+`build.log`. They contain only synthetic fixtures. The mock server was stopped
+and its connection was removed from the isolated profile after testing.
+
+Cases marked partial above are not asserted complete. The remaining native checks
+are the unexercised variants listed in the table; the owner no longer needs to
+establish the basic PNG paste result. No merge, push, tag or version change was
+performed.
+
+The isolated test app was closed. The normal release executable was restored with
+`npm run tauri build -- --no-bundle` (exit 0; frontend 10.67s). Log:
+`/tmp/bugtext-reading-pack-gui-tests/default-release-build.log`.
