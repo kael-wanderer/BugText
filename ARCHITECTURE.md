@@ -61,6 +61,34 @@ available only while `settings.json` has `mcp.enabled: true`; Settings ▸ AI �
 server also manages terminal client registration.
 `codex exec` requires per-tool approval before using MCP tools.
 
+Review queue (`src-tauri/src/review_model.rs`, `review_store.rs`, `src/review/`): Rust alone
+decides review state; the frontend renders the snapshot it gets back and sends mark,
+later, dismiss and restore requests. State lives per folder in memory behind one mutex
+and on disk under `<app config dir>/review/<folder-id>/` (`index.json`, plus
+`blobs/<sha256>.txt` holding the text of each reviewed version). `review_open` loads the
+index when a folder is set. Every full workspace refresh passes the folder's file list
+(skipped while the list still belongs to another folder) and its context-excluded notes
+to `review_scan` without awaiting it; a record is removed only when its note is gone
+from disk, no longer tracked, or excluded, never because a list omitted it; Rust stats
+each tracked file, hashes only those whose size or modification time changed, and reads
+and hashes with no lock held. `write_atomic_at` (and `create_file_at`, template and link
+note creation) call a hook before and after the write, so a write BugText makes itself
+counts as the owner's: the reviewed version moves only if the note was Reviewed before
+the save, and a change on disk that no scan has seen yet is recorded first. The hook
+swallows every error and never blocks a save; the store writes its own files with
+`write_atomic_raw` so it never re-enters the hook. MCP saves and coding CLI runs leave a
+route hint (`review_expect`, kept 60 s) so their writes are labelled MCP or AI panel
+run instead of owner; scans pause while a CLI run is active (at most 15 minutes). Line
+counts are computed outside the lock with a 50 ms diff deadline; the hook stays idle
+until a folder's first scan has baselined it; close and reset raise a per-folder
+generation so a scan already running cannot bring the folder back. The Reading view
+skips change marks when the two texts are too large for the line diff. The first scan of a folder
+records every file as a baseline and queues nothing. Files over 2 MB (hashed as a
+stream) or not UTF-8 keep a digest only. Later and Dismissed are dropped once a note
+matches its reviewed version. Tracked: `.md`, `.markdown`, `.html`, `.htm`; not tracked: PDFs, paths with
+a hidden component, and notes matched by `context.exclude`. Settings ▸ General ▸ Review
+queue (`review.track`) turns it off.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,
