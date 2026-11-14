@@ -536,6 +536,7 @@ pub(crate) fn before_write(target: &Path) -> Option<Ticket> {
         // Until the first scan has baselined the folder, that scan records this file too.
         if active.baseline_pending { return None; }
         let relative = relative_of(&active.root, &target)?;
+        if active.excluded.contains(&relative) { return None; }
         let copy = active.index.records.get(&relative).map(Copy::of);
         (active.root.clone(), relative, copy, active.dir.clone())
     };
@@ -1050,5 +1051,27 @@ mod open_tests {
         open_at(&e.config, &e.f(), now_ms()).unwrap();
         write_atomic_at(&e.folder.canonicalize().unwrap().join("a.md"), b"typed before any scan").unwrap();
         assert!(e.scan(&["a.md"]).items.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod excluded_hook_tests {
+    use super::tests::env;
+    use super::*;
+    use crate::files::write_atomic_at;
+
+    #[test] fn writes_to_excluded_notes_are_not_recorded() {
+        let e = env();
+        e.put("a.md", b"a");
+        let excluded = vec!["private/p.md".to_string()];
+        scan_at(&e.config, &e.f(), &["a.md".to_string()], &excluded, now_ms(), &read_seen).unwrap();
+        let root = e.folder.canonicalize().unwrap();
+        fs::create_dir_all(root.join("private")).unwrap();
+        expect_at(&e.f(), &excluded, Route::Mcp, now_ms()).unwrap();
+        assert!(before_write(&root.join("private/p.md")).is_none());
+        write_atomic_at(&root.join("private/p.md"), b"secret").unwrap();
+        let s = scan_at(&e.config, &e.f(), &["a.md".to_string()], &excluded, now_ms(), &read_seen).unwrap().0;
+        assert_eq!(s.tracked, 1);
+        assert!(s.items.is_empty());
     }
 }
