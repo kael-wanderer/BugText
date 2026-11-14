@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Review bar Show diff compares the note with the version you reviewed, and Explain changes asks the Summarize engine for a summary of the changes grouped by section. A coding CLI run that changed notes offers Review changes in its summary card.
 - Review bar: a queued note opened in Reading view shows what changed since you reviewed it, marks the changed blocks and Outline sections, and offers Previous / Next change, Later and Mark reviewed. View menu: Mark as Reviewed, Next Change, Previous Change.
 - Review sidebar: notes changed outside your own editing are listed under Changed, New and Later with when, how much and by what route, with Mark reviewed, Later, Dismiss and Mark All Reviewed. The Review button shows a count and Explorer marks queued notes with a dot. View ▸ Show Review Queue opens it.
 - Review queue tracking: BugText records which notes in the open folder were changed by a coding CLI run, an MCP client or another app since you last reviewed them. Your own saves count as reviewed. Settings ▸ General ▸ Review queue turns it off.
