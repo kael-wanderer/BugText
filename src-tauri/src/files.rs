@@ -634,7 +634,13 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
 /// Writes to `target` exactly as given, without resolving it again. Callers that
 /// have already checked a canonical path use this so the check and the write
 /// refer to the same file.
-fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
+    write_atomic_raw(target, bytes)
+}
+
+/// The atomic write itself, with no review bookkeeping. The review store writes
+/// its own files through this so it never re-enters its own write hook.
+pub(crate) fn write_atomic_raw(target: &Path, bytes: &[u8]) -> Result<(), String> {
     use std::io::Write;
 
     let parent = target

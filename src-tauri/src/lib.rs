@@ -40,6 +40,7 @@ mod sandbox;
 mod secrets;
 mod templates;
 mod review_model;
+mod review_store;
 mod workflow_store;
 mod update_feed;
 
@@ -263,6 +264,12 @@ pub fn run() {
             git_locate::git_diagnostics,
             git_run::git_cancel,
             workflow_store::read_workflow_store,
+            review_store::review_scan,
+            review_store::review_mark,
+            review_store::review_expect,
+            review_store::review_base,
+            review_store::review_reset,
+            review_store::review_close,
             workflow_store::write_workflow_store,
             update_feed::update_feed_fetch,
             app_build,
