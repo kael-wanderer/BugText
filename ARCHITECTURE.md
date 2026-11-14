@@ -116,6 +116,16 @@ Table view edits properties through the same writer, with isolated undo for open
 and Recovery snapshots plus checked atomic writes for closed notes. Bulk changes are
 reviewed before writing; hidden columns and row selections are local to the table.
 
+Callouts and footnotes are markdown-it rules (`preview-callouts.ts`,
+`preview-footnotes.ts`) whose HTML passes through the sanitizer. Code copy buttons,
+the diagram toolbar, fullscreen and the error card are built after sanitizing, in
+note windows only (`preview-code-copy.ts`, `preview-mermaid.ts`,
+`mermaid-fullscreen.ts`); export and presentation have no interactive controls.
+`render-extras.ts` records each diagram's source, opening line and parser error.
+Fix with AI is a quick action bound to one fenced block (`ai/fix-mermaid.ts`),
+checked against the current source before sending and applied through the existing
+diff review. Empty diagrams cannot trigger the action.
+
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
 sanitizing (`preview-tasks.ts`, never `<input>`) and toggle only the source marker
@@ -150,7 +160,9 @@ are locked off; folder-access CLI agents can still open those files themselves.
 
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 Note/selection and Folder search chips default on; keyword retrieval adds up to
-`workspaceContextK` chunks while search is on. Replies show timing, model and
+`workspaceContextK` chunks while search is on. The Unicode tokenizer keeps runs of
+letters and digits whole, normalizes composed accents, and adds a diacritic-free
+second token (including `đ` to `d`) for accented words. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents
@@ -191,6 +203,8 @@ Export is document-aware: Markdown/plain documents offer rendered PDF/DOCX plus
 PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
+PDF/DOCX callouts fall back to blockquotes with bold labels; image captures retain
+the styled callout. Footnotes retain numbered references and back links.
 Export presets and last-used choices live in `settings.json` under `export`; Settings ▸
 Export manages presets and tool diagnostics. A sheet checks Pandoc, Typst, fonts and
 missing local images before the save dialog. Rust validates preset values again and

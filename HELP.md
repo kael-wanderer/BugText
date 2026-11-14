@@ -78,6 +78,37 @@ Use `⌘K` and choose **Snapshot Now** or **Show Version History** for saved fil
 History can compare an older snapshot with the current buffer or restore it as
 unsaved edits.
 
+## Markdown reading
+
+Start a quote with `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`
+to show a callout. Markers accept either case. Add a title after the marker or leave
+it blank for the default label:
+
+```markdown
+> [!WARNING] Before you sync
+> Save your changes first.
+```
+
+Write a footnote reference as `[^source]` and its definition on a separate line as
+`[^source]: The source details.` References become numbered links to the notes at
+the end; use the return arrow to jump back.
+
+Hover over a code block to reveal **Copy**, which copies its code text.
+
+### Mermaid diagrams
+
+Use a fenced code block with `mermaid` after the opening fence. Hover over a diagram
+for **Zoom out**, **Zoom in**, **Fit**, **Fullscreen**, **PNG** and **SVG**. Fit resets
+the inline zoom. PNG copies an image; SVG copies the diagram's SVG markup as text.
+Fullscreen covers the diagram's note pane: use the wheel to zoom, drag to pan, and
+**Close** or `Esc` to return.
+
+If a diagram fails, the preview shows its error and a **Show source** toggle.
+**Fix with AI** appears when Rewrite is enabled with an available engine and the
+diagram has source text. It sends only that diagram's source, then shows a diff for
+you to review. If the source changed since the preview rendered, wait for the
+preview to update before trying again. An empty diagram needs source text first.
+
 ## Search
 
 - **Find in the current document:** `⌘F` opens the editor find bar, or a Reading-view
@@ -98,7 +129,8 @@ Toggle the right-side panel with the activity-bar agent button. The panel is a c
 - **Context chips:** *Note/selection* sends the open document or your selection;
   *Folder search* adds the most relevant passages from the open folder using a local
   keyword search (no extra service or key). Both start on. Each reply records the
-  context that was sent, with links to the source files.
+  context that was sent, with links to the source files. Accented words match with
+  or without accents, including Vietnamese `đ`/`d`.
 - **Sending:** **Enter** sends; **Shift+Enter** inserts a newline. Click **Cancel** to
   stop a streaming reply.
 - **Attachments:** use the 📎 button, drag files onto the panel, or type `@` to mention
@@ -194,6 +226,8 @@ brew install pandoc typst
 ```
 
 BugText checks these tools before asking where to save and shows the missing install
-command when setup is incomplete.
+command when setup is incomplete. PDF and Word export show callouts as quotes with
+bold labels. Image exports retain the coloured callout boxes. Export and
+presentation mode omit the preview copy buttons and diagram controls.
 
 This help document is itself Markdown and opens as a normal BugText tab.
