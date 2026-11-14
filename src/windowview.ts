@@ -10,6 +10,8 @@ import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import type { MermaidDeps } from "./preview-mermaid";
+import { showToast } from "./toast";
 import { enhanceCodeCopy } from "./preview-code-copy";
 import { enhanceFootnotes } from "./preview-footnotes";
 import { enhancePreviewTasks } from "./preview-tasks";
@@ -144,6 +146,11 @@ export function createWindowView(
   isMain: boolean,
   h: WindowHandlers
 ): WindowView {
+  const mermaidDeps: MermaidDeps = {
+    copyText: writeText,
+    copyImage: (png) => navigator.clipboard.write([new ClipboardItem({ "image/png": png })]),
+    notify: showToast,
+  };
   const root = document.createElement("div");
   root.className = "window";
   root.dataset.windowId = windowId;
@@ -932,7 +939,15 @@ export function createWindowView(
         placeObserver = new ResizeObserver(restoreIfUnmoved);
         placeObserver.observe(article);
       }
-      void enhancePreview(previewPane).then(restoreIfUnmoved);
+      void enhancePreview(previewPane).then(async () => {
+        if (token !== previewRenderToken) return;
+        if (previewPane.querySelector(".mermaid-rendered")) {
+          const { enhanceMermaid } = await import("./preview-mermaid");
+          if (token !== previewRenderToken) return;
+          enhanceMermaid(previewPane, mermaidDeps);
+        }
+        restoreIfUnmoved();
+      });
       h.onNavigation(windowId);
     }
   }

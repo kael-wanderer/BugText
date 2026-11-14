@@ -2727,6 +2727,7 @@ body.no-folder .explorer-empty {
 }
 
 .mermaid-rendered {
+  position: relative;
   margin: 1.25em 0;
   overflow-x: auto;
   text-align: center;
@@ -3691,3 +3692,27 @@ body.file-op-busy, body.file-op-busy #explorer * { cursor: progress; }
   cursor: pointer;
 }
 .code-block:hover .code-copy, .code-copy:focus-visible { opacity: 1; }
+
+.mermaid-toolbar {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  opacity: 0;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.mermaid-rendered:hover .mermaid-toolbar, .mermaid-rendered:focus-within .mermaid-toolbar { opacity: 1; }
+.mermaid-toolbar button {
+  padding: 4px 8px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font: 12px var(--font-ui);
+  cursor: pointer;
+}
+.mermaid-toolbar button:hover { background: var(--selection); }
