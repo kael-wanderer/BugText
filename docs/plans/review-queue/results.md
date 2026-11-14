@@ -145,7 +145,7 @@ Run 2026-11-14 by Claude in the release binary (`src-tauri/target/release/bugtex
 1. **Margin mark too short on one-line blocks.** `.pane-preview .review-changed` (`src/styles.css`) draws the mark with `box-shadow: -14px 0 0 -11px`. The negative spread takes 22px off the mark's height, so a one-line paragraph got a mark about 7px tall. Fixed after the run: the shadow is now `-3px 0 0 0`, the same 3px bar at the same place, the full height of the block (`review-mark-style.test.ts`). Checked in the rebuilt release app on the second display: a changed one-line paragraph and a changed five-line paragraph both get a full-height mark.
 2. **A one-line new note shows "+2 −0".** `cli-new.md` held `# CLI new` plus a newline. Same cause as M8. Fixed by final review fix 2.
 3. **Low contrast on the run card.** The "+ cli-new.md" line in the changed-files card is dark green on the dark panel and hard to read.
-4. **delta.md showed no counts after the CLI edit.** Expected: in that run its record came from the first-open baseline, which stores no text, so there is nothing to count against (the bar says "No reviewed version yet"). Confirmed by the final-review hand check: after Mark reviewed, the next change counts "+1 −0".
+4. **delta.md showed no counts after the CLI edit.** Expected: delta.md was marked reviewed in REV-12, but the REV-20 Reset ran before REV-03 and re-baselined every note. A baseline record stores no text, so there is nothing to count against (the bar says "No reviewed version yet"). Confirmed by the final-review hand check: after Mark reviewed, the next change counts "+1 −0".
 
 ### Seen during the run, not caused by this branch
 
