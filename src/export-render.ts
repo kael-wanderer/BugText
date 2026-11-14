@@ -11,6 +11,11 @@ table{border-collapse:collapse;width:100%}
 th,td{border:1px solid #bbb;padding:6px 10px;text-align:left}
 pre{white-space:pre-wrap}
 
+.doc sup.footnote-ref a { text-decoration: none; color: #345e96; }
+.doc .footnotes { font-size: 0.85em; border-top: 1px solid #bbb; margin-top: 14px; padding-top: 8px; }
+.doc .footnote-backref { text-decoration: none; margin-left: 0.3em; }
+
+
 .doc blockquote.callout {
   margin: 0 0 12px;
   padding: 9px 14px;

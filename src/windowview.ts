@@ -9,6 +9,7 @@ import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from
 import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
+import { enhanceFootnotes } from "./preview-footnotes";
 import { enhancePreviewTasks } from "./preview-tasks";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -816,7 +817,8 @@ export function createWindowView(
         article.className = "doc";
         article.style.zoom = String(previewZoom);
         article.innerHTML = renderMarkdown(`\`\`\`sql\n${text}\n\`\`\``);
-        previewPane.appendChild(article);
+        enhanceFootnotes(article);
+      previewPane.appendChild(article);
       }
       return;
     }
@@ -884,6 +886,7 @@ export function createWindowView(
         renderPreview(current, pathOrName);
         return false;
       } : null);
+      enhanceFootnotes(article);
       previewPane.appendChild(article);
       restorePlace();
       const token = previewRenderToken;

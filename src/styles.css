@@ -3669,3 +3669,8 @@ body.settings-active #git-panel, body.focus-active #git-panel { visibility: hidd
 .citation-picker .outline-row small { opacity: .75; }
 
 body.file-op-busy, body.file-op-busy #explorer * { cursor: progress; }
+
+
+.doc sup.footnote-ref a { text-decoration: none; color: var(--accent); }
+.doc .footnotes { font-size: 0.85em; border-top: 1px solid var(--border-soft); margin-top: 14px; padding-top: 8px; }
+.doc .footnote-backref { text-decoration: none; margin-left: 0.3em; }
