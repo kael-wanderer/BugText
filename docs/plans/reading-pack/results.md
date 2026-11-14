@@ -281,7 +281,7 @@ Fresh automated checks also passed: `npx tsc --noEmit` and `npm run test`, with
 
 ### Release finding
 
-**Unresolved: Mermaid leaves its own error graphic outside the custom card.**
+**Resolved by `9095602` (see the native recheck below): Mermaid left its own error graphic outside the custom card.**
 Opening a note with invalid Mermaid also inserts a large “Syntax error in text”
 Mermaid graphic below the app layout. Re-rendering adds further graphics, and the
 outer document scrolls, clipping the app header/status layout. The graphics remain
@@ -307,3 +307,50 @@ performed.
 The isolated test app was closed. The normal release executable was restored with
 `npm run tauri build -- --no-bundle` (exit 0; frontend 10.67s). Log:
 `/tmp/bugtext-reading-pack-gui-tests/default-release-build.log`.
+
+
+### Mermaid error-graphic cleanup and native recheck
+
+Fix commit: `9095602` — `fix(preview): remove Mermaid's leftover error graphic`.
+This corrects an existing bug also present on main. Mermaid initialization now uses
+`suppressErrorRendering: true`. A `finally` block removes only the two exact
+per-render IDs (`id` and `"d" + id`) when their elements are outside the preview
+host, on either success or failure. The successful SVG inside the host is retained.
+The requested Unreleased ▸ Fixed CHANGELOG line is included in the fix commit.
+
+Test-first evidence: the extended initialization test failed before the config
+change, then passed. Both new cleanup tests failed before `finally` was added:
+repeated rejection left the temporary SVG/div in the document, and success left
+the temporary wrapper. Afterwards all six tests in
+`render-extras-mermaid.test.ts` passed, including two renders in the same container,
+unchanged body child counts, preservation of an unrelated element and preservation
+of the successful SVG. `npx tsc --noEmit` passed; `npm run test` passed with
+**245 files / 1,277 tests** (4.62s). Logs: `/tmp/bugtext-mermaid-config-red.log`,
+`/tmp/bugtext-mermaid-cleanup-red.log`, `/tmp/bugtext-mermaid-cleanup-green.log`.
+
+Rebuilt and launched the release app in the same isolated profile and display-2
+placement as the earlier check, with the production CSP and unchanged bundleVersion.
+The isolated release build passed (frontend 10.45s, native 18.36s).
+
+| Requested native recheck | Result |
+| --- | --- |
+| Broken diagram, several typing re-renders | **Passed.** Typed five rounds into `release-cleanup.md`, retaining one valid and one broken Mermaid fence. Each round updated the preview. No Mermaid error graphic appeared below the layout, no outer page scrollbar appeared, and the header and status bar stayed in place. The custom error card and valid diagram remained visible. |
+| Switch to a valid note | **Passed.** Opened the `valid.md` tab after the repeated failures; its diagram rendered and the app layout remained clean. Ordinary note-pane scrolling remained available for this long fixture. |
+| Error card / Show source / Fix with AI | **Passed.** Show source expanded with literal `nonsense <b>x</b>`, with the expected expanded/Hide source state. Fix with AI, using the loopback-only mock provider and synthetic diagram, opened the expected fenced-body diff with Accept/Reject. Rejected it to retain the broken diagram for export. No external service or key was used. |
+| Mixed valid/broken diagram PDF | **Passed.** Exported the current note through the native PDF sheet. The one-page PDF shows the complete valid Edit → Save diagram and the plain Mermaid error message, without the Mermaid error graphic or interactive controls. Inspected its rendered page and extracted text. |
+| Fullscreen closes on tab close | **Passed.** Opened fullscreen in the clean `valid.md` tab and pressed ⌘W. The tab closed, the adjacent note became active and the overlay was gone. |
+| Fullscreen closes when preview is hidden | **Passed.** Opened fullscreen in `release-cleanup.md`, opened ⌘K, selected `View: Editor` and pressed Return. Both preview and overlay disappeared; the editor remained. This tests the actual mode-change action without relying on synthetic delivery of a native-menu accelerator. |
+
+The release finding is resolved. These two native lifecycle results also supersede
+the corresponding incomplete tab-close/preview-hide entries in READ-04D above;
+other earlier unexercised variants remain recorded as such.
+
+New artifacts in `/tmp/bugtext-reading-pack-gui-tests/`:
+`cleanup-typed.png`, `cleanup-valid.png`, `cleanup-hidden.png`,
+`release-cleanup.pdf`, `cleanup-pdf.png`, and `cleanup-release-build.log`.
+The mock server was stopped and its temporary connection removed from the isolated
+profile. No merge, push, tag, Rust, capabilities or bundleVersion change was made.
+
+The isolated app was closed. Restored the normal release executable with
+`npm run tauri build -- --no-bundle` (exit 0; frontend 10.24s, native 17.31s).
+Log: `/tmp/bugtext-reading-pack-gui-tests/cleanup-default-release-build.log`.
