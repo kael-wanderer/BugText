@@ -46,6 +46,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-038 | 2026-10-27 | Export / PNG, SVG | Major | — | Image export of a Markdown note failed with images, or came out blank | fixed (unreleased) |
 | BUG-039 | 2026-11-01 | Editor / Spell check | Minor | — | Spell check underlined whole lines of correctly spelled text | fixed (unreleased) |
 | BUG-040 | 2026-11-14 | Preview / Mermaid | Minor | — | A diagram with a syntax error left Mermaid's error graphic below the window and pushed the layout | fixed (unreleased) |
+| BUG-041 | 2026-11-14 | Tabs | Minor | REV runs (28-review-queue) | With more tabs than fit, the tab strip showed the first tabs while a later note was open; the active tab was scrolled out of view | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -339,3 +340,18 @@ Copy this template for each new bug:
 - **Notes:** A failed `mermaid.render` leaves its temporary element in `document.body`.
 - **Fix:** `suppressErrorRendering: true`, and `enhancePreview` removes the two per-render element ids after each render (9095602, merged in dbc0f67).
 - **Status:** fixed (unreleased).
+
+### BUG-041 — Tab strip hid the active tab
+
+- **Feature / test case:** Tabs (seen during the review-queue manual run, docs/test-cases/28-review-queue.md)
+- **Severity:** Minor
+- **Environment:** macOS, release build of main (a62b10b)
+- **Steps to reproduce:**
+  1. Open a folder and open eight notes as kept tabs in a window whose tab strip is narrow (sidebar open, split view).
+  2. Look at the tab strip while the last note is open.
+- **Expected:** The active tab is visible.
+- **Actual:** The strip showed the first one or two tabs; the open note's tab was off to the right, so the strip looked like another note was open.
+- **Notes:** Every render rebuilt the strip with `innerHTML = ""`, which resets its horizontal scroll to 0, and nothing scrolled the active tab into view.
+- **Fix:** The render keeps the strip's scroll position and then scrolls just enough to show the whole active tab (`revealScroll` in `src/tab-reveal.ts`).
+- **Status:** fixed (unreleased).
+
