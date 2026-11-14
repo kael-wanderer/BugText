@@ -4,7 +4,7 @@ Branch `feat/review-queue`, built from `plan.md` in this folder. Not merged, pus
 
 ## Status
 
-All 8 tasks are built and every automated check passes. The manual checks (REV-01 to REV-20 in `docs/test-cases/28-review-queue.md`) were run on 2026-11-14 in the release build on the second display: 18 pass, 2 pass in part (REV-05, REV-13), none fail. They were not repeated in `npm run tauri dev`. One finding (the margin mark height) is worth fixing before merge; see "Manual check results" below.
+All 8 tasks are built and every automated check passes. The manual checks (REV-01 to REV-20 in `docs/test-cases/28-review-queue.md`) were run on 2026-11-14 in the release build on the second display: 18 pass, 2 pass in part (REV-05, REV-13), none fail. They were not repeated in `npm run tauri dev`. The margin-mark height finding has since been fixed; see "Manual check results" below.
 
 ## What was built, per task
 
@@ -122,7 +122,7 @@ Run 2026-11-14 by Claude in the release binary (`src-tauri/target/release/bugtex
 
 ### Findings
 
-1. **Margin mark too short on one-line blocks.** `.pane-preview .review-changed` (`src/styles.css`) draws the mark with `box-shadow: -14px 0 0 -11px`. The negative spread takes 22px off the mark's height, so a one-line paragraph gets a mark about 7px tall. Not fixed yet; a fix needs a test and a CHANGELOG line.
+1. **Margin mark too short on one-line blocks.** `.pane-preview .review-changed` (`src/styles.css`) draws the mark with `box-shadow: -14px 0 0 -11px`. The negative spread takes 22px off the mark's height, so a one-line paragraph got a mark about 7px tall. Fixed after the run: the shadow is now `-3px 0 0 0`, the same 3px bar at the same place, the full height of the block (`review-mark-style.test.ts`).
 2. **A one-line new note shows "+2 −0".** `cli-new.md` held `# CLI new` plus a newline. Same family as deferred minor M8 (an empty new file shows "+1").
 3. **Low contrast on the run card.** The "+ cli-new.md" line in the changed-files card is dark green on the dark panel and hard to read.
 4. **delta.md showed no counts after the CLI edit**, although it had been marked reviewed earlier in the run. Not investigated; may be expected if no reviewed text was stored for it.

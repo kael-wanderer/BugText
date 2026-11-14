@@ -62,6 +62,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Review: the margin mark beside a changed one-line paragraph now runs the full height of the block instead of a few pixels.
 - A diagram with a syntax error no longer leaves Mermaid's error graphic below the window, which pushed the layout on every re-render.
 - Folder search for AI context now matches Vietnamese and other accented words, with or without their accents.
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.
