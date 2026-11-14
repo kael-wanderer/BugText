@@ -52,6 +52,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Folder search for AI context now matches Vietnamese and other accented words, with or without their accents.
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.
 - Security: a checked folder write now writes the exact file that was checked, so a link swapped in after the check cannot redirect the write outside the open folder.
 - Security: updated the HTML sanitizer (DOMPurify 3.4.17), Markdown renderer, PDF engine and KaTeX to versions without known advisories.

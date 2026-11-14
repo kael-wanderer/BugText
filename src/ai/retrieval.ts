@@ -14,10 +14,13 @@ const K1 = 1.5;
 const B = 0.75;
 
 export function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 0);
+  const tokens: string[] = [];
+  for (const token of text.normalize("NFC").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []) {
+    tokens.push(token);
+    const folded = token.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
+    if (folded !== token) tokens.push(folded);
+  }
+  return tokens;
 }
 
 function splitToSize(text: string, maxChars: number): string[] {

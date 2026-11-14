@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildIndex, retrieve, retrieveScored } from "../ai/retrieval";
+import { buildIndex, retrieve, retrieveScored, tokenize } from "../ai/retrieval";
 
 const chunks = [
   { path: "/a.md", heading: "Auth", text: "login uses okta saml single sign on" },
@@ -43,4 +43,32 @@ describe("retrieve (BM25)", () => {
   it("handles an empty index", () => {
     expect(retrieve(buildIndex([]), "anything", 5)).toEqual([]);
   });
+});
+
+describe("tokenize", () => {
+  it("keeps Vietnamese words whole and adds a form without diacritics", () => {
+    expect(tokenize("Tiếng Việt")).toEqual(["tiếng", "tieng", "việt", "viet"]);
+  });
+  it("does not repeat a token that has no diacritics", () => {
+    expect(tokenize("sync model v2")).toEqual(["sync", "model", "v2"]);
+  });
+  it("treats composed and decomposed accents the same", () => {
+    expect(tokenize("tiếng".normalize("NFD"))).toEqual(tokenize("tiếng".normalize("NFC")));
+  });
+  it("folds đ to d", () => {
+    expect(tokenize("đường")).toEqual(["đường", "duong"]);
+  });
+  it("returns nothing for text without letters or digits", () => {
+    expect(tokenize(" — … !! ")).toEqual([]);
+  });
+});
+
+it("finds a Vietnamese note from a query typed without accents", () => {
+  const index = buildIndex([
+    { path: "a.md", heading: "", text: "Tài liệu thiết kế đồng bộ" },
+    { path: "b.md", heading: "", text: "Meeting notes about export" },
+  ]);
+  expect(retrieve(index, "thiet ke dong bo", 1)[0].path).toBe("a.md");
+  expect(retrieve(index, "thiết kế", 1)[0].path).toBe("a.md");
+  expect(retrieve(index, "…", 1)).toEqual([]);
 });
