@@ -24,7 +24,10 @@ All 8 tasks are built and every automated check passes. The manual checks (REV-0
 | Owner review fix 4 | `83bb1ce` | The write hook ignores notes excluded from AI context |
 | Owner review fix 5 | `6b21ba1` | Later and Dismissed are dropped once a note matches its reviewed version |
 | Optional | `9284f30` | Files over 2 MB are hashed in a stream |
-| 8 | this commit | `ARCHITECTURE.md`, test cases, this file |
+| 8 | `1cb31ca` | `ARCHITECTURE.md`, test cases, this file |
+| Manual run fix | `798ec48` | Margin mark spans the full height of a changed block |
+| Final review fix 1 | `f814c69` | `after_write` records BugText's own write from the bytes it wrote, not a re-read of the disk |
+| Final review fix 2 | `79eebc9` | A new note counts its lines, not its newlines |
 
 ## Step 3 output (run at `9284f30`)
 
@@ -77,14 +80,31 @@ Every decision made during the build:
 
 **Owner review**: fixes 1 to 5 and the streamed hash, listed in the table above. Each fix was written test first, and all four check commands passed after each one.
 
+**Final review** (Fable, 2026-11-14): fit to merge after two fixes, both written test first with all four checks green after each.
+
+- Fix 1, `f814c69`: `after_write` read the file back, so content another tool wrote between BugText's write and the hook was recorded as reviewed. Digest and text now come from the bytes BugText wrote. The mtime comes from a stat only while the file on disk still has the written size; otherwise it is 0, so the next scan reads the file and queues whatever replaced it. Test: `a_file_replaced_before_after_write_is_not_recorded_as_reviewed`. Left open: a same-size replacement inside that window keeps the stat's mtime and is not seen until the file changes again.
+- Fix 2, `79eebc9`: `counts()` used `split('\n')`, so an empty file showed +1 and `# x\n` showed +2. It now uses `lines()`. Test: `new_file_counts_lines_not_newlines` (empty +0, `# x\n` +1).
+- Hand check, release build, second display: delta.md, recorded at first open, was changed from a terminal; its row showed no counts and the bar read "No reviewed version yet". After Mark reviewed, appending one line from a terminal showed "+1 −0" in both the row and the bar, with a margin mark on the changed block.
+
 ## Deferred minors
 
 Still open:
 
-- M1: An owner save that lands mid-scan can be labelled Outside. Fix 2 narrows this.
 - M5: An older snapshot can briefly overwrite a newer one in the UI.
 - M6: A failed MCP write leaves its hint active for 60 s.
-- M8: An empty new file shows "+1".
+
+Closed:
+
+- M1: An owner save that lands mid-scan can be labelled Outside. Closed at the final review.
+- M8: An empty new file showed "+1". Fixed by final review fix 2.
+
+## Backlog
+
+Recorded at the final review, not fixed on this branch:
+
+- An empty first listing saves an empty baseline.
+- A file missing for one scan loses its record.
+- Nested folders update one index.
 
 Covered by the owner-review fixes:
 
@@ -123,9 +143,9 @@ Run 2026-11-14 by Claude in the release binary (`src-tauri/target/release/bugtex
 ### Findings
 
 1. **Margin mark too short on one-line blocks.** `.pane-preview .review-changed` (`src/styles.css`) draws the mark with `box-shadow: -14px 0 0 -11px`. The negative spread takes 22px off the mark's height, so a one-line paragraph got a mark about 7px tall. Fixed after the run: the shadow is now `-3px 0 0 0`, the same 3px bar at the same place, the full height of the block (`review-mark-style.test.ts`). Checked in the rebuilt release app on the second display: a changed one-line paragraph and a changed five-line paragraph both get a full-height mark.
-2. **A one-line new note shows "+2 −0".** `cli-new.md` held `# CLI new` plus a newline. Same family as deferred minor M8 (an empty new file shows "+1").
+2. **A one-line new note shows "+2 −0".** `cli-new.md` held `# CLI new` plus a newline. Same cause as M8. Fixed by final review fix 2.
 3. **Low contrast on the run card.** The "+ cli-new.md" line in the changed-files card is dark green on the dark panel and hard to read.
-4. **delta.md showed no counts after the CLI edit**, although it had been marked reviewed earlier in the run. Not investigated; may be expected if no reviewed text was stored for it.
+4. **delta.md showed no counts after the CLI edit.** Expected: in that run its record came from the first-open baseline, which stores no text, so there is nothing to count against (the bar says "No reviewed version yet"). Confirmed by the final-review hand check: after Mark reviewed, the next change counts "+1 −0".
 
 ### Seen during the run, not caused by this branch
 
