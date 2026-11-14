@@ -112,7 +112,7 @@ export function retrieveScored(
   excludePath?: string,
 ): { chunk: Chunk; score: number }[] {
   if (index.n === 0) return [];
-  const terms = tokenize(query);
+  const terms = new Set(tokenize(query));
   const scored: { i: number; score: number }[] = [];
 
   for (let i = 0; i < index.n; i += 1) {

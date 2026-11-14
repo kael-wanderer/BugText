@@ -82,3 +82,11 @@ it("keeps a Thai word as one token", () => {
 it("does not fold Cyrillic marks", () => {
   expect(tokenize("ёлка")).toEqual(["ёлка"]);
 });
+
+it.each(["thiết", "café"])("scores each distinct query term once for %s", (query) => {
+  const index = buildIndex([
+    { path: "a.md", heading: "", text: "thiết kế café" },
+    { path: "b.md", heading: "", text: "thiet cafe notes" },
+  ]);
+  expect(retrieveScored(index, `${query} ${query}`, 2)).toEqual(retrieveScored(index, query, 2));
+});
