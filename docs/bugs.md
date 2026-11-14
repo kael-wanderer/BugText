@@ -47,6 +47,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-039 | 2026-11-01 | Editor / Spell check | Minor | — | Spell check underlined whole lines of correctly spelled text | fixed (unreleased) |
 | BUG-040 | 2026-11-14 | Preview / Mermaid | Minor | — | A diagram with a syntax error left Mermaid's error graphic below the window and pushed the layout | fixed (unreleased) |
 | BUG-041 | 2026-11-14 | Tabs | Minor | REV runs (28-review-queue) | With more tabs than fit, the tab strip showed the first tabs while a later note was open; the active tab was scrolled out of view | fixed (unreleased) |
+| BUG-042 | 2026-11-14 | Windows | Major | REV-16 (28-review-queue) | A second window did not close from its close button | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -353,5 +354,19 @@ Copy this template for each new bug:
 - **Actual:** The strip showed the first one or two tabs; the open note's tab was off to the right, so the strip looked like another note was open.
 - **Notes:** Every render rebuilt the strip with `innerHTML = ""`, which resets its horizontal scroll to 0, and nothing scrolled the active tab into view.
 - **Fix:** The render keeps the strip's scroll position and then scrolls just enough to show the whole active tab (`revealScroll` in `src/tab-reveal.ts`).
+- **Status:** fixed (unreleased).
+
+### BUG-042 — Second window would not close
+
+- **Feature / test case:** Native windows (seen during REV-16, docs/test-cases/28-review-queue.md)
+- **Severity:** Major
+- **Environment:** macOS, release build of main (a62b10b)
+- **Steps to reproduce:**
+  1. File ▸ New Window (⇧⌘N).
+  2. Click the new window's red close button.
+- **Expected:** The window closes.
+- **Actual:** Nothing happens; the window stays until the app quits.
+- **Notes:** Secondary windows register `onCloseRequested` so a window closed by hand is not reopened at startup. With a handler registered, Tauri closes the window from JavaScript with `destroy()`, which needs `core:window:allow-destroy`; `core:default` does not grant it, so the call was refused.
+- **Fix:** New capability `secondary-window.json` grants `core:window:allow-destroy` to `window-*` only; the main window, which has no close handler, does not get it.
 - **Status:** fixed (unreleased).
 

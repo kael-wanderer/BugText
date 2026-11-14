@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "secondary-window",
+  "description": "Secondary windows close themselves from their close handler",
+  "windows": ["window-*"],
+  "permissions": ["core:window:allow-destroy"]
+}
