@@ -4,7 +4,7 @@ Branch `feat/review-queue`, built from `plan.md` in this folder. Not merged, pus
 
 ## Status
 
-All 8 tasks are built and every automated check passes. **The manual checks (REV-01 to REV-20 in `docs/test-cases/28-review-queue.md`) have not been run.** The owner deferred them on 2026-11-14. Run them before merging or handing out a build.
+All 8 tasks are built and every automated check passes. The manual checks (REV-01 to REV-20 in `docs/test-cases/28-review-queue.md`) were run on 2026-11-14 in the release build on the second display: 18 pass, 2 pass in part (REV-05, REV-13), none fail. They were not repeated in `npm run tauri dev`. One finding (the margin mark height) is worth fixing before merge; see "Manual check results" below.
 
 ## What was built, per task
 
@@ -93,6 +93,47 @@ Covered by the owner-review fixes:
 - M7: Fix 4. The hook skips excluded notes.
 - M9: Streamed hash for files over 2 MB.
 
-## Manual checks still open
+## Manual check results
 
-All of REV-01 to REV-20 in `docs/test-cases/28-review-queue.md`. The release-build launch and opening the Review panel (part of Step 3) were checked. Nothing else was checked by hand.
+Run 2026-11-14 by Claude in the release binary (`src-tauri/target/release/bugtext`), window on the second display, on scratch folders made for the test (a small one and a large-folder one). The owner's own folders were not used.
+
+| Case | Result | Notes |
+|---|---|---|
+| REV-01 | Pass | |
+| REV-02 | Pass | The test case expected "+1 −0"; a note first recorded by the baseline shows no counts. Test case corrected. |
+| REV-03 | Pass | Run with Codex CLI because Claude Code was out of quota. Edited note under Changed and created note under New, both "AI panel run". Review changes on the run card switches the sidebar to Review. |
+| REV-04 | Pass | MCP edits of an open and a closed note both labelled "MCP". |
+| REV-05 | Partial | Own typing and save, folder Replace, rename with link rewrite, New from Template and Quick Note: nothing queued. Accepting an AI diff was not run (owner skipped it). |
+| REV-06 | Pass | |
+| REV-07 | Pass | |
+| REV-08 | Pass | Later, Dismiss, Mark reviewed; Mark All asks first and Cancel changes nothing. |
+| REV-09 | Pass | |
+| REV-10 | Pass | Toast "1 file changed again and was not marked." |
+| REV-11 | Pass | Rename in Explorer and in Finder both keep the record. |
+| REV-12 | Pass | Test case said "amber"; the mark uses the accent colour. Test case corrected. See finding 1. |
+| REV-13 | Partial | Show diff and Explain pass. "Explain hidden with no Summarize engine" not run, because it needs the owner's `agent.json` changed. |
+| REV-14 | Pass | HTML note: counts, no marks, no Previous / Next. |
+| REV-15 | Pass | |
+| REV-16 | Pass | |
+| REV-17 | Pass | Change queued after about 5 s, inside the 10 s limit. |
+| REV-18 | Pass | |
+| REV-19 | Pass | |
+| REV-20 | Pass | Reset kept `index.broken-<ms>.json` and re-baselined. |
+
+### Findings
+
+1. **Margin mark too short on one-line blocks.** `.pane-preview .review-changed` (`src/styles.css`) draws the mark with `box-shadow: -14px 0 0 -11px`. The negative spread takes 22px off the mark's height, so a one-line paragraph gets a mark about 7px tall. Not fixed yet; a fix needs a test and a CHANGELOG line.
+2. **A one-line new note shows "+2 −0".** `cli-new.md` held `# CLI new` plus a newline. Same family as deferred minor M8 (an empty new file shows "+1").
+3. **Low contrast on the run card.** The "+ cli-new.md" line in the changed-files card is dark green on the dark panel and hard to read.
+4. **delta.md showed no counts after the CLI edit**, although it had been marked reviewed earlier in the run. Not investigated; may be expected if no reviewed text was stored for it.
+
+### Seen during the run, not caused by this branch
+
+- The tab strip can show one note's tab while another note is open.
+- A second window would not close from its close button; quitting closed it.
+- New windows open on the primary display.
+- Hovering a queue row reflows the list.
+
+### Clean-up after the run
+
+The owner's config dir is shared with the installed app. After the run: `settings.json` MCP server and last-used template, and `agent.json` chat engine, were put back to their values from before the run; the two review folders, six Recovery snapshots and one discarded draft created by the test notes were moved out (kept in the session scratchpad). No other Recovery entries were touched.
