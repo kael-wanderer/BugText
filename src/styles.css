@@ -3812,3 +3812,8 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 .capture-picker-box ul { margin: 0; padding: 0; overflow: auto; list-style: none; }
 .capture-picker-box li { padding: 5px 8px; border-radius: 4px; cursor: default; }
 .capture-picker-box li:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* Capture: the passage a followed excerpt or task link points back to. */
+::highlight(capture-quote) {
+  background-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}

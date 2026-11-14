@@ -50,6 +50,7 @@ import { configureCitationCompletion } from "./citations/complete";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
+import { findQuote, findQuoteInSource, showQuote } from "./capture/follow";
 import { createHoverCard } from "./links/hover-card";
 import { createLinkIndex, compactKnown, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
@@ -4053,8 +4054,12 @@ configureLinks({
   index: linkIndex,
   hoverCard, hoverPreview: () => currentSettings.links.hoverPreview,
   context: linkContext,
-  open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
-  jump: (line) => activeView().jumpToLine(line),
+  open: async (path, other) => {
+    if (other && getState().windows.some((w) => w.id === "sub")) { await openInSub(path); return "sub"; }
+    await doOpenPath(path);
+  },
+  jump: (line, windowId) => ((windowId && views.get(windowId)) || activeView()).jumpToLine(line),
+  highlight: (quote, fromLine, windowId) => highlightQuote(quote, fromLine, windowId ?? getState().activeWindowId),
   openPdfAt: (page, annotation) => activeView().openPdfPage(page, annotation),
   read: async (path) => {
     const found = findTabByPath(getState().windows, path);
@@ -4063,6 +4068,27 @@ configureLinks({
   create: async (folder, path) => { await invoke("create_link_note", { folder, path }); linkIndex.onFileChanged(path, ""); },
   toast: (text, action) => showToast(text, 6000, action),
 });
+
+/** Shows a captured quote in the window that opened its note: the preview when it is
+ *  visible, otherwise the editor selection. Waits briefly for the preview to render. */
+async function highlightQuote(quote: string, fromLine: number, windowId: string): Promise<boolean> {
+  const view = views.get(windowId);
+  const win = getState().windows.find((w) => w.id === windowId);
+  if (!view || !win?.activeTabId) return false;
+  if (win.mode === "editor") {
+    const text = view.editor.getText(win.activeTabId);
+    const offset = text.split("\n").slice(0, fromLine - 1).reduce((sum, line) => sum + line.length + 1, 0);
+    const found = findQuoteInSource(text, quote, offset);
+    if (found) view.editor.selectRange(found[0], found[1]);
+    return Boolean(found);
+  }
+  for (let tries = 0; tries < 20; tries++) {
+    const range = findQuote(view.previewElement, quote, fromLine);
+    if (range) { showQuote(view.previewElement, range); return true; }
+    await new Promise((done) => window.setTimeout(done, 30));
+  }
+  return false;
+}
 
 makeView("main", true);
 if (ui.aiVisible) buildAIPanel();

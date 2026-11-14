@@ -6,6 +6,7 @@ import { resolveLink } from "./resolve";
 import type { LinkIndex } from "./index";
 import type { createHoverCard } from "./hover-card";
 import { cardStateForTarget } from "./hover-state";
+import { captureQuote } from "../capture/follow";
 
 export type LinkContext = { path: string; text: string; folder: string | null };
 type Services = {
@@ -13,8 +14,11 @@ type Services = {
   hoverPreview?: () => boolean;
   hoverCard?: ReturnType<typeof createHoverCard>;
   context: (id: string) => LinkContext | null;
-  open: (path: string, other: boolean) => Promise<void>;
-  jump: (line: number) => void;
+  /** Resolves the id of the window that shows the note, when it is not the active one. */
+  open: (path: string, other: boolean) => Promise<string | void>;
+  jump: (line: number, windowId?: string) => void;
+  /** Finds and shows a captured quote at or after `fromLine`; false when it is gone. */
+  highlight?: (quote: string, fromLine: number, windowId?: string) => Promise<boolean>;
   openPdfAt?: (page: number, annotation?: string) => void;
   read: (path: string) => Promise<string>;
   create: (folder: string, path: string) => Promise<void>;
@@ -30,7 +34,7 @@ export function linkAt(text: string, position: number) {
     return position >= start && position <= link.end + (text[link.end] === ">" ? 2 : 1);
   });
 }
-export async function followLink(target: string, context: LinkContext, other = false): Promise<void> {
+export async function followLink(target: string, context: LinkContext, other = false, quote?: string): Promise<void> {
   const s = services;
   if (!s) return;
   const resolved = resolveLink(target, context.path, context.folder);
@@ -57,12 +61,16 @@ export async function followLink(target: string, context: LinkContext, other = f
     } else s.toast("Could not open file");
     return;
   }
-  await s.open(resolved.path, other);
+  const opened = await s.open(resolved.path, other);
+  const where = opened ? [opened] : [];
+  let line = 1;
   if (resolved.anchor !== undefined) {
     const heading = headingAnchors(markdownOutline(text)).find((h) => h.anchor === resolved.anchor);
-    s.jump(heading?.line ?? 1);
+    line = heading?.line ?? 1;
+    s.jump(line, ...where);
     if (!heading) s.toast(`Heading not found: #${resolved.anchor}`);
   }
+  if (quote && s.highlight && !(await s.highlight(quote, line, ...where))) s.toast("This passage changed after it was saved.");
 }
 export function followEditorLink(id: string, text: string, position: number) {
   const context = services?.context(id);
@@ -77,7 +85,7 @@ export function bindPreviewLinks(host: HTMLElement, context: () => LinkContext |
     event.preventDefault();
     if (event.type === "auxclick" && event.button !== 1) return;
     const current = context();
-    if (current) void followLink(anchor.getAttribute("href") ?? "", current, event.metaKey || event.ctrlKey || event.button === 1);
+    if (current) void followLink(anchor.getAttribute("href") ?? "", current, event.metaKey || event.ctrlKey || event.button === 1, captureQuote(anchor as HTMLAnchorElement) ?? undefined);
   };
   const attached = new Set<HTMLElement>();
   const attachHover = (event: Event) => {
