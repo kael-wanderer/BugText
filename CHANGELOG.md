@@ -64,6 +64,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ### Fixed
 - Review: the margin mark beside a changed one-line paragraph now runs the full height of the block instead of a few pixels.
 - Review: a note that another tool replaces while BugText is saving it is no longer recorded as reviewed with the other tool's content.
+- Review: a new note's line count no longer counts the final newline as an extra line, so an empty note shows +0 and a one-line note +1.
 - A diagram with a syntax error no longer leaves Mermaid's error graphic below the window, which pushed the layout on every re-render.
 - Folder search for AI context now matches Vietnamese and other accented words, with or without their accents.
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.

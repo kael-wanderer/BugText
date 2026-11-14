@@ -116,7 +116,7 @@ pub fn counts(reviewed: bool, seen: &Seen, base: Option<&str>) -> Counts {
             let (a, r) = line_counts(base, text);
             (Some(a), Some(r))
         }
-        (Some(text), None) if !reviewed => (Some(clamp(text.split('\n').count())), Some(0)),
+        (Some(text), None) if !reviewed => (Some(clamp(text.lines().count())), Some(0)),
         _ => (None, None),
     }
 }
@@ -279,6 +279,11 @@ mod tests {
     #[test] fn new_record_is_new_and_counts_its_lines() {
         let r = new_record(&seen("a\nb\nc"), Route::Outside, 1);
         assert_eq!((state(&r), r.added, r.removed), (State::New, Some(3), Some(0)));
+    }
+    #[test] fn new_file_counts_lines_not_newlines() {
+        assert_eq!(counts(false, &seen(""), None), (Some(0), Some(0)));
+        assert_eq!(counts(false, &seen("# x\n"), None), (Some(1), Some(0)));
+        assert_eq!(counts(false, &seen("a\nb"), None), (Some(2), Some(0)));
     }
     #[test] fn digest_only_records_have_no_counts() {
         let big = Seen { digest: "x".into(), text: None, mtime_ms: 1, size: 3_000_000 };
