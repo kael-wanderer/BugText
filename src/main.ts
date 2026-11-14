@@ -57,7 +57,7 @@ import { createFrameCoalescer } from "./render-coalescer";
 import { createRefreshRunner, createFocusDeduper, decideLarge, tickKind, BASE_MS } from "./workspace-refresh";
 import { createOutlineView } from "./outline-view";
 import { createReviewController } from "./review/controller";
-import { REVIEW_EVENT, type ReviewSnapshot } from "./review/types";
+import { REVIEW_EVENT, type ReviewAction, type ReviewItem, type ReviewSnapshot } from "./review/types";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
 import "./styles.css";
@@ -1133,6 +1133,10 @@ const handlers = {
   },
   canFixMermaid,
   onFixMermaid: fixMermaid,
+  onPreviewRendered: (wid: string) => {
+    reviewRenders.set(wid, (reviewRenders.get(wid) ?? 0) + 1);
+    if (review.snapshot()?.items.length) void updateReviewBar(wid);
+  },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   onStatusChange: refreshStatusBar,
   onWordCount: (tabId: string, count: number, text: string) => {
@@ -3730,7 +3734,77 @@ reviewListeners.push((snapshot, error) => {
   const folder = getState().folder;
   setExplorerReviewPaths(new Set(folder && snapshot ? snapshot.items.map(i => joinPath(folder, i.path)) : []));
   reviewPanel?.render(snapshot, error);
+  refreshReviewBars();
 });
+
+// Review bar and change marks for a queued note in Reading view.
+const reviewBarKeys = new Map<string, string>();
+const reviewRenders = new Map<string, number>();
+function refreshReviewBars(): void { for (const wid of views.keys()) void updateReviewBar(wid); }
+function reviewTarget(wid: string): { tab: TabMeta; item: ReviewItem } | null {
+  const windowState = getWindow(wid);
+  const tab = windowState?.tabs.find(t => t.id === windowState.activeTabId);
+  if (!windowState || windowState.mode !== "preview" || !tab?.path) return null;
+  const item = review.item(tab.path);
+  return item ? { tab, item } : null;
+}
+async function updateReviewBar(wid: string): Promise<void> {
+  const view = views.get(wid);
+  if (!view) return;
+  const target = reviewTarget(wid);
+  const key = target ? `${target.tab.id}|${target.item.digest}|${target.item.state}|${target.tab.dirty}|${reviewRenders.get(wid) ?? 0}` : "";
+  if (reviewBarKeys.get(wid) === key) return;
+  reviewBarKeys.set(wid, key);
+  const clear = (): void => {
+    view.reviewHost.replaceChildren(); view.reviewHost.hidden = true;
+    view.previewElement.querySelectorAll(".review-changed").forEach(el => el.classList.remove("review-changed", "review-current"));
+    if (wid === getState().activeWindowId) outlineView.setChangedLines(new Set());
+  };
+  if (!target) { clear(); return; }
+  const { tab, item } = target;
+  const [{ renderReviewBar }, { changedLines, markBlocks, changedSections }] = await Promise.all([import("./review/bar"), import("./review/changes")]);
+  const markdown = isMarkdownFile(tab.path);
+  const text = view.editor.getText(tab.id);
+  const base = item.hasText ? await review.base(tab.path!) : null;
+  if (reviewBarKeys.get(wid) !== key) return;
+  const changes = base === null ? null : changedLines(base, text);
+  const marked = changes && markdown ? markBlocks(view.previewElement, changes.lines) : [];
+  const sections = changes && markdown ? changedSections(markdownOutline(text), changes.lines) : new Set<number>();
+  if (wid === getState().activeWindowId) outlineView.setChangedLines(sections);
+  renderReviewBar(view.reviewHost, item, changes, sections.size, {
+    mark: action => markActiveReview(wid, action),
+    showDiff: () => void showReviewDiff(wid),
+    explain: () => void explainReview(wid),
+    step: direction => stepReviewChange(wid, direction),
+    canExplain: canExplainReview,
+    dirty: () => !!tabIn(wid, tab.id)?.dirty,
+    marks: () => marked.length,
+  });
+}
+async function markActiveReview(wid: string, action: ReviewAction): Promise<void> {
+  const target = reviewTarget(wid);
+  if (!target) return;
+  if (action === "reviewed" && target.tab.dirty) { showToast("Save your changes first"); return; }
+  const stale = await review.mark(action, [target.item.path]);
+  if (stale.length) { showToast("This note changed again. Review the new changes."); void review.scan(); }
+}
+function stepReviewChange(wid: string, direction: 1 | -1): void {
+  const pane = views.get(wid)?.previewElement;
+  if (!pane) return;
+  const blocks = [...pane.querySelectorAll<HTMLElement>(".review-changed")];
+  const top = pane.getBoundingClientRect().top;
+  const tops = blocks.map(b => b.getBoundingClientRect().top - top + pane.scrollTop);
+  void import("./review/changes").then(({ stepTarget }) => {
+    const index = stepTarget(tops, pane.scrollTop, direction);
+    if (index < 0) return;
+    blocks.forEach(b => b.classList.remove("review-current"));
+    blocks[index].classList.add("review-current");
+    pane.scrollTo({ top: tops[index], behavior: "smooth" });
+  });
+}
+function canExplainReview(): boolean { return false; }
+async function showReviewDiff(_wid: string): Promise<void> {}
+async function explainReview(_wid: string): Promise<void> {}
 
 function showExplorerColumn(): void {
   if (getState().explorerVisible) return;
@@ -4004,6 +4078,7 @@ subscribe(() => {
   };
   persistUiState();
   scheduleWindowReport();
+  if (review.snapshot()?.items.length || reviewBarKeys.size) refreshReviewBars();
 });
 
 const refreshOnFocus = createFocusDeduper(() => {
@@ -4141,6 +4216,9 @@ listenScoped<string>("menu", (event) => {
       toggleGit(); return;
     case "review.show":
       settingsScreen.close(); setReviewActive(true); return;
+    case "review.mark_reviewed": return void markActiveReview(getState().activeWindowId, "reviewed");
+    case "review.next_change": return stepReviewChange(getState().activeWindowId, 1);
+    case "review.previous_change": return stepReviewChange(getState().activeWindowId, -1);
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();

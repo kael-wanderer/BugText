@@ -3779,3 +3779,11 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 .review-btn.review-link { padding: 0; color: var(--accent); background: transparent; border: 0; }
 .review-body > .review-btn { margin: 4px 6px; }
 .tree-row.review-queued .tree-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+.window > .review-bar { padding: 8px 14px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); font-size: 12.5px; }
+.window > .review-bar[hidden] { display: none; }
+.review-bar-text { color: var(--text); font-variant-numeric: tabular-nums; }
+.review-bar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.review-bar-space { flex: 1; }
+.pane-preview .review-changed { box-shadow: -14px 0 0 -11px var(--accent); background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%); }
+.pane-preview .review-changed.review-current { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%); }
+.outline-row.review-changed > span:last-child::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }

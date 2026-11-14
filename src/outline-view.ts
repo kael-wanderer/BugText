@@ -53,6 +53,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
     if (!collapsed.has(key)) collapsed.set(key, new Set());
     return collapsed.get(key)!;
   };
+  let changed: ReadonlySet<number> = new Set();
   function render(): void {
     tree.replaceChildren();
     if (!markdown || !headings.length) {
@@ -77,6 +78,7 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
       const row = document.createElement("div");
       row.className = "outline-row";
       row.classList.toggle("active", i === active);
+      row.classList.toggle("review-changed", changed.has(heading.line));
       row.style.paddingInlineStart = `${8 + (heading.level - 1) * 14}px`;
       row.setAttribute("role", "treeitem");
       row.setAttribute("aria-level", String(heading.level));
@@ -135,6 +137,11 @@ export function createOutlineView(host: HTMLElement, jump: (line: number) => voi
         stack.push(i);
       });
       render();
+    },
+    /** Lines of headings whose section changed since review; they get a dot. */
+    setChangedLines(lines: ReadonlySet<number>) {
+      if (lines.size === changed.size && [...lines].every(l => changed.has(l))) return;
+      changed = lines; render();
     },
     setActive(line: number) {
       let next = -1;
