@@ -151,11 +151,37 @@ export function createWindowView(
   isMain: boolean,
   h: WindowHandlers
 ): WindowView {
+  let fullscreenHandle: { close(): void } | null = null;
+  let fullscreenTabId: string | null = null;
+  let fullscreenGeneration = 0;
+  let destroyed = false;
+  function closeMermaidFullscreen(): void {
+    fullscreenGeneration += 1;
+    fullscreenHandle?.close();
+    fullscreenHandle = null;
+    fullscreenTabId = null;
+  }
   const mermaidDeps: MermaidDeps = {
     copyText: writeText,
     copyImage: (png) => navigator.clipboard.write([new ClipboardItem({ "image/png": png })]),
     notify: showToast,
-    fullscreen: (svg) => { void import("./mermaid-fullscreen").then((m) => m.openMermaidFullscreen(svg, root)); },
+    fullscreen: (svg) => {
+      const tabId = getWindow(windowId)?.activeTabId ?? null;
+      if (!tabId) return;
+      closeMermaidFullscreen();
+      fullscreenTabId = tabId;
+      const generation = fullscreenGeneration;
+      void import("./mermaid-fullscreen").then((m) => {
+        if (destroyed || generation !== fullscreenGeneration) return;
+        const state = getWindow(windowId);
+        const tab = state?.tabs.find(t => t.id === state.activeTabId);
+        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || tab.tableView) {
+          closeMermaidFullscreen();
+          return;
+        }
+        fullscreenHandle = m.openMermaidFullscreen(svg, root);
+      });
+    },
   };
   const root = document.createElement("div");
   root.className = "window";
@@ -490,6 +516,7 @@ export function createWindowView(
     }));
   }
   function activateDocument(tabId: string): void {
+    if (fullscreenTabId !== null && fullscreenTabId !== tabId) closeMermaidFullscreen();
     editor.switchTo(tabId);
   }
   async function restoreReadingPosition(): Promise<void> {
@@ -603,7 +630,7 @@ export function createWindowView(
   const tableHost = document.createElement("div"); tableHost.className = "table-view"; tableHost.hidden = true; root.append(tableHost);
   function render(): void {
     const w = getWindow(windowId);
-    if (!w) return;
+    if (!w) { closeMermaidFullscreen(); return; }
     editor.setLivePreview(h.livePreviewEnabled?.() ?? false);
     queueMicrotask(refreshContextAction);
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
@@ -617,6 +644,7 @@ export function createWindowView(
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
+    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || active.tableView)) closeMermaidFullscreen();
     const language = fileLanguageInfo(activeName);
     // mode class
     root.classList.remove(
@@ -736,6 +764,7 @@ export function createWindowView(
   ): void {
     clearTimeout(citationTimer);
     const documentId = getWindow(windowId)?.activeTabId ?? null;
+    if (fullscreenTabId !== null && fullscreenTabId !== documentId) closeMermaidFullscreen();
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
     if (documentId) h.onWordCount?.(documentId, count, text);
@@ -1198,6 +1227,8 @@ export function createWindowView(
       editor.focus();
     },
     destroy: () => {
+      destroyed = true;
+      closeMermaidFullscreen();
       graphView?.destroy(); graphTab.destroy();
       captureReadingPosition();
       clearTimeout(cardTimer);

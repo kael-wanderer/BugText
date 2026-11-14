@@ -92,6 +92,16 @@ export function openMermaidFullscreen(svg: SVGSVGElement, host: HTMLElement): { 
   overlay.addEventListener("pointerup", endDrag, { signal });
   overlay.addEventListener("pointercancel", endDrag, { signal });
   overlay.addEventListener("keydown", (event) => {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      event.stopPropagation();
+      const buttons = Array.from(bar.querySelectorAll<HTMLButtonElement>("button:not([disabled])"));
+      const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const next = event.shiftKey
+        ? (current <= 0 ? buttons.length - 1 : current - 1)
+        : (current + 1) % buttons.length;
+      buttons[next]?.focus();
+    }
     if (event.key === "Escape") {
       event.stopPropagation();
       handle.close();

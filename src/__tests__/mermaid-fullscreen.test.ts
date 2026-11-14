@@ -92,3 +92,38 @@ it("opens only one overlay per window", () => {
   previous.close();
   expect(host.querySelectorAll(".mermaid-fullscreen")).toHaveLength(1);
 });
+
+it("traps Tab and Shift+Tab through the overlay buttons", () => {
+  const { svg, host } = setup();
+  openMermaidFullscreen(svg, host);
+  const overlay = host.querySelector<HTMLElement>(".mermaid-fullscreen")!;
+  const buttons = Array.from(overlay.querySelectorAll<HTMLButtonElement>("button"));
+  const tab = (shiftKey = false): void => {
+    const event = new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true });
+    document.activeElement!.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+  };
+  tab();
+  expect(document.activeElement).toBe(buttons[0]);
+  for (let i = 1; i < buttons.length; i++) {
+    tab();
+    expect(document.activeElement).toBe(buttons[i]);
+  }
+  tab();
+  expect(document.activeElement).toBe(buttons[0]);
+  tab(true);
+  expect(document.activeElement).toBe(buttons[buttons.length - 1]);
+  for (let i = buttons.length - 2; i >= 0; i--) {
+    tab(true);
+    expect(document.activeElement).toBe(buttons[i]);
+  }
+  document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(host.querySelector(".mermaid-fullscreen")).toBeNull();
+});
+it("starts reverse tabbing at the last button from the overlay itself", () => {
+  const { svg, host } = setup();
+  openMermaidFullscreen(svg, host);
+  const overlay = host.querySelector<HTMLElement>(".mermaid-fullscreen")!;
+  overlay.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
+  expect(document.activeElement).toBe(overlay.querySelector('[aria-label="Close"]'));
+});
