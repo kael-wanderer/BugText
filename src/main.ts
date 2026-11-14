@@ -595,7 +595,7 @@ function syncReviewTracking(): void {
   reviewTracking = currentSettings.review.track;
   const folder = getState().folder;
   if (!reviewTracking && folder) void invoke("review_close", { folder }).catch(() => {});
-  void review.scan();
+  void (reviewTracking ? review.open() : Promise.resolve()).then(() => review.scan());
 }
 
 const mcpHandler = createMcpHandler({
@@ -4105,7 +4105,8 @@ subscribe(() => {
     linkIndex.setFolder(s.folder);
     aiPanel?.resetWorkspaceContext();
     searchPanel.cancel();
-    void refreshFileList().then(() => {
+    // Load the review index first, so saves made before the first scan count as the owner's.
+    void review.open().then(refreshFileList).then(() => {
       if (getState().folder === s.folder && document.body.classList.contains("search-active")) searchPanel.refresh();
       if (getState().folder === s.folder) void review.scan();
     });

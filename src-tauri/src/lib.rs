@@ -270,6 +270,7 @@ pub fn run() {
             review_store::review_base,
             review_store::review_reset,
             review_store::review_close,
+            review_store::review_open,
             workflow_store::write_workflow_store,
             update_feed::update_feed_fetch,
             app_build,

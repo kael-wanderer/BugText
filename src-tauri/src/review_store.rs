@@ -419,6 +419,14 @@ pub(crate) fn reset_at(config: &Path, folder: &str, now: u64) -> Result<Snapshot
     Ok(Snapshot { folder: folder.to_string(), tracked: 0, started_at: now, items: Vec::new() })
 }
 
+/// Loads a folder's review index into memory without scanning, so the write hook
+/// recognises the owner's saves made before the first scan.
+pub(crate) fn open_at(config: &Path, folder: &str, now: u64) -> Result<(), String> {
+    let root = canonical_folder(folder)?;
+    let mut inner = lock()?;
+    ensure(&mut inner, config, &root, folder, now).map(|_| ())
+}
+
 pub(crate) fn close_at(folder: &str) {
     let Ok(root) = canonical_folder(folder) else { return };
     if let Ok(mut inner) = global().lock() {
@@ -477,6 +485,12 @@ pub async fn review_base(folder: String, path: String) -> Result<Option<String>,
 pub async fn review_reset(app: AppHandle, folder: String) -> Result<Snapshot, String> {
     let config = config_dir(&app)?;
     blocking(move || reset_at(&config, &folder, now_ms())).await
+}
+
+#[tauri::command]
+pub async fn review_open(app: AppHandle, folder: String) -> Result<(), String> {
+    let config = config_dir(&app)?;
+    blocking(move || open_at(&config, &folder, now_ms())).await
 }
 
 #[tauri::command]
@@ -1019,5 +1033,22 @@ mod owner_race_tests {
         after_write(ticket);
         let s = e.scan(&["a.md"]);
         assert!(s.items.is_empty(), "{:?}", s.items);
+    }
+}
+
+#[cfg(test)]
+mod open_tests {
+    use super::tests::env;
+    use super::*;
+    use crate::files::write_atomic_at;
+
+    #[test] fn save_before_first_scan_after_open_stays_reviewed() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"]);
+        close_at(&e.f()); // as after a relaunch: index on disk, nothing in memory
+        open_at(&e.config, &e.f(), now_ms()).unwrap();
+        write_atomic_at(&e.folder.canonicalize().unwrap().join("a.md"), b"typed before any scan").unwrap();
+        assert!(e.scan(&["a.md"]).items.is_empty());
     }
 }

@@ -74,6 +74,13 @@ export function createReviewController(deps: ReviewDeps) {
     try { await deps.invoke<void>("review_expect", { folder, paths: relative, route }); } catch { /* labels are best effort */ }
   }
 
+  /** Loads the folder's review index in Rust so saves before the first scan count as the owner's. */
+  async function open(): Promise<void> {
+    const folder = deps.folder();
+    if (!folder || !deps.enabled()) return;
+    try { await deps.invoke<void>("review_open", { folder }); } catch { /* the next scan reports errors */ }
+  }
+
   async function base(path: string): Promise<string | null> {
     const folder = deps.folder();
     const relative = folder ? relativeTo(folder, path) : null;
@@ -95,7 +102,7 @@ export function createReviewController(deps: ReviewDeps) {
   }
 
   return {
-    scan, mark, expect, base, reset, item,
+    scan, open, mark, expect, base, reset, item,
     accept: take,
     snapshot: (): ReviewSnapshot | null => cache,
   };

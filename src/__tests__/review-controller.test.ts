@@ -108,4 +108,15 @@ describe("review controller", () => {
     expect(a.invoke).not.toHaveBeenCalled();
     expect(a.onChange).not.toHaveBeenCalled();
   });
+
+  it("open loads the folder's index without scanning, and never throws", async () => {
+    const a = setup();
+    await a.controller.open();
+    expect(a.invoke).toHaveBeenCalledWith("review_open", { folder: "/r" });
+    a.invoke.mockImplementationOnce(async () => { throw new Error("x"); });
+    await expect(a.controller.open()).resolves.toBeUndefined();
+    const off = setup({ enabled: () => false });
+    await off.controller.open();
+    expect(off.invoke).not.toHaveBeenCalled();
+  });
 });
