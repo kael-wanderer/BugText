@@ -102,7 +102,7 @@ nonsense <b>x</b>
 ### READ-05D — Empty diagram safety
 
 - Steps: Render an empty Mermaid fence, then one containing spaces/tabs only, with an engine available. Also clear a previously failed diagram's body and immediately click its old Fix with AI button before the preview updates.
-- Expected: Empty/whitespace cards have no Fix with AI button. The stale button reaches the handler guard, which shows “This diagram is empty. Add diagram source first.” No AI request or whole-note edit occurs.
+- Expected: Empty/whitespace cards have no Fix with AI button. A stale button after the body changes shows “The diagram changed. Wait for the preview to update, then try again.” If an unchanged empty body reaches the handler, it shows “This diagram is empty. Add diagram source first.” No AI request or whole-note edit occurs.
 - Status: [ ]  Notes:
 
 ### READ-06 — Unicode folder search for AI context (1.6)
@@ -114,11 +114,24 @@ nonsense <b>x</b>
 ### READ-07 — PDF and DOCX export
 
 - Steps: Export the sample containing callouts, footnotes, code and a valid diagram to PDF and Word. Open both exported files and inspect each page. Also capture a note as PNG/SVG.
-- Expected: PDF/Word callouts are ordinary quotes with bold labels. Notes and the diagram remain readable; verify the footnote references/return links and record any converter limitation. No copy buttons, diagram toolbar or interactive error card is exported. Image captures retain the coloured callout boxes.
+- Expected: PDF/Word callouts are ordinary quotes with bold labels. Notes and the diagram remain readable; footnote numbers and text remain, without clickable footnote links or return arrows. No copy buttons, diagram toolbar or interactive error card is exported. Image captures retain the coloured callout boxes.
 - Status: [ ]  Notes:
 
 ### READ-08 — Presentation isolation
 
 - Steps: Present the sample note with a callout, footnotes, code, a valid diagram and a failed diagram.
 - Expected: Callouts/notes/code render normally. No Copy button, Mermaid toolbar, fullscreen control, Show source toggle or Fix with AI card. A failed diagram remains the plain error message.
+- Status: [ ]  Notes:
+
+
+### READ-04D — Fullscreen lifecycle and keyboard focus (review item 8)
+
+- Steps: Open Fullscreen. Tab and Shift+Tab through its controls, including wrapping in both directions; press Escape. Reopen, then switch tabs, close the active tab, hide the preview, and destroy the note pane/window in separate trials. Also type in the same note while fullscreen is open, and try switching away immediately after clicking Fullscreen while its module is loading.
+- Expected: Keyboard focus stays inside the overlay. Escape still closes it. A different/closed tab, hidden preview or destroyed view closes the overlay and cannot reopen it from a pending import. Typing and re-rendering the same visible note leaves the clone working.
+- Status: [ ]  Notes: Window lifecycle wiring has no isolated automated seam; this check remains with the owner.
+
+### READ-05E — Nested fences and empty replies (review items 6–7)
+
+- Steps: Try Fix with AI for an indented Mermaid fence inside a list item and for a quoted Mermaid fence. For a top-level diagram, test a reply with prose around a fenced diagram, then an empty or whitespace-only reply (including an empty fenced block).
+- Expected: List/quote attempts show “Fix with AI works only on a diagram that is not inside a list or quote.” The first fenced diagram is extracted from a prose-wrapped reply. An empty result shows “The AI returned no diagram.” and does not open a diff.
 - Status: [ ]  Notes:

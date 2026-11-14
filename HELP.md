@@ -105,7 +105,8 @@ Fullscreen covers the diagram's note pane: use the wheel to zoom, drag to pan, a
 
 If a diagram fails, the preview shows its error and a **Show source** toggle.
 **Fix with AI** appears when Rewrite is enabled with an available engine and the
-diagram has source text. It sends only that diagram's source, then shows a diff for
+diagram has source text. Diagrams inside lists or quotes cannot be fixed with
+this action. It sends only that diagram's source, then shows a diff for
 you to review. If the source changed since the preview rendered, wait for the
 preview to update before trying again. An empty diagram needs source text first.
 
@@ -227,7 +228,8 @@ brew install pandoc typst
 
 BugText checks these tools before asking where to save and shows the missing install
 command when setup is incomplete. PDF and Word export show callouts as quotes with
-bold labels. Image exports retain the coloured callout boxes. Export and
+bold labels. Exported footnotes retain their numbers and text without in-page
+links or return arrows. Image exports retain the coloured callout boxes. Export and
 presentation mode omit the preview copy buttons and diagram controls.
 
 This help document is itself Markdown and opens as a normal BugText tab.

@@ -182,3 +182,66 @@ one session in the release app on the second display, recording actual outcomes:
 No owner-only check is marked complete. A successful release compilation does
 not establish clipboard behavior, theme appearance, converter output, display
 placement or runtime CSP behavior.
+
+## Review fixes
+
+These follow-up results supersede the original implementation's final counts and
+export/link behavior above. All nine numbered review items were handled in order,
+with one `fix(reading-pack): …` commit per item. TypeScript and the full Vitest
+suite passed after each item. No CHANGELOG lines were added, as requested.
+
+| Item | Fix and commit | Tests passing after item |
+| --- | --- | ---: |
+| 1 | `ddb6b8d` — Preserve combining marks and fold only tokens matching the owner's Latin-script rule; Hindi, Thai and Cyrillic stay intact, with existing Vietnamese/NFD/`đường` tests unchanged. | 1,242 |
+| 2 | `19c0ef6` — De-duplicate query terms with a Set before scoring; repeated Vietnamese and café queries retain the single-query scores. | 1,244 |
+| 3 | `8a03958` — Require whitespace before a custom callout title and advance retained body maps by one line, clearing maps that would be empty; cover lists and following paragraph anchors. | 1,248 |
+| 4 | `01d0a18` — Scope reference targets to `.footnotes` and return targets to `sup.footnote-ref`; cover colliding headings, strengthen the existing missing-definition test, and remove the SQL-path footnote enhancer while fixing indentation. | 1,250 |
+| 5 | `d185add` — Always run `staticFootnotes` during export, preserving reference numbers and note text while removing their links and return arrows. | 1,253 |
+| 6 | `dae59e9` — Extract the first complete fenced reply block anywhere, trim other replies, and remove every triple-double-quote sequence from parser errors before quoting. | 1,256 |
+| 7 | `cb98b7f` — Add pure `fixTarget` with the specified nested/changed/empty/success validation order, including frontmatter/list/quote cases; reject empty normalized AI replies before diff review. | 1,271 |
+| 8 | `e328d76` — Retain and close the fullscreen handle on note/visibility/destruction changes, invalidate pending opens when context changes, and trap Tab/Shift+Tab while preserving same-note re-renders. | 1,273 |
+| 9 | `007345c` — Add Mermaid-backed export regression tests proving controls stay absent and callout classes follow the fallback option. | 1,275 |
+
+Final checks: `npx tsc --noEmit` passed; `npm run test` passed with **245 test
+files and 1,275 tests** (36 additional tests since the original 1,239-test suite).
+`npm run build` passed in 11.46s: main chunk **628.36 kB**, lazy
+`preview-mermaid` **2.68 kB**, lazy `mermaid-fullscreen` **2.78 kB**. The existing
+warning for the optional lazy ELK chunk remains; the startup chunk is under 800 kB.
+Per-item logs are `/tmp/bugtext-review1.log` through `/tmp/bugtext-review9.log`;
+the frontend build log is `/tmp/bugtext-review-build.log`.
+
+The release executable was refreshed successfully with
+`npm run tauri build -- --no-bundle` (exit 0). Its frontend build completed in
+11.16s and the native release profile completed in 20.74s. The resulting binary
+is `src-tauri/target/release/bugtext`; no runtime/manual check was performed.
+The log is `/tmp/bugtext-review-tauri-build.log`.
+
+Test-first observations and limits:
+
+- Items 1–8 had new or updated regression tests observed failing before the
+  respective implementation. The item 9 tests passed on their first run because
+  the export-isolation/fallback behavior was already correct; its commit adds
+  coverage without changing production code.
+- The missing-definition footnote test requested in item 4 already existed. It
+  was retained and strengthened to explicitly reject a rendered footnote
+  reference; both newly added heading-collision tests failed before scoping.
+- Item 5 exposed three old SVG fixtures whose `querySelectorAll` returned SVGs
+  for every selector. Those fixtures now honor the `svg` selector. The new
+  footnote tests use the real jsdom DOM; production needs no mock-specific path.
+- Item 8(a) has no isolated lifecycle seam without constructing `createWindowView`
+  and the surrounding editor/store fixture. Per the review instruction, no large
+  fixture was built. The lifecycle wiring and asynchronous-open invalidation were
+  inspected; real tab switch/close, preview hiding and destruction behavior remain
+  owner checks in READ-04D. Focus cycles and same-note clone survival are covered
+  in `mermaid-fullscreen.test.ts`.
+- Item 7 tests all target-decision branches and empty/fenced-empty reply
+  normalization through pure functions. The main-panel toast/no-diff wiring is
+  inspected, with real AI UI behavior still pending in READ-05E.
+
+Architecture/help and the owner cases were updated to reflect Latin-only folding,
+static export footnotes, nested-fence refusal, empty replies and fullscreen
+lifecycle/focus checks. No owner-only check has been marked complete. Copy as PNG
+remains unverified in the real webview; its fallback is still conditional on an
+owner-reported paste failure. No Rust, capabilities, shared AI runner, sanitizer
+allow-list, dependency or bundleVersion changes were made. No merge, push or tag
+was performed.

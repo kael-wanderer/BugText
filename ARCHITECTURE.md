@@ -124,7 +124,10 @@ note windows only (`preview-code-copy.ts`, `preview-mermaid.ts`,
 `render-extras.ts` records each diagram's source, opening line and parser error.
 Fix with AI is a quick action bound to one fenced block (`ai/fix-mermaid.ts`),
 checked against the current source before sending and applied through the existing
-diff review. Empty diagrams cannot trigger the action.
+diff review. Empty diagrams and diagrams inside lists or quotes cannot trigger
+the action; an empty AI reply is rejected before opening the diff. Fullscreen
+traps keyboard focus and closes when the note changes, its preview is hidden or
+the view is destroyed, while same-note preview re-renders retain the overlay.
 
 Markdown task markers are parsed from source lines outside code blocks
 (`markdown-blocks.ts` is the shared line scanner); preview checkboxes are built after
@@ -161,8 +164,9 @@ are locked off; folder-access CLI agents can still open those files themselves.
 The AI panel is Chat only. Its engine/model picker reads and updates `uses.chat`.
 Note/selection and Folder search chips default on; keyword retrieval adds up to
 `workspaceContextK` chunks while search is on. The Unicode tokenizer keeps runs of
-letters and digits whole, normalizes composed accents, and adds a diacritic-free
-second token (including `đ` to `d`) for accented words. Replies show timing, model and
+letters, digits and combining marks whole, normalizes composed accents, and adds
+a diacritic-free second token (including `đ` to `d`) only for Latin-script words.
+Query terms are de-duplicated before keyword scoring. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents
@@ -204,7 +208,8 @@ PNG/SVG; HTML offers PNG/SVG; PDF is read-only.
 Document export renders KaTeX and Mermaid before conversion. DOCX rasterizes SVG
 diagrams as a best-effort compatibility step while retaining MathML for equations.
 PDF/DOCX callouts fall back to blockquotes with bold labels; image captures retain
-the styled callout. Footnotes retain numbered references and back links.
+the styled callout. Export footnotes keep static reference numbers and note text;
+in-page reference links and return arrows are removed.
 Export presets and last-used choices live in `settings.json` under `export`; Settings ▸
 Export manages presets and tool diagnostics. A sheet checks Pandoc, Typst, fonts and
 missing local images before the save dialog. Rust validates preset values again and
