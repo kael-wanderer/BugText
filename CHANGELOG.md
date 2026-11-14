@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Review sidebar: notes changed outside your own editing are listed under Changed, New and Later with when, how much and by what route, with Mark reviewed, Later, Dismiss and Mark All Reviewed. The Review button shows a count and Explorer marks queued notes with a dot. View ▸ Show Review Queue opens it.
 - Review queue tracking: BugText records which notes in the open folder were changed by a coding CLI run, an MCP client or another app since you last reviewed them. Your own saves count as reviewed. Settings ▸ General ▸ Review queue turns it off.
 - A diagram that fails to render shows the error, a Show source toggle and Fix with AI, which proposes a corrected diagram in the usual diff review.
 - Diagram Fullscreen: opens the diagram over its note window with wheel zoom and drag to pan; Esc closes.

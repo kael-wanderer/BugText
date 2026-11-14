@@ -63,6 +63,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "view.links_panel", label: "Links", category: "View", default: "CmdOrCtrl+Alt+Shift+O", scope: "menu" },
   { id: "view.source_control", label: "Source Control", category: "View", default: "Ctrl+Shift+G", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
+  { id: "review.show", label: "Show Review Queue", category: "View", default: "", scope: "menu" },
   { id: "view.status_bar", label: "Show Status Bar", category: "View", default: "", scope: "menu" },
   { id: "view.present", label: "Present", category: "View", default: "CmdOrCtrl+Shift+P", scope: "menu" },
   { id: "view.present_here", label: "Present from Current Slide", category: "View", default: "CmdOrCtrl+Alt+Shift+P", scope: "menu" },

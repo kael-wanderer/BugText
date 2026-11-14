@@ -66,7 +66,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { SETTINGS_CHANGED_EVENT, shouldReload, type SettingsFile } from "./settings-sync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm, message } from "@tauri-apps/plugin-dialog";
-import { initActivityBar } from "./activitybar";
+import { initActivityBar, setReviewBadge } from "./activitybar";
 import {
   DEFAULT_AI_SETTINGS_JSON,
   BUILTIN_V1_IDS,
@@ -92,7 +92,7 @@ import {
   openFolder,
   setExplorerActivePath,
 } from "./explorer";
-import { revealExplorerPath, setExplorerNotice } from "./explorer";
+import { revealExplorerPath, setExplorerNotice, setExplorerReviewPaths } from "./explorer";
 import { showDiagnosticsSheet } from "./perf/diagnostics-sheet";
 import { explorerDropDirectory, logicalDropPoint, type DropPoint } from "./file-drop";
 import {
@@ -3654,6 +3654,7 @@ async function refreshGitAvailability(): Promise<void> {
 function setGitActive(on: boolean): void {
   on = on && gitAvailable && currentSettings.git.showSourceControl;
   if (on && document.body.classList.contains("search-active")) setSearchActive(false);
+  if (on && document.body.classList.contains("review-active")) setReviewActive(false);
   document.body.classList.toggle("git-active", on); gitHost.hidden = !on;
   gitButton.classList.toggle("active", on); gitButton.setAttribute("aria-pressed", String(on));
   if (on) { showExplorerColumn(); void gitPanel.refresh(); }
@@ -3665,6 +3666,7 @@ function openGitControl(control: GitPanelControl): void {
 }
 function setSearchActive(on: boolean): void {
   if (on && document.body.classList.contains("git-active")) setGitActive(false);
+  if (on && document.body.classList.contains("review-active")) setReviewActive(false);
   document.body.classList.toggle("search-active", on);
   const button = document.getElementById("ab-search")!;
   button.classList.toggle("active", on);
@@ -3677,6 +3679,58 @@ function setSearchActive(on: boolean): void {
     searchPanel.refresh();
   }
 }
+
+// Review sidebar: one sidebar panel is visible at a time, like Source Control.
+const reviewHost = document.getElementById("review-panel")!;
+let reviewPanel: { render(snapshot: ReviewSnapshot | null, error: string | null): void; focus(): void } | null = null;
+let reviewLast: { snapshot: ReviewSnapshot | null; error: string | null } = { snapshot: null, error: null };
+async function loadReviewPanel(): Promise<NonNullable<typeof reviewPanel>> {
+  if (reviewPanel) return reviewPanel;
+  const { createReviewPanel } = await import("./review/panel");
+  reviewPanel ??= createReviewPanel(reviewHost, {
+    open: relative => void openReviewed(relative),
+    mark: (action, paths) => review.mark(action, paths),
+    confirm: text => confirm(text, { title: "Review", kind: "warning" }),
+    reset: () => review.reset(),
+    now: () => Date.now(),
+    reason: () => !currentSettings.review.track ? "off" : getState().folder ? null : "no-folder",
+  });
+  return reviewPanel;
+}
+async function openReviewed(relative: string): Promise<void> {
+  const folder = getState().folder;
+  if (!folder) return;
+  await doOpenPath(joinPath(folder, relative));
+  const wid = getState().activeWindowId;
+  if (activeWindow().mode !== "preview") setMode(wid, "preview");
+}
+function setReviewActive(on: boolean): void {
+  if (on && document.body.classList.contains("git-active")) setGitActive(false);
+  if (on && document.body.classList.contains("search-active")) setSearchActive(false);
+  document.body.classList.toggle("review-active", on); reviewHost.hidden = !on;
+  const button = document.getElementById("ab-review")!;
+  button.classList.toggle("active", on); button.setAttribute("aria-pressed", String(on));
+  if (on) {
+    showExplorerColumn();
+    void loadReviewPanel().then(panel => {
+      panel.render(reviewLast.snapshot, reviewLast.error);
+      if (document.body.classList.contains("review-active")) panel.focus();
+    });
+  }
+  requestWindowMeasure();
+}
+function toggleReview(): void {
+  if (settingsScreen.isOpen()) { settingsScreen.close(); setReviewActive(true); return; }
+  setReviewActive(!document.body.classList.contains("review-active"));
+}
+reviewListeners.push((snapshot, error) => {
+  reviewLast = { snapshot, error };
+  const queued = snapshot?.items.filter(i => i.state !== "later") ?? [];
+  setReviewBadge(queued.length);
+  const folder = getState().folder;
+  setExplorerReviewPaths(new Set(folder && snapshot ? snapshot.items.map(i => joinPath(folder, i.path)) : []));
+  reviewPanel?.render(snapshot, error);
+});
 
 function showExplorerColumn(): void {
   if (getState().explorerVisible) return;
@@ -3693,7 +3747,11 @@ function toggleSearch(): void {
 }
 
 initActivityBar(
-  () => { if (document.body.classList.contains("git-active")) setGitActive(false); requestWindowMeasure(); },
+  () => {
+    if (document.body.classList.contains("git-active")) setGitActive(false);
+    if (document.body.classList.contains("review-active")) setReviewActive(false);
+    requestWindowMeasure();
+  },
   () => {
     // Leaving settings through a panel button shows that panel, never hides it.
     if (!settingsScreen.isOpen()) return toggleSearch();
@@ -3708,6 +3766,7 @@ initActivityBar(
   },
   openExportMenu,
   toggleGit,
+  toggleReview,
 );
 
 void refreshGitAvailability();
@@ -3723,6 +3782,7 @@ function applySidebarView(): void {
 }
 document.getElementById("ab-outline")!.addEventListener("click", () => {
   if (document.body.classList.contains("git-active")) setGitActive(false);
+  if (document.body.classList.contains("review-active")) setReviewActive(false);
   if (settingsScreen.isOpen()) settingsScreen.close();
   if (document.body.classList.contains("search-active")) setSearchActive(false);
   const hide = ui.sidebarView === "outline" && getState().explorerVisible;
@@ -3750,6 +3810,7 @@ document.getElementById("ab-explorer")!.addEventListener(
     event.stopImmediatePropagation();
     settingsScreen.close();
     if (document.body.classList.contains("search-active")) setSearchActive(false);
+    if (document.body.classList.contains("review-active")) setReviewActive(false);
     showExplorerColumn();
   },
   true,
@@ -3765,6 +3826,9 @@ document.getElementById("ab-explorer")!.addEventListener(
     } else if (document.body.classList.contains("git-active")) {
       event.stopImmediatePropagation();
       setGitActive(false);
+    } else if (document.body.classList.contains("review-active")) {
+      event.stopImmediatePropagation();
+      setReviewActive(false);
     }
   },
   true,
@@ -4062,17 +4126,21 @@ listenScoped<string>("menu", (event) => {
     case "view.filter_panel":
       settingsScreen.close();
       if (document.body.classList.contains("search-active")) setSearchActive(false);
+      if (document.body.classList.contains("review-active")) setReviewActive(false);
       ui = { ...ui, sidebarView: "outline", outlineTab: "filter" };
       showExplorerColumn(); applySidebarView(); outlineView.selectTab("filter"); updateOutline(true);
       return;
     case "view.links_panel":
       settingsScreen.close();
       if (document.body.classList.contains("search-active")) setSearchActive(false);
+      if (document.body.classList.contains("review-active")) setReviewActive(false);
       ui = { ...ui, sidebarView: "outline", outlineTab: "links" };
       showExplorerColumn(); applySidebarView(); outlineView.selectTab("links"); updateOutline(true);
       return;
     case "view.source_control":
       toggleGit(); return;
+    case "review.show":
+      settingsScreen.close(); setReviewActive(true); return;
     case "view.outline":
       return void document.getElementById("ab-outline")?.click();
     case "edit.insert_note_link": return insertNoteLink();
