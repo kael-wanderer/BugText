@@ -2609,6 +2609,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     let heading = "";
     const { buildExportHtml } = await import("./export-render");
     const html = await buildExportHtml(text, {
+      calloutFallback: true,
       rasterizeSvg: kind === "docx", svgAsImage: kind === "pdf",
       citations: { result: citation.result, style: citation.style, references: false },
       firstHeading: preset.id !== "standard" && preset.title.mode === "first-heading" ? value => { heading = value; } : undefined,

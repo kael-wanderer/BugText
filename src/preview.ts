@@ -1,3 +1,4 @@
+import { installCallouts } from "./preview-callouts";
 import { installCitationSyntax } from "./citations/syntax";
 import { headingAnchors } from "./links/parse";
 import { markdownOutline } from "./outline";
@@ -27,6 +28,7 @@ const md = new MarkdownIt({
 });
 
 installCitationSyntax(md);
+installCallouts(md);
 
 // Source maps attach navigation anchors to rendered block elements.
 md.core.ruler.push("source_lines", (state) => {
