@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Code blocks in the preview show a Copy button on hover.
 - Footnotes: `[^id]` references and `[^id]: text` definitions render as numbered notes with links in both directions.
 - Callouts: a quote starting with `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` renders as a labelled box. PDF and Word export show it as a quote with a bold label.
 - Presentation mode: present a Markdown note as slides (⇧⌘P), with speaker notes, laser pointer, black screen and a presenter window.
