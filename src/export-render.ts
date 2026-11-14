@@ -47,6 +47,13 @@ export function plainCallouts(root: ParentNode): void {
   }
 }
 
+export function staticFootnotes(root: ParentNode): void {
+  for (const link of root.querySelectorAll("sup.footnote-ref a")) {
+    link.replaceWith(document.createTextNode(link.textContent ?? ""));
+  }
+  for (const backref of root.querySelectorAll("a.footnote-backref")) backref.remove();
+}
+
 function svgToDataUri(svg: SVGElement): string {
   const xml = new XMLSerializer().serializeToString(svg);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
@@ -165,6 +172,7 @@ export async function buildExportHtml(
     if (heading?.tagName === "H1" && !host.querySelector("h1")) promoteHeadings(host);
   }
   staticTaskMarks(host);
+  staticFootnotes(host);
   if (options.calloutFallback) plainCallouts(host);
   document.body.appendChild(host);
   try {
