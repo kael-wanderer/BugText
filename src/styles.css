@@ -3716,3 +3716,17 @@ body.file-op-busy, body.file-op-busy #explorer * { cursor: progress; }
   cursor: pointer;
 }
 .mermaid-toolbar button:hover { background: var(--selection); }
+
+.mermaid-fullscreen {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg-editor);
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.mermaid-fullscreen:active { cursor: grabbing; }
+.mermaid-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.mermaid-fullscreen > .mermaid-toolbar { opacity: 1; cursor: default; }

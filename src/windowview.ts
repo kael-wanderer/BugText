@@ -150,6 +150,7 @@ export function createWindowView(
     copyText: writeText,
     copyImage: (png) => navigator.clipboard.write([new ClipboardItem({ "image/png": png })]),
     notify: showToast,
+    fullscreen: (svg) => { void import("./mermaid-fullscreen").then((m) => m.openMermaidFullscreen(svg, root)); },
   };
   const root = document.createElement("div");
   root.className = "window";
