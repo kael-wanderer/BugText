@@ -424,6 +424,90 @@ pub async fn review_close(folder: String) -> Result<(), String> {
     blocking(move || { close_at(&folder); Ok(()) }).await
 }
 
+// ---- Write hook: BugText's own writes are the owner's ----
+
+type Summary = Option<(State, Option<u32>, Option<u32>)>;
+
+pub(crate) struct Ticket { root: PathBuf, relative: String, existed: bool, before: Summary }
+
+fn summary(record: Option<&Record>) -> Summary { record.map(|r| (state(r), r.added, r.removed)) }
+
+/// The canonical form of `target`, resolving the parent when the file does not exist yet.
+fn locate(target: &Path) -> Option<PathBuf> {
+    if let Ok(real) = target.canonicalize() { return Some(real); }
+    Some(target.parent()?.canonicalize().ok()?.join(target.file_name()?))
+}
+
+fn relative_of(root: &Path, target: &Path) -> Option<String> {
+    let rest = target.strip_prefix(root).ok()?;
+    let parts: Option<Vec<&str>> = rest.components().map(|c| match c {
+        std::path::Component::Normal(part) => part.to_str(),
+        _ => None,
+    }).collect();
+    let relative = parts?.join("/");
+    (valid_relative(&relative) && tracked(&relative)).then_some(relative)
+}
+
+/// Called before BugText writes `target`. None when the file is not a tracked file of
+/// an active folder. Never fails: any problem means "do nothing".
+pub(crate) fn before_write(target: &Path) -> Option<Ticket> {
+    let target = locate(target)?;
+    let (root, relative, copy) = {
+        let inner = global().lock().ok()?;
+        let active = inner.folders.values().find(|a| target.starts_with(&a.root))?;
+        let relative = relative_of(&active.root, &target)?;
+        let copy = active.index.records.get(&relative).map(|r| (r.mtime_ms, r.size));
+        (active.root.clone(), relative, copy)
+    };
+    let meta = fs::symlink_metadata(&target).ok().filter(|m| m.is_file());
+    let existed = meta.is_some();
+    // The disk holds a change no scan has seen yet: record it before our write hides it.
+    let unseen = meta.as_ref().is_some_and(|m| copy != Some((mtime_ms(m), m.len())));
+    let seen = if unseen { read_seen(&root, &relative) } else { None };
+    let mut inner = global().lock().ok()?;
+    let active = inner.folders.get_mut(&root)?;
+    let before = summary(active.index.records.get(&relative));
+    if let Some(seen) = seen {
+        let still = active.index.records.get(&relative).map(|r| (r.mtime_ms, r.size));
+        if still == copy {
+            apply_seen(active, &relative, &seen, false, now_ms());
+            let _ = persist(active);
+        }
+    }
+    Some(Ticket { root, relative, existed, before })
+}
+
+/// Called after BugText's write succeeded. Never fails.
+pub(crate) fn after_write(ticket: Option<Ticket>) {
+    let Some(ticket) = ticket else { return };
+    let Some(seen) = read_seen(&ticket.root, &ticket.relative) else { return };
+    let now = now_ms();
+    let snapshot = {
+        let Ok(mut inner) = global().lock() else { return };
+        let Some(active) = inner.folders.get_mut(&ticket.root) else { return };
+        let path = ticket.relative.as_str();
+        let hint = take_hint(active, path, now);
+        let base = active.index.records.get(path).and_then(|r| base_text(&active.dir, r));
+        match (active.index.records.get_mut(path), hint) {
+            (Some(record), Some(route)) => outside_change(record, &seen, base.as_deref(), route, now),
+            (None, Some(route)) => { active.index.records.insert(path.to_string(), new_record(&seen, route, now)); }
+            (Some(record), None) => {
+                if owner_write(record, &seen, base.as_deref(), now) { store_blob(&active.dir, &seen); }
+            }
+            (None, None) => {
+                let record = owner_created(&seen, now);
+                if record.stored { store_blob(&active.dir, &seen); }
+                active.index.records.insert(path.to_string(), record);
+            }
+        }
+        let _ = persist(active);
+        let after = summary(active.index.records.get(path));
+        if ticket.existed && after == ticket.before { return; }
+        snapshot(&active.name, active)
+    };
+    emit(&snapshot);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,5 +716,117 @@ mod tests {
         e.put("a.md", b"ab");
         let s = e.scan(&["a.md"], true);
         assert!(s.items.is_empty()); assert_eq!(s.tracked, 1);
+    }
+}
+
+#[cfg(test)]
+mod hook_tests {
+    use super::tests::{env, item, Env};
+    use super::*;
+    use crate::files::{create_file_at, write_atomic_at};
+
+    fn snap(e: &Env) -> Snapshot { scan_at(&e.config, &e.f(), &[], false, now_ms(), &read_seen).unwrap().0 }
+    fn save(e: &Env, rel: &str, body: &str) { write_atomic_at(&e.folder.canonicalize().unwrap().join(rel), body.as_bytes()).unwrap(); }
+    fn record(e: &Env, rel: &str) -> Option<Record> {
+        let root = e.folder.canonicalize().unwrap();
+        global().lock().unwrap().folders.get(&root).and_then(|a| a.index.records.get(rel).cloned())
+    }
+
+    #[test] fn own_save_of_a_reviewed_note_stays_reviewed_and_stores_text() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        save(&e, "a.md", "a\nb");
+        let s = e.scan(&["a.md"], true);
+        assert!(s.items.is_empty());
+        let r = record(&e, "a.md").unwrap();
+        assert!(r.stored && !r.baseline);
+        assert_eq!(e.blobs(), vec![format!("{}.txt", r.current)]);
+    }
+    #[test] fn own_save_of_a_changed_note_stays_changed() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        e.put("a.md", b"ab");
+        let reviewed = record(&e, "a.md").unwrap().reviewed;
+        e.scan(&["a.md"], true);
+        save(&e, "a.md", "abc");
+        let s = e.scan(&["a.md"], true);
+        assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
+        assert_eq!(record(&e, "a.md").unwrap().reviewed, reviewed);
+    }
+    #[test] fn unseen_outside_change_then_own_save_is_changed() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        let reviewed = record(&e, "a.md").unwrap().reviewed;
+        e.put("a.md", b"outside");
+        save(&e, "a.md", "outside + typing");
+        let s = snap(&e);
+        assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
+        assert_eq!(record(&e, "a.md").unwrap().reviewed, reviewed);
+        let s = e.scan(&["a.md"], true);
+        assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
+    }
+    #[test] fn note_created_by_the_app_is_reviewed() {
+        let e = env();
+        e.scan(&[], true);
+        let path = e.folder.join("n.md");
+        create_file_at(&path.to_string_lossy()).unwrap();
+        save(&e, "n.md", "# hi");
+        let s = snap(&e);
+        assert!(s.items.is_empty()); assert_eq!(s.tracked, 1);
+        assert!(e.scan(&["n.md"], true).items.is_empty());
+    }
+    #[test] fn unseen_outside_file_then_own_save_is_new() {
+        let e = env();
+        e.scan(&[], true);
+        e.put("o.md", b"from outside");
+        save(&e, "o.md", "from outside, edited");
+        assert_eq!(item(&snap(&e), "o.md").unwrap().state, State::New);
+    }
+    #[test] fn hinted_write_counts_as_mcp_not_owner() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        expect_at(&e.f(), &["a.md".to_string()], Route::Mcp, now_ms()).unwrap();
+        save(&e, "a.md", "mcp wrote this");
+        let s = snap(&e);
+        let i = item(&s, "a.md").unwrap();
+        assert_eq!((i.state, i.route), (State::Changed, Route::Mcp));
+        let root = e.folder.canonicalize().unwrap();
+        assert!(global().lock().unwrap().folders[&root].hints.is_empty());
+    }
+    #[test] fn write_outside_any_active_folder_is_ignored() {
+        let e = env();
+        e.put("a.md", b"a");
+        save(&e, "a.md", "b");
+        let root = e.folder.canonicalize().unwrap();
+        assert!(!global().lock().unwrap().folders.contains_key(&root));
+        assert!(!e.config.join("review").exists());
+    }
+    #[test] fn save_succeeds_when_review_data_is_broken() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        let index = e.index_path();
+        fs::remove_file(&index).unwrap();
+        fs::create_dir_all(&index).unwrap(); // the index can no longer be written
+        save(&e, "a.md", "new bytes");
+        assert_eq!(fs::read_to_string(e.folder.join("a.md")).unwrap(), "new bytes");
+    }
+    #[test] fn store_files_do_not_reenter_the_hook() {
+        let e = env();
+        let config = e.config.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            fs::write(config.join("n.md"), "a").unwrap();
+            let folder = config.to_string_lossy().into_owned();
+            scan_at(&config, &folder, &["n.md".to_string()], true, now_ms(), &read_seen).unwrap();
+            write_atomic_at(&config.canonicalize().unwrap().join("n.md"), b"b").unwrap();
+            scan_at(&config, &folder, &["n.md".to_string()], true, now_ms(), &read_seen).unwrap();
+            tx.send(()).unwrap();
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(5)).expect("deadlock");
     }
 }

@@ -1,8 +1,6 @@
 //! Review records: what the owner last reviewed for each tracked note, and the
 //! pure rules that move a record between states.
 
-// Task 1 lands the model before the store that uses it.
-#![allow(dead_code)]
 
 use serde::{Deserialize, Serialize};
 use similar::{capture_diff_slices, Algorithm, DiffOp};
