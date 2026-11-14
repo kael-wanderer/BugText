@@ -50,7 +50,7 @@ describe("buildExportHtml", () => {
       className: "",
       innerHTML: "",
       style: {},
-      querySelectorAll: () => [svg],
+      querySelectorAll: (selector: string) => selector === "svg" ? [svg] : [],
       remove: vi.fn(),
     };
     Object.defineProperty(host, "outerHTML", {
@@ -110,7 +110,7 @@ describe("buildExportHtml", () => {
       className: "",
       innerHTML: "",
       style: {},
-      querySelectorAll: () => [svg],
+      querySelectorAll: (selector: string) => selector === "svg" ? [svg] : [],
       remove: vi.fn(),
     };
     Object.defineProperty(host, "outerHTML", {
@@ -144,7 +144,7 @@ describe("buildExportHtml", () => {
       className: "",
       innerHTML: "",
       style: {},
-      querySelectorAll: () => [{ replaceWith: replacement }],
+      querySelectorAll: (selector: string) => selector === "svg" ? [{ replaceWith: replacement }] : [],
       remove: vi.fn(),
     };
     Object.defineProperty(host, "outerHTML", {

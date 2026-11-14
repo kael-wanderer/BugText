@@ -10,7 +10,49 @@ img,svg{max-width:100%;height:auto}
 table{border-collapse:collapse;width:100%}
 th,td{border:1px solid #bbb;padding:6px 10px;text-align:left}
 pre{white-space:pre-wrap}
+
+.doc sup.footnote-ref a { text-decoration: none; color: #345e96; }
+.doc .footnotes { font-size: 0.85em; border-top: 1px solid #bbb; margin-top: 14px; padding-top: 8px; }
+.doc .footnote-backref { text-decoration: none; margin-left: 0.3em; }
+
+
+.doc blockquote.callout {
+  margin: 0 0 12px;
+  padding: 9px 14px;
+  color: #111;
+  font-style: normal;
+  border: 1px solid color-mix(in srgb, var(--callout) 40%, #bbb);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--callout) 8%, transparent);
+}
+.callout-note { --callout: #7fa6d9; }
+.callout-tip { --callout: #9fbf7f; }
+.callout-important { --callout: #c98fb0; }
+.callout-warning { --callout: #e0a356; }
+.callout-caution { --callout: #d98a8a; }
+.doc .callout-title { color: var(--callout); font-weight: 700; margin: 0 0 2px; }
+.doc .callout > :last-child { margin-bottom: 0; }
+
 `;
+
+export function plainCallouts(root: ParentNode): void {
+  for (const quote of root.querySelectorAll("blockquote.callout")) {
+    quote.removeAttribute("class");
+    const title = quote.querySelector(".callout-title");
+    if (!title) continue;
+    const strong = document.createElement("strong");
+    strong.append(...Array.from(title.childNodes));
+    title.append(strong);
+    title.removeAttribute("class");
+  }
+}
+
+export function staticFootnotes(root: ParentNode): void {
+  for (const link of root.querySelectorAll("sup.footnote-ref a")) {
+    link.replaceWith(document.createTextNode(link.textContent ?? ""));
+  }
+  for (const backref of root.querySelectorAll("a.footnote-backref")) backref.remove();
+}
 
 function svgToDataUri(svg: SVGElement): string {
   const xml = new XMLSerializer().serializeToString(svg);
@@ -104,6 +146,7 @@ export async function buildExportHtml(
   markdown: string,
   options: {
     rasterizeSvg: boolean;
+    calloutFallback?: boolean;
     firstHeading?: (title: string) => void;
     svgAsImage?: boolean;
     inlineImages?: { notePath: string; read: (path: string) => Promise<Uint8Array> };
@@ -129,6 +172,8 @@ export async function buildExportHtml(
     if (heading?.tagName === "H1" && !host.querySelector("h1")) promoteHeadings(host);
   }
   staticTaskMarks(host);
+  staticFootnotes(host);
+  if (options.calloutFallback) plainCallouts(host);
   document.body.appendChild(host);
   try {
     await enhancePreview(host);

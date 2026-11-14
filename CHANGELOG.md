@@ -7,6 +7,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- A diagram that fails to render shows the error, a Show source toggle and Fix with AI, which proposes a corrected diagram in the usual diff review.
+- Diagram Fullscreen: opens the diagram over its note window with wheel zoom and drag to pan; Esc closes.
+- Diagrams show a toolbar on hover: zoom out, zoom in, Fit, Copy as PNG and Copy as SVG.
+- Code blocks in the preview show a Copy button on hover.
+- Footnotes: `[^id]` references and `[^id]: text` definitions render as numbered notes with links in both directions.
+- Callouts: a quote starting with `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` renders as a labelled box. PDF and Word export show it as a quote with a bold label.
 - Presentation mode: present a Markdown note as slides (⇧⌘P), with speaker notes, laser pointer, black screen and a presenter window.
 - Writing goals: a word target per note (`word_goal` property) or per session, with progress in the status bar and focus mode.
 - PDF page organization with reorder, rotation, deletion, insertion, extraction, and Recovery-backed in-place saves.
@@ -52,6 +58,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- A diagram with a syntax error no longer leaves Mermaid's error graphic below the window, which pushed the layout on every re-render.
+- Folder search for AI context now matches Vietnamese and other accented words, with or without their accents.
 - Properties: closing a tab now clears its remembered expanded state instead of keeping it for the rest of the session.
 - Security: a checked folder write now writes the exact file that was checked, so a link swapped in after the check cannot redirect the write outside the open folder.
 - Security: updated the HTML sanitizer (DOMPurify 3.4.17), Markdown renderer, PDF engine and KaTeX to versions without known advisories.

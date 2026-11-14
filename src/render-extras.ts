@@ -1,3 +1,10 @@
+export type MermaidResult = { code: string; error: string | null; line: number | null };
+const results = new WeakMap<HTMLElement, MermaidResult>();
+
+export function mermaidResult(host: HTMLElement): MermaidResult | undefined {
+  return results.get(host);
+}
+
 let counter = 0;
 let mermaidPromise: Promise<typeof import("mermaid").default> | null = null;
 
@@ -8,6 +15,7 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
         startOnLoad: false,
         theme: "dark",
         securityLevel: "strict",
+        suppressErrorRendering: true,
         // Plain SVG text labels: PDF export (Typst) cannot draw HTML labels
         // inside <foreignObject>.
         htmlLabels: false,
@@ -36,14 +44,25 @@ export async function enhancePreview(container: HTMLElement): Promise<void> {
       const host = document.createElement("div");
       host.className = "mermaid-rendered";
       const pre = block.closest("pre");
+      const sourceLine = Number(pre?.getAttribute("data-line"));
+      const line = Number.isInteger(sourceLine) && sourceLine > 0 ? sourceLine : null;
+      if (line !== null) host.setAttribute("data-line", String(line));
+      const result: MermaidResult = { code, error: null, line };
+      results.set(host, result);
       (pre ?? block).replaceWith(host);
       const id = `mmd-${counter++}`;
       try {
         const { svg } = await mermaid.render(id, code);
         if (host.isConnected) host.innerHTML = svg;
       } catch (error) {
-        host.textContent = `Mermaid error: ${String(error)}`;
+        result.error = String(error);
+        host.textContent = `Mermaid error: ${result.error}`;
         host.classList.add("mermaid-error");
+      } finally {
+        for (const renderId of [id, `d${id}`]) {
+          const leftover = document.getElementById(renderId);
+          if (leftover && !host.contains(leftover)) leftover.remove();
+        }
       }
     }),
   );

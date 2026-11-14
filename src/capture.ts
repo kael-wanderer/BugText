@@ -142,3 +142,23 @@ export async function htmlToCanvas(html: string, options?: CaptureOptions): Prom
   const { svg, width, height } = await htmlToSvgAndSize(html, options);
   return rasterize(svg, width, height);
 }
+
+/** Rasterize an independent diagram copy at export resolution. */
+export async function svgToPngBlob(svg: SVGSVGElement, scale = 2): Promise<Blob> {
+  const box = svg.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number);
+  const size = box?.length === 4 && box.every(Number.isFinite) && box[2] > 0 && box[3] > 0
+    ? { width: box[2], height: box[3] } : svg.getBoundingClientRect();
+  const width = Math.ceil(size.width * scale);
+  const height = Math.ceil(size.height * scale);
+  const tooLarge = "The diagram is too large to copy as an image.";
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || width > 16384 || height > 16384) throw new Error(tooLarge);
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
+  clone.style.removeProperty("width");
+  clone.style.removeProperty("max-width");
+  const canvas = await rasterize(new XMLSerializer().serializeToString(clone), width, height);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(tooLarge)), "image/png");
+  });
+}

@@ -14,10 +14,14 @@ const K1 = 1.5;
 const B = 0.75;
 
 export function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length > 0);
+  const tokens: string[] = [];
+  for (const token of text.normalize("NFC").toLowerCase().match(/[\p{L}\p{N}\p{M}]+/gu) ?? []) {
+    tokens.push(token);
+    if (!/^[\p{Script=Latin}\p{M}\p{N}]+$/u.test(token)) continue;
+    const folded = token.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
+    if (folded !== token) tokens.push(folded);
+  }
+  return tokens;
 }
 
 function splitToSize(text: string, maxChars: number): string[] {
@@ -108,7 +112,7 @@ export function retrieveScored(
   excludePath?: string,
 ): { chunk: Chunk; score: number }[] {
   if (index.n === 0) return [];
-  const terms = tokenize(query);
+  const terms = new Set(tokenize(query));
   const scored: { i: number; score: number }[] = [];
 
   for (let i = 0; i < index.n; i += 1) {

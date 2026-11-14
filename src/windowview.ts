@@ -9,6 +9,11 @@ import { createScrollGuard, lineToOffset, offsetToLine, type ScrollAnchor } from
 import { capturePreviewPlace, restorePreviewPlace, shiftedLine } from "./preview-place";
 import { createEditor, type EditorHandle } from "./editor";
 import { resolvePreviewImages } from "./preview-images";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import type { MermaidDeps } from "./preview-mermaid";
+import { showToast } from "./toast";
+import { enhanceCodeCopy } from "./preview-code-copy";
+import { enhanceFootnotes } from "./preview-footnotes";
 import { enhancePreviewTasks } from "./preview-tasks";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -52,7 +57,12 @@ import {
   highlightText,
 } from "./preview-find";
 
-export type WindowHandlers = {
+export type WindowViewHooks = {
+  canFixMermaid?: () => boolean;
+  onFixMermaid?: (windowId: string, tabId: string, line: number, code: string, error: string) => void;
+};
+
+export type WindowHandlers = WindowViewHooks & {
   graphIndex?: LinkIndex;
   onGraphOpen?: (windowId: string, path: string, newTab: boolean) => void;
   onGraphFolder?: () => void;
@@ -141,6 +151,38 @@ export function createWindowView(
   isMain: boolean,
   h: WindowHandlers
 ): WindowView {
+  let fullscreenHandle: { close(): void } | null = null;
+  let fullscreenTabId: string | null = null;
+  let fullscreenGeneration = 0;
+  let destroyed = false;
+  function closeMermaidFullscreen(): void {
+    fullscreenGeneration += 1;
+    fullscreenHandle?.close();
+    fullscreenHandle = null;
+    fullscreenTabId = null;
+  }
+  const mermaidDeps: MermaidDeps = {
+    copyText: writeText,
+    copyImage: (png) => navigator.clipboard.write([new ClipboardItem({ "image/png": png })]),
+    notify: showToast,
+    fullscreen: (svg) => {
+      const tabId = getWindow(windowId)?.activeTabId ?? null;
+      if (!tabId) return;
+      closeMermaidFullscreen();
+      fullscreenTabId = tabId;
+      const generation = fullscreenGeneration;
+      void import("./mermaid-fullscreen").then((m) => {
+        if (destroyed || generation !== fullscreenGeneration) return;
+        const state = getWindow(windowId);
+        const tab = state?.tabs.find(t => t.id === state.activeTabId);
+        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || tab.tableView) {
+          closeMermaidFullscreen();
+          return;
+        }
+        fullscreenHandle = m.openMermaidFullscreen(svg, root);
+      });
+    },
+  };
   const root = document.createElement("div");
   root.className = "window";
   root.dataset.windowId = windowId;
@@ -474,6 +516,7 @@ export function createWindowView(
     }));
   }
   function activateDocument(tabId: string): void {
+    if (fullscreenTabId !== null && fullscreenTabId !== tabId) closeMermaidFullscreen();
     editor.switchTo(tabId);
   }
   async function restoreReadingPosition(): Promise<void> {
@@ -587,7 +630,7 @@ export function createWindowView(
   const tableHost = document.createElement("div"); tableHost.className = "table-view"; tableHost.hidden = true; root.append(tableHost);
   function render(): void {
     const w = getWindow(windowId);
-    if (!w) return;
+    if (!w) { closeMermaidFullscreen(); return; }
     editor.setLivePreview(h.livePreviewEnabled?.() ?? false);
     queueMicrotask(refreshContextAction);
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
@@ -601,6 +644,7 @@ export function createWindowView(
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
+    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || active.tableView)) closeMermaidFullscreen();
     const language = fileLanguageInfo(activeName);
     // mode class
     root.classList.remove(
@@ -720,6 +764,7 @@ export function createWindowView(
   ): void {
     clearTimeout(citationTimer);
     const documentId = getWindow(windowId)?.activeTabId ?? null;
+    if (fullscreenTabId !== null && fullscreenTabId !== documentId) closeMermaidFullscreen();
     const count = countWords(text);
     wsWords.textContent = `${count} ${count === 1 ? "word" : "words"}`;
     if (documentId) h.onWordCount?.(documentId, count, text);
@@ -816,6 +861,7 @@ export function createWindowView(
         article.className = "doc";
         article.style.zoom = String(previewZoom);
         article.innerHTML = renderMarkdown(`\`\`\`sql\n${text}\n\`\`\``);
+        enhanceCodeCopy(article, writeText);
         previewPane.appendChild(article);
       }
       return;
@@ -884,6 +930,8 @@ export function createWindowView(
         renderPreview(current, pathOrName);
         return false;
       } : null);
+      enhanceFootnotes(article);
+      enhanceCodeCopy(article, writeText);
       previewPane.appendChild(article);
       restorePlace();
       const token = previewRenderToken;
@@ -925,7 +973,21 @@ export function createWindowView(
         placeObserver = new ResizeObserver(restoreIfUnmoved);
         placeObserver.observe(article);
       }
-      void enhancePreview(previewPane).then(restoreIfUnmoved);
+      void enhancePreview(previewPane).then(async () => {
+        if (token !== previewRenderToken) return;
+        if (previewPane.querySelector(".mermaid-rendered")) {
+          const { enhanceMermaid } = await import("./preview-mermaid");
+          if (token !== previewRenderToken) return;
+          enhanceMermaid(previewPane, {
+            ...mermaidDeps,
+            fix: h.onFixMermaid ? {
+              available: () => Boolean(documentId) && (h.canFixMermaid?.() ?? false),
+              run: (r) => { if (documentId) h.onFixMermaid!(windowId, documentId, r.line, r.code, r.error ?? ""); },
+            } : undefined,
+          });
+        }
+        restoreIfUnmoved();
+      });
       h.onNavigation(windowId);
     }
   }
@@ -1165,6 +1227,8 @@ export function createWindowView(
       editor.focus();
     },
     destroy: () => {
+      destroyed = true;
+      closeMermaidFullscreen();
       graphView?.destroy(); graphTab.destroy();
       captureReadingPosition();
       clearTimeout(cardTimer);

@@ -37,7 +37,8 @@ import { captureLayout, sessionLayout, type WorkspaceLayout } from "./workspaces
 import { createPositionTracker } from "./workspaces/positions";
 import { restoreLayout } from "./workspaces/restore";
 import { actionsIO, loadActions, saveActions, type ActionsFile } from "./ai/actions-store";
-import { runnableActions } from "./ai/actions";
+import { fixTarget, fixMermaidAction, stripCodeFence, DIAGRAM_CHANGED } from "./ai/fix-mermaid";
+import { actionEngine, runnableActions } from "./ai/actions";
 import { appConfigDir, homeDir, join } from "@tauri-apps/api/path";
 import { createLinksPanel } from "./links/panel";
 import { createMentionsSection } from "./links/mentions-section";
@@ -77,6 +78,7 @@ import { permitAISettingsSave } from "./ai/aisettings-write-guard";
 import { createAIPanel, type AIPanel } from "./ai/panel";
 import { showDiff, type EditReviewDeps } from "./ai/edit-review";
 import {
+  matchEdges,
   type QuickActionDeps,
 } from "./ai/quick-actions";
 import { clampAgentPanelWidth } from "./ai-layout";
@@ -1098,6 +1100,8 @@ const handlers = {
       },
     })).catch((error) => showToast(`Could not export annotations: ${String(error)}`));
   },
+  canFixMermaid,
+  onFixMermaid: fixMermaid,
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   onStatusChange: refreshStatusBar,
   onWordCount: (tabId: string, count: number, text: string) => {
@@ -2609,6 +2613,7 @@ async function exportDocument(kind: "pdf" | "docx"): Promise<void> {
     let heading = "";
     const { buildExportHtml } = await import("./export-render");
     const html = await buildExportHtml(text, {
+      calloutFallback: true,
       rasterizeSvg: kind === "docx", svgAsImage: kind === "pdf",
       citations: { result: citation.result, style: citation.style, references: false },
       firstHeading: preset.id !== "standard" && preset.title.mode === "first-heading" ? value => { heading = value; } : undefined,
@@ -3255,6 +3260,32 @@ function quickActionDeps(actionLabel: string): QuickActionDeps {
     getWorkingDir: () => getState().folder,
     makeAbort: () => new AbortController(),
   };
+}
+
+function canFixMermaid(): boolean {
+  const action = fixMermaidAction("");
+  return currentAISettings.enabled.rewrite
+    && actionEngine(action, currentAISettings, cliInfos).engine.kind !== "none";
+}
+
+function fixMermaid(windowId: string, tabId: string, line: number, code: string, error: string): void {
+  const tab = tabIn(windowId, tabId);
+  const editor = views.get(windowId)?.editor;
+  if (!tab || !editor) { showToast(DIAGRAM_CHANGED); return; }
+  const text = editor.getText(tabId);
+  const range = fixTarget(text, line, code);
+  if (!range.ok) { showToast(range.message); return; }
+  setAIVisible(true);
+  const shared = quickActionDeps("Fix diagram");
+  void aiPanel!.runAction(fixMermaidAction(error), {
+    ...shared,
+    getDoc: () => ({ path: tab.path, text, selection: range.body, windowId, tabId, from: range.from, to: range.to }),
+    reviewEdit: (base, reply, binding) => {
+      const diagram = stripCodeFence(reply);
+      if (!diagram.trim()) { showToast("The AI returned no diagram."); return; }
+      shared.reviewEdit(base, matchEdges(base, diagram), binding);
+    },
+  });
 }
 
 function runQuickActionById(id: string): void {
