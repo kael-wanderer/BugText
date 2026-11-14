@@ -15,6 +15,7 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
         startOnLoad: false,
         theme: "dark",
         securityLevel: "strict",
+        suppressErrorRendering: true,
         // Plain SVG text labels: PDF export (Typst) cannot draw HTML labels
         // inside <foreignObject>.
         htmlLabels: false,
@@ -57,6 +58,11 @@ export async function enhancePreview(container: HTMLElement): Promise<void> {
         result.error = String(error);
         host.textContent = `Mermaid error: ${result.error}`;
         host.classList.add("mermaid-error");
+      } finally {
+        for (const renderId of [id, `d${id}`]) {
+          const leftover = document.getElementById(renderId);
+          if (leftover && !host.contains(leftover)) leftover.remove();
+        }
       }
     }),
   );
