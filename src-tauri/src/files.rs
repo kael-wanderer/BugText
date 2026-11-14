@@ -498,7 +498,7 @@ pub fn create_file_at(path: &str) -> Result<(), String> {
     }
     let ticket = crate::review_store::before_write(Path::new(path));
     fs::write(path, "").map_err(|error| error.to_string())?;
-    crate::review_store::after_write(ticket);
+    crate::review_store::after_write(ticket, b"");
     Ok(())
 }
 
@@ -640,7 +640,7 @@ pub(crate) fn write_atomic(path: &str, bytes: &[u8]) -> Result<(), String> {
 pub(crate) fn write_atomic_at(target: &Path, bytes: &[u8]) -> Result<(), String> {
     let ticket = crate::review_store::before_write(target);
     write_atomic_raw(target, bytes)?;
-    crate::review_store::after_write(ticket);
+    crate::review_store::after_write(ticket, bytes);
     Ok(())
 }
 

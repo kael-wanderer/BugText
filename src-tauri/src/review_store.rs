@@ -144,7 +144,6 @@ pub(crate) fn read_seen(root: &Path, relative: &str) -> Option<Seen> {
     if !path.starts_with(&root) { return None; }
     let meta = fs::metadata(&path).ok()?;
     if !meta.is_file() { return None; }
-    let hex = |hash: &[u8]| hash.iter().map(|b| format!("{b:02x}")).collect::<String>();
     if meta.len() > TEXT_LIMIT {
         // Digest only: stream it rather than holding a large file in memory.
         let mut hasher = Sha256::new();
@@ -152,10 +151,25 @@ pub(crate) fn read_seen(root: &Path, relative: &str) -> Option<Seen> {
         return Some(Seen { digest: hex(&hasher.finalize()), text: None, mtime_ms: mtime_ms(&meta), size });
     }
     let bytes = fs::read(&path).ok()?;
-    let digest = hex(&Sha256::digest(&bytes));
+    Some(seen_of(&bytes, mtime_ms(&meta)))
+}
+
+fn hex(hash: &[u8]) -> String { hash.iter().map(|b| format!("{b:02x}")).collect() }
+
+fn seen_of(bytes: &[u8], mtime_ms: u64) -> Seen {
     let size = bytes.len() as u64;
-    let text = if size <= TEXT_LIMIT { String::from_utf8(bytes).ok() } else { None };
-    Some(Seen { digest, text, mtime_ms: mtime_ms(&meta), size })
+    let text = if size <= TEXT_LIMIT { std::str::from_utf8(bytes).ok().map(str::to_owned) } else { None };
+    Seen { digest: hex(&Sha256::digest(bytes)), text, mtime_ms, size }
+}
+
+/// What BugText wrote, taken from the bytes it wrote, never read back: another tool may
+/// have replaced the file since. Only the time comes from the disk, and only while the
+/// file there has the written size; otherwise the time is 0, so the next scan reads the
+/// file and queues whatever replaced it.
+fn written_seen(root: &Path, relative: &str, bytes: &[u8]) -> Seen {
+    let meta = fs::symlink_metadata(root.join(relative)).ok()
+        .filter(|m| m.is_file() && m.len() == bytes.len() as u64);
+    seen_of(bytes, meta.map_or(0, |m| mtime_ms(&m)))
 }
 
 pub(crate) fn persist(active: &Active) -> Result<(), String> {
@@ -571,11 +585,11 @@ pub(crate) fn before_write(target: &Path) -> Option<Ticket> {
     Some(Ticket { root, relative, existed, before, pre_reviewed, pre_current })
 }
 
-/// Called after BugText's write succeeded. Never fails. Reading and diffing happen
-/// without the lock; only the record update and the index write hold it.
-pub(crate) fn after_write(ticket: Option<Ticket>) {
+/// Called after BugText's write of `bytes` succeeded. Never fails. Hashing and diffing
+/// happen without the lock; only the record update and the index write hold it.
+pub(crate) fn after_write(ticket: Option<Ticket>, bytes: &[u8]) {
     let Some(ticket) = ticket else { return };
-    let Some(seen) = read_seen(&ticket.root, &ticket.relative) else { return };
+    let seen = written_seen(&ticket.root, &ticket.relative, bytes);
     let path = ticket.relative.as_str();
     let (copy, dir) = {
         let Ok(inner) = global().lock() else { return };
@@ -1047,9 +1061,23 @@ mod owner_race_tests {
         write_atomic_raw(&target, b"owner typed this").unwrap();
         let s = e.scan(&["a.md"]);
         assert!(item(&s, "a.md").is_some(), "the scan saw the write first");
-        after_write(ticket);
+        after_write(ticket, b"owner typed this");
         let s = e.scan(&["a.md"]);
         assert!(s.items.is_empty(), "{:?}", s.items);
+    }
+
+    #[test] fn a_file_replaced_before_after_write_is_not_recorded_as_reviewed() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"]);
+        let target = e.folder.canonicalize().unwrap().join("a.md");
+        let ticket = before_write(&target);
+        write_atomic_raw(&target, b"owner typed this").unwrap();
+        // Another tool replaces the file before the hook runs.
+        write_atomic_raw(&target, b"other tool wrote this instead").unwrap();
+        after_write(ticket, b"owner typed this");
+        let s = e.scan(&["a.md"]);
+        assert!(item(&s, "a.md").is_some(), "the other tool's content was recorded as the owner's");
     }
 }
 

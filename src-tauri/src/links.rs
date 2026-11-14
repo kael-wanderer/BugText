@@ -529,6 +529,6 @@ pub fn create_link_note(folder: String, path: String) -> Result<(), String> {
         .create_new(true)
         .open(&path)
         .map_err(|_| "Could not create note")?;
-    crate::review_store::after_write(ticket);
+    crate::review_store::after_write(ticket, b"");
     Ok(())
 }
