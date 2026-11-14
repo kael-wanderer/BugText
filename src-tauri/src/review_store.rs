@@ -368,7 +368,8 @@ pub(crate) fn mark_at(folder: &str, action: &str, items: Vec<MarkItem>, now: u64
         if !valid_relative(&item.path) { continue; }
         let Some(record) = active.index.records.get_mut(&item.path) else { continue };
         match (flag, found) {
-            (Some(flag), _) => set_flag(record, flag),
+            // Later and Dismiss mean nothing for a note that matches its reviewed version.
+            (Some(flag), _) => if flag == Flag::None || state(record) != State::Reviewed { set_flag(record, flag) },
             (None, Some(found)) if found.digest == item.digest => {
                 mark_reviewed(record, &found, now);
                 store_blob(&active.dir, &found);
@@ -1073,5 +1074,23 @@ mod excluded_hook_tests {
         let s = scan_at(&e.config, &e.f(), &["a.md".to_string()], &excluded, now_ms(), &read_seen).unwrap().0;
         assert_eq!(s.tracked, 1);
         assert!(s.items.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod flag_tests {
+    use super::tests::{env, item};
+    use super::*;
+
+    #[test] fn later_and_dismiss_ignore_reviewed_notes() {
+        let e = env();
+        e.put("a.md", b"a"); e.put("b.md", b"b");
+        e.scan(&["a.md", "b.md"]);
+        e.mark("later", &[("a.md", "")]);
+        e.mark("dismiss", &[("b.md", "")]);
+        e.put("a.md", b"aa"); e.put("b.md", b"bb");
+        let s = e.scan(&["a.md", "b.md"]);
+        assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
+        assert_eq!(item(&s, "b.md").unwrap().state, State::Changed);
     }
 }

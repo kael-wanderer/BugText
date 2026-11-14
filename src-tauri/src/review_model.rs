@@ -154,6 +154,11 @@ pub fn outside_change(record: &mut Record, seen: &Seen, base: Option<&str>, rout
     outside_change_counted(record, seen, counted, route, now);
 }
 
+/// Later and Dismissed only mean something while the note differs from its reviewed version.
+fn settle(record: &mut Record) {
+    if state(record) == State::Reviewed { record.flag = Flag::None; }
+}
+
 pub fn outside_change_counted(record: &mut Record, seen: &Seen, counted: Counts, route: Route, now: u64) {
     record.mtime_ms = seen.mtime_ms;
     record.size = seen.size;
@@ -167,6 +172,7 @@ pub fn outside_change_counted(record: &mut Record, seen: &Seen, counted: Counts,
         record.flag = Flag::None;
     }
     (record.added, record.removed) = counted;
+    settle(record);
 }
 
 /// A write BugText made itself. Returns true when the reviewed version moved.
@@ -188,9 +194,11 @@ pub fn owner_write_counted(record: &mut Record, seen: &Seen, counted: Counts, no
         record.stored = seen.text.is_some();
         record.added = None;
         record.removed = None;
+        settle(record);
         return true;
     }
     (record.added, record.removed) = counted;
+    settle(record);
     false
 }
 
@@ -290,6 +298,18 @@ mod tests {
         for bad in ["", "/a.md", "a/../b.md", "a//b.md", "..", "\\a.md"] { assert!(!valid_relative(bad), "{bad}"); }
         assert!(valid_relative("a/b c.md"));
         assert!(tracked("A/Note.MD") && tracked("x.htm") && !tracked("x.pdf") && !tracked(".obsidian/x.md"));
+    }
+    #[test] fn returning_to_the_reviewed_version_clears_the_flag() {
+        let mut r = owner_created(&seen("a"), 1);
+        outside_change(&mut r, &seen("b"), None, Route::Outside, 2);
+        set_flag(&mut r, Flag::Later);
+        outside_change(&mut r, &seen("a"), None, Route::Outside, 3);
+        assert_eq!((state(&r), r.flag), (State::Reviewed, Flag::None));
+        outside_change(&mut r, &seen("c"), None, Route::Outside, 4);
+        assert_eq!(state(&r), State::Changed);
+        set_flag(&mut r, Flag::Dismissed);
+        owner_write(&mut r, &seen("a"), None, 5);
+        assert_eq!((state(&r), r.flag), (State::Reviewed, Flag::None));
     }
     #[test] fn line_counts_match_the_frontend_split() {
         assert_eq!(line_counts("a\nb", "a\nb\n"), (1, 0));   // trailing newline is one added empty line
