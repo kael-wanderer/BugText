@@ -116,3 +116,55 @@ it("adds nothing twice and nothing to a failed diagram", () => {
   enhanceMermaid(failed.root, deps());
   expect(failed.host.querySelectorAll(".mermaid-toolbar")).toHaveLength(0);
 });
+
+function failed(line: number | null = 4): ReturnType<typeof diagram> {
+  const result = diagram();
+  result.host.replaceChildren();
+  result.host.classList.add("mermaid-error");
+  result.host.textContent = "Mermaid error: raw";
+  vi.mocked(mermaidResult).mockReturnValue({ code: "nonsense <b>x</b>", error: "Error: Parse error on line 1:\nmore detail", line });
+  return result;
+}
+it("turns a failed diagram into a card with the first error line and a source toggle", () => {
+  const { root, host } = failed();
+  enhanceMermaid(root, deps());
+  expect(host.classList.contains("mermaid-error-card")).toBe(true);
+  expect(host.querySelector(".mermaid-error-message")!.textContent).toBe("Parse error on line 1:");
+  const toggle = Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Show source")!;
+  const pre = host.querySelector<HTMLElement>("pre.mermaid-error-source")!;
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(pre.hidden).toBe(true);
+  toggle.click();
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(toggle.textContent).toBe("Hide source");
+  expect(pre.hidden).toBe(false);
+  expect(pre.textContent).toBe("nonsense <b>x</b>");
+  expect(pre.children).toHaveLength(0);
+  toggle.click();
+  expect(pre.hidden).toBe(true);
+  expect(Array.from(host.querySelectorAll("button")).some(b => b.textContent === "Fix with AI")).toBe(false);
+  enhanceMermaid(root, deps());
+  expect(host.querySelectorAll(".mermaid-error-message")).toHaveLength(1);
+});
+it("offers Fix with AI only when available and the line is known", () => {
+  const fix = { available: () => true, run: vi.fn() };
+  const ready = failed();
+  enhanceMermaid(ready.root, deps({ fix }));
+  Array.from(ready.host.querySelectorAll("button")).find(b => b.textContent === "Fix with AI")!.click();
+  expect(fix.run).toHaveBeenCalledWith({ code: "nonsense <b>x</b>", error: "Error: Parse error on line 1:\nmore detail", line: 4 });
+  const unavailable = failed();
+  enhanceMermaid(unavailable.root, deps({ fix: { ...fix, available: () => false } }));
+  expect(unavailable.host.textContent).not.toContain("Fix with AI");
+  const unknown = failed(null);
+  enhanceMermaid(unknown.root, deps({ fix }));
+  expect(unknown.host.textContent).not.toContain("Fix with AI");
+});
+it.each(["", " \t\r\n "])("hides Fix with AI when the diagram source is empty (%j)", (code) => {
+  const { root, host } = failed();
+  vi.mocked(mermaidResult).mockReturnValue({ code, error: "No diagram type detected", line: 4 });
+  const fix = { available: () => true, run: vi.fn() };
+  enhanceMermaid(root, deps({ fix }));
+  expect(host.querySelector(".mermaid-error-message")!.textContent).toBe("No diagram type detected");
+  expect(Array.from(host.querySelectorAll("button")).some(b => b.textContent === "Fix with AI")).toBe(false);
+  expect(fix.run).not.toHaveBeenCalled();
+});

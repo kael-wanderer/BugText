@@ -2739,13 +2739,35 @@ body.no-folder .explorer-empty {
 }
 
 .mermaid-error {
-  padding: 10px;
-  color: #e99;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  padding: 12px 14px;
+  color: #d98a8a;
+  font: 12px var(--font-mono);
   white-space: pre-wrap;
-  background: rgba(220, 80, 80, 0.1);
+  background: rgba(217, 138, 138, 0.07);
+  border: 1px solid color-mix(in srgb, #d98a8a 40%, var(--border-soft));
+  border-radius: 8px;
+  text-align: left;
+}
+.mermaid-error-card { font: 13.5px/1.5 var(--font-ui); white-space: normal; }
+.doc .mermaid-error-message { margin: 0 0 8px; font-weight: 600; }
+.mermaid-error-card button {
+  margin-right: 6px;
+  padding: 4px 10px;
+  font: 12px var(--font-ui);
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
+  cursor: pointer;
+}
+.mermaid-error-card button:hover { background: var(--selection); }
+.doc .mermaid-error-source {
+  margin: 10px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  color: var(--muted);
+  font: 12.5px/1.5 var(--font-mono);
 }
 
 .pdf-document {

@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- A diagram that fails to render shows the error, a Show source toggle and Fix with AI, which proposes a corrected diagram in the usual diff review.
 - Diagram Fullscreen: opens the diagram over its note window with wheel zoom and drag to pan; Esc closes.
 - Diagrams show a toolbar on hover: zoom out, zoom in, Fit, Copy as PNG and Copy as SVG.
 - Code blocks in the preview show a Copy button on hover.

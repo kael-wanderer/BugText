@@ -57,7 +57,12 @@ import {
   highlightText,
 } from "./preview-find";
 
-export type WindowHandlers = {
+export type WindowViewHooks = {
+  canFixMermaid?: () => boolean;
+  onFixMermaid?: (windowId: string, tabId: string, line: number, code: string, error: string) => void;
+};
+
+export type WindowHandlers = WindowViewHooks & {
   graphIndex?: LinkIndex;
   onGraphOpen?: (windowId: string, path: string, newTab: boolean) => void;
   onGraphFolder?: () => void;
@@ -945,7 +950,13 @@ export function createWindowView(
         if (previewPane.querySelector(".mermaid-rendered")) {
           const { enhanceMermaid } = await import("./preview-mermaid");
           if (token !== previewRenderToken) return;
-          enhanceMermaid(previewPane, mermaidDeps);
+          enhanceMermaid(previewPane, {
+            ...mermaidDeps,
+            fix: h.onFixMermaid ? {
+              available: () => Boolean(documentId) && (h.canFixMermaid?.() ?? false),
+              run: (r) => { if (documentId) h.onFixMermaid!(windowId, documentId, r.line, r.code, r.error ?? ""); },
+            } : undefined,
+          });
         }
         restoreIfUnmoved();
       });

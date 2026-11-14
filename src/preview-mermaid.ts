@@ -1,4 +1,4 @@
-import type { MermaidResult } from "./render-extras";
+import { mermaidResult, type MermaidResult } from "./render-extras";
 import { svgToPngBlob } from "./capture";
 import { flashCopied } from "./copy-feedback";
 import { clampScale, STEP } from "./mermaid-zoom";
@@ -12,6 +12,37 @@ export type MermaidDeps = {
 };
 
 export function enhanceMermaid(root: ParentNode, deps: MermaidDeps): void {
+  for (const host of root.querySelectorAll<HTMLElement>(".mermaid-error:not(.mermaid-error-card)")) {
+    const result = mermaidResult(host);
+    if (!result) continue;
+    host.replaceChildren();
+    host.classList.add("mermaid-error-card");
+    const message = document.createElement("p");
+    message.className = "mermaid-error-message";
+    message.textContent = (result.error ?? "").split(/\r?\n/)[0].replace(/^Error: /, "");
+    const source = document.createElement("pre");
+    source.className = "mermaid-error-source";
+    source.textContent = result.code;
+    source.hidden = true;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.textContent = "Show source";
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.addEventListener("click", () => {
+      source.hidden = !source.hidden;
+      toggle.setAttribute("aria-expanded", String(!source.hidden));
+      toggle.textContent = source.hidden ? "Show source" : "Hide source";
+    });
+    host.append(message, toggle, source);
+    if (deps.fix?.available() && result.line !== null && result.code.trim()) {
+      const line = result.line;
+      const fix = document.createElement("button");
+      fix.type = "button";
+      fix.textContent = "Fix with AI";
+      fix.addEventListener("click", () => deps.fix!.run({ ...result, line }));
+      source.before(fix);
+    }
+  }
   for (const host of root.querySelectorAll<HTMLElement>(".mermaid-rendered")) {
     const svg = host.querySelector("svg");
     if (!svg || host.classList.contains("mermaid-error") || host.querySelector(".mermaid-toolbar")) continue;
