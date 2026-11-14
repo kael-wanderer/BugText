@@ -39,6 +39,7 @@ mod recovery;
 mod sandbox;
 mod secrets;
 mod templates;
+mod review_model;
 mod workflow_store;
 mod update_feed;
 
