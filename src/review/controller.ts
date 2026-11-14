@@ -3,7 +3,9 @@ import { REVIEW_ERROR, type ReviewAction, type ReviewItem, type ReviewRoute, typ
 
 export type ReviewDeps = {
   invoke<T>(command: string, args: Record<string, unknown>): Promise<T>;
-  folder(): string | null; files(): readonly string[]; complete(): boolean;
+  folder(): string | null;
+  /** The last folder listing and the folder it was taken from. */
+  listing(): { folder: string | null; files: readonly string[]; complete: boolean };
   exclude(): readonly string[]; enabled(): boolean;
   onChange(snapshot: ReviewSnapshot | null, error: string | null): void;
 };
@@ -26,9 +28,12 @@ export function createReviewController(deps: ReviewDeps) {
   async function scanOnce(): Promise<void> {
     const folder = deps.folder();
     if (!folder || !deps.enabled()) { cache = null; deps.onChange(null, null); return; }
-    const files = trackedFiles(deps.files(), folder, deps.exclude());
+    // A listing taken for another folder (a switch still loading) is not this folder's.
+    const listing = deps.listing();
+    if (listing.folder !== folder) return;
+    const { tracked: files, excluded } = trackedFiles(listing.files, folder, deps.exclude());
     try {
-      take(await deps.invoke<ReviewSnapshot>("review_scan", { folder, files, complete: deps.complete() }));
+      take(await deps.invoke<ReviewSnapshot>("review_scan", { folder, files, excluded }));
     } catch {
       if (deps.folder() === folder) fail();
     }

@@ -9,6 +9,7 @@ const snap = (folder: string, items: ReviewItem[] = []): ReviewSnapshot => ({ fo
 
 function setup(over: Partial<ReviewDeps> = {}) {
   let folder: string | null = "/r";
+  let listed: string | null = "/r";
   const onChange = vi.fn();
   const invoke = vi.fn(async (command: string, args: Record<string, unknown>): Promise<unknown> => {
     if (command === "review_scan") return snap(args.folder as string, [item("a.md")]);
@@ -17,10 +18,11 @@ function setup(over: Partial<ReviewDeps> = {}) {
   });
   const deps: ReviewDeps = {
     invoke: invoke as ReviewDeps["invoke"],
-    folder: () => folder, files: () => ["a.md", "b.pdf"], complete: () => true, exclude: () => [], enabled: () => true,
+    folder: () => folder, listing: () => ({ folder: listed, files: ["a.md", "b.pdf", "private/p.md"], complete: true }),
+    exclude: () => ["private/**"], enabled: () => true,
     onChange, ...over,
   };
-  return { controller: createReviewController(deps), invoke, onChange, setFolder: (f: string | null) => { folder = f; } };
+  return { controller: createReviewController(deps), invoke, onChange, setFolder: (f: string | null) => { folder = f; }, setListed: (f: string | null) => { listed = f; } };
 }
 
 describe("review controller", () => {
@@ -42,7 +44,7 @@ describe("review controller", () => {
     await first;
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(a.invoke.mock.calls.filter(c => c[0] === "review_scan")).toHaveLength(2);
-    expect(a.invoke.mock.calls[0][1]).toEqual({ folder: "/r", files: ["a.md"], complete: true });
+    expect(a.invoke.mock.calls[0][1]).toEqual({ folder: "/r", files: ["a.md"], excluded: ["private/p.md"] });
   });
 
   it("drops a result that arrives after the folder changed", async () => {
@@ -97,5 +99,13 @@ describe("review controller", () => {
     expect(a.invoke).toHaveBeenLastCalledWith("review_expect", { folder: "/r", paths: ["x/n.md", "y.md"], route: "mcp" });
     a.invoke.mockImplementationOnce(async () => { throw new Error("x"); });
     await expect(a.controller.expect(["y.md"], "cli")).resolves.toBeUndefined();
+  });
+
+  it("skips the scan while the file list belongs to another folder", async () => {
+    const a = setup();
+    a.setListed("/old");
+    await a.controller.scan();
+    expect(a.invoke).not.toHaveBeenCalled();
+    expect(a.onChange).not.toHaveBeenCalled();
   });
 });

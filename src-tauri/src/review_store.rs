@@ -8,7 +8,7 @@ use crate::files::write_atomic_raw;
 use crate::review_model::*;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -30,6 +30,8 @@ pub(crate) struct Active {
     /// No index existed when this folder was loaded: the first scan baselines every
     /// file, and the write hook stays out of the way until it has.
     pub baseline_pending: bool,
+    /// Notes the owner excluded from AI context (`context.exclude`): never tracked.
+    pub excluded: HashSet<String>,
 }
 
 pub(crate) struct Inner {
@@ -127,7 +129,7 @@ fn ensure<'a>(inner: &'a mut Inner, config: &Path, root: &Path, name: &str, now:
         let loaded = load_index(&dir)?;
         let baseline_pending = loaded.is_none();
         let index = loaded.unwrap_or(Index { version: 1, started_at: now, records: Default::default() });
-        inner.folders.insert(root.to_path_buf(), Active { root: root.to_path_buf(), dir, index, hints: HashMap::new(), name: name.to_string(), baseline_pending });
+        inner.folders.insert(root.to_path_buf(), Active { root: root.to_path_buf(), dir, index, hints: HashMap::new(), name: name.to_string(), baseline_pending, excluded: HashSet::new() });
     }
     let active = inner.folders.get_mut(root).ok_or(ERROR)?;
     active.name = name.to_string();
@@ -281,7 +283,9 @@ impl Copy {
 }
 
 /// Scan the folder's file list. Returns the snapshot and whether anything changed.
-pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], complete: bool, now: u64, reader: Reader) -> Result<(Snapshot, bool), String> {
+/// `files` may be stale, empty or capped, so it never removes a record: a record goes
+/// only when its file is gone from disk, is no longer tracked, or is in `excluded`.
+pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], excluded: &[String], now: u64, reader: Reader) -> Result<(Snapshot, bool), String> {
     let root = canonical_folder(folder)?;
     // 1. Copy what each record last saw.
     let (copies, dir, first, generation) = {
@@ -303,6 +307,12 @@ pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], complete: b
         let counted = copy.filter(|c| !first && c.current != found.digest).map(|c| c.counts(&dir, &found));
         seen.push((path.clone(), found, counted));
     }
+    // Records whose file is gone or no longer tracked, checked without the lock.
+    let gone: Vec<String> = copies.keys()
+        .filter(|path| !tracked(path) || !fs::symlink_metadata(root.join(path)).is_ok_and(|m| m.is_file()))
+        .cloned()
+        .collect();
+    let excluded: HashSet<String> = excluded.iter().filter(|p| valid_relative(p)).cloned().collect();
     // 3. Apply under the lock, skipping records that changed meanwhile.
     let mut inner = lock()?;
     if inner.generations.get(&root).copied().unwrap_or(0) != generation {
@@ -319,13 +329,14 @@ pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], complete: b
         apply_seen(active, path, found, first, *counted, now);
         if active.index.records.get(path) != before.as_ref() { dirty = true; }
     }
-    // 4. Forget deleted files, but only when the walk saw the whole folder.
-    if complete {
-        let keep: BTreeSet<&str> = files.iter().map(String::as_str).collect();
-        let count = active.index.records.len();
-        active.index.records.retain(|k, _| keep.contains(k.as_str()));
-        dirty |= count != active.index.records.len();
+    // 4. Forget deleted, untracked and excluded notes.
+    let count = active.index.records.len();
+    for path in &gone {
+        if active.index.records.get(path).map(Copy::of).as_ref() == copies.get(path) { active.index.records.remove(path); }
     }
+    active.index.records.retain(|k, _| !excluded.contains(k));
+    dirty |= count != active.index.records.len();
+    active.excluded = excluded;
     // 5. Drop unreferenced blobs and persist.
     if dirty {
         remove_unreferenced_blobs(active);
@@ -433,10 +444,10 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + 
 }
 
 #[tauri::command]
-pub async fn review_scan(app: AppHandle, folder: String, files: Vec<String>, complete: bool) -> Result<Snapshot, String> {
+pub async fn review_scan(app: AppHandle, folder: String, files: Vec<String>, excluded: Vec<String>) -> Result<Snapshot, String> {
     let config = config_dir(&app)?;
     blocking(move || {
-        let (snapshot, dirty) = scan_at(&config, &folder, &files, complete, now_ms(), &read_seen)?;
+        let (snapshot, dirty) = scan_at(&config, &folder, &files, &excluded, now_ms(), &read_seen)?;
         if dirty { emit(&snapshot); }
         Ok(snapshot)
     }).await
@@ -602,9 +613,9 @@ mod tests {
             fs::create_dir_all(p.parent().unwrap()).unwrap();
             fs::write(p, body).unwrap();
         }
-        pub fn scan(&self, files: &[&str], complete: bool) -> Snapshot {
+        pub fn scan(&self, files: &[&str]) -> Snapshot {
             let files: Vec<String> = files.iter().map(|s| s.to_string()).collect();
-            scan_at(&self.config, &self.f(), &files, complete, now_ms(), &read_seen).unwrap().0
+            scan_at(&self.config, &self.f(), &files, &[], now_ms(), &read_seen).unwrap().0
         }
         pub fn mark(&self, action: &str, items: &[(&str, &str)]) -> MarkResult {
             let items = items.iter().map(|(p, d)| MarkItem { path: p.to_string(), digest: d.to_string() }).collect();
@@ -626,52 +637,52 @@ mod tests {
     #[test] fn first_scan_baselines_everything_and_queues_nothing() {
         let e = env();
         e.put("a.md", b"a"); e.put("b/c.markdown", b"c"); e.put("d.html", b"<p>");
-        let s = e.scan(&["a.md", "b/c.markdown", "d.html"], true);
+        let s = e.scan(&["a.md", "b/c.markdown", "d.html"]);
         assert!(s.items.is_empty()); assert_eq!(s.tracked, 3);
         assert!(e.blobs().is_empty());
     }
     #[test] fn later_change_is_changed_without_text_until_marked() {
         let e = env();
         e.put("a.md", b"one");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"one\ntwo");
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         let i = item(&s, "a.md").unwrap();
         assert_eq!((i.state, i.has_text, i.added), (State::Changed, false, None));
         let digest = i.digest.clone();
         let r = e.mark("reviewed", &[("a.md", &digest)]);
         assert!(r.stale.is_empty() && r.snapshot.items.is_empty());
         e.put("a.md", b"one\ntwo\nthree");
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         let i = item(&s, "a.md").unwrap();
         assert_eq!((i.state, i.has_text, i.added, i.removed), (State::Changed, true, Some(1), Some(0)));
     }
     #[test] fn new_file_after_baseline_is_new() {
         let e = env();
-        e.scan(&[], true);
+        e.scan(&[]);
         e.put("n.md", b"x\ny");
-        let s = e.scan(&["n.md"], true);
+        let s = e.scan(&["n.md"]);
         let i = item(&s, "n.md").unwrap();
         assert_eq!((i.state, i.added, i.removed, i.has_text), (State::New, Some(2), Some(0), false));
     }
     #[test] fn unchanged_mtime_and_size_is_not_rehashed() {
         let e = env();
         e.put("a.md", b"a"); e.put("b.md", b"bb");
-        e.scan(&["a.md", "b.md"], true);
+        e.scan(&["a.md", "b.md"]);
         let count = Cell::new(0);
         let counting = |root: &Path, rel: &str| { count.set(count.get() + 1); read_seen(root, rel) };
         let files = vec!["a.md".to_string(), "b.md".to_string()];
-        scan_at(&e.config, &e.f(), &files, true, now_ms(), &counting).unwrap();
+        scan_at(&e.config, &e.f(), &files, &[], now_ms(), &counting).unwrap();
         assert_eq!(count.get(), 0);
     }
     #[test] fn renamed_file_keeps_its_record() {
         let e = env();
         e.put("a.md", b"one");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"two!");
-        let before = item(&e.scan(&["a.md"], true), "a.md").unwrap().clone();
+        let before = item(&e.scan(&["a.md"]), "a.md").unwrap().clone();
         fs::rename(e.folder.join("a.md"), e.folder.join("b.md")).unwrap();
-        let s = e.scan(&["b.md"], true);
+        let s = e.scan(&["b.md"]);
         assert!(item(&s, "a.md").is_none());
         let i = item(&s, "b.md").unwrap();
         assert_eq!((i.state, &i.digest, i.reviewed_at), (State::Changed, &before.digest, before.reviewed_at));
@@ -680,25 +691,46 @@ mod tests {
     #[test] fn duplicate_of_a_reviewed_file_is_reviewed() {
         let e = env();
         e.put("a.md", b"same");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("copy.md", b"same");
-        let s = e.scan(&["a.md", "copy.md"], true);
+        let s = e.scan(&["a.md", "copy.md"]);
         assert!(s.items.is_empty()); assert_eq!(s.tracked, 2);
     }
-    #[test] fn deleted_file_is_removed_only_when_complete() {
+    #[test] fn deleted_file_record_is_removed() {
         let e = env();
         e.put("a.md", b"a"); e.put("b.md", b"b");
-        e.scan(&["a.md", "b.md"], true);
+        e.scan(&["a.md", "b.md"]);
         fs::remove_file(e.folder.join("b.md")).unwrap();
-        assert_eq!(e.scan(&["a.md"], false).tracked, 2);
-        assert_eq!(e.scan(&["a.md"], true).tracked, 1);
+        assert_eq!(e.scan(&["a.md"]).tracked, 1);
+    }
+    #[test] fn empty_or_partial_list_keeps_records() {
+        let e = env();
+        e.put("a.md", b"a"); e.put("b.md", b"b");
+        e.scan(&["a.md", "b.md"]);
+        e.put("a.md", b"ab");
+        let s = e.scan(&["a.md"]);
+        assert_eq!(s.tracked, 2);
+        let s = e.scan(&[]);
+        assert_eq!(s.tracked, 2);
+        assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
+    }
+    #[test] fn excluded_note_leaves_the_queue() {
+        let e = env();
+        e.put("a.md", b"a"); e.put("private/p.md", b"p");
+        e.scan(&["a.md", "private/p.md"]);
+        e.put("private/p.md", b"pp");
+        assert!(item(&e.scan(&["a.md", "private/p.md"]), "private/p.md").is_some());
+        let files = vec!["a.md".to_string()];
+        let (s, _) = scan_at(&e.config, &e.f(), &files, &["private/p.md".to_string()], now_ms(), &read_seen).unwrap();
+        assert!(item(&s, "private/p.md").is_none());
+        assert_eq!(s.tracked, 1);
     }
     #[test] fn mark_reviewed_refuses_a_stale_digest() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"ab");
-        let digest = item(&e.scan(&["a.md"], true), "a.md").unwrap().digest.clone();
+        let digest = item(&e.scan(&["a.md"]), "a.md").unwrap().digest.clone();
         e.put("a.md", b"abc");
         let r = e.mark("reviewed", &[("a.md", &digest)]);
         assert_eq!(r.stale, vec!["a.md".to_string()]);
@@ -707,12 +739,12 @@ mod tests {
     #[test] fn hint_sets_the_route_once() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         expect_at(&e.f(), &["a.md".to_string()], Route::Cli, now_ms()).unwrap();
         e.put("a.md", b"ab");
-        assert_eq!(item(&e.scan(&["a.md"], true), "a.md").unwrap().route, Route::Cli);
+        assert_eq!(item(&e.scan(&["a.md"]), "a.md").unwrap().route, Route::Cli);
         e.put("a.md", b"abc");
-        assert_eq!(item(&e.scan(&["a.md"], true), "a.md").unwrap().route, Route::Outside);
+        assert_eq!(item(&e.scan(&["a.md"]), "a.md").unwrap().route, Route::Outside);
     }
     #[test] fn symlink_and_dotdot_are_never_read() {
         let e = env();
@@ -724,7 +756,7 @@ mod tests {
         let count = Cell::new(0);
         let counting = |root: &Path, rel: &str| { let r = read_seen(root, rel); if r.is_some() { count.set(count.get() + 1); } r };
         let files = vec!["link.md".to_string(), "../x.md".to_string(), "dir/x.md".to_string()];
-        let (s, _) = scan_at(&e.config, &e.f(), &files, true, now_ms(), &counting).unwrap();
+        let (s, _) = scan_at(&e.config, &e.f(), &files, &[], now_ms(), &counting).unwrap();
         assert_eq!((s.tracked, count.get()), (0, 0));
         assert!(read_seen(&e.folder, "../outside/x.md").is_none());
     }
@@ -735,17 +767,17 @@ mod tests {
             let path = e.index_path();
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, body).unwrap();
-            let r = scan_at(&e.config, &e.f(), &["a.md".to_string()], true, now_ms(), &read_seen);
+            let r = scan_at(&e.config, &e.f(), &["a.md".to_string()], &[], now_ms(), &read_seen);
             assert_eq!(r.err().as_deref(), Some(ERROR));
             assert_eq!(fs::read(&path).unwrap(), body);
         }
     }
     #[test] fn large_and_binary_files_are_digest_only() {
         let e = env();
-        e.scan(&[], true);
+        e.scan(&[]);
         e.put("big.md", &vec![b'a'; 2_000_001]);
         e.put("x.md", &[0xff, 0xfe]);
-        let s = e.scan(&["big.md", "x.md"], true);
+        let s = e.scan(&["big.md", "x.md"]);
         for p in ["big.md", "x.md"] {
             let i = item(&s, p).unwrap();
             assert_eq!((i.state, i.has_text, i.added, i.removed), (State::New, false, None, None));
@@ -759,33 +791,33 @@ mod tests {
     #[test] fn unreferenced_blobs_are_removed() {
         let e = env();
         e.put("a.md", b"1");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"22");
-        let d2 = item(&e.scan(&["a.md"], true), "a.md").unwrap().digest.clone();
+        let d2 = item(&e.scan(&["a.md"]), "a.md").unwrap().digest.clone();
         e.mark("reviewed", &[("a.md", &d2)]);
         assert_eq!(e.blobs(), vec![format!("{d2}.txt")]);
         e.put("a.md", b"333");
-        let d3 = item(&e.scan(&["a.md"], true), "a.md").unwrap().digest.clone();
+        let d3 = item(&e.scan(&["a.md"]), "a.md").unwrap().digest.clone();
         e.mark("reviewed", &[("a.md", &d3)]);
         e.put("a.md", b"4444");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         assert_eq!(e.blobs(), vec![format!("{d3}.txt")]);
     }
     #[test] fn reset_keeps_the_broken_index_and_rebaselines() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         let path = e.index_path();
         fs::write(&path, "bad").unwrap();
         close_at(&e.f());
-        assert!(scan_at(&e.config, &e.f(), &["a.md".to_string()], true, now_ms(), &read_seen).is_err());
+        assert!(scan_at(&e.config, &e.f(), &["a.md".to_string()], &[], now_ms(), &read_seen).is_err());
         reset_at(&e.config, &e.f(), now_ms()).unwrap();
         let backups: Vec<_> = fs::read_dir(path.parent().unwrap()).unwrap().filter_map(|x| x.ok())
             .filter(|x| x.file_name().to_string_lossy().starts_with("index.broken-")).collect();
         assert_eq!(backups.len(), 1);
         assert_eq!(fs::read(backups[0].path()).unwrap(), b"bad");
         e.put("a.md", b"ab");
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         assert!(s.items.is_empty()); assert_eq!(s.tracked, 1);
     }
 }
@@ -796,7 +828,7 @@ mod hook_tests {
     use super::*;
     use crate::files::{create_file_at, write_atomic_at};
 
-    fn snap(e: &Env) -> Snapshot { scan_at(&e.config, &e.f(), &[], false, now_ms(), &read_seen).unwrap().0 }
+    fn snap(e: &Env) -> Snapshot { scan_at(&e.config, &e.f(), &[], &[], now_ms(), &read_seen).unwrap().0 }
     fn save(e: &Env, rel: &str, body: &str) { write_atomic_at(&e.folder.canonicalize().unwrap().join(rel), body.as_bytes()).unwrap(); }
     fn record(e: &Env, rel: &str) -> Option<Record> {
         let root = e.folder.canonicalize().unwrap();
@@ -806,9 +838,9 @@ mod hook_tests {
     #[test] fn own_save_of_a_reviewed_note_stays_reviewed_and_stores_text() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         save(&e, "a.md", "a\nb");
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         assert!(s.items.is_empty());
         let r = record(&e, "a.md").unwrap();
         assert!(r.stored && !r.baseline);
@@ -817,41 +849,41 @@ mod hook_tests {
     #[test] fn own_save_of_a_changed_note_stays_changed() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"ab");
         let reviewed = record(&e, "a.md").unwrap().reviewed;
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         save(&e, "a.md", "abc");
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
         assert_eq!(record(&e, "a.md").unwrap().reviewed, reviewed);
     }
     #[test] fn unseen_outside_change_then_own_save_is_changed() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         let reviewed = record(&e, "a.md").unwrap().reviewed;
         e.put("a.md", b"outside");
         save(&e, "a.md", "outside + typing");
         let s = snap(&e);
         assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
         assert_eq!(record(&e, "a.md").unwrap().reviewed, reviewed);
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         assert_eq!(item(&s, "a.md").unwrap().state, State::Changed);
     }
     #[test] fn note_created_by_the_app_is_reviewed() {
         let e = env();
-        e.scan(&[], true);
+        e.scan(&[]);
         let path = e.folder.join("n.md");
         create_file_at(&path.to_string_lossy()).unwrap();
         save(&e, "n.md", "# hi");
         let s = snap(&e);
         assert!(s.items.is_empty()); assert_eq!(s.tracked, 1);
-        assert!(e.scan(&["n.md"], true).items.is_empty());
+        assert!(e.scan(&["n.md"]).items.is_empty());
     }
     #[test] fn unseen_outside_file_then_own_save_is_new() {
         let e = env();
-        e.scan(&[], true);
+        e.scan(&[]);
         e.put("o.md", b"from outside");
         save(&e, "o.md", "from outside, edited");
         assert_eq!(item(&snap(&e), "o.md").unwrap().state, State::New);
@@ -859,7 +891,7 @@ mod hook_tests {
     #[test] fn hinted_write_counts_as_mcp_not_owner() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         expect_at(&e.f(), &["a.md".to_string()], Route::Mcp, now_ms()).unwrap();
         save(&e, "a.md", "mcp wrote this");
         let s = snap(&e);
@@ -879,7 +911,7 @@ mod hook_tests {
     #[test] fn save_succeeds_when_review_data_is_broken() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         let index = e.index_path();
         fs::remove_file(&index).unwrap();
         fs::create_dir_all(&index).unwrap(); // the index can no longer be written
@@ -893,9 +925,9 @@ mod hook_tests {
         std::thread::spawn(move || {
             fs::write(config.join("n.md"), "a").unwrap();
             let folder = config.to_string_lossy().into_owned();
-            scan_at(&config, &folder, &["n.md".to_string()], true, now_ms(), &read_seen).unwrap();
+            scan_at(&config, &folder, &["n.md".to_string()], &[], now_ms(), &read_seen).unwrap();
             write_atomic_at(&config.canonicalize().unwrap().join("n.md"), b"b").unwrap();
-            scan_at(&config, &folder, &["n.md".to_string()], true, now_ms(), &read_seen).unwrap();
+            scan_at(&config, &folder, &["n.md".to_string()], &[], now_ms(), &read_seen).unwrap();
             tx.send(()).unwrap();
         });
         rx.recv_timeout(std::time::Duration::from_secs(5)).expect("deadlock");
@@ -920,21 +952,21 @@ mod review_fix_tests {
             read_seen(r, rel)
         };
         let files = vec!["a.md".to_string(), "b.md".to_string()];
-        let (s, _) = scan_at(&e.config, &e.f(), &files, true, now_ms(), &reader).unwrap();
+        let (s, _) = scan_at(&e.config, &e.f(), &files, &[], now_ms(), &reader).unwrap();
         assert!(s.items.is_empty(), "{:?}", s.items);
         assert_eq!(s.tracked, 2);
-        assert!(e.scan(&["a.md", "b.md"], true).items.is_empty());
+        assert!(e.scan(&["a.md", "b.md"]).items.is_empty());
     }
 
     #[test] fn touch_only_change_keeps_the_mcp_hint() {
         let e = env();
         e.put("a.md", b"same");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         std::thread::sleep(std::time::Duration::from_millis(20));
         e.put("a.md", b"same"); // mtime moves, content does not
         expect_at(&e.f(), &["a.md".to_string()], Route::Mcp, now_ms()).unwrap();
         write_atomic_at(&root(&e).join("a.md"), b"written by mcp").unwrap();
-        let s = e.scan(&["a.md"], true);
+        let s = e.scan(&["a.md"]);
         let i = item(&s, "a.md").expect("MCP edit must be queued");
         assert_eq!((i.state, i.route), (State::Changed, Route::Mcp));
     }
@@ -942,11 +974,11 @@ mod review_fix_tests {
     #[test] fn close_during_a_scan_is_not_undone() {
         let e = env();
         e.put("a.md", b"a");
-        e.scan(&["a.md"], true);
+        e.scan(&["a.md"]);
         e.put("a.md", b"ab");
         let folder = e.f();
         let reader = |r: &Path, rel: &str| { close_at(&folder); read_seen(r, rel) };
-        let _ = scan_at(&e.config, &e.f(), &["a.md".to_string()], true, now_ms(), &reader);
+        let _ = scan_at(&e.config, &e.f(), &["a.md".to_string()], &[], now_ms(), &reader);
         assert!(!global().lock().unwrap().folders.contains_key(&root(&e)));
     }
 }

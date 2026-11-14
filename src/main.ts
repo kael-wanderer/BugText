@@ -350,6 +350,8 @@ async function rescanClis(): Promise<void> {
 }
 let aiPanel: AIPanel | null = null;
 let fileList: string[] = [];
+/** The folder `fileList` was listed from; it lags behind a folder switch. */
+let fileListFolder: string | null = null;
 let indexedFolder: string | null = null;
 let tabSeq = 0;
 const nextId = () => `t${++tabSeq}`;
@@ -579,8 +581,7 @@ const reviewListeners: ((snapshot: ReviewSnapshot | null, error: string | null) 
 const review = createReviewController({
   invoke: (command, args) => invoke(command, args),
   folder: () => getState().folder,
-  files: () => fileList,
-  complete: () => !linkIndex.capped,
+  listing: () => ({ folder: fileListFolder, files: fileList, complete: !linkIndex.capped }),
   exclude: () => currentAISettings.context.exclude,
   enabled: () => currentSettings.review.track,
   onChange(snapshot, error) {
@@ -890,8 +891,9 @@ void listenScoped<McpRequest>("bugtext://mcp-request", async ({ payload }) => {
 
 async function refreshFileList(): Promise<void> {
   const folder = getState().folder;
-  const files = folder ? await listFilesRecursive(folder).catch(() => []) : [];
-  if (getState().folder === folder) fileList = files;
+  let listed = true;
+  const files = folder ? await listFilesRecursive(folder).catch(() => { listed = false; return []; }) : [];
+  if (getState().folder === folder) { fileList = files; fileListFolder = listed ? folder : null; }
 }
 
 // Opening a settings file shows it as a tab, so leave the settings screen first.
