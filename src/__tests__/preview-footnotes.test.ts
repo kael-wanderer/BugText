@@ -20,6 +20,7 @@ it("leaves a reference without a definition as text", () => {
   const html = renderMarkdown("Lonely[^x].");
   expect(html).toContain("[^x]");
   expect(html).not.toContain("footnotes");
+  expect(html).not.toContain("footnote-ref");
 });
 it("sanitizes a definition", () => {
   const html = renderMarkdown('A[^a]\n\n[^a]: <img src=x onerror="evil()"><script>evil()</script>');
@@ -40,4 +41,25 @@ it("jumps both ways and keeps the click from other handlers", () => {
   root.querySelector<HTMLElement>('[data-anchor="fn-2"] .footnote-backref')!.click();
   expect(scrolled[1]).toBe(root.querySelector('[data-anchor="fnref-2"]'));
   expect(outer).not.toHaveBeenCalled();
+});
+
+it("ignores a heading with the same anchor as a footnote target", () => {
+  const root = document.createElement("article");
+  root.innerHTML = renderMarkdown("# fn-1\n\n" + SRC);
+  document.body.append(root);
+  const scrolled: Element[] = [];
+  Element.prototype.scrollIntoView = function () { scrolled.push(this); };
+  enhanceFootnotes(root);
+  root.querySelector<HTMLElement>("sup.footnote-ref a")!.click();
+  expect(scrolled).toEqual([root.querySelector('.footnotes li[data-anchor="fn-1"]')]);
+});
+it("ignores a heading with the same anchor as a return reference", () => {
+  const root = document.createElement("article");
+  root.innerHTML = renderMarkdown("# fnref-1\n\n" + SRC);
+  document.body.append(root);
+  const scrolled: Element[] = [];
+  Element.prototype.scrollIntoView = function () { scrolled.push(this); };
+  enhanceFootnotes(root);
+  root.querySelector<HTMLElement>(".footnote-backref")!.click();
+  expect(scrolled).toEqual([root.querySelector('sup.footnote-ref[data-anchor="fnref-1"]')]);
 });

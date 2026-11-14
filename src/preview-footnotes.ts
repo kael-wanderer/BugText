@@ -29,7 +29,10 @@ export function enhanceFootnotes(root: HTMLElement): void {
       event.preventDefault();
       event.stopPropagation();
       const name = (link.getAttribute("href") ?? "").slice(1);
-      root.querySelector(`[data-anchor="${CSS.escape(name)}"]`)?.scrollIntoView({ block: "center" });
+      const target = link.classList.contains("footnote-backref")
+        ? `sup.footnote-ref[data-anchor="${CSS.escape(name)}"]`
+        : `.footnotes [data-anchor="${CSS.escape(name)}"]`;
+      root.querySelector(target)?.scrollIntoView({ block: "center" });
     });
   }
 }

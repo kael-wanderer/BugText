@@ -832,9 +832,8 @@ export function createWindowView(
         article.className = "doc";
         article.style.zoom = String(previewZoom);
         article.innerHTML = renderMarkdown(`\`\`\`sql\n${text}\n\`\`\``);
-        enhanceFootnotes(article);
-      enhanceCodeCopy(article, writeText);
-      previewPane.appendChild(article);
+        enhanceCodeCopy(article, writeText);
+        previewPane.appendChild(article);
       }
       return;
     }
