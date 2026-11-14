@@ -32,3 +32,7 @@ it("wraps the diff as untrusted content in the prompt", () => {
 it("a diff holding a fence cannot close the prompt's fence", () => {
   expect(explainPrompt("a.md", "+```\n+evil", false)).toContain("````diff\n+```\n+evil\n````");
 });
+it("does not diff texts too large for the line diff", () => {
+  const big = "x\n".repeat(5000);
+  expect(diffForPrompt(big, big + "y", 10_000)).toEqual({ text: "", cut: true });
+});

@@ -27,14 +27,22 @@ pub(crate) struct Active {
     pub hints: HashMap<String, (Route, u64)>,
     /// The folder string the frontend uses, echoed back in snapshots.
     pub name: String,
+    /// No index existed when this folder was loaded: the first scan baselines every
+    /// file, and the write hook stays out of the way until it has.
+    pub baseline_pending: bool,
 }
 
-pub(crate) struct Inner { pub app: Option<AppHandle>, pub folders: HashMap<PathBuf, Active> }
+pub(crate) struct Inner {
+    pub app: Option<AppHandle>,
+    pub folders: HashMap<PathBuf, Active>,
+    /// Raised per folder by close and reset, so a scan in flight does not bring it back.
+    pub generations: HashMap<PathBuf, u64>,
+}
 
 static GLOBAL: OnceLock<Mutex<Inner>> = OnceLock::new();
 
 pub(crate) fn global() -> &'static Mutex<Inner> {
-    GLOBAL.get_or_init(|| Mutex::new(Inner { app: None, folders: HashMap::new() }))
+    GLOBAL.get_or_init(|| Mutex::new(Inner { app: None, folders: HashMap::new(), generations: HashMap::new() }))
 }
 
 fn lock() -> Result<MutexGuard<'static, Inner>, String> { global().lock().map_err(|_| ERROR.to_string()) }
@@ -116,12 +124,14 @@ fn load_index(dir: &Path) -> Result<Option<Index>, String> {
 fn ensure<'a>(inner: &'a mut Inner, config: &Path, root: &Path, name: &str, now: u64) -> Result<(&'a mut Active, bool), String> {
     if !inner.folders.contains_key(root) {
         let dir = review_dir(config, root)?;
-        let index = load_index(&dir)?.unwrap_or(Index { version: 1, started_at: now, records: Default::default() });
-        inner.folders.insert(root.to_path_buf(), Active { root: root.to_path_buf(), dir, index, hints: HashMap::new(), name: name.to_string() });
+        let loaded = load_index(&dir)?;
+        let baseline_pending = loaded.is_none();
+        let index = loaded.unwrap_or(Index { version: 1, started_at: now, records: Default::default() });
+        inner.folders.insert(root.to_path_buf(), Active { root: root.to_path_buf(), dir, index, hints: HashMap::new(), name: name.to_string(), baseline_pending });
     }
     let active = inner.folders.get_mut(root).ok_or(ERROR)?;
     active.name = name.to_string();
-    let first = !active.dir.join("index.json").exists();
+    let first = active.baseline_pending;
     Ok((active, first))
 }
 
@@ -207,16 +217,25 @@ fn take_hint(active: &mut Active, path: &str, now: u64) -> Option<Route> {
 
 /// Applies a change seen on disk that no BugText write explains: the shared core
 /// of scan step 3 and the write hook's catch-up.
-pub(crate) fn apply_seen(active: &mut Active, path: &str, seen: &Seen, first: bool, now: u64) {
+/// `counted` holds line counts computed outside the lock; None reads the base here.
+pub(crate) fn apply_seen(active: &mut Active, path: &str, seen: &Seen, first: bool, counted: Option<Counts>, now: u64) {
     if first {
         active.index.records.insert(path.to_string(), baseline(seen, now));
         return;
     }
+    if let Some(record) = active.index.records.get_mut(path) {
+        if record.current == seen.digest {
+            // Only the timestamp moved: keep any route hint for the real change.
+            record.mtime_ms = seen.mtime_ms;
+            record.size = seen.size;
+            return;
+        }
+    }
     let route = take_hint(active, path, now).unwrap_or(Route::Outside);
     if let Some(record) = active.index.records.get(path) {
-        let base = base_text(&active.dir, record);
+        let counted = counted.unwrap_or_else(|| counts(record.reviewed.is_some(), seen, base_text(&active.dir, record).as_deref()));
         if let Some(record) = active.index.records.get_mut(path) {
-            outside_change(record, seen, base.as_deref(), route, now);
+            outside_change_counted(record, seen, counted, route, now);
         }
         return;
     }
@@ -245,34 +264,59 @@ pub(crate) fn apply_seen(active: &mut Active, path: &str, seen: &Seen, first: bo
 
 type Reader<'a> = &'a dyn Fn(&Path, &str) -> Option<Seen>;
 
+/// What a record looked like when a scan or write started; used to detect a change
+/// made meanwhile and to diff against the reviewed text without the lock.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Copy { mtime_ms: u64, size: u64, current: String, reviewed: Option<String>, stored: bool }
+
+impl Copy {
+    fn of(r: &Record) -> Copy {
+        Copy { mtime_ms: r.mtime_ms, size: r.size, current: r.current.clone(), reviewed: r.reviewed.clone(), stored: r.stored }
+    }
+    /// Line counts for `seen` against the stored reviewed text. Reads and diffs: call without the lock.
+    fn counts(&self, dir: &Path, seen: &Seen) -> Counts {
+        let base = if self.stored { self.reviewed.as_deref().and_then(|d| read_blob(dir, d)) } else { None };
+        counts(self.reviewed.is_some(), seen, base.as_deref())
+    }
+}
+
 /// Scan the folder's file list. Returns the snapshot and whether anything changed.
 pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], complete: bool, now: u64, reader: Reader) -> Result<(Snapshot, bool), String> {
     let root = canonical_folder(folder)?;
     // 1. Copy what each record last saw.
-    let copies: HashMap<String, (u64, u64, String)> = {
+    let (copies, dir, first, generation) = {
         let mut inner = lock()?;
-        let (active, _) = ensure(&mut inner, config, &root, folder, now)?;
-        active.index.records.iter().map(|(k, r)| (k.clone(), (r.mtime_ms, r.size, r.current.clone()))).collect()
+        let generation = inner.generations.get(&root).copied().unwrap_or(0);
+        let (active, first) = ensure(&mut inner, config, &root, folder, now)?;
+        let copies: HashMap<String, Copy> = active.index.records.iter().map(|(k, r)| (k.clone(), Copy::of(r))).collect();
+        (copies, active.dir.clone(), first, generation)
     };
-    // 2. Stat everything, read only what changed, holding no lock.
-    let mut seen: Vec<(String, Seen)> = Vec::new();
+    // 2. Stat everything, read and diff only what changed, holding no lock.
+    let mut seen: Vec<(String, Seen, Option<Counts>)> = Vec::new();
     for path in files {
         if !valid_relative(path) || !tracked(path) { continue; }
         let Ok(meta) = fs::symlink_metadata(root.join(path)) else { continue };
         if !meta.is_file() { continue; }
-        let unchanged = copies.get(path).is_some_and(|(m, s, _)| *m == mtime_ms(&meta) && *s == meta.len());
-        if unchanged { continue; }
-        if let Some(found) = reader(&root, path) { seen.push((path.clone(), found)); }
+        let copy = copies.get(path);
+        if copy.is_some_and(|c| c.mtime_ms == mtime_ms(&meta) && c.size == meta.len()) { continue; }
+        let Some(found) = reader(&root, path) else { continue };
+        let counted = copy.filter(|c| !first && c.current != found.digest).map(|c| c.counts(&dir, &found));
+        seen.push((path.clone(), found, counted));
     }
     // 3. Apply under the lock, skipping records that changed meanwhile.
     let mut inner = lock()?;
-    let (active, first) = ensure(&mut inner, config, &root, folder, now)?;
+    if inner.generations.get(&root).copied().unwrap_or(0) != generation {
+        // The folder was closed or reset while this scan ran: do not bring it back.
+        return Ok((Snapshot { folder: folder.to_string(), tracked: 0, started_at: now, items: Vec::new() }, false));
+    }
+    let (active, still_first) = ensure(&mut inner, config, &root, folder, now)?;
+    let first = first && still_first;
     let mut dirty = first;
-    for (path, found) in &seen {
-        let now_copy = active.index.records.get(path).map(|r| (r.mtime_ms, r.size, r.current.clone()));
+    for (path, found, counted) in &seen {
+        let now_copy = active.index.records.get(path).map(Copy::of);
         if now_copy.as_ref() != copies.get(path) { continue; }
         let before = active.index.records.get(path).cloned();
-        apply_seen(active, path, found, first, now);
+        apply_seen(active, path, found, first, *counted, now);
         if active.index.records.get(path) != before.as_ref() { dirty = true; }
     }
     // 4. Forget deleted files, but only when the walk saw the whole folder.
@@ -287,6 +331,7 @@ pub(crate) fn scan_at(config: &Path, folder: &str, files: &[String], complete: b
         remove_unreferenced_blobs(active);
         persist(active)?;
     }
+    active.baseline_pending = false;
     Ok((snapshot(folder, active), dirty))
 }
 
@@ -350,6 +395,7 @@ pub(crate) fn reset_at(config: &Path, folder: &str, now: u64) -> Result<Snapshot
     let root = canonical_folder(folder)?;
     let mut inner = lock()?;
     inner.folders.remove(&root);
+    *inner.generations.entry(root.clone()).or_default() += 1;
     let dir = review_dir(config, &root)?;
     let index = dir.join("index.json");
     if fs::symlink_metadata(&index).is_ok() {
@@ -364,7 +410,10 @@ pub(crate) fn reset_at(config: &Path, folder: &str, now: u64) -> Result<Snapshot
 
 pub(crate) fn close_at(folder: &str) {
     let Ok(root) = canonical_folder(folder) else { return };
-    if let Ok(mut inner) = global().lock() { inner.folders.remove(&root); }
+    if let Ok(mut inner) = global().lock() {
+        inner.folders.remove(&root);
+        *inner.generations.entry(root).or_default() += 1;
+    }
 }
 
 pub(crate) fn emit(snapshot: &Snapshot) {
@@ -452,60 +501,82 @@ fn relative_of(root: &Path, target: &Path) -> Option<String> {
 /// an active folder. Never fails: any problem means "do nothing".
 pub(crate) fn before_write(target: &Path) -> Option<Ticket> {
     let target = locate(target)?;
-    let (root, relative, copy) = {
+    let (root, relative, copy, dir) = {
         let inner = global().lock().ok()?;
         let active = inner.folders.values().find(|a| target.starts_with(&a.root))?;
+        // Until the first scan has baselined the folder, that scan records this file too.
+        if active.baseline_pending { return None; }
         let relative = relative_of(&active.root, &target)?;
-        let copy = active.index.records.get(&relative).map(|r| (r.mtime_ms, r.size));
-        (active.root.clone(), relative, copy)
+        let copy = active.index.records.get(&relative).map(Copy::of);
+        (active.root.clone(), relative, copy, active.dir.clone())
     };
     let meta = fs::symlink_metadata(&target).ok().filter(|m| m.is_file());
     let existed = meta.is_some();
     // The disk holds a change no scan has seen yet: record it before our write hides it.
-    let unseen = meta.as_ref().is_some_and(|m| copy != Some((mtime_ms(m), m.len())));
+    let unseen = meta.as_ref().is_some_and(|m| copy.as_ref().is_none_or(|c| (c.mtime_ms, c.size) != (mtime_ms(m), m.len())));
     let seen = if unseen { read_seen(&root, &relative) } else { None };
+    let counted = match (&copy, &seen) {
+        (Some(c), Some(found)) if c.current != found.digest => Some(c.counts(&dir, found)),
+        _ => None,
+    };
     let mut inner = global().lock().ok()?;
     let active = inner.folders.get_mut(&root)?;
     let before = summary(active.index.records.get(&relative));
     if let Some(seen) = seen {
-        let still = active.index.records.get(&relative).map(|r| (r.mtime_ms, r.size));
-        if still == copy {
-            apply_seen(active, &relative, &seen, false, now_ms());
+        if active.index.records.get(&relative).map(Copy::of) == copy {
+            apply_seen(active, &relative, &seen, false, counted, now_ms());
             let _ = persist(active);
         }
     }
     Some(Ticket { root, relative, existed, before })
 }
 
-/// Called after BugText's write succeeded. Never fails.
+/// Called after BugText's write succeeded. Never fails. Reading and diffing happen
+/// without the lock; only the record update and the index write hold it.
 pub(crate) fn after_write(ticket: Option<Ticket>) {
     let Some(ticket) = ticket else { return };
     let Some(seen) = read_seen(&ticket.root, &ticket.relative) else { return };
+    let path = ticket.relative.as_str();
+    let (copy, dir) = {
+        let Ok(inner) = global().lock() else { return };
+        let Some(active) = inner.folders.get(&ticket.root) else { return };
+        (active.index.records.get(path).map(Copy::of), active.dir.clone())
+    };
+    let counted = copy.as_ref().filter(|c| c.current != seen.digest).map(|c| c.counts(&dir, &seen));
     let now = now_ms();
-    let snapshot = {
+    let (snapshot, blob) = {
         let Ok(mut inner) = global().lock() else { return };
         let Some(active) = inner.folders.get_mut(&ticket.root) else { return };
-        let path = ticket.relative.as_str();
-        let hint = take_hint(active, path, now);
-        let base = active.index.records.get(path).and_then(|r| base_text(&active.dir, r));
-        match (active.index.records.get_mut(path), hint) {
-            (Some(record), Some(route)) => outside_change(record, &seen, base.as_deref(), route, now),
-            (None, Some(route)) => { active.index.records.insert(path.to_string(), new_record(&seen, route, now)); }
-            (Some(record), None) => {
-                if owner_write(record, &seen, base.as_deref(), now) { store_blob(&active.dir, &seen); }
+        let unchanged = active.index.records.get(path).map(Copy::of) == copy;
+        let counted = match (unchanged, counted) {
+            (true, Some(c)) => c,
+            _ => {
+                let record = active.index.records.get(path);
+                let base = record.and_then(|r| base_text(&active.dir, r));
+                counts(record.is_some_and(|r| r.reviewed.is_some()), &seen, base.as_deref())
             }
+        };
+        let hint = take_hint(active, path, now);
+        let mut blob = false;
+        match (active.index.records.get_mut(path), hint) {
+            (Some(record), Some(route)) => outside_change_counted(record, &seen, counted, route, now),
+            (None, Some(route)) => { active.index.records.insert(path.to_string(), new_record(&seen, route, now)); }
+            (Some(record), None) => blob = owner_write_counted(record, &seen, counted, now),
             (None, None) => {
                 let record = owner_created(&seen, now);
-                if record.stored { store_blob(&active.dir, &seen); }
+                blob = record.stored;
                 active.index.records.insert(path.to_string(), record);
             }
         }
         let _ = persist(active);
         let after = summary(active.index.records.get(path));
-        if ticket.existed && after == ticket.before { return; }
-        snapshot(&active.name, active)
+        let snapshot = (!ticket.existed || after != ticket.before).then(|| snapshot(&active.name, active));
+        (snapshot, blob.then(|| active.dir.clone()))
     };
-    emit(&snapshot);
+    // Blobs are named by digest and kept while a record refers to them, so writing
+    // one after the lock is released is safe.
+    if let Some(dir) = blob { store_blob(&dir, &seen); }
+    if let Some(snapshot) = snapshot { emit(&snapshot); }
 }
 
 #[cfg(test)]
@@ -828,5 +899,54 @@ mod hook_tests {
             tx.send(()).unwrap();
         });
         rx.recv_timeout(std::time::Duration::from_secs(5)).expect("deadlock");
+    }
+}
+
+#[cfg(test)]
+mod review_fix_tests {
+    use super::tests::{env, item};
+    use super::*;
+    use crate::files::write_atomic_at;
+
+    fn root(e: &super::tests::Env) -> PathBuf { e.folder.canonicalize().unwrap() }
+
+    #[test] fn save_during_first_scan_keeps_the_baseline() {
+        let e = env();
+        e.put("a.md", b"a"); e.put("b.md", b"b");
+        let target = root(&e).join("b.md");
+        let saved = std::cell::Cell::new(false);
+        let reader = |r: &Path, rel: &str| {
+            if !saved.get() { saved.set(true); write_atomic_at(&target, b"typed").unwrap(); }
+            read_seen(r, rel)
+        };
+        let files = vec!["a.md".to_string(), "b.md".to_string()];
+        let (s, _) = scan_at(&e.config, &e.f(), &files, true, now_ms(), &reader).unwrap();
+        assert!(s.items.is_empty(), "{:?}", s.items);
+        assert_eq!(s.tracked, 2);
+        assert!(e.scan(&["a.md", "b.md"], true).items.is_empty());
+    }
+
+    #[test] fn touch_only_change_keeps_the_mcp_hint() {
+        let e = env();
+        e.put("a.md", b"same");
+        e.scan(&["a.md"], true);
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        e.put("a.md", b"same"); // mtime moves, content does not
+        expect_at(&e.f(), &["a.md".to_string()], Route::Mcp, now_ms()).unwrap();
+        write_atomic_at(&root(&e).join("a.md"), b"written by mcp").unwrap();
+        let s = e.scan(&["a.md"], true);
+        let i = item(&s, "a.md").expect("MCP edit must be queued");
+        assert_eq!((i.state, i.route), (State::Changed, Route::Mcp));
+    }
+
+    #[test] fn close_during_a_scan_is_not_undone() {
+        let e = env();
+        e.put("a.md", b"a");
+        e.scan(&["a.md"], true);
+        e.put("a.md", b"ab");
+        let folder = e.f();
+        let reader = |r: &Path, rel: &str| { close_at(&folder); read_seen(r, rel) };
+        let _ = scan_at(&e.config, &e.f(), &["a.md".to_string()], true, now_ms(), &reader);
+        assert!(!global().lock().unwrap().folders.contains_key(&root(&e)));
     }
 }

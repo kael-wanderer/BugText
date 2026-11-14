@@ -40,3 +40,9 @@ it("steps to the next and previous block without wrapping", () => {
   expect(stepTarget(tops, 0, -1)).toBe(-1);
   expect(stepTarget(tops, 150, -1)).toBe(1);
 });
+it("refuses texts too large for the line diff", async () => {
+  const { diffFits } = await import("../review/changes");
+  const big = "x\n".repeat(5000);
+  expect(diffFits("a\nb", "a\nc")).toBe(true);
+  expect(diffFits(big, big + "y")).toBe(false);
+});

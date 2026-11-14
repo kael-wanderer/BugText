@@ -1,10 +1,12 @@
 import { lineDiff } from "../ai/diff";
 import { markdownOutline } from "../outline";
+import { diffFits } from "./changes";
 
 const CONTEXT = 3;
 
 /** A unified-style diff of the reviewed text against the current one, hunk headers named by section. */
 export function diffForPrompt(base: string, current: string, maxChars: number): { text: string; cut: boolean } {
+  if (!diffFits(base, current)) return { text: "", cut: true };
   const parts = lineDiff(base, current);
   // The current-text line (1-based) each diff line sits at, for the heading lookup.
   const at: number[] = [];

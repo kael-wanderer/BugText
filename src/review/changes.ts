@@ -1,6 +1,14 @@
 import { lineDiff } from "../ai/diff";
 import type { OutlineHeading } from "../outline";
 
+/** The line diff keeps an old × new table; past this many cells it is too slow and large. */
+const DIFF_CELLS = 4_000_000;
+
+/** True when `lineDiff` can compare these texts without stalling the window. */
+export function diffFits(base: string, current: string): boolean {
+  return (base.split("\n").length + 1) * (current.split("\n").length + 1) <= DIFF_CELLS;
+}
+
 /** `lines` are 1-based lines of the current text, ascending and unique. */
 export type Changes = { added: number; removed: number; lines: number[] };
 

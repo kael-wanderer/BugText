@@ -3,7 +3,8 @@
 
 
 use serde::{Deserialize, Serialize};
-use similar::{capture_diff_slices, Algorithm, DiffOp};
+use similar::{capture_diff_slices_deadline, Algorithm, DiffOp};
+use std::time::{Duration, Instant};
 use std::collections::BTreeMap;
 
 pub const TEXT_LIMIT: u64 = 2_000_000;
@@ -80,12 +81,16 @@ pub fn tracked(path: &str) -> bool {
     }
 }
 
+/// A diff gives up refining after this long, so huge notes cannot stall a save or scan.
+const DIFF_DEADLINE: Duration = Duration::from_millis(50);
+
 /// (added, removed) lines, splitting on '\n' exactly as the frontend diff does.
+/// Past `DIFF_DEADLINE` the counts are an upper bound rather than exact.
 pub fn line_counts(old: &str, new: &str) -> (u32, u32) {
     let a: Vec<&str> = old.split('\n').collect();
     let b: Vec<&str> = new.split('\n').collect();
     let (mut added, mut removed) = (0usize, 0usize);
-    for op in capture_diff_slices(Algorithm::Myers, &a, &b) {
+    for op in capture_diff_slices_deadline(Algorithm::Myers, &a, &b, Some(Instant::now() + DIFF_DEADLINE)) {
         match op {
             DiffOp::Equal { .. } => {}
             DiffOp::Delete { old_len, .. } => removed += old_len,
@@ -101,7 +106,11 @@ pub fn line_counts(old: &str, new: &str) -> (u32, u32) {
 
 fn clamp(n: usize) -> u32 { u32::try_from(n).unwrap_or(u32::MAX) }
 
-fn counts(reviewed: bool, seen: &Seen, base: Option<&str>) -> (Option<u32>, Option<u32>) {
+pub type Counts = (Option<u32>, Option<u32>);
+
+/// Line counts for a change, computed from the reviewed text when one is stored.
+/// Callers compute this outside the store lock and pass it to the `_counted` functions.
+pub fn counts(reviewed: bool, seen: &Seen, base: Option<&str>) -> Counts {
     match (&seen.text, base) {
         (Some(text), Some(base)) => {
             let (a, r) = line_counts(base, text);
@@ -139,7 +148,13 @@ pub fn adopt(index: &Index, digest: &str, exists: &dyn Fn(&str) -> bool) -> Adop
     Adopted::None
 }
 
+#[cfg(test)]
 pub fn outside_change(record: &mut Record, seen: &Seen, base: Option<&str>, route: Route, now: u64) {
+    let counted = counts(record.reviewed.is_some(), seen, base);
+    outside_change_counted(record, seen, counted, route, now);
+}
+
+pub fn outside_change_counted(record: &mut Record, seen: &Seen, counted: Counts, route: Route, now: u64) {
     record.mtime_ms = seen.mtime_ms;
     record.size = seen.size;
     if seen.digest == record.current {
@@ -151,11 +166,17 @@ pub fn outside_change(record: &mut Record, seen: &Seen, base: Option<&str>, rout
     if record.flag == Flag::Dismissed {
         record.flag = Flag::None;
     }
-    (record.added, record.removed) = counts(record.reviewed.is_some(), seen, base);
+    (record.added, record.removed) = counted;
 }
 
 /// A write BugText made itself. Returns true when the reviewed version moved.
+#[cfg(test)]
 pub fn owner_write(record: &mut Record, seen: &Seen, base: Option<&str>, now: u64) -> bool {
+    let counted = counts(record.reviewed.is_some(), seen, base);
+    owner_write_counted(record, seen, counted, now)
+}
+
+pub fn owner_write_counted(record: &mut Record, seen: &Seen, counted: Counts, now: u64) -> bool {
     let was_reviewed = record.reviewed.as_deref() == Some(record.current.as_str());
     record.mtime_ms = seen.mtime_ms;
     record.size = seen.size;
@@ -169,7 +190,7 @@ pub fn owner_write(record: &mut Record, seen: &Seen, base: Option<&str>, now: u6
         record.removed = None;
         return true;
     }
-    (record.added, record.removed) = counts(record.reviewed.is_some(), seen, base);
+    (record.added, record.removed) = counted;
     false
 }
 
