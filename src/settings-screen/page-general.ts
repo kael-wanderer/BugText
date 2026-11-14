@@ -51,6 +51,8 @@ export const generalPage: SettingsPage = {
       fontRow("sub", "sub-font", "Sub Editor Font"),
       caption("Performance"),
       row("large-folders", "Large folders", "In folders with 2,000 or more notes, check the folder every 10 seconds instead of 3. Open files are still checked every 3 seconds.", segmented("Large folders", [{ value: "auto", label: "Automatic" }, { value: "off", label: "Off" }], settings.performance.largeFolders, value => deps.onSettingsChange({ ...deps.getSettings(), performance: { largeFolders: value } }))),
+      row("review-track", "Review queue", "List notes that an AI tool or another app changed, until you mark them reviewed. BugText keeps a copy of each reviewed version in its settings folder.",
+        toggle("Review queue", settings.review.track, checked => deps.onSettingsChange({ ...deps.getSettings(), review: { track: checked } }))),
       caption("Session"),
       row(
         "restore-session",

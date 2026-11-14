@@ -75,6 +75,10 @@ export type AIPanelDeps = {
   beforeApply?: (binding: EditBinding) => void | Promise<void>;
   onInsert(text: string): void;
   onOpenChangedFile(dir: string, relativePath: string): void;
+  /** A coding CLI run that may write files in `dir` is starting. */
+  onRunStarted?(dir: string): void;
+  /** The run ended; `paths` (relative to `dir`) were added or modified. Called once per started run. */
+  onRunChanged?(dir: string, paths: string[]): void;
   onClose(): void;
   getSendAccelerator(): string;
   getWorkingDir(): string | null;
@@ -565,6 +569,7 @@ export function createAIPanel(
       if (runDir && row.engine.kind === "cli") {
         await beforeAgentRun(runDir, row.engine.tool, deps.guard);
         before = await captureFolderState(runDir);
+        deps.onRunStarted?.(runDir);
       }
       if (request.signal.aborted)
         throw new DOMException("AI request cancelled.", "AbortError");
@@ -633,6 +638,8 @@ export function createAIPanel(
           const after = await captureFolderState(runDir);
           const diff = diffFolderState(before, after);
           workspaceIndex.reset();
+          deps.onRunChanged?.(runDir, [...diff.added, ...diff.modified]);
+          before = null;
           changedCard(runDir, diff);
           await afterAgentRun(
             [...diff.added, ...diff.modified, ...diff.deleted].map(
@@ -646,6 +653,7 @@ export function createAIPanel(
             "Could not refresh files changed by the coding agent.",
           );
         }
+        if (before) deps.onRunChanged?.(runDir, []);
       }
       activeRequest = null;
       switcher.refreshState();

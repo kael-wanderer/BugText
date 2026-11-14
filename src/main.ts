@@ -56,6 +56,8 @@ import { createDiagnostics } from "./perf/diagnostics";
 import { createFrameCoalescer } from "./render-coalescer";
 import { createRefreshRunner, createFocusDeduper, decideLarge, tickKind, BASE_MS } from "./workspace-refresh";
 import { createOutlineView } from "./outline-view";
+import { createReviewController } from "./review/controller";
+import { REVIEW_EVENT, type ReviewSnapshot } from "./review/types";
 import { isLightTheme } from "./theme-catalog";
 import type { CliInfo } from "./ai/engines";
 import "./styles.css";
@@ -567,6 +569,30 @@ function editorForTab(id: string): WindowView["editor"] {
   return view.editor;
 }
 
+// Review queue: Rust decides state; this only forwards scans and renders snapshots.
+let cliRuns = 0;
+const reviewListeners: ((snapshot: ReviewSnapshot | null, error: string | null) => void)[] = [];
+const review = createReviewController({
+  invoke: (command, args) => invoke(command, args),
+  folder: () => getState().folder,
+  files: () => fileList,
+  complete: () => !linkIndex.capped,
+  exclude: () => currentAISettings.context.exclude,
+  enabled: () => currentSettings.review.track,
+  onChange(snapshot, error) {
+    for (const listener of reviewListeners) listener(snapshot, error);
+  },
+});
+void listen<ReviewSnapshot>(REVIEW_EVENT, ({ payload }) => review.accept(payload));
+let reviewTracking = true;
+function syncReviewTracking(): void {
+  if (currentSettings.review.track === reviewTracking) return;
+  reviewTracking = currentSettings.review.track;
+  const folder = getState().folder;
+  if (!reviewTracking && folder) void invoke("review_close", { folder }).catch(() => {});
+  void review.scan();
+}
+
 const mcpHandler = createMcpHandler({
   findOpenTab(path) {
     for (const windowState of getState().windows) {
@@ -593,6 +619,7 @@ const mcpHandler = createMcpHandler({
       const current = getState().windows.find((item) => item.tabs.some((candidate) => candidate.id === id));
       const currentTab = current?.tabs.find((candidate) => candidate.id === id);
       if (queued && currentTab && !currentTab.dirty && editorForTab(id).revision(id) === binding.revision) return;
+      await review.expect([path], "mcp");
       await invoke<void>("save_file", { path, contents: text });
       await recordStat(path);
       workspaceIndex.onFileChanged(path, text);
@@ -603,6 +630,7 @@ const mcpHandler = createMcpHandler({
   },
   readDisk: (path) => invoke<string>("read_file", { path }),
   writeDiskAtomic: async (path, text) => {
+    await review.expect([path], "mcp");
     await invoke<void>("write_file_atomic", { path, contents: text });
     workspaceIndex.onFileChanged(path, text);
       linkIndex.onFileChanged(path, text);
@@ -698,6 +726,7 @@ async function loadSettings(): Promise<void> {
   }
   hoverCard.setEnabled(currentSettings.links.hoverPreview);
   applySettings(currentSettings);
+  syncReviewTracking();
   refreshFirstRunHint();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -805,6 +834,7 @@ async function reloadSettingsFromDisk(file: SettingsFile): Promise<void> {
       if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       refreshFirstRunHint();
       applySettings(currentSettings);
+      syncReviewTracking();
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
@@ -887,6 +917,7 @@ function saveSettingsFromPanel(settings: Settings): void {
   if (gitVisibilityChanged) void refreshGitAvailability();
   if (hoverChanged) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
   applySettings(currentSettings);
+  syncReviewTracking();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   syncMcpEnabled();
@@ -2257,6 +2288,7 @@ async function doSave(saveAs = false): Promise<boolean> {
       if (currentSettings.git.showSourceControl !== previous.git.showSourceControl) void refreshGitAvailability();
       if (currentSettings.links.hoverPreview !== previous.links.hoverPreview) { hoverCard.setEnabled(currentSettings.links.hoverPreview); refreshPreviewLinks(); renderAll(); }
       applySettings(currentSettings);
+      syncReviewTracking();
       refreshStatusBar();
       setTableFormatting(currentSettings.tables.formatOnEdit);
       syncMcpEnabled();
@@ -2512,6 +2544,9 @@ const refreshRunner = createRefreshRunner(async (kind, reason) => {
       else await linkIndex.refresh().catch(() => {});
       largeFolder = decideLarge(largeFolder, linkIndex, currentSettings.performance.largeFolders);
       setExplorerNotice(linkIndex.capped ? "Indexed the first 5,000 files. Some notes are not included." : null);
+      // Not awaited: a first baseline must never delay the Explorer. Paused during a CLI run
+      // so the run's edits are labelled when it ends.
+      if (cliRuns === 0) void review.scan();
       diagnostics.setTotals({ notes: linkIndex.markdownCount, walked: linkIndex.walked, capped: linkIndex.capped, heldTextBytes: linkIndex.notes().reduce((sum, note) => sum + note.source.length * 2, 0), aiChunks: workspaceIndex.chunkCount, large: largeFolder });
     }
     await refreshCleanOpenFilesFromDisk();
@@ -2860,6 +2895,7 @@ function syncViewMenu(): void {
 
 function persistCurrentSettings(): void {
   applySettings(currentSettings);
+  syncReviewTracking();
   applySoftWrap();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
@@ -2938,6 +2974,7 @@ function ensureSubWindow(): void {
   addSplitter();
   makeView("sub", false);
   applySettings(currentSettings);
+  syncReviewTracking();
   refreshStatusBar();
   setTableFormatting(currentSettings.tables.formatOnEdit);
   renderAll();
@@ -3175,6 +3212,11 @@ function buildAIPanel(): void {
       editor.replaceRange(selection.from, selection.to, text);
     },
     onOpenChangedFile: (dir, rel) => void doOpenPath(joinPath(dir, rel)),
+    onRunStarted: () => { cliRuns++; },
+    onRunChanged: (dir, paths) => {
+      cliRuns = Math.max(0, cliRuns - 1);
+      void review.expect(paths.map(rel => joinPath(dir, rel)), "cli").then(() => review.scan());
+    },
     onClose: () => setAIVisible(false),
     getSendAccelerator: () => resolvedAccel("ai.send"),
     getWorkingDir: () => getState().folder,
@@ -3870,6 +3912,7 @@ subscribe(() => {
   const s = getState();
   if (s.folder !== indexedFolder) {
     if (!indexedFolder && s.folder) markOnboarded();
+    if (indexedFolder) void invoke("review_close", { folder: indexedFolder }).catch(() => {});
     indexedFolder = s.folder;
     gitPanel.setFolder(null); void refreshGitAvailability();
     largeFolder = false;
@@ -3880,6 +3923,7 @@ subscribe(() => {
     searchPanel.cancel();
     void refreshFileList().then(() => {
       if (getState().folder === s.folder && document.body.classList.contains("search-active")) searchPanel.refresh();
+      if (getState().folder === s.folder) void review.scan();
     });
   }
   ui = {
@@ -4197,6 +4241,7 @@ function layoutRestoreDeps(layout: WorkspaceLayout): Parameters<typeof restoreLa
         addSplitter();
         makeView("sub", false);
         applySettings(currentSettings);
+        syncReviewTracking();
         refreshStatusBar();
         setTableFormatting(currentSettings.tables.formatOnEdit);
         const main = windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')!;
