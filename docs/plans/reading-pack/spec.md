@@ -321,7 +321,9 @@ lists problems such as missing images.
 | 4 Trust and resume | 2 for one overview section | medium |
 | 5 Recipes and import | 4.3 for the weekly starter | large |
 
-## Calls made by the designer (owner to check)
+## Calls made by the designer (confirmed by the owner, 2026-11-14)
+
+All seven confirmed as written.
 
 1. The owner's own saves and accepted AI diffs count as reviewed (2.2).
 2. First use records a baseline and queues nothing (2.4).
@@ -331,13 +333,12 @@ lists problems such as missing images.
 6. Superseded notes are left out of AI context by default (4.2).
 7. PDFs are not in the review queue in this version.
 
-## Open questions for the owner
+## Open questions (answered by the owner, 2026-11-14)
 
-1. The "Docusaurus" need: a single PDF or HTML to send to someone, or a browsable set
-   of pages with navigation and search? They are different features; neither is in this
-   spec until answered.
-2. Is there an existing Obsidian vault to open? If yes, read-only `[[wikilink]]`
-   support moves into Phase 1.
+1. The "Docusaurus" need is a single PDF or HTML file to send to someone. A browsable
+   site with navigation and search stays deferred (static site export). Merging several
+   notes into one export is not in any phase yet and needs its own small spec.
+2. There is no Obsidian vault to open. Wikilinks stay deferred.
 
 ## Deferred
 
