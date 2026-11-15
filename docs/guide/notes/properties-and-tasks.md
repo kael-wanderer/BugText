@@ -38,9 +38,13 @@ A properties card above the note shows them; click a value to edit it. Tags coun
 
 **Edit** ▸ **Tasks in Folder…** lists every open checklist item in the folder, grouped by **Overdue**, **Today**, **This week**, **Later** and **No date**. A task can carry a due date as `due:2026-11-20` or `📅 2026-11-20`. Tick a task in the list to tick it in its note; a closed note gets a Recovery snapshot first.
 
+![The Tasks panel listing open tasks from every note in the folder](../images/notes/properties-and-tasks/tasks-in-folder.png)
+
 ### Project Overview
 
 Right-click a folder and choose **Project Overview** (or use **View** ▸ **Project Overview**). It opens a generated tab with the folder's key documents, decisions, open questions and blockers, next actions, and what changed since you last reviewed it, each linked to its source. You can tick tasks there, and **Copy as Markdown** to paste it elsewhere.
+
+![Project Overview with notes grouped by status](../images/notes/properties-and-tasks/project-overview.png)
 
 ## What it will not do
 

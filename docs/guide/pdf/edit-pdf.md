@@ -18,6 +18,8 @@ BugText can change a PDF itself, not just mark it up: fix text, add text and pic
 
 Open a PDF and press <kbd>⌘</kbd> <kbd>E</kbd> (**Edit PDF**). A second toolbar row appears with these tools:
 
+![A PDF in edit mode with the editing toolbar](../images/pdf/edit-pdf/edit-toolbar.png)
+
 | Tool | Key | Does |
 |---|---|---|
 | Select | <kbd>V</kbd> | Select and move what you added |

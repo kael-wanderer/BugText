@@ -40,6 +40,8 @@ When you rename or move a note in the Explorer, an **Update links?** sheet lists
 
 From <kbd>⌘</kbd> <kbd>K</kbd>:
 
+![The folder graph, with notes as dots and links as lines](../images/notes/links-and-graph/folder-graph.png)
+
 - **Graph: Open Local Graph** shows the open note with its links and backlinks, one or two steps out.
 - **Graph: Open Folder Graph** shows the whole folder, up to its 500 most-linked notes. Filter by folder, show orphans (notes with no links) and missing targets.
 

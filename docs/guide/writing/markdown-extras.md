@@ -16,6 +16,8 @@ Beyond plain Markdown, the preview draws diagrams, math, callouts and footnotes,
 
 Write the diagram in a fenced code block marked `mermaid`:
 
+![The reading view showing a callout and a Mermaid diagram with its hover toolbar](../images/writing/markdown-extras/reading-view.png)
+
 ````markdown
 ```mermaid
 flowchart LR

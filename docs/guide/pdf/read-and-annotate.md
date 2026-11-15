@@ -16,6 +16,8 @@ PDFs open in a tab like any note. You can read, search and highlight them, add c
 
 The PDF toolbar has **Pages** (thumbnails), previous and next page, a page number box (type a number and press <kbd>Return</kbd>), zoom with **Automatic**, **Fit Width**, **Fit Page** and **Actual Size**, and **Find**. <kbd>⌘</kbd> <kbd>F</kbd> searches the text of the PDF; Find in Folder searches PDFs too.
 
+![A PDF open in the reader with page thumbnails and the toolbar](../images/pdf/read-and-annotate/pdf-reader.png)
+
 BugText reopens a PDF at the page where you left it. If another app changes the PDF while it is open, BugText reloads it, or asks first when you have unsaved edits.
 
 ### Highlight and comment

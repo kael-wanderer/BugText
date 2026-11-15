@@ -30,6 +30,8 @@ Each entry says when it changed, how much, and by what route: a coding CLI run, 
 3. **Show diff** compares the note with the version you last reviewed. **Explain changes** asks AI for a summary of the changes, grouped by section.
 4. Click **Mark reviewed** (also **View** ▸ **Mark as Reviewed**), or **Later** to come back to it.
 
+![A changed note with change marks, the review bar with Previous change, Next change, Show diff and Explain changes, and the review queue in the sidebar](../images/reading/review-queue/review-bar.png)
+
 In the queue, **Dismiss** removes an entry without reviewing, and **Mark All Reviewed…** clears the whole list.
 
 ### Turn it off

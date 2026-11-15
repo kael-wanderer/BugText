@@ -25,7 +25,11 @@ Reading is where ideas come from, and copying quotes by hand loses where they ca
    - **Companion note**: a notes file beside the source with the same name ending in `.notes.md`, such as `plan.notes.md` for `plan.md`.
    - **Daily note**: today's daily note.
    - **Choose Note…**: any note you pick.
-4. Click **Save excerpt** or **Save task**. BugText remembers your choice for this folder.
+4. Add a comment if you like, then click **Save**. BugText remembers your choice for this folder.
+
+![The capture menu on a selected sentence: Excerpt, Task, Ask AI and Copy link](../images/reading/capture/capture-menu.png)
+
+![The Save excerpt sheet with the quote, its source heading, a comment box and where to save it](../images/reading/capture/excerpt-sheet.png)
 
 Text selected in Reading view is saved exactly as you see it, without stray Markdown characters.
 

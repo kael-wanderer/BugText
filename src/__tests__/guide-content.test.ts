@@ -13,3 +13,10 @@ describe("docs/guide", () => {
     expect(validateGuide("docs/guide", [])).toEqual([]);
   });
 });
+
+describe("guide link", () => {
+  it("points at the published guide", async () => {
+    const { GUIDE_BASE_URL } = await import("../guide/guideLinks");
+    expect(GUIDE_BASE_URL).toBe("https://kael.io.vn/projects/bugtext/docs");
+  });
+});

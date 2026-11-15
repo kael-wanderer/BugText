@@ -16,6 +16,8 @@ BugText is a Mac app for working with a folder of plain files. You write Markdow
 
 BugText is organised around one open folder per window:
 
+![BugText with a folder of notes in the Explorer and a note open in the editor beside its preview](../images/start-here/what-is-bugtext/main-window.png)
+
 - **Explorer** on the left lists the folder's files. <kbd>⌘</kbd> <kbd>B</kbd> shows or hides it.
 - **Main** and an optional **Sub** pane hold your open tabs, each with its own view mode: editor, reading view, or editor with preview beside it.
 - **Side panels** open on demand: Outline, Links, Filter, Review, Source Control and the AI chat.

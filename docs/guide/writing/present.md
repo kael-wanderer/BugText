@@ -29,6 +29,8 @@ Diagrams, callouts, code and images render on slides as in the preview.
 4. During the talk: <kbd>L</kbd> turns the laser pointer on and off, <kbd>B</kbd> blacks out the screen, <kbd>N</kbd> shows or hides the speaker notes, and <kbd>T</kbd> switches the slide theme.
 5. Press <kbd>Esc</kbd> to stop.
 
+![A Markdown note shown as a full-screen slide](../images/writing/present/slide.png)
+
 ## What it will not do
 
 - Edits you make to the note while presenting do not appear until you start again; the deck is a snapshot of the note when you started.

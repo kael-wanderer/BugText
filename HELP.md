@@ -3,6 +3,9 @@
 BugText is a lightweight document workspace for Markdown, HTML, code/config files,
 and PDFs.
 
+The full guide, with step-by-step pages for every feature, is online at
+<https://kael.io.vn/projects/bugtext/docs> (**Help → BugText Guide Online**).
+
 ## Windows and panes
 
 Choose **View → New Window** or press `⌘⇧N` to create an independent native window.
