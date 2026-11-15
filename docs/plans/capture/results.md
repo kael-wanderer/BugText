@@ -89,6 +89,8 @@ Findings, none blocking:
 6. Add note on an HTML page uses the file stem as the link title, not the page's `<title>` (CAP-11).
 7. Not checked in the app: the per-folder default in a second folder (CAP-05, unit-tested), and pasting the copied link (CAP-09).
 
+Fixed after the run (one commit, each with a test watched failing first): findings 1, 2, 4, 5 and 6. A task link now carries a flag; when its words are not found the source opens at the heading without the "passage changed" toast. Placeholders are dropped from the quote and skipped by `findQuote`. The trigger ignores a mouseup whose mousedown started outside the note. The sheet clears its error on input. Add note reads the page's `<title>` through an inert `DOMParser` document. Suite 1,426 passed, `tsc` clean, startup chunk 648.28 kB (+4.45 kB). Finding 3 stays as designed. These fixes were not re-checked in the app.
+
 Seen, not from this branch: a plain click on a link in the Sub pane moves the target note into the Sub window.
 
 ## Backlog
