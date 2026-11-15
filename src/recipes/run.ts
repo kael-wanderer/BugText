@@ -78,7 +78,7 @@ export async function runRecipe(action: SavedAction & { recipe: Recipe }, deps: 
     { kind: "note", relative, exists: before?.kind !== "new" };
   const plan: RunPlan = {
     name: action.name, sources: resolved.sources.map(s => ({ label: s.label, chars: s.text.length })),
-    leftOut: resolved.leftOut, trimmed: built.truncatedChars, engine: deps.engineLabel(row), output,
+    leftOut: resolved.leftOut.map(l => ({ ...l, path: relativeContextPath(l.path, deps.folder) })), trimmed: built.truncatedChars, engine: deps.engineLabel(row), output,
   };
   if (!await ui.confirm(plan)) return;
   const sourceDigests = digests(resolved.sources, deps.folder);

@@ -1038,6 +1038,9 @@ function commandItems(): PaletteItem[] {
         runQuickActionById(action.id),
       ),
     ),
+    ...currentActions.actions.filter(action => action.recipe).map(action =>
+      command(`recipe:${action.id}`, `Recipe: ${action.name}`, () => runRecipeById(action.id)),
+    ),
     ...recent.files.map((path) =>
       command(`recent-file:${path}`, `Open Recent File: ${basename(path)}`, () =>
         void doOpenPath(path),
@@ -1657,6 +1660,20 @@ function taskWriter(): import("./task-inbox/write").TaskWriteDeps {
     changed: (path, text, saved) => { linkIndex.onFileChanged(path, text, saved); workspaceIndex.onFileChanged(path, text); },
     stamp: () => (currentSettings.tasks.stampCompletion ? localToday() : null),
   };
+}
+/** Runs a saved recipe (spec 5.1–5.4). Everything under src/recipes loads on first use. */
+function recipeHost(): import("./recipes/host").RecipeHost {
+  return {
+    actions: () => currentActions.actions, folder: () => getState().folder, windows: () => getState().windows,
+    activePath: () => activeMeta()?.path ?? null, editorForTab, linkIndex, workspaceIndex,
+    settings: () => currentAISettings, clis: () => cliInfos, toast: text => showToast(text),
+    views: create => (savedViews ??= create()),
+    chatPanel: () => { setAIVisible(true); return aiPanel; },
+    refreshExplorer: () => refreshExpandedDirs().then(refreshFileList),
+  };
+}
+function runRecipeById(id: string): void {
+  void import("./recipes/host").then(({ runRecipeById }) => runRecipeById(id, recipeHost()), () => showToast("Could not run the recipe."));
 }
 function withOrganize(run: (actions: OrganizeActions) => void): void {
   if (organizeActions) { run(organizeActions); return; }

@@ -317,3 +317,35 @@ it("focusInput puts the caret in the message box", () => {
   expect(document.activeElement).toBe(root.querySelector("textarea.ai-input"));
   root.remove();
 });
+
+it("runs a prepared recipe request in a new conversation without storing the sources", async () => {
+  const panel = createAIPanel(root, deps);
+  const row = { engine: { kind: "api" as const, connectionId: "c1" }, model: "m", effort: "" };
+  const messages = [{ role: "system" as const, content: "fixed" }, { role: "user" as const, content: "SOURCE TEXT secret" }];
+  const context = { excerpts: [], files: [{ name: "a.md", chars: 18 }], trimmed: 0 };
+  const ok = await panel.runPrepared({ title: "Weekly review", summary: "▸ Weekly review · 1 note", messages, row, context });
+  expect(ok).toBe(true);
+  expect(streamChat).toHaveBeenCalledWith(row, expect.anything(), messages, expect.any(Function), expect.objectContaining({ folder: null, write: false }));
+  const calls = vi.mocked(writeConversation).mock.calls; const saved = calls[calls.length - 1][1];
+  expect(saved.title).toBe("Weekly review");
+  expect(saved.messages.map(m => [m.role, m.text])).toEqual([["user", "▸ Weekly review · 1 note"], ["assistant", "reply"]]);
+  expect(JSON.stringify(saved)).not.toContain("SOURCE TEXT");
+  expect(root.textContent).toContain("▸ Weekly review · 1 note");
+  expect(root.querySelector(".ai-context-sent")).not.toBeNull();
+});
+
+it("refuses a prepared request while busy and reports an empty reply", async () => {
+  const panel = createAIPanel(root, deps);
+  const row = { engine: { kind: "api" as const, connectionId: "c1" }, model: "m", effort: "" };
+  const args = { title: "R", summary: "▸ R · 1 note", messages: [{ role: "user" as const, content: "x" }], row, context: { excerpts: [], files: [], trimmed: 0 } };
+  let release!: () => void;
+  vi.mocked(streamChat).mockImplementationOnce(async (_r, _s, _m, onChunk) => { await new Promise<void>(r => { release = r; }); onChunk("late"); });
+  const first = panel.runPrepared(args);
+  await vi.waitFor(() => expect(streamChat).toHaveBeenCalledOnce());
+  expect(await panel.runPrepared(args)).toBe(false);
+  release(); expect(await first).toBe(true);
+  vi.mocked(streamChat).mockImplementationOnce(async (_r, _s, _m, onChunk) => onChunk("  "));
+  expect(await panel.runPrepared(args)).toBe(false);
+  vi.mocked(streamChat).mockImplementationOnce(async () => { throw new Error("boom"); });
+  expect(await panel.runPrepared(args)).toBe(false);
+});

@@ -108,12 +108,13 @@ export async function runQuickAction(
     engine: null, feature: action.feature, panel: true,
   } : action;
   const doc = deps.getDoc();
-  if (isContextExcluded(doc.path, deps.getWorkingDir(), deps.getSettings().context.exclude)) {
+  const prepared = "prepared" in action ? action.prepared : undefined;
+  if (!prepared && isContextExcluded(doc.path, deps.getWorkingDir(), deps.getSettings().context.exclude)) {
     const message = exclusionMessage(doc.path!, deps.getWorkingDir());
     deps.notify?.(message); deps.appendBubble("system", message); return;
   }
   const scope = actionScope(normalized.input === "note" ? "" : doc.selection, doc.text);
-  if (!scope.text.trim()) {
+  if (!prepared && !scope.text.trim()) {
     deps.appendBubble("system", "Nothing to send — the selection and note are empty.");
     return;
   }
@@ -128,7 +129,8 @@ export async function runQuickAction(
     return;
   }
 
-  const built = buildMessages({
+  // A recipe sends messages it built itself (spec 5.2); its sources never reach the note scope.
+  const built = prepared ? { ...prepared, truncatedChars: 0 } : buildMessages({
     history: [],
     prompt: normalized.instruction,
     docText: scope.text,
@@ -138,7 +140,7 @@ export async function runQuickAction(
     notePath: doc.path ? doc.path.split(/[\\/]/).pop() : "Untitled",
     maxContextChars: settings.maxContextChars,
   });
-  built.context.action = true;
+  if (!prepared) built.context.action = true;
   if (built.context.note) built.context.note.label = scope.whole ? "This note" : "Selection";
   deps.onContext?.(built.context);
   if (built.truncatedChars > 0) {
@@ -148,7 +150,7 @@ export async function runQuickAction(
   if (normalized.result === "answer") {
     const lines = scope.text.split("\n").length;
     const where = scope.whole ? "on note" : `on selection (${lines} line${lines === 1 ? "" : "s"})`;
-    deps.appendBubble("user", `▸ ${normalized.name} · ${where}`);
+    deps.appendBubble("user", prepared?.summary ?? `▸ ${normalized.name} · ${where}`);
   }
   const bubble = deps.appendBubble("assistant", "");
   let reply = "";
