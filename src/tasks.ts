@@ -29,6 +29,11 @@ export function taskToggleChange(line: string, lineStart: number): TextChange | 
 
 const STAMP = /[ \t]*✅[ \t]*\d{4}-\d{2}-\d{2}[ \t]*$/u;
 
+/** The date of a trailing "✅ YYYY-MM-DD" completion stamp, or null. */
+export function completionDate(line: string): string | null {
+  return STAMP.exec(line)?.[0].match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+}
+
 /** The marker flip plus, with a stamp, " ✅ <stamp>" added on check or a trailing ✅ date removed on uncheck. */
 export function taskToggleEdits(line: string, lineStart: number, stamp: string | null): TextChange[] {
   const flip = taskToggleChange(line, lineStart);

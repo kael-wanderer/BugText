@@ -175,6 +175,11 @@ export function createLinkIndex(scan = (folder: string, paths?: string[], known?
     get walked() { return walked; },
     get capped() { return capped; },
     get markdownCount() { return Object.keys(stamps).length; },
+    /** Last modification time from the scan stamp ("len:nanos"), in ms. Nanoseconds are too big for an exact JS number, so the last six digits are dropped as text. */
+    modifiedMs(path: string): number | null {
+      const nanos = stamps[path]?.split(":")[1];
+      return nanos && /^\d{7,}$/.test(nanos) ? Number(nanos.slice(0, -6)) : null;
+    },
     subscribe(fn: () => void) { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

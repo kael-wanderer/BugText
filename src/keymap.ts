@@ -103,6 +103,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "ai.quick.rewrite", label: "AI: Rewrite", category: "AI", default: "", scope: "app" },
   { id: "ai.quick.summarize", label: "AI: Summarize", category: "AI", default: "", scope: "app" },
   { id: "ai.quick.outline", label: "AI: Generate outline", category: "AI", default: "", scope: "app" },
+  { id: "ai.recipes", label: "AI: Recipes…", category: "AI", default: "", scope: "app" },
 ];
 
 export type Keymap = Record<string, string>;

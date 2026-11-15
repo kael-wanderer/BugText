@@ -16,7 +16,7 @@ describe("saved actions", () => {
     const io = { read: async () => "{", write, broadcast };
     expect(await loadActions(io)).toEqual({ file: null, error: true });
     expect(write).not.toHaveBeenCalled();
-    const file = { version: 1 as const, actions: [action], extra: "kept" };
+    const file = { version: 2 as const, actions: [action], extra: "kept" };
     await expect(saveActions(io, file)).rejects.toThrow();
     await saveActions({ ...io, read: async () => null }, file);
     expect(parseActions(write.mock.calls[0][0])).toEqual(file);

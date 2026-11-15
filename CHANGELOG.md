@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Recipes: save a repeated AI job once as inputs, an instruction and where the result goes. Inputs are the current note, chosen notes, a folder and glob, a saved view, notes changed in the last N days, or tasks completed in the last N days (up to 200 notes, excluded notes never sent). The result goes to a note at a path pattern (`{{date}}`, `{{week}}`, `{{title}}`…), to Chat, or to the current note's properties. A run sheet shows what will be sent and where before anything is sent; running again shows a diff against the existing note and writes nothing until Accept. AI: Recipes… lists them with how many sources changed since the last run. Starters: Meeting notes, Compare reports, Weekly review, File this note. Settings ▸ AI ▸ Actions has a Recipes section and editor. `ai-actions.json` is now version 2.
 - Decision note type (`type: decision`, `date`, `status: current`).
 - Project Overview (View menu, palette, Explorer folder menu): a generated tab with key documents, decisions, open questions and blockers, next actions and changes since review, each linked to its source. Tasks can be ticked there. Copy as Markdown.
 - Tasks in Folder groups tasks by Overdue, Today, This week, Later and No date, and ticks tasks in closed notes after a Recovery snapshot.

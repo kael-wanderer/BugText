@@ -96,7 +96,9 @@ export type AIPanelDeps = {
   legacyHistoryKey?: string;
 };
 export type AIPanel = {
-  runAction(action: RunnableAction, deps: QuickActionDeps): Promise<void>;
+  runAction(action: RunnableAction, deps: QuickActionDeps): Promise<boolean>;
+  /** Streams already-built messages into a new conversation; true when a non-empty reply finished. */
+  runPrepared(args: { title: string; summary: string; messages: ChatMessage[]; row: UseRow; context: ContextSent }): Promise<boolean>;
   destroy(): void;
   newChat(): void;
   render(): void;
@@ -708,35 +710,50 @@ export function createAIPanel(
       void send();
     }
   });
+  /** True when an answer finished and was saved to the conversation. */
+  async function runAction(action: RunnableAction, actionDeps: QuickActionDeps): Promise<boolean> {
+    await historyReady;
+    if (remotelyLocked || activeRequest) return false;
+    let done: { model: string; seconds: number } | undefined;
+    const onReplyDone = (meta: { model: string; seconds: number }) => { done = meta; };
+    const appendMeta = () => { if (done) messagesElement.append(element("div", "ai-reply-meta", `${done.model} · ${done.seconds.toFixed(1)}s`)); };
+    if (action.result === "edit") { let sent: ContextSent | undefined; await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { sent = context; } }); appendMeta(); const disclosure = renderContextSent(sent, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure); return false; }
+    const run = await switcher.begin(action.name, structuredClone(chipState));
+    if (!run) return false;
+    const request = actionDeps.makeAbort(); activeRequest = request;
+    let actionContext: ContextSent | undefined;
+    let saved = false;
+    const bubbles: { role: string; node: { textContent: string | null } }[] = [];
+    try {
+      await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { actionContext = context; }, makeAbort: () => request,
+        appendBubble(role, text) { const node = actionDeps.appendBubble(role, text); bubbles.push({ role, node }); return node; },
+      });
+      const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now(), ...(b.role === "assistant" ? { context: actionContext, ...(done ? { engine: done.model } : {}) } : {}) }));
+      appendMeta();
+      const disclosure = renderContextSent(actionContext, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure);
+      if (messages.some(m => m.role === "assistant")) {
+        const value = await switcher.finish(run, messages);
+        if (value.earlierMessagesRemoved && !run.value.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
+        history.splice(0, history.length, ...value.messages.map(m => ({ role: m.role, content: m.text })));
+        saved = true;
+      } else await switcher.cancel();
+    } catch { await switcher.cancel(); appendBubble("error", "Could not save conversation."); }
+    finally { activeRequest = null; switcher.refreshState(); await switcher.folderChanged(); }
+    // A reply cut off by an error or Stop does not count as finished.
+    return saved && !!done;
+  }
   render();
   return {
     focusInput() { input.focus(); },
-    async runAction(action, actionDeps) {
+    runAction,
+    async runPrepared({ title, summary, messages, row, context }) {
       await historyReady;
-      if (remotelyLocked || activeRequest) return;
-      let done: { model: string; seconds: number } | undefined;
-      const onReplyDone = (meta: { model: string; seconds: number }) => { done = meta; };
-      const appendMeta = () => { if (done) messagesElement.append(element("div", "ai-reply-meta", `${done.model} · ${done.seconds.toFixed(1)}s`)); };
-      if (action.result === "edit") { let sent: ContextSent | undefined; await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { sent = context; } }); appendMeta(); const disclosure = renderContextSent(sent, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure); return; }
-      const run = await switcher.begin(action.name, structuredClone(chipState));
-      if (!run) return;
-      const request = actionDeps.makeAbort(); activeRequest = request;
-      let actionContext: ContextSent | undefined;
-      const bubbles: { role: string; node: { textContent: string | null } }[] = [];
-      try {
-        await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { actionContext = context; }, makeAbort: () => request,
-          appendBubble(role, text) { const node = actionDeps.appendBubble(role, text); bubbles.push({ role, node }); return node; },
-        });
-        const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now(), ...(b.role === "assistant" ? { context: actionContext, ...(done ? { engine: done.model } : {}) } : {}) }));
-        appendMeta();
-        const disclosure = renderContextSent(actionContext, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure);
-        if (messages.some(m => m.role === "assistant")) {
-          const value = await switcher.finish(run, messages);
-          if (value.earlierMessagesRemoved && !run.value.earlierMessagesRemoved) appendBubble("system", EARLIER_MESSAGES_NOTICE);
-          history.splice(0, history.length, ...value.messages.map(m => ({ role: m.role, content: m.text })));
-        } else await switcher.cancel();
-      } catch { await switcher.cancel(); appendBubble("error", "Could not save conversation."); }
-      finally { activeRequest = null; switcher.refreshState(); await switcher.folderChanged(); }
+      if (remotelyLocked || activeRequest) return false;
+      await switcher.newChat();
+      return runAction({ id: "recipe", name: title, instruction: "", result: "answer", input: "note", engine: row, panel: true, prepared: { messages, context, summary } }, {
+        getSettings: deps.getSettings, getClis: deps.getClis, getDoc: deps.getDoc, reviewEdit: () => {}, appendBubble,
+        getWorkingDir: deps.getWorkingDir, makeAbort: () => new AbortController(),
+      });
     },
     destroy: () => { activeRequest?.abort(); switcher.destroy(); },
     newChat: () => { void historyReady.then(() => switcher.newChat()); },

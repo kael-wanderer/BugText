@@ -132,6 +132,37 @@ review snapshot on each change (key documents, `type: decision` notes, `#questio
 `#blocker` tasks, next actions, changes since review), `view.ts` renders text-only rows,
 and Copy as Markdown links relative to the folder.
 
+Recipes (`src/recipes/`, all lazy; spec 5.1–5.4): a recipe is a saved action in
+`ai-actions.json` (now version 2; version 1 files parse and are written back as 2) with a
+`recipe` field: one to six inputs, an output (`note` with a path pattern, `chat`, or
+`properties`) and an optional template. `validRecipe` (`ai/actions-store.ts`) refuses at
+Save what would fail after the AI was paid for. Recipes are not quick actions
+(`runnableActions` leaves them out); they run from AI: Recipes… (`list.ts`) and the
+`Recipe: <name>` palette entries. `main.ts` only passes a `RecipeHost` to `host.ts`, which
+refreshes the link index first (scan stamps give `modifiedMs`) and builds the run's deps.
+`run.ts` resolves the output path (`path.ts`: placeholders in one pass, ISO week-year with
+`{{week}}`, inside-the-folder and `.md` checks), the inputs (`inputs.ts`: current note,
+files, folder glob via `matchesContextGlob`, saved view, changed in N days, completed
+tasks as one synthetic source; excluded notes never, superseded only when Settings
+includes them, never its own output, notes it generated left out of glob/view/changed;
+at most 200), builds the messages (`prompt.ts`: fixed system text, each source in a
+`<context>` block sealed against closing and forged opening tags, `fitContext` budget),
+shows the run sheet (`sheet.ts`), streams answer-only (`folder: null, write: false`, Stop
+aborts), turns the reply into note text (`output.ts`: `generated_by`, `generated_at`,
+`sources`; remote images become plain links and HTML that loads a resource is shown as
+text, so a source cannot make preview fetch a URL carrying other sources' text; or the
+reply's YAML as the note's whole front matter), and shows a diff when the
+note exists. `write.ts` writes by the app's routes: open tab through its editor (one undo
+step), closed note after a "Before recipe run" snapshot with `write_file_atomic` and the
+expected text, new note through `create_from_template`; it refuses when the folder or the
+note changed after the diff. Chat output goes through `AIPanel.runPrepared` (the
+`runAction` answer path with prepared messages; the conversation keeps a one-line summary,
+not the sources). Run digests (`runs.ts`, `hashText` per source) live in
+`<app config dir>/recipe-runs.json` (`recipe_runs_read` / `recipe_runs_write`, 2 MB cap)
+and give "N sources changed since last run". The editor is `settings-screen/recipe-form.ts`;
+the Actions page saves the full list by id, so the My actions and Recipes sections are
+only filtered views.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,

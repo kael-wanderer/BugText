@@ -35,6 +35,7 @@ Local QA doc (this folder is gitignored). Update as features/cases change.
 | Review queue (reading workflow Phase 2) | 28-review-queue.md | REV-01..20 | new (2026-11-14) |
 | Capture while reading (reading workflow Phase 3) | 29-capture.md | CAP-01..12 | new (2026-11-14) |
 | Trust and resume (reading workflow Phase 4) | 30-trust-resume.md | TRU-01..14 | new (2026-11-15) |
+| Recipes (reading workflow Phase 5a) | 31-recipes.md | RCP-01..12 | new (2026-11-15) |
 | agent.json rename + migration | smoke-branch-2026-06-21.md | SMOKE (migration) | covered in smoke only |
 
 ## Gaps / to-do

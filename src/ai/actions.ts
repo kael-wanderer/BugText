@@ -2,6 +2,8 @@ import type { AISettings, FeatureId, UseRow } from "./aisettings";
 import { resolveUse, type CliInfo } from "./engines";
 import { QUICK_ACTIONS } from "./quick-actions";
 import type { SavedAction } from "./actions-store";
+import type { ChatMessage } from "./providers";
+import type { ContextSent } from "./context-sent";
 
 export type RunnableAction = {
   id: string;
@@ -12,6 +14,8 @@ export type RunnableAction = {
   engine: UseRow | null;
   feature?: FeatureId;
   panel: boolean;
+  /** Already-built messages (a recipe sent to Chat): sent as they are, with `summary` as the user line. */
+  prepared?: { messages: ChatMessage[]; context: ContextSent; summary: string };
 };
 
 export function runnableActions(settings: AISettings, saved: SavedAction[]): RunnableAction[] {
@@ -21,7 +25,7 @@ export function runnableActions(settings: AISettings, saved: SavedAction[]): Run
       result: a.kind === "edit" ? "edit" as const : "answer" as const,
       input: "selection-or-note" as const, engine: null, feature: a.feature, panel: true,
     })),
-    ...saved,
+    ...saved.filter(a => !a.recipe),
   ];
 }
 

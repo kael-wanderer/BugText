@@ -3840,3 +3840,10 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 .window:has(> .overview-view:not([hidden])) > .window-panes,
 .window:has(> .overview-view:not([hidden])) .window-status,
 .window:has(> .overview-view:not([hidden])) .window-toolbar { display: none !important; }
+
+/* Recipes: run sheet and review sheet (diff lines reuse .ai-diff-line). */
+.recipe-sheet .recipe-sources { list-style: none; margin: 0 0 8px; padding: 0; max-height: 40vh; overflow: auto; }
+.recipe-sheet .recipe-sources li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+.recipe-sheet .recipe-sources li span:last-child { color: var(--muted, #888); white-space: nowrap; }
+.recipe-sheet .recipe-left-out span:first-child { text-decoration: line-through; }
+.recipe-sheet .ai-diff, .recipe-sheet .recipe-new-text { max-height: 55vh; overflow: auto; white-space: pre-wrap; }

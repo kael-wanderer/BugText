@@ -689,7 +689,7 @@ const mcpHandler = createMcpHandler({
   },
 });
 
-let currentActions: ActionsFile = { version: 1, actions: [] };
+let currentActions: ActionsFile = { version: 2, actions: [] };
 let actionsError = false;
 let actionsPath = "";
 async function reloadActions(): Promise<void> {
@@ -980,6 +980,7 @@ function commandItems(): PaletteItem[] {
     command("view.present_here", "Present from Current Slide", () => void present(true)),
     command("view.live_preview", "Toggle Live Preview", toggleLivePreview),
     command("ai.new_chat", "AI: New chat", newAIChat),
+    command("ai.recipes", "AI: Recipes…", openRecipes),
     command("newFromTemplate", "New from Template…", () => templateActions.newFromTemplate()),
     command("quickNote", "Quick Note…", () => templateActions.quickNote()),
     command("open", "Open File…", () => void doOpen()),
@@ -1037,6 +1038,9 @@ function commandItems(): PaletteItem[] {
       command(action.id, `AI: ${action.name}`, () =>
         runQuickActionById(action.id),
       ),
+    ),
+    ...currentActions.actions.filter(action => action.recipe).map(action =>
+      command(`recipe:${action.id}`, `Recipe: ${action.name}`, () => withRecipes((r, host) => r.runRecipeById(action.id, host))),
     ),
     ...recent.files.map((path) =>
       command(`recent-file:${path}`, `Open Recent File: ${basename(path)}`, () =>
@@ -1657,6 +1661,22 @@ function taskWriter(): import("./task-inbox/write").TaskWriteDeps {
     changed: (path, text, saved) => { linkIndex.onFileChanged(path, text, saved); workspaceIndex.onFileChanged(path, text); },
     stamp: () => (currentSettings.tasks.stampCompletion ? localToday() : null),
   };
+}
+/** Runs a saved recipe (spec 5.1–5.4). Everything under src/recipes loads on first use. */
+function recipeHost(): import("./recipes/host").RecipeHost {
+  return {
+    actions: () => currentActions.actions, state: getState,
+    activePath: () => activeMeta()?.path ?? null, editorForTab, linkIndex, workspaceIndex,
+    settings: () => currentAISettings, clis: () => cliInfos, toast: showToast,
+    views: create => (savedViews ??= create()),
+    chatPanel: () => { setAIVisible(true); return aiPanel; },
+    refreshExplorer: () => refreshExpandedDirs().then(refreshFileList),
+    files: () => fileList, openActions: () => settingsScreen.open("ai", "actions"),
+  };
+}
+function openRecipes(): void { withRecipes((recipes, host) => recipes.openRecipesList(host)); }
+function withRecipes(run: (recipes: typeof import("./recipes/host"), host: import("./recipes/host").RecipeHost) => unknown): void {
+  void import("./recipes/host").then(recipes => run(recipes, recipeHost()), () => showToast("Could not load recipes."));
 }
 function withOrganize(run: (actions: OrganizeActions) => void): void {
   if (organizeActions) { run(organizeActions); return; }
@@ -3533,6 +3553,7 @@ const settingsScreen = createSettingsScreen(
       save: async file => { await saveActions(actionsIO(nativeWindowLabel), file); currentActions = file; actionsError = false; aiPanel?.render(); },
       run: action => { settingsScreen.close(); setAIVisible(true); void aiPanel!.runAction(action, quickActionDeps(action.name)); },
       openFile: () => { if (actionsPath) void doOpenPath(actionsPath); settingsScreen.close(); },
+      recipeHost,
     },
     onSettingsChange: saveSettingsFromPanel,
     onAISettingsChange: saveAISettingsFromPanel,
@@ -4646,6 +4667,7 @@ const appKeyActions: Record<string, () => void> = {
   "history.show": showActiveHistory,
   "history.snapshot": snapshotActiveDocument,
   "ai.new_chat": newAIChat,
+  "ai.recipes": () => openRecipes(),
   "ai.quick.proofread": () => runQuickActionById("ai.quick.proofread"),
   "ai.quick.rewrite": () => runQuickActionById("ai.quick.rewrite"),
   "ai.quick.summarize": () => runQuickActionById("ai.quick.summarize"),
