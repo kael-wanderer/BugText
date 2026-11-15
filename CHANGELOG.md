@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Decision note type (`type: decision`, `date`, `status: current`).
 - Tasks in Folder groups tasks by Overdue, Today, This week, Later and No date, and ticks tasks in closed notes after a Recovery snapshot.
 - Tasks: checking a task adds ` ✅ <date>` and unchecking removes it (Settings ▸ Editing ▸ Add completion date, on by default). A task may carry `due:YYYY-MM-DD` or `📅 YYYY-MM-DD`.
 - AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them labelled `[superseded]`. The context record lists what was left out.
