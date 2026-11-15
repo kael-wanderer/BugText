@@ -4,7 +4,7 @@ Branch `feat/trust-resume` from `787816a`, built from `plan.md` in this folder (
 
 ## Status
 
-All 9 tasks are built and every automated check passes. Not reviewed yet: Fable reviews the branch from `review-request.md`. The manual cases TRU-01 to TRU-14 in `docs/test-cases/30-trust-resume.md` have not been run.
+All 9 tasks are built and every automated check passes. Not reviewed yet: Fable reviews the branch from `review-request.md`. The manual cases TRU-01 to TRU-14 in `docs/test-cases/30-trust-resume.md` were run on 2026-11-15 (Claude, release build, second display): all pass, findings under "Manual run".
 
 ## What was built, per task
 
@@ -51,3 +51,29 @@ All 9 tasks are built and every automated check passes. Not reviewed yet: Fable 
 
 - The overview and Table view tabs are not restored after a restart (plan decision 8).
 - An overview tab keeps the folder it was opened for; after opening another folder it shows that folder's notes only if they are under the old path (otherwise empty sections).
+
+## Manual run (2026-11-15, release build, second display)
+
+All 14 cases pass. The test folder held `old.md`, `new.md`, `draft.md`, `web.md`, `plain.md`, `a.md`, `closed.md`, `badyaml.md`, `tasks.md`, `decision.md` and `sub/inner.md`. Afterwards `settings.json` and `agent.json` were restored from the backup, the test folder's Recovery snapshots, review index and AI conversation were removed from the app folder, and the clipboard was restored. The owner's installed BugText and its Recovery drafts were not touched.
+
+Confirmed in the app:
+
+- the write routes. An open dirty tab changes as one ⌘Z step, with the disk unchanged. A closed note gets a "Before mark superseded" or "Before task edit" snapshot first. Broken YAML and a stale task line write nothing.
+- AI folder search with the setting off: "Left out 1 superseded note: old.md".
+- the Project Overview for the root folder and for a sub-folder, Open Review, and that overview tabs are gone after a restart.
+
+Findings, none blocking:
+
+1. The Filter panel's Draft, Current and Superseded chips have no style, so the pressed one looks the same as the others (TRU-06). Fix: style `.filter-status-chips button` and `[aria-pressed="true"]`.
+2. With "Include superseded notes" on, the context record lists the superseded note's excerpt without marking it (TRU-07). The data is in `sent.excerpts[i].superseded`, but `context-sent.ts` does not show it. Fix: add "(superseded)" after the path.
+3. Ticking a task in an open, unsaved note from the overview, or from Tasks in Folder, changes the tab, but the row stays unticked until the note is saved, because both lists read the index built from disk (TRU-13). Ticking it again is refused as stale. Fix idea: drop the row right after a successful tick, or toast "Ticked in the open tab. Save to update the list."
+4. Copy as Markdown writes tasks as live `- [ ]` lines (TRU-14). Pasted into a note in the same folder, each one shows up again in Tasks in Folder and the overview. Fix: write plain bullets.
+5. A web `superseded_by` target reads "Superseded by x.md" (TRU-02), hiding that it is a web address. Fix: show the full target when it is not a note in the folder.
+6. Mark as Superseded By… on a note with broken YAML opens the note picker first and only then refuses (TRU-05). Fix: check the properties before the picker.
+7. Settings ▸ AI says the included excerpts are "marked [superseded]", but the build marks them with a `status="superseded"` attribute. This is wording only.
+8. Key documents show only the file name (`inner.md` for `sub/inner.md`), which is ambiguous for notes in sub-folders.
+9. A dirty tab's status chip changes only after saving, because the chip comes from the index.
+
+Not checked in the app: the disabled checkboxes while a tick is pending and the overview error line (both unit-tested), and pasting the copied Markdown.
+
+Harness notes for the next run: the owner's Vietnamese input method changes text typed with System Events `keystroke`, so use CGEvent unicode typing. The palette input needs a click before typing.
