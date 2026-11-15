@@ -73,6 +73,11 @@ function linkTarget(link: string): string {
   return /[ ()]/.test(link) ? `<${link}>` : link;
 }
 
+/** Images in the converted note that still point at the web. */
+function webImageCount(markdown: string): number {
+  return (markdown.match(/!\[(?:[^\]\\]|\\.)*\]\(<?https:\/\//g) ?? []).length;
+}
+
 function imagesLine(count: number): string[] {
   if (count === 0) return [];
   return [count === 1 ? "1 image stays linked to the web." : `${count} images stay linked to the web.`];
@@ -156,7 +161,7 @@ export async function importWeb(deps: ImportDeps, ui: ImportUI): Promise<void> {
     digest: page.digest,
     ...(cleaned.title ? { title: cleaned.title } : {}),
   });
-  await finish(deps, ui, folder, where, contents, imagesLine(cleaned.webImages));
+  await finish(deps, ui, folder, where, contents, imagesLine(webImageCount(markdown)));
 }
 
 async function csvBody(deps: ImportDeps, path: string, name: string, link: string): Promise<string> {

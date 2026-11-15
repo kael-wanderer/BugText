@@ -11,6 +11,13 @@ const REMOVED =
 const KEPT_ATTRIBUTES = new Set(["href", "src", "alt", "title", "colspan", "rowspan", "lang"]);
 const LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const MAX_TITLE = 120;
+// Elements a GitHub-flavored Markdown table cell can hold. A table whose cells hold
+// anything else (paragraphs, lists, divs, nested tables) is written by Pandoc as a
+// bare "[TABLE]" with its content dropped, so such a table is flattened into blocks.
+const INLINE = new Set([
+  "a", "abbr", "b", "bdi", "bdo", "br", "cite", "code", "data", "del", "dfn", "em", "i", "img", "ins",
+  "kbd", "mark", "q", "s", "samp", "small", "span", "strong", "sub", "sup", "time", "u", "var", "wbr",
+]);
 
 function squash(text: string | null | undefined): string {
   return (text ?? "").replace(/\s+/g, " ").trim();
@@ -40,6 +47,42 @@ function removeComments(root: Node, doc: Document): void {
   for (const comment of comments) comment.parentNode?.removeChild(comment);
 }
 
+function blockCells(table: HTMLTableElement): boolean {
+  for (const row of Array.from(table.rows)) {
+    for (const cell of Array.from(row.cells)) {
+      if (Array.from(cell.querySelectorAll("*")).some((el) => !INLINE.has(el.tagName.toLowerCase()))) return true;
+    }
+  }
+  return false;
+}
+
+/** Each row becomes a block holding one block per cell; the caption becomes a paragraph. */
+function flatten(table: HTMLTableElement, doc: Document): void {
+  const out = doc.createElement("div");
+  if (table.caption) {
+    const caption = doc.createElement("p");
+    caption.append(...Array.from(table.caption.childNodes));
+    out.append(caption);
+  }
+  for (const row of Array.from(table.rows)) {
+    const block = doc.createElement("div");
+    for (const cell of Array.from(row.cells)) {
+      const part = doc.createElement("div");
+      part.append(...Array.from(cell.childNodes));
+      block.append(part);
+    }
+    out.append(block);
+  }
+  table.replaceWith(out);
+}
+
+function flattenTables(root: Element, doc: Document): void {
+  // Document order puts an outer table first; walking backwards flattens inner ones first.
+  for (const table of Array.from(root.querySelectorAll("table")).reverse()) {
+    if (blockCells(table)) flatten(table, doc);
+  }
+}
+
 function keptRoot(doc: Document): Element {
   const mains = doc.body.querySelectorAll("main");
   if (mains.length === 1) return mains[0];
@@ -55,6 +98,7 @@ export function cleanPage(html: string, baseUrl: string): Cleaned {
   for (const element of Array.from(doc.querySelectorAll(REMOVED))) element.remove();
   removeComments(doc, doc);
   const root = keptRoot(doc);
+  flattenTables(root, doc);
   let webImages = 0;
   for (const element of Array.from(root.querySelectorAll("*"))) {
     for (const name of element.getAttributeNames()) {

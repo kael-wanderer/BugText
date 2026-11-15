@@ -19,7 +19,15 @@ function shortDate(iso: string | null): string | null {
   return month ? `${Number(match[3])} ${month}` : null;
 }
 
+// Only the newest import owns the sheet: starting another closes the older sheet,
+// and a slower, older import finishing later shows nothing.
+let newest = 0;
+let closeNewest: (() => void) | null = null;
+
 export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): ImportUI {
+  const id = ++newest;
+  closeNewest?.();
+  const stale = () => id !== newest;
   const label = options.label ?? ((path: string) => path);
   let sheet: ReturnType<typeof organizeSheet> | null = null;
   let content = node("div");
@@ -47,6 +55,10 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
     return content;
   };
   const close = () => sheet?.close();
+  closeNewest = () => {
+    close();
+    settle(null);
+  };
   const actions = (...buttons: HTMLButtonElement[]) => {
     const row = node("div");
     row.className = "organize-actions";
@@ -57,6 +69,7 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
   return {
     ask({ kind, address, savePath, earlier }) {
       settle(null);
+      if (stale()) return Promise.resolve(null);
       const body = show(TITLES[kind]);
       const addressInput = node("input");
       addressInput.type = "url";
@@ -118,6 +131,7 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       });
     },
     busy(text) {
+      if (stale()) return;
       const body = show(title);
       const status = node("p", text);
       status.setAttribute("role", "status");
@@ -128,6 +142,7 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       body.append(status, actions(cancel, submit));
     },
     result({ path, problems }) {
+      if (stale()) return;
       const body = show(title);
       body.append(node("p", `Imported ${label(path)}`));
       if (problems.length > 0) {
@@ -144,6 +159,7 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
     },
     fail(text) {
       settle(null);
+      if (stale()) return;
       const body = show(title);
       const error = node("p", text);
       error.className = "organize-error";

@@ -108,4 +108,31 @@ describe("cleanPage", () => {
     expect(cleanPage(`<p>x</p>`, BASE).title).toBe("");
     expect(cleanPage(`<title>${"a".repeat(200)}</title>`, BASE).title).toHaveLength(120);
   });
+
+  it("flattens a table whose cells hold blocks, so Pandoc does not drop it", () => {
+    const { html } = cleanPage(
+      `<table><caption>Info</caption><tr><th>Name</th><td><p>One</p><ul><li>two</li></ul></td></tr>` +
+        `<tr><td colspan="2"><div><img src="https://e.com/a.png" alt="logo"></div></td></tr></table>` +
+        `<table><tr><th>h</th></tr><tr><td>plain <b>x</b></td></tr></table>`,
+      BASE,
+    );
+    const doc = parse(html);
+    expect(doc.querySelectorAll("table")).toHaveLength(1);
+    expect(doc.querySelector("table")!.textContent).toContain("plain");
+    const text = doc.body.textContent ?? "";
+    for (const word of ["Info", "Name", "One", "two"]) expect(text).toContain(word);
+    expect(doc.querySelector("img")!.getAttribute("src")).toBe("https://e.com/a.png");
+  });
+
+  it("flattens a table that holds a table, keeping a simple inner table", () => {
+    const { html } = cleanPage(
+      `<table><tr><td><table><tr><td><p>deep</p></td></tr></table><table><tr><td>inner</td></tr></table></td></tr></table>`,
+      BASE,
+    );
+    const doc = parse(html);
+    expect(doc.querySelectorAll("table table")).toHaveLength(0);
+    expect(doc.querySelectorAll("table")).toHaveLength(1);
+    expect(doc.querySelector("table")!.textContent).toBe("inner");
+    expect(doc.body.textContent).toContain("deep");
+  });
 });

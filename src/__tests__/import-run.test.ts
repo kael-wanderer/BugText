@@ -116,16 +116,19 @@ describe("importWeb", () => {
     expect(deps.create).not.toHaveBeenCalled();
   });
 
-  it("reports images that stay on the web", async () => {
+  it("counts the web images that reach the note", async () => {
     const three = setup({
-      html: `<p>x</p><img src="https://e.com/1.png"><img src="https://e.com/2.png"><img src="/3.png">`,
+      markdown: "![a](https://e.com/1.png) ![b](<https://e.com/2 x.png>)\n\n![](https://e.com/3.png)\n[link](https://e.com/)\n",
       answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }],
     });
     await importWeb(three.deps, three.ui);
     expect(three.ui.result).toHaveBeenCalledWith({ path: "/f/a.md", problems: ["3 images stay linked to the web."] });
-    const one = setup({ html: `<p>x</p><img src="https://e.com/1.png">`, answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }] });
+    const one = setup({ markdown: "text ![x](https://e.com/1.png)\n", answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }] });
     await importWeb(one.deps, one.ui);
     expect(one.ui.result).toHaveBeenCalledWith({ path: "/f/a.md", problems: ["1 image stays linked to the web."] });
+    const none = setup({ html: `<p>x</p><img src="https://e.com/1.png">`, markdown: "x\n", answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }] });
+    await importWeb(none.deps, none.ui);
+    expect(none.ui.result).toHaveBeenCalledWith({ path: "/f/a.md", problems: [] });
   });
 
   it("refuses a page with no text", async () => {

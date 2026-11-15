@@ -122,6 +122,24 @@ describe("import sheet", () => {
   });
 });
 
+describe("a second import", () => {
+  it("replaces the first import's sheet and silences the first import", async () => {
+    const first = importUI(document.body);
+    const asked = first.ask({ kind: "web", savePath: "", earlier: null });
+    const second = importUI(document.body);
+    void second.ask({ kind: "csv", savePath: "d.md", earlier: null });
+    await expect(asked).resolves.toBeNull();
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(1);
+    expect(document.querySelector("h2")?.textContent).toBe("Import CSV");
+    first.fail("late error");
+    first.result({ path: "/f/x.md", problems: [] });
+    first.busy("late");
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(1);
+    expect(text()).not.toContain("late");
+    await expect(first.ask({ kind: "web", savePath: "", earlier: null })).resolves.toBeNull();
+  });
+});
+
 describe("import commands", () => {
   const menu = readFileSync("src-tauri/src/menu.rs", "utf8");
   it("exist in the keymap and the native menu with the same ids", () => {

@@ -68,8 +68,18 @@ All 7 tasks are built and every automated check passes. The security review (Fab
 9. Pages in other charsets (Shift-JIS, windows-1252) are decoded as lossy UTF-8.
 10. An `<img>` with no `src` counts toward "N images stay linked to the web".
 
+## Manual run (2026-11-15, `npm run tauri dev`)
+
+IMP-01..14 all pass (details in `docs/test-cases/32-import.md`). Three bugs found and fixed with tests first:
+
+- Tables whose cells hold paragraphs, lists, divs or tables were written by Pandoc as `[TABLE]` with their content dropped (every Wikipedia infobox and navbox, and with them all 4 images of the Markdown article). `cleanPage` now flattens such tables into blocks; simple tables stay tables. Tests `flattens a table whose cells hold blocks…`, `flattens a table that holds a table…`.
+- The result sheet counted images before Pandoc ran ("54 images" for a note holding 38, "4" for one holding 0). The count now comes from the `![…](https://…)` images in the note. Test `counts the web images that reach the note`.
+- Starting an import while an import sheet was open stacked a second sheet; an older import finishing later reopened its sheet. Only the newest import owns the sheet now. Test `replaces the first import's sheet and silences the first import`.
+
+Suite after the fixes: 1,650 passed; startup chunk 661.70 kB. Not fixed, outside import: the ⌘K palette opens underneath an open sheet. Keychain: "Always Allow" does not survive a rebuild because the item's `partition_id` is the binary's cdhash ("BugText Local Dev" has no Team ID); see the owner note in the final report.
+
 ## Not done
 
 - Security review of Tasks 1–3 (Fable).
-- Manual cases IMP-01..14, in dev and release builds.
+- Manual cases in the release build (IMP-14's CSP half).
 - No Windows or Linux check.
