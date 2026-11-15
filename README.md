@@ -111,8 +111,18 @@ npm run tauri dev                      # run the desktop app (hot reload)
 ### Build a release bundle
 
 ```bash
-npm run tauri build
+scripts/make-local-signing-cert.sh   # one-time: creates the "BugText Local Dev" identity
+npm run build:app                    # app + DMG, signed with that identity
 ```
+
+Every build handed out is built with `npm run build:app`, never plain
+`npm run tauri build`. The script sets `APPLE_SIGNING_IDENTITY="BugText Local Dev"`,
+stops when the identity is missing, and checks the signature afterwards. The macOS
+Keychain ties "Always Allow" on saved API keys to the app's signing certificate; with
+the same certificate on every build, an update keeps access to the keys. An ad-hoc
+signed build is a new app to the Keychain and asks for the login password again.
+`BUGTEXT_ALLOW_ADHOC=1 npm run build:app` makes a local ad-hoc build that is not
+handed out.
 
 ### Tests & checks
 

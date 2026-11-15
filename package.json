@@ -11,6 +11,7 @@
     "test": "vitest run",
     "vendor:tesseract": "node scripts/build-tesseract-vendor.mjs",
     "tauri": "tauri",
+    "build:app": "bash scripts/build-local-app.sh",
     "icons:app": "node scripts/build-app-icons.mjs"
   },
   "dependencies": {

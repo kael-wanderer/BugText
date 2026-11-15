@@ -70,6 +70,9 @@ Rules that hold everywhere:
 - **Settings** live in `<app config dir>/settings.json`, AI settings in `agent.json`.
 - **Build number:** `bundle.macOS.bundleVersion` in `tauri.conf.json`. Raise it by one
   for every build handed out, even when the version is unchanged; never reuse one.
+  Build every handed-out build with `npm run build:app` (signs with the "BugText Local
+  Dev" identity through `APPLE_SIGNING_IDENTITY`), never plain `npm run tauri build`:
+  an ad-hoc signature makes the Keychain ask for the password again after an update.
 - **Heavy engines load on demand** so the startup chunk stays under the 800 kB
   warning limit in `vite.config.ts`.
 - Document PDF/DOCX export needs `brew install pandoc typst`.

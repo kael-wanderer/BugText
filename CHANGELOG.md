@@ -69,6 +69,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Changed
+- Builds are signed with the stable local identity "BugText Local Dev" (`npm run build:app`, which sets `APPLE_SIGNING_IDENTITY`), so after an update the macOS Keychain keeps "Always Allow" for saved API keys instead of asking for the login password again. The first build signed this way asks once per saved key.
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
