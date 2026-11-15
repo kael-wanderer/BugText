@@ -1484,15 +1484,17 @@ function showOverview(folder = getState().folder): void {
   void linkIndex.ensure().then(renderAll, () => showToast("Could not index notes."));
 }
 const overviewKeys = new WeakMap<HTMLElement, unknown[]>();
+let indexVersion = 0; // linkIndex.notes() is a fresh array per call; the overview keys on this instead.
+linkIndex.subscribe(() => { indexVersion++; });
 function renderOverviewTab(host: HTMLElement, folder: string): void {
-  const notes = linkIndex.notes(), snapshot = review.snapshot(), today = localToday();
-  const key = [folder, notes, snapshot, today];
+  const snapshot = review.snapshot(), today = localToday();
+  const key = [folder, indexVersion, snapshot, today];
   const last = overviewKeys.get(host);
   if (last && last.every((part, i) => part === key[i])) return;
   overviewKeys.set(host, key);
   void Promise.all([import("./overview/model"), import("./overview/view"), import("./task-inbox/write")]).then(([model, view, write]) => {
     if (overviewKeys.get(host) !== key) return;
-    const overview = model.buildOverview({ folder, reviewRoot: snapshot?.folder ?? null, notes, review: snapshot?.items ?? [], today, now: Date.now() });
+    const overview = model.buildOverview({ folder, reviewRoot: snapshot?.folder ?? null, notes: linkIndex.notes(), review: snapshot?.items ?? [], today, now: Date.now() });
     view.renderOverview(host, overview, {
       today,
       open: (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line ?? 1)); },
