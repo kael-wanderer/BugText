@@ -151,3 +151,14 @@ it("compacts known paths for the scan request without changing stamp values", as
   const { compactKnown } = await import("../links/index");
   expect(compactKnown("/long/folder/", { "/long/folder/a.md": "10:123", "/other/a.md": "2:4" })).toEqual({ "a.md": "10:123", "/other/a.md": "2:4" });
 });
+it("reads modification times from scan stamps", async () => {
+  let calls = 0;
+  const index = createLinkIndex(async () => calls++ === 0
+    ? { notes: [parseNote("/r/a.md", "a")], stamps: { "/r/a.md": "10:1762905600000000000" }, skipped: [] }
+    : { notes: [], stamps: { "/r/a.md": "11:1762905700123456789" }, removed: [], skipped: [] });
+  await index.ensure("/r");
+  expect(index.modifiedMs("/r/a.md")).toBe(1762905600000);
+  expect(index.modifiedMs("/r/none.md")).toBeNull();
+  await index.refresh();
+  expect(index.modifiedMs("/r/a.md")).toBe(1762905700123);
+});
