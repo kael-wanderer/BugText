@@ -2,8 +2,9 @@ import type { IndexedNote } from "../links/index";
 import { scanMarkdownLines } from "../markdown-blocks";
 import { taskAt, taskToggleEdits, type TextChange } from "../tasks";
 import { tagAncestors, tagKey } from "../properties/tags";
+import { taskDue } from "./dates";
 
-export type InboxTask = { path: string; source: string; line: number; offset: number; checked: boolean; text: string; heading: string };
+export type InboxTask = { path: string; source: string; line: number; offset: number; checked: boolean; text: string; heading: string; due: string | null };
 export type InboxFilter = { state: "incomplete" | "completed" | "all"; tag: string; folder: string };
 
 const cached = new WeakMap<IndexedNote, InboxTask[]>();
@@ -17,7 +18,7 @@ export function noteTasks(note: IndexedNote): InboxTask[] {
       const headingMatch = /^ {0,3}#{1,6}\s+(.+)$/.exec(line);
       if (headingMatch) heading = headingMatch[1];
       const marker = taskAt(line);
-      if (marker) tasks.push({ path: note.path, source: note.source, line: index + 1, offset, checked: marker.checked, text: line.slice(marker.offset + 2).trim(), heading });
+      if (marker) { const text = line.slice(marker.offset + 2).trim(); tasks.push({ path: note.path, source: note.source, line: index + 1, offset, checked: marker.checked, text, heading, due: taskDue(text) }); }
     }
     offset += line.length + 1;
   });

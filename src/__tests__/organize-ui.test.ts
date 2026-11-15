@@ -11,7 +11,7 @@ const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 function setup(text = "A complete paragraph.\n") {
  const host = document.createElement("div"); document.body.append(host);
  const source = { tabId: "a", revision: 1, path: "/notes/source.md", text, from: 0, to: text.length };
- const deps: OrganizeHost = { host: () => host, getFolder: () => "/notes", getSource: () => source, apply: vi.fn(() => true), index: createLinkIndex(async () => ({ notes: [], skipped: [] })), openPath: vi.fn(async () => {}), openForEdit: vi.fn(async () => source), refreshExplorer: vi.fn(async () => {}), afterDiskWrite: vi.fn(), getTemplates: () => ({ folder: "", dateFormat: "YYYY-MM-DD", defaultFolder: "", lastUsed: "" }) as ReturnType<OrganizeHost["getTemplates"]> };
+ const deps: OrganizeHost = { host: () => host, getFolder: () => "/notes", getSource: () => source, apply: vi.fn(() => true), index: createLinkIndex(async () => ({ notes: [], skipped: [] })), openPath: vi.fn(async () => {}), taskWriter: () => { throw new Error("not used"); }, refreshExplorer: vi.fn(async () => {}), afterDiskWrite: vi.fn(), getTemplates: () => ({ folder: "", dateFormat: "YYYY-MM-DD", defaultFolder: "", lastUsed: "" }) as ReturnType<OrganizeHost["getTemplates"]> };
  return { host, source, deps, actions: createOrganizeActions(deps) };
 }
 const button = (host: HTMLElement, label: string) => [...host.querySelectorAll("button")].find(b => b.textContent === label)!;

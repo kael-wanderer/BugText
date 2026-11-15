@@ -1600,6 +1600,23 @@ function travelHistory(direction: "back" | "forward"): void {
 type OrganizeActions = ReturnType<typeof import("./notes/actions").createOrganizeActions>;
 let organizeActions: OrganizeActions | undefined;
 // Loaded on first use so the organize code (extract, tasks, note types) stays out of the startup bundle.
+/** Ticks tasks from Tasks in Folder and Project Overview (spec 4.3). */
+function taskWriter(): import("./task-inbox/write").TaskWriteDeps {
+  const folder = getState().folder;
+  return {
+    folder: () => (getState().folder === folder ? folder : null),
+    findOpen: (path) => {
+      const found = findTabByPath(getState().windows, path); if (!found) return null;
+      const editor = editorForTab(found.tab.id);
+      return { text: editor.getText(found.tab.id), apply: (changes) => { editor.applyChanges(found.tab.id, changes, { isolate: true }); return true; } };
+    },
+    read: (path) => invoke<string>("read_file", { path }),
+    snapshot: async (path, text) => { await manualSnapshot(path, text, "Before task edit", true); },
+    write: async (path, contents, expected) => { if (getState().folder !== folder) throw new Error("The folder changed. Refresh the tasks list."); await invoke("write_file_atomic", { path, contents, folder, expected }); },
+    changed: (path, text) => { linkIndex.onFileChanged(path, text); workspaceIndex.onFileChanged(path, text); },
+    stamp: () => (currentSettings.tasks.stampCompletion ? localToday() : null),
+  };
+}
 function withOrganize(run: (actions: OrganizeActions) => void): void {
   if (organizeActions) { run(organizeActions); return; }
   void import("./notes/actions").then(({ createOrganizeActions }) => {
@@ -1621,16 +1638,10 @@ function withOrganize(run: (actions: OrganizeActions) => void): void {
       },
       index: linkIndex,
       openPath: async (path) => { await doOpenPath(path); },
-      // Only tabs open in the active window can be edited in place; others report that the note must be opened first.
-      openForEdit: async (path) => {
-        const tab = activeWindow().tabs.find((candidate) => candidate.path === path);
-        if (!tab) return null;
-        const editor = activeView().editor;
-        return { tabId: tab.id, path, text: editor.getText(tab.id), revision: editor.revision(tab.id), from: 0, to: 0 };
-      },
       refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
       afterDiskWrite,
       getTemplates: () => currentSettings.templates,
+      taskWriter,
     });
     run(organizeActions!);
   });
