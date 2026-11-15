@@ -233,6 +233,8 @@ import { tableCommandFromId, tableMenuItems } from "./table-menu";
 import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 import { forgetPropertiesExpansion } from "./properties/card";
+import { lifecycleOf, localToday, type LifecycleStatus } from "./lifecycle/model";
+import { loadProperties } from "./properties/loader";
 
 const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
 const diagnostics = createDiagnostics();
@@ -1091,6 +1093,7 @@ const handlers = {
   },
   onGraphFolder: () => { void pickFolder().then(folder => { if (folder) void openFolder(folder); }); },
   renderTable: renderTableSurface,
+  tabStatus: (tab: TabMeta) => (tab.path ? statusByPath.get(tab.path) ?? null : null),
   livePreviewEnabled: () => livePreviewOn,
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
@@ -1148,6 +1151,7 @@ const handlers = {
   onPreviewRendered: (wid: string) => {
     reviewRenders.set(wid, (reviewRenders.get(wid) ?? 0) + 1);
     if (review.snapshot()?.items.length) void updateReviewBar(wid);
+    void updateLifecycleBar(wid);
   },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   onStatusChange: refreshStatusBar,
@@ -1501,6 +1505,17 @@ function filterPanelModel() {
 let currentTableFilter: import("./properties/filter-query").FilterModel | null = null;
 const indexRender = createFrameCoalescer(renderAll);
 linkIndex.subscribe(() => indexRender.request());
+// Lifecycle status per note (spec 4.1), for tab chips and AI folder search.
+const statusByPath = new Map<string, LifecycleStatus>();
+linkIndex.subscribe(() => {
+  const next = new Map<string, LifecycleStatus>();
+  for (const note of linkIndex.notes()) { const status = lifecycleOf(note.properties).status; if (status) next.set(note.path, status); }
+  const same = next.size === statusByPath.size && [...next].every(([path, status]) => statusByPath.get(path) === status);
+  if (same) return;
+  statusByPath.clear(); for (const [path, status] of next) statusByPath.set(path, status);
+  for (const view of views.values()) view.render();
+  refreshLifecycleBars();
+});
 
 function renderAll(): void {
   refreshFirstRunHint();
@@ -3754,6 +3769,42 @@ reviewListeners.push((snapshot, error) => {
   refreshReviewBars();
 });
 
+// Lifecycle bar (spec 4.1): superseded and review-due lines over a note in Reading view.
+const lifecycleBarKeys = new Map<string, string>();
+/** Settings ▸ AI ▸ Context ▸ Include superseded notes (Task 4). */
+const includeSuperseded = (): boolean => false;
+function refreshLifecycleBars(): void { for (const wid of views.keys()) void updateLifecycleBar(wid); }
+async function updateLifecycleBar(wid: string): Promise<void> {
+  const view = views.get(wid);
+  const windowState = getWindow(wid);
+  if (!view || !windowState) return;
+  const tab = windowState.tabs.find(t => t.id === windowState.activeTabId);
+  const shown = windowState.mode === "preview" && tab?.path && isMarkdownFile(tab.path) ? tab : null;
+  const text = shown ? view.editor.getText(shown.id) : "";
+  const key = shown ? `${shown.id}|${localToday()}|${includeSuperseded()}|${text}` : "";
+  if (lifecycleBarKeys.get(wid) === key) return;
+  lifecycleBarKeys.set(wid, key);
+  if (!shown) { view.lifecycleHost.replaceChildren(); view.lifecycleHost.hidden = true; return; }
+  const [{ readProperties }, { renderLifecycleBar }] = await Promise.all([loadProperties(), import("./lifecycle/bar")]);
+  if (lifecycleBarKeys.get(wid) !== key) return;
+  const result = readProperties(text);
+  const lifecycle = lifecycleOf(result?.ok ? result.props : null);
+  const notePath = shown.path!;
+  renderLifecycleBar(view.lifecycleHost, {
+    lifecycle, today: localToday(),
+    leftOutOfAI: lifecycle.status === "superseded" && !includeSuperseded(),
+  }, { open: target => void openSupersedingNote(target, notePath) });
+}
+async function openSupersedingNote(target: string, notePath: string): Promise<void> {
+  const folder = getState().folder;
+  const { supersedingPath } = await import("./lifecycle/open");
+  const resolved = supersedingPath(target, notePath, folder);
+  if ("error" in resolved) { showToast(resolved.error); return; }
+  try { await invoke<string>("read_file", { path: resolved.path, folder }); }
+  catch { showToast(`Note not found: ${basename(resolved.path)}`); return; }
+  await doOpenPath(resolved.path);
+}
+
 // Review bar and change marks for a queued note in Reading view.
 const reviewBarKeys = new Map<string, string>();
 const reviewRenders = new Map<string, number>();
@@ -4272,6 +4323,7 @@ subscribe(() => {
   persistUiState();
   scheduleWindowReport();
   if (review.snapshot()?.items.length || reviewBarKeys.size) refreshReviewBars();
+  refreshLifecycleBars();
 });
 
 const refreshOnFocus = createFocusDeduper(() => {

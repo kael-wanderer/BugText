@@ -1,4 +1,7 @@
 import { countWords } from "./status-bar/model";
+import type { TabMeta } from "./tabops";
+import type { LifecycleStatus } from "./lifecycle/model";
+import { lifecycleChip } from "./lifecycle/chip";
 import { revealScroll } from "./tab-reveal";
 import { createGraphView } from "./graph/view";
 import { createGraphTab } from "./graph/tab";
@@ -71,6 +74,8 @@ export type WindowHandlers = WindowViewHooks & {
   onGraphFolder?: () => void;
   onGraphNew?: () => void;
   renderTable?: (host: HTMLElement) => void;
+  /** Lifecycle status shown as a chip after the tab name. */
+  tabStatus?: (tab: TabMeta) => LifecycleStatus | null;
   livePreviewEnabled?: () => boolean;
   onStatusChange?: () => void;
   onWordCount?: (tabId: string, count: number, text: string) => void;
@@ -150,6 +155,7 @@ export type WindowView = {
   openFind: () => boolean;
   /** Host for the review bar, above the panes. */
   reviewHost: HTMLElement;
+  lifecycleHost: HTMLElement;
   /** The reading view's scroll container. */
   previewElement: HTMLElement;
   /** The editor pane, for reading where a selection sits. */
@@ -227,6 +233,7 @@ export function createWindowView(
       </div>
     </div>
     <div class="review-bar" role="region" aria-label="Review" hidden></div>
+    <div class="lifecycle-bar" role="region" aria-label="Document status" hidden></div>
     <div class="window-panes">
       <div class="pane pane-editor">
         <div class="format-toolbar" role="toolbar" aria-label="Markdown formatting">
@@ -782,7 +789,10 @@ export function createWindowView(
         keep.addEventListener("click", event => { event.stopPropagation(); h.onKeepTab?.(windowId, t.id); });
         tab.append(keep);
       }
-      tab.append(dot, tabIcon, name, close);
+      tab.append(dot, tabIcon, name);
+      const status = h.tabStatus?.(t);
+      if (status) tab.append(lifecycleChip(document, status));
+      tab.append(close);
       tabbarEl.appendChild(tab);
       if (t.id === w.activeTabId) activeTabEl = tab;
     }
@@ -1239,6 +1249,7 @@ export function createWindowView(
 
   return {
     reviewHost: root.querySelector<HTMLElement>(".review-bar")!,
+    lifecycleHost: root.querySelector<HTMLElement>(".lifecycle-bar")!,
     previewElement: previewPane,
     editorElement: editorPane,
     refreshNotes,

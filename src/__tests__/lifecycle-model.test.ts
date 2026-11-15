@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lifecycleOf, localToday, reviewDue, shortDate, supersedeTarget } from "../lifecycle/model";
+import { supersedingPath } from "../lifecycle/open";
 
 describe("lifecycleOf", () => {
   it("reads the three properties", () => {
@@ -41,5 +42,18 @@ describe("dates", () => {
   });
   it("gives today's local date", () => {
     expect(localToday(new Date(2026, 10, 5, 23, 59))).toBe("2026-11-05");
+  });
+});
+
+describe("supersedingPath", () => {
+  it("opens only notes inside the folder", () => {
+    expect(supersedingPath("b.md", "/r/docs/a.md", "/r")).toEqual({ path: "/r/docs/b.md" });
+    expect(supersedingPath("../c.md", "/r/docs/a.md", "/r")).toEqual({ path: "/r/c.md" });
+    const refused = { error: "Opens only notes in this folder." };
+    expect(supersedingPath("https://example.com/x.md", "/r/a.md", "/r")).toEqual(refused);
+    expect(supersedingPath("../../etc/x.md", "/r/docs/a.md", "/r")).toEqual(refused);
+    expect(supersedingPath("/r/b.md", "/r/a.md", "/r")).toEqual(refused);
+    expect(supersedingPath("b.pdf", "/r/a.md", "/r")).toEqual(refused);
+    expect(supersedingPath("b.md", "/r/a.md", null)).toEqual(refused);
   });
 });

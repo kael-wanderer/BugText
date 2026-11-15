@@ -3781,6 +3781,17 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 .tree-row.review-queued .tree-name::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .window > .review-bar { padding: 8px 14px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--bg)); font-size: 12.5px; }
 .window > .review-bar[hidden] { display: none; }
+/* Lifecycle (spec 4.1): status chips and the Reading view bar. */
+.lifecycle-chip { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 10.5px; line-height: 16px; white-space: nowrap; border: 1px solid var(--border); color: var(--fg-muted, var(--fg)); }
+.lifecycle-chip.is-draft { border-color: color-mix(in srgb, #d9a441 60%, var(--border)); color: #d9a441; }
+.lifecycle-chip.is-current { border-color: color-mix(in srgb, #6bb47a 60%, var(--border)); color: #6bb47a; }
+.lifecycle-chip.is-superseded { opacity: 0.75; }
+.tab .lifecycle-chip { margin-left: 4px; }
+.window > .lifecycle-bar { padding: 6px 14px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--fg) 5%, var(--bg)); font-size: 12.5px; display: flex; flex-direction: column; gap: 2px; }
+.window > .lifecycle-bar[hidden] { display: none; }
+.lifecycle-line { display: flex; align-items: center; gap: 8px; }
+.lifecycle-line button { font-size: 12px; }
+.lifecycle-line small { opacity: 0.7; }
 .review-bar-text { color: var(--text); font-variant-numeric: tabular-nums; }
 .review-bar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 .review-bar-space { flex: 1; }
