@@ -62,7 +62,9 @@ describe("overviewMarkdown", () => {
     const md = overviewMarkdown(buildOverview(input()));
     for (const heading of ["## Key documents", "## Decisions", "## Open questions and blockers", "## Next actions", "## Changed since review"]) expect(md).toContain(heading);
     expect(md).toContain("- [plan.md](plan.md) · current");
-    expect(md).toContain("- [ ] Send access list due:2026-11-10 — [plan.md](plan.md)");
+    // Plain bullets: pasted into a note in the folder, they must not become new open tasks.
+    expect(md).toContain("- Send access list due:2026-11-10 — [plan.md](plan.md)");
+    expect(md).not.toMatch(/^\s*[-*+] \[[ xX]\]/m);
     expect(md).toContain("- [plan.md](plan.md) +42 −7");
     expect(md).toContain("- [new.md](new.md) (new)");
   });

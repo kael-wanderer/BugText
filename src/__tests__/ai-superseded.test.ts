@@ -48,6 +48,13 @@ describe("superseded excerpts in messages and the context record", () => {
     expect(two.textContent).toContain("Left out 2 superseded notes: a.md, b.md");
     expect(renderContextSent({ excerpts: [], files: [], trimmed: 0 }, vi.fn())).not.toBeNull();
   });
+  it("marks an included superseded note in the record", () => {
+    const view = renderContextSent({ excerpts: [{ path: "/r/old.md", chars: 5, superseded: true }, { path: "/r/new.md", chars: 5 }], files: [], trimmed: 0 }, vi.fn())!;
+    const links = [...view.querySelectorAll("button")].map(b => b.textContent);
+    expect(links).toEqual(["/r/old.md", "/r/new.md"]);
+    expect(view.querySelector("li")!.textContent).toContain("/r/old.md (superseded)");
+    expect(view.textContent).not.toContain("/r/new.md (superseded)");
+  });
 });
 
 import { searchSettings } from "../settings-screen/registry";

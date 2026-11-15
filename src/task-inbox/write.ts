@@ -12,8 +12,8 @@ export type TaskWriteDeps = {
   snapshot: (path: string, text: string) => Promise<void>;
   /** write_file_atomic with expected text */
   write: (path: string, contents: string, expected: string) => Promise<void>;
-  /** The note's new text, for the link and workspace indexes. */
-  changed: (path: string, text: string) => void;
+  /** The note's new text, for the link and workspace indexes; saved is false for an open tab's unsaved text. */
+  changed: (path: string, text: string, saved: boolean) => void;
   stamp: () => string | null;
 };
 
@@ -27,6 +27,7 @@ export async function toggleTask(task: InboxTask, deps: TaskWriteDeps): Promise<
   if (open) {
     const changes = inboxTaskChange(task, open.text, deps.stamp());
     if (!open.apply(changes)) throw new Error("This note changed. Refresh the tasks list and try again.");
+    deps.changed(task.path, applyAll(open.text, changes), false);
     return;
   }
   const text = await deps.read(task.path);
@@ -34,5 +35,5 @@ export async function toggleTask(task: InboxTask, deps: TaskWriteDeps): Promise<
   await deps.snapshot(task.path, text);
   const next = applyAll(text, changes);
   await deps.write(task.path, next, text);
-  deps.changed(task.path, next);
+  deps.changed(task.path, next, true);
 }

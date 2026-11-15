@@ -19,7 +19,11 @@ export function renderContextSent(value: unknown, open: (path: string) => void):
   if (excerpts.length) {
     const paths = [...new Set(excerpts.map(e => e.path))];
     const li = item(`Folder search · ${excerpts.length} excerpts from ${paths.length} notes: `);
-    for (const path of paths) { const link = document.createElement("button"); link.type = "button"; link.textContent = path; link.addEventListener("click", () => open(path)); li.append(link); }
+    const superseded = new Set(excerpts.filter(e => e.superseded === true).map(e => e.path));
+    for (const path of paths) {
+      const link = document.createElement("button"); link.type = "button"; link.textContent = path; link.addEventListener("click", () => open(path)); li.append(link);
+      if (superseded.has(path)) li.append(" (superseded)");
+    }
   } else if (data.action) item("No folder excerpts (actions send only their input)");
   for (const file of data.files) if (file && typeof file.name === "string") item(`File · ${file.name}${file.pathOnly ? " (path only, CLI)" : typeof file.chars === "number" ? ` (${file.chars.toLocaleString("en-US")} chars)` : ""}`);
   const leftOut = Array.isArray(data.leftOut) ? data.leftOut.filter(e => e && typeof e.path === "string").map(e => e.path.split("/").pop() ?? e.path) : [];

@@ -72,6 +72,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Filter panel: the pressed Draft, Current or Superseded chip now looks pressed.
+- AI context record: with Include superseded notes on, an excerpt from a superseded note is marked "(superseded)".
+- Ticking a task in an open, unsaved note from Tasks in Folder or Project Overview now updates the list at once instead of after saving.
+- Project Overview Copy as Markdown writes tasks as plain bullets, so pasting it into a note in the folder no longer adds new open tasks.
 - Review: the margin mark beside a changed one-line paragraph now runs the full height of the block instead of a few pixels.
 - Review: a note that another tool replaces while BugText is saving it is no longer recorded as reviewed with the other tool's content.
 - Review: a new note's line count no longer counts the final newline as an extra line, so an empty note shows +0 and a one-line note +1.

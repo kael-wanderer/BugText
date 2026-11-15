@@ -1654,7 +1654,7 @@ function taskWriter(): import("./task-inbox/write").TaskWriteDeps {
     read: (path) => invoke<string>("read_file", { path }),
     snapshot: async (path, text) => { await manualSnapshot(path, text, "Before task edit", true); },
     write: async (path, contents, expected) => { if (getState().folder !== folder) throw new Error("The folder changed. Refresh the tasks list."); await invoke("write_file_atomic", { path, contents, folder, expected }); },
-    changed: (path, text) => { linkIndex.onFileChanged(path, text); workspaceIndex.onFileChanged(path, text); },
+    changed: (path, text, saved) => { linkIndex.onFileChanged(path, text, saved); workspaceIndex.onFileChanged(path, text); },
     stamp: () => (currentSettings.tasks.stampCompletion ? localToday() : null),
   };
 }

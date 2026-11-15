@@ -33,6 +33,8 @@ describe("toggleTask", () => {
     expect(d.read).not.toHaveBeenCalled();
     expect(d.snapshot).not.toHaveBeenCalled();
     expect(d.write).not.toHaveBeenCalled();
+    // The lists read the index: tell it the open tab's unsaved text, or the row stays unticked until saved.
+    expect(d.changed).toHaveBeenCalledWith("/r/a.md", "# A\n- [x] one ✅ 2026-11-12\n", false);
   });
   it("snapshots, then writes a closed note with the expected text", async () => {
     const { d, calls } = deps();
@@ -59,6 +61,7 @@ describe("toggleTask", () => {
   it("refuses an open note whose editor rejects the change", async () => {
     const { d } = deps({ findOpen: () => ({ text: SOURCE, apply: () => false }) });
     await expect(toggleTask(task(), d)).rejects.toThrow("This note changed. Refresh the tasks list and try again.");
+    expect(d.changed).not.toHaveBeenCalled();
   });
 });
 

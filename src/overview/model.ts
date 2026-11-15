@@ -79,7 +79,8 @@ export function overviewMarkdown(overview: ProjectOverview): string {
   };
   const link = (path: string, label = fileName(path)): string => `[${label.replace(/[[\]]/g, "")}](${rel(path)})`;
   const section = (title: string, lines: string[]): string => `## ${title}\n\n${lines.length ? lines.join("\n") : "None."}\n`;
-  const task = (t: OverviewTask): string => `- [ ] ${t.text} — ${link(t.path)}`;
+  // A plain bullet, not "- [ ]": pasted into a note in the folder, a checkbox would become a new open task.
+  const task = (t: OverviewTask): string => `- ${t.text.replace(/^\[/, "\\[")} — ${link(t.path)}`;
   const changedLine = (i: ReviewItem): string => `- ${link(overview.reviewRoot ? `${overview.reviewRoot}/${i.path}` : i.path)} ${i.state === "new" ? "(new)" : counts(i)}`.trimEnd();
   return [
     `# Overview — ${fileName(overview.folder)}\n`,
