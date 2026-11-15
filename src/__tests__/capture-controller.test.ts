@@ -164,6 +164,14 @@ describe("capture controller", () => {
     await t.capture.openNotes();
     expect(t.writer.create).not.toHaveBeenCalled();
   });
+  it("Add note takes the HTML page's <title> when it has one", async () => {
+    const t = setup({ active: () => ({ folder: "/r", path: "/r/site/page.html", text: "<html><head><title>Field &amp; Notes</title></head><h1>Page</h1></html>", passage: null }) });
+    const done = t.capture.addNote();
+    await Promise.resolve();
+    save();
+    await done;
+    expect(t.files.get("/r/site/page.notes.md")).toBe("---\nabout: \"page.html\"\n---\n\n# Notes on Field & Notes\n\n**2026-11-14** — [Field & Notes](page.html)\n");
+  });
   it("Add note writes a dated entry to the companion of an HTML file", async () => {
     const t = setup({ active: () => ({ folder: "/r", path: "/r/site/page.html", text: "<h1>Page</h1>", passage: null }) });
     const done = t.capture.addNote();

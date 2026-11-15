@@ -9,6 +9,15 @@ export function watchSelections(
   show: (rect: DOMRect) => void,
   hide: () => void,
 ): () => void {
+  // A click that starts outside the note (a toolbar button) leaves the old selection in
+  // place; it must not bring the menu back.
+  let fromNote = true;
+  const onDown = (event: MouseEvent): void => {
+    const host = current();
+    const target = event.target instanceof Node ? event.target : null;
+    fromNote = Boolean(target && (host?.pane?.contains(target) || host?.editorDom.contains(target)));
+  };
+  const onUp = (): void => { if (fromNote) check(); else hide(); };
   const check = (): void => {
     const host = current();
     const selection = doc.getSelection();
@@ -21,10 +30,12 @@ export function watchSelections(
   const onKey = (event: KeyboardEvent): void => {
     if (event.shiftKey || event.key === "Shift") check();
   };
-  doc.addEventListener("mouseup", check);
+  doc.addEventListener("mousedown", onDown, true);
+  doc.addEventListener("mouseup", onUp);
   doc.addEventListener("keyup", onKey);
   return () => {
-    doc.removeEventListener("mouseup", check);
+    doc.removeEventListener("mousedown", onDown, true);
+    doc.removeEventListener("mouseup", onUp);
     doc.removeEventListener("keyup", onKey);
   };
 }

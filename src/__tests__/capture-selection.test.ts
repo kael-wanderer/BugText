@@ -36,6 +36,18 @@ function select(start: Node, startOffset: number, end: Node, endOffset: number):
 }
 
 describe("previewPassage", () => {
+  it("leaves out the placeholder of a missing image", () => {
+    const root = document.createElement("div");
+    const p = block("p", 2, "Look ");
+    const missing = document.createElement("span");
+    missing.className = "img-missing";
+    missing.textContent = "Image not found · x";
+    p.append(missing, " and here.");
+    root.append(p);
+    document.body.append(root);
+    const passage = previewPassage(root, select(p.firstChild!, 0, p.lastChild!, 10));
+    expect(passage?.quote).toBe("Look and here.");
+  });
   it("maps a preview selection to its block's data-line", () => {
     const { pane: p, second } = pane();
     const text = second.firstChild!;

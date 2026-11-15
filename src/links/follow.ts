@@ -6,7 +6,7 @@ import { resolveLink } from "./resolve";
 import type { LinkIndex } from "./index";
 import type { createHoverCard } from "./hover-card";
 import { cardStateForTarget } from "./hover-state";
-import { captureQuote } from "../capture/link-quote";
+import { captureQuote, type CaptureQuote } from "../capture/link-quote";
 
 export type LinkContext = { path: string; text: string; folder: string | null };
 type Services = {
@@ -34,7 +34,7 @@ export function linkAt(text: string, position: number) {
     return position >= start && position <= link.end + (text[link.end] === ">" ? 2 : 1);
   });
 }
-export async function followLink(target: string, context: LinkContext, other = false, quote?: string): Promise<void> {
+export async function followLink(target: string, context: LinkContext, other = false, quote?: CaptureQuote): Promise<void> {
   const s = services;
   if (!s) return;
   const resolved = resolveLink(target, context.path, context.folder);
@@ -70,7 +70,7 @@ export async function followLink(target: string, context: LinkContext, other = f
     s.jump(line, ...where);
     if (!heading) s.toast(`Heading not found: #${resolved.anchor}`);
   }
-  if (quote && s.highlight && !(await s.highlight(quote, line, ...where))) s.toast("This passage changed after it was saved.");
+  if (quote && s.highlight && !(await s.highlight(quote.text, line, ...where)) && !quote.task) s.toast("This passage changed after it was saved.");
 }
 export function followEditorLink(id: string, text: string, position: number) {
   const context = services?.context(id);

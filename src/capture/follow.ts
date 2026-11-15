@@ -43,6 +43,7 @@ export function findQuote(pane: HTMLElement, quote: string, fromLine: number): R
   let start = -1;
   for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
     const holder = node.parentElement;
+    if (holder?.closest(".img-missing")) continue; // a missing-image placeholder is not note text
     const owner = holder?.closest(BLOCKS) ?? null;
     if (owner !== lastBlock && flat && !flat.endsWith(" ")) { flat += " "; map.push([node, 0]); }
     lastBlock = owner;

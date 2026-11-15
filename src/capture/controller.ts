@@ -2,7 +2,7 @@
 // Add note do. main.ts supplies the app services; this file holds the flow.
 
 import type { Settings } from "../settings";
-import { closeFence, escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
+import { closeFence, escapeMarkdown, excerptBlock, htmlTitle, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
 import type { CaptureAction } from "./menu";
 import { pickNote } from "./note-picker";
 import type { Passage } from "./selection";
@@ -137,7 +137,7 @@ export function createCapture(host: CaptureHost) {
     async addNote(): Promise<void> {
       const src = source();
       if (!src) return;
-      const title = sourceRef(src.path, src.text, 1).title;
+      const title = htmlTitle(src.text) || sourceRef(src.path, src.text, 1).title;
       const target = companion(src, title);
       if (!target) return;
       const result = await showCaptureSheet(host.doc, {

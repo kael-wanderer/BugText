@@ -90,6 +90,7 @@ export function showCaptureSheet(doc: Document, input: SheetInput): Promise<Shee
     submit.type = "submit";
     actions.append(cancel, submit);
     form.append(error, actions);
+    taskField?.addEventListener("input", () => { error.textContent = ""; });
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();

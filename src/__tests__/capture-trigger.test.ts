@@ -50,6 +50,19 @@ describe("watchSelections", () => {
     expect(hide).toHaveBeenCalled();
     stop();
   });
+  it("ignores a click that started outside the note, such as a toolbar button", () => {
+    const { p, other, show, hide, stop, select } = setup();
+    select(p.firstChild!, 0, 4);
+    show.mockClear();
+    other.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    other.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    expect(show).not.toHaveBeenCalled();
+    expect(hide).toHaveBeenCalled();
+    p.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    other.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    expect(show).toHaveBeenCalledTimes(1); // a drag from the note that ends outside it still counts
+    stop();
+  });
   it("stops listening", () => {
     const { p, show, stop, select } = setup();
     stop();

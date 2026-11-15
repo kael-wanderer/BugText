@@ -75,4 +75,16 @@ describe("capture sheet", () => {
     expect(sheet().querySelector(".capture-quote")).toBeNull();
     expect(sheet().querySelector('input[type="radio"]')).toBeNull();
   });
+  it("clears the empty-task error once the owner types", async () => {
+    const done = showCaptureSheet(document, { kind: "task", quote: "", label: "Doc", target: { kind: "daily" }, targetHint: () => "", chooseNote: async () => null });
+    document.querySelector<HTMLFormElement>("form.capture-sheet")!.requestSubmit();
+    const error = document.querySelector(".capture-error")!;
+    expect(error.textContent).toBe("Write the task first.");
+    const field = document.querySelector<HTMLInputElement>("input.capture-task")!;
+    field.value = "Do it";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(error.textContent).toBe("");
+    document.querySelector<HTMLButtonElement>(".capture-cancel")!.click();
+    await done;
+  });
 });

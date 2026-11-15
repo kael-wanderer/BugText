@@ -29,14 +29,14 @@ describe("captureQuote", () => {
       block("p", 3, "a\nb"), "\n",
       block("p", 6, "c\n— ", a, " · 2026-11-14"));
     document.body.append(quote);
-    expect(captureQuote(a)).toBe("a\nb\nc");
+    expect(captureQuote(a)).toEqual({ text: "a\nb\nc", task: false });
   });
   it("reads the quote of a task source link", () => {
     const a = link("source");
     const item = block("li", 11, "[ ] Verify x (", a, ")");
     item.className = "task";
     document.body.append(item);
-    expect(captureQuote(a)).toBe("Verify x");
+    expect(captureQuote(a)).toEqual({ text: "Verify x", task: true });
   });
   it("ignores ordinary links", () => {
     const inText = link("Doc");
@@ -52,6 +52,12 @@ describe("captureQuote", () => {
 });
 
 describe("findQuote", () => {
+  it("skips the placeholder of a missing image", () => {
+    const root = document.createElement("div");
+    const missing = Object.assign(document.createElement("span"), { className: "img-missing", textContent: "Image not found · x" });
+    root.append(block("p", 1, "Look ", missing, " and here."));
+    expect(findQuote(root, "Look and here.", 1)?.toString()).toBe("Look Image not found · x and here.");
+  });
   function pane(): HTMLElement {
     const root = document.createElement("div");
     root.append(
@@ -94,17 +100,23 @@ describe("followLink with a quote", () => {
   const context = { path: "/r/notes.md", text: "", folder: "/r" };
   it("followLink toasts when highlight fails", async () => {
     const s = setup(undefined);
-    await followLink("a.md#h", context, false, "text");
+    await followLink("a.md#h", context, false, { text: "text", task: false });
     expect(s.highlight).toHaveBeenCalledWith("text", 1);
     expect(s.toast).toHaveBeenCalledWith("This passage changed after it was saved.");
     s.toast.mockClear();
-    await followLink("a.md#gone", context, false, "text");
+    await followLink("a.md#gone", context, false, { text: "text", task: false });
     expect(s.toast.mock.calls.map((call) => call[0])).toEqual(["Heading not found: #gone", "This passage changed after it was saved."]);
+  });
+  it("followLink stays quiet when a task's own words are not found", async () => {
+    const s = setup(undefined);
+    await followLink("a.md#h", context, false, { text: "my edited task", task: true });
+    expect(s.highlight).toHaveBeenCalledWith("my edited task", 1);
+    expect(s.toast).not.toHaveBeenCalled();
   });
   it("followLink jumps in the window it opened", async () => {
     const s = setup("sub");
     s.highlight.mockResolvedValue(true);
-    await followLink("a.md#h", context, true, "text");
+    await followLink("a.md#h", context, true, { text: "text", task: false });
     expect(s.open).toHaveBeenCalledWith("/r/a.md", true);
     expect(s.jump).toHaveBeenCalledWith(1, "sub");
     expect(s.highlight).toHaveBeenCalledWith("text", 1, "sub");
@@ -133,7 +145,7 @@ describe("preview text round-trip", () => {
     it(`reads back "${selected}" as selected`, () => {
       expect(findQuote(rendered(source), selected, 1)?.toString().replace(/\s+/g, " ")).toBe(selected);
       const notes = rendered(excerptBlock(escapeMarkdown(selected), "Doc › H", "doc.md#h", "2026-11-15", ""));
-      expect(captureQuote(notes.querySelector("a")!)).toBe(selected);
+      expect(captureQuote(notes.querySelector("a")!)?.text).toBe(selected);
     });
   }
 });

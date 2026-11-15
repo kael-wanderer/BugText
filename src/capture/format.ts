@@ -24,6 +24,11 @@ export function sourceRef(sourcePath: string, sourceText: string, line: number):
   return { title, heading: nearest?.text ?? null, anchor: nearest?.anchor ?? null };
 }
 
+/** An HTML page's <title> (entities decoded; the parsed document is inert), else "". */
+export function htmlTitle(html: string): string {
+  return new DOMParser().parseFromString(html, "text/html").title.trim();
+}
+
 const oneLine = (text: string): string => text.replace(/[[\]\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 
 /** "Architecture › Sync model", or "Architecture" without a heading (or when the heading is the title). */

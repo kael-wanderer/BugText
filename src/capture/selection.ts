@@ -37,12 +37,19 @@ function lastLineOf(end: { element: HTMLElement; line: number }, pane: HTMLEleme
   return Infinity;
 }
 
+/** The selected text minus missing-image placeholders, which are not part of the note. */
+function textWithoutPlaceholders(range: Range): string {
+  const copy = range.cloneContents();
+  copy.querySelectorAll(".img-missing").forEach((node) => node.replaceWith("\u0000"));
+  return (copy.textContent ?? "").replace(/[ \t]*\u0000[ \t]*/g, " ");
+}
+
 /** Selection inside a rendered Markdown preview pane; null when empty or outside it. */
 export function previewPassage(pane: HTMLElement, selection: Selection | null): Passage | null {
   if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
   const range = selection.getRangeAt(0);
   if (!pane.contains(range.startContainer) || !pane.contains(range.endContainer)) return null;
-  const quote = cleanQuote(selection.toString());
+  const quote = cleanQuote(textWithoutPlaceholders(range));
   if (!quote) return null;
   const start = blockOf(range.startContainer, pane);
   const end = blockOf(range.endContainer, pane);
