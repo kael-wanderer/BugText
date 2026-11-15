@@ -11,7 +11,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Project Overview (View menu, palette, Explorer folder menu): a generated tab with key documents, decisions, open questions and blockers, next actions and changes since review, each linked to its source. Tasks can be ticked there. Copy as Markdown.
 - Tasks in Folder groups tasks by Overdue, Today, This week, Later and No date, and ticks tasks in closed notes after a Recovery snapshot.
 - Tasks: checking a task adds ` ✅ <date>` and unchecking removes it (Settings ▸ Editing ▸ Add completion date, on by default). A task may carry `due:YYYY-MM-DD` or `📅 YYYY-MM-DD`.
-- AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them labelled `[superseded]`. The context record lists what was left out.
+- AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them tagged `status="superseded"`. The context record lists what was left out.
 - Mark as Superseded By… (palette, File menu, Explorer) sets `status` and `superseded_by` in one step. The Filter panel has Draft, Current and Superseded chips.
 - Document status: `status: draft | current | superseded` shows a chip on the tab and the properties card; Reading view shows "Superseded by … · Open" and "Review was due …" from `superseded_by` and `review_by`.
 - Capture while reading: select text in a Markdown note and choose Excerpt, Task, Ask AI or Copy link. An excerpt is saved as a quote with a link back to its heading, a task as a checklist line; both go to the note's companion notes file, today's daily note or a note you choose, remembered per folder. Text selected in Reading view is saved with Markdown characters escaped, so the saved quote reads exactly as selected. A note that is closed gets a Recovery snapshot first; an open one changes as one undo step. Edit menu: Save Excerpt… (⇧⌘E), Task from Selection…. Ask AI on text selected in Reading view sends the whole passage, even when its source has inline formatting.
@@ -73,6 +73,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Settings ▸ AI ▸ Context: Include superseded notes now describes the tag as it is sent (`status="superseded"`), not as `[superseded]`.
 - Reading view: a `superseded_by` that is not a note in the folder, such as a web address, shows in full ("Superseded by https://example.com/x.md") instead of only its last part.
 - Mark as Superseded By…: a failed write shows "Could not mark this note." instead of the raw system error.
 - Mark as Superseded By… on a note with broken properties says so before the note picker opens, not after a note is chosen.

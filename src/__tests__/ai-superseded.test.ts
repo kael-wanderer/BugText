@@ -71,4 +71,11 @@ describe("Settings ▸ AI ▸ Context", () => {
     box.checked = true; box.dispatchEvent(new Event("change"));
     expect(change.mock.calls[0][0].context.includeSuperseded).toBe(true);
   });
+  it("describes the tag the way it is sent", () => {
+    const host = document.createElement("div");
+    renderContext(host, { getAISettings: () => structuredClone(DEFAULT_AI_SETTINGS), getSettings: () => DEFAULT_SETTINGS, onAISettingsChange: vi.fn(), onSettingsChange: vi.fn() });
+    const text = host.querySelector('[data-setting="context-superseded"]')?.textContent ?? host.textContent ?? "";
+    expect(text).not.toContain("[superseded]");
+    expect(text).toContain('status="superseded"');
+  });
 });
