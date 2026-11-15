@@ -2,7 +2,7 @@
 // Add note do. main.ts supplies the app services; this file holds the flow.
 
 import type { Settings } from "../settings";
-import { escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
+import { closeFence, escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
 import type { CaptureAction } from "./menu";
 import { pickNote } from "./note-picker";
 import type { Passage } from "./selection";
@@ -89,13 +89,14 @@ export function createCapture(host: CaptureHost) {
     const link = linkTarget(absoluteOf(src.folder, target.relative), src.path, ref);
     // A preview selection is rendered text: escape it so it renders back the same.
     // An editor selection is already Markdown.
-    const text = passage.source === "preview" ? escapeMarkdown(result.text) : result.text;
+    const text = passage.source === "preview" ? escapeMarkdown(result.text) : closeFence(result.text);
     const entry = kind === "excerpt"
       ? excerptBlock(text, label, link, isoDate(host.now()), result.comment)
       : taskLine(text, link);
     const written = await write(src.folder, target, entry);
     if (!written) return;
-    host.saveSettings(withRemembered(host.settings(), src.folder, kind, result.target));
+    const before = rememberedTarget(host.settings(), src.folder, kind);
+    if (JSON.stringify(before) !== JSON.stringify(result.target)) host.saveSettings(withRemembered(host.settings(), src.folder, kind, result.target));
     if (!written.renamed) host.toast(`Saved to ${fileName(written.path)}`, { label: "Open", run: () => void host.openInSub(written.path) });
   }
 

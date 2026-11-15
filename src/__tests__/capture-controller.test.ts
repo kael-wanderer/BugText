@@ -52,14 +52,14 @@ describe("capture controller", () => {
     save();
     await done;
     expect(t.files.get("/r/docs/arch.notes.md")).toBe(
-      "---\nabout: arch.md\n---\n\n# Notes on Architecture\n\n> The sync runs\n> — [Architecture › Sync model](arch.md#sync-model) · 2026-11-14\n",
+      "---\nabout: \"arch.md\"\n---\n\n# Notes on Architecture\n\n> The sync runs\n> — [Architecture › Sync model](arch.md#sync-model) · 2026-11-14\n",
     );
     const [text, action] = vi.mocked(t.host.toast).mock.calls[0];
     expect(text).toBe("Saved to arch.notes.md");
     action!.run();
     expect(t.host.openInSub).toHaveBeenCalledWith("/r/docs/arch.notes.md");
     expect(t.host.written).toHaveBeenCalledWith("/r/docs/arch.notes.md");
-    expect(t.settings().capture.targets["/r"]?.excerpt).toEqual({ kind: "companion" });
+    expect(t.host.saveSettings).not.toHaveBeenCalled(); // the default target needs no write
   });
   it("saves a task to the daily note and remembers a changed target", async () => {
     const t = setup();
@@ -69,7 +69,38 @@ describe("capture controller", () => {
     save();
     await done;
     expect(t.files.get("/r/Daily/2026-11-14.md")).toContain("- [ ] Check the sync ([source](../docs/arch.md#sync-model))\n");
-    expect(t.settings().capture.targets["/r"]?.task).toEqual({ kind: "daily" });
+    expect(t.host.saveSettings).not.toHaveBeenCalled();
+  });
+  it("remembers a changed target and writes settings only when it changes", async () => {
+    const t = setup();
+    const pick = async () => {
+      const done = t.capture.run("task");
+      await Promise.resolve();
+      return done;
+    };
+    let done = pick();
+    await Promise.resolve();
+    document.querySelector<HTMLInputElement>('input[name="capture-target"][value="note"]')!.click();
+    await Promise.resolve();
+    [...document.querySelectorAll<HTMLLIElement>(".capture-picker li")].find((li) => li.textContent === "inbox.md")!.click();
+    await new Promise((r) => setTimeout(r, 0));
+    save();
+    await done;
+    expect(t.settings().capture.targets["/r"]?.task).toEqual({ kind: "note", relative: "inbox.md" });
+    expect(t.host.saveSettings).toHaveBeenCalledTimes(1);
+    done = pick();
+    await Promise.resolve(); await Promise.resolve();
+    save();
+    await done;
+    expect(t.host.saveSettings).toHaveBeenCalledTimes(1);
+  });
+  it("closes a code fence an editor selection left open", async () => {
+    const t = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "```ts\nconst a = 1;", line: 5, endLine: 6, source: "editor" } }) });
+    const done = t.capture.run("excerpt");
+    await Promise.resolve();
+    save();
+    await done;
+    expect(t.files.get("/r/docs/arch.notes.md")).toContain("> ```ts\n> const a = 1;\n> ```\n> — [");
   });
   it("escapes text selected in the preview and keeps editor text as written", async () => {
     const preview = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "Map<K> for *args", line: 5, endLine: 5, source: "preview" } }) });
@@ -127,7 +158,7 @@ describe("capture controller", () => {
   it("Notes button creates the companion note with its starter, then opens it", async () => {
     const t = setup();
     await t.capture.openNotes();
-    expect(t.files.get("/r/docs/arch.notes.md")).toBe("---\nabout: arch.md\n---\n\n# Notes on Architecture\n\n");
+    expect(t.files.get("/r/docs/arch.notes.md")).toBe("---\nabout: \"arch.md\"\n---\n\n# Notes on Architecture\n\n");
     expect(t.host.openInSub).toHaveBeenCalledWith("/r/docs/arch.notes.md");
     vi.mocked(t.writer.create).mockClear();
     await t.capture.openNotes();
@@ -140,6 +171,6 @@ describe("capture controller", () => {
     document.querySelector<HTMLTextAreaElement>("textarea.capture-comment")!.value = "Read later";
     save();
     await done;
-    expect(t.files.get("/r/site/page.notes.md")).toBe("---\nabout: page.html\n---\n\n# Notes on page\n\n**2026-11-14** — [page](page.html)\n\nRead later\n");
+    expect(t.files.get("/r/site/page.notes.md")).toBe("---\nabout: \"page.html\"\n---\n\n# Notes on page\n\n**2026-11-14** — [page](page.html)\n\nRead later\n");
   });
 });

@@ -63,9 +63,9 @@ export function taskLine(text: string, target: string): string {
   return `- [ ] ${text.replace(/\s+/g, " ").trim()} ([source](${target}))\n`;
 }
 
-/** Starter text of a new companion note. */
+/** Starter text of a new companion note; the about: value is a quoted YAML string. */
 export function companionStarter(sourcePath: string, title: string): string {
-  return `---\nabout: ${fileName(sourcePath)}\n---\n\n# Notes on ${oneLine(title)}\n\n`;
+  return `---\nabout: ${JSON.stringify(fileName(sourcePath))}\n---\n\n# Notes on ${oneLine(title)}\n\n`;
 }
 
 /** Add note entry for HTML files. */
@@ -73,4 +73,17 @@ export function noteEntry(title: string, target: string, date: string, comment: 
   const head = `**${date}** — [${oneLine(title)}](${target})\n`;
   const note = comment.replace(/\r\n?/g, "\n").trim();
   return note ? `${head}\n${endWithNewline(note)}` : head;
+}
+
+/** Closes a code fence that `text` opens but does not close, so a quoted editor selection
+ *  cannot swallow the rest of the notes file. */
+export function closeFence(text: string): string {
+  let open: string | null = null;
+  for (const line of text.split("\n")) {
+    const fence = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (!fence) continue;
+    if (open === null) open = fence;
+    else if (fence[0] === open[0] && fence.length >= open.length) open = null;
+  }
+  return open === null ? text : `${text}\n${open}`;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  companionPath, companionStarter, escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine,
+  closeFence, companionPath, companionStarter, escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine,
 } from "../capture/format";
 
 const doc = "# Arch\n\n## Sync model\n\ntext";
@@ -72,8 +72,12 @@ describe("companion note", () => {
     expect(companionPath("page.html")).toBe("page.notes.md");
     expect(companionPath("arch.notes.md")).toBeNull();
   });
+  it("quotes the about: value so any file name stays valid YAML", () => {
+    expect(companionStarter("a: b #1.md", "T")).toContain('about: "a: b #1.md"\n');
+    expect(companionStarter('say "hi".md', "T")).toContain('about: "say \\"hi\\".md"\n');
+  });
   it("starts the companion with about: and a heading", () => {
-    expect(companionStarter("docs/arch.md", "Architecture")).toBe("---\nabout: arch.md\n---\n\n# Notes on Architecture\n\n");
+    expect(companionStarter("docs/arch.md", "Architecture")).toBe("---\nabout: \"arch.md\"\n---\n\n# Notes on Architecture\n\n");
   });
 });
 
@@ -85,5 +89,14 @@ describe("escapeMarkdown", () => {
   });
   it("escapes block markers at the start of a line only", () => {
     expect(escapeMarkdown("# a\n> b\n- c\n+ d\n12. e\nf - g 3. h")).toBe("\\# a\n\\> b\n\\- c\n\\+ d\n12\\. e\nf - g 3. h");
+  });
+});
+
+describe("closeFence", () => {
+  it("closes a code fence the selection opened but did not close", () => {
+    expect(closeFence("text\n```ts\nconst a = 1;")).toBe("text\n```ts\nconst a = 1;\n```");
+    expect(closeFence("~~~~\nx")).toBe("~~~~\nx\n~~~~");
+    expect(closeFence("```\nx\n```")).toBe("```\nx\n```");
+    expect(closeFence("plain `code`")).toBe("plain `code`");
   });
 });
