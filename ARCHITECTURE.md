@@ -149,7 +149,9 @@ at most 200), builds the messages (`prompt.ts`: fixed system text, each source i
 `<context>` block sealed against closing and forged opening tags, `fitContext` budget),
 shows the run sheet (`sheet.ts`), streams answer-only (`folder: null, write: false`, Stop
 aborts), turns the reply into note text (`output.ts`: `generated_by`, `generated_at`,
-`sources`; or the reply's YAML as the note's whole front matter), and shows a diff when the
+`sources`; remote images become plain links and HTML that loads a resource is shown as
+text, so a source cannot make preview fetch a URL carrying other sources' text; or the
+reply's YAML as the note's whole front matter), and shows a diff when the
 note exists. `write.ts` writes by the app's routes: open tab through its editor (one undo
 step), closed note after a "Before recipe run" snapshot with `write_file_atomic` and the
 expected text, new note through `create_from_template`; it refuses when the folder or the

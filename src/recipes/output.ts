@@ -11,6 +11,19 @@ function unfence(reply: string): string {
   return match ? match[1] : reply;
 }
 
+// An image whose destination is not a local path inline: remote, protocol-relative or a reference.
+const REMOTE_IMAGE = /!\[((?:[^\]\\\n]|\\.)*)\](?!\((?![\s<]*(?:[a-z][a-z0-9+.-]*:|\/\/)))/gi;
+// An HTML tag that can load something by itself: images, SVG, or a resource or style attribute.
+const LOADING_TAG = /<(?=(?:img|image|svg|picture|source|video|audio|track)\b|[a-z][\w-]*\s[^>]*\b(?:src|srcset|poster|background|style)\s*=)/gi;
+
+/**
+ * A reply that read untrusted sources could make preview fetch a remote URL carrying their text.
+ * Remote images become plain links and loading HTML is shown as text; local images stay.
+ */
+function defangRemote(text: string): string {
+  return text.replace(REMOTE_IMAGE, "[$1]").replace(LOADING_TAG, "&lt;");
+}
+
 function set(text: string, key: string, value: unknown, props: PropertiesModule): string {
   const edit = props.setProperty(text, key, value);
   return edit ? text.slice(0, edit.from) + edit.insert + text.slice(edit.to) : text;
@@ -21,7 +34,7 @@ export function generatedNote(
   meta: { name: string; now: Date; outputRelative: string; sourceRelatives: string[] },
   props: PropertiesModule,
 ): string {
-  let text = unfence(reply).trim();
+  let text = defangRemote(unfence(reply).trim());
   const { now } = meta;
   const at = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
   // A reply whose own front matter does not parse is kept as body under fresh properties.

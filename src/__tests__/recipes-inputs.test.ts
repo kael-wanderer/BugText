@@ -122,6 +122,17 @@ describe("resolveInputs", () => {
     expect(paths(glob)).toEqual(["/r/Reviews/2026-W46.md", "/r/Reviews/other.md"]);
   });
 
+  it("does not read completed tasks back from its own output", () => {
+    const extra = {
+      "/r/Reviews/2026-W46.md": "## Done\n- [x] ship ✅ 2026-11-10",
+      "/r/Reviews/2026-W45.md": "---\ngenerated_by: Weekly review\n---\n- [x] earlier ✅ 2026-11-09",
+    };
+    const r = resolveInputs(recipe({ kind: "completed-tasks", days: 7 }), ctx({ output: "/r/Reviews/2026-W46.md" }, extra));
+    expect(r.sources[0].text).toBe("- [x] ship ✅ 2026-11-10 — tasks.md");
+    const other = resolveInputs(recipe({ kind: "completed-tasks", days: 7 }), ctx({ recipeName: "Other recipe" }, extra));
+    expect(other.sources[0].text).toContain("earlier");
+  });
+
   it(`keeps at most ${SOURCE_LIMIT} sources`, () => {
     const extra = Object.fromEntries(Array.from({ length: 205 }, (_, i) => [`/r/many/n${String(i).padStart(3, "0")}.md`, "n"]));
     const r = resolveInputs(recipe({ kind: "glob", folder: "many", glob: "*.md" }), ctx({}, extra));
