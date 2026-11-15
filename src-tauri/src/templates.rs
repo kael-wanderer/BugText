@@ -67,7 +67,7 @@ pub struct TemplateInfo {
 
 /// Split a relative path into plain components; anything that could leave the
 /// folder (absolute, `..`, prefixes, NUL) is refused.
-fn plain_parts(relative: &str) -> Result<Vec<String>, String> {
+pub(crate) fn plain_parts(relative: &str) -> Result<Vec<String>, String> {
     let normalized = relative.replace('\\', "/");
     if normalized.contains('\0') {
         return Err(OUTSIDE.into());
@@ -86,7 +86,7 @@ fn plain_parts(relative: &str) -> Result<Vec<String>, String> {
 /// Walk `parts` below `root`, requiring every existing step to resolve inside the
 /// canonical root, then create the missing tail. Nothing is created when an
 /// existing ancestor resolves outside.
-fn confined_dir(root: &str, parts: &[String]) -> Result<PathBuf, String> {
+pub(crate) fn confined_dir(root: &str, parts: &[String]) -> Result<PathBuf, String> {
     let canonical_root = Path::new(root)
         .canonicalize()
         .map_err(|_| "The open folder is not available.".to_string())?;

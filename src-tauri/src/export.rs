@@ -21,7 +21,7 @@ fn find_bin(name: &str, known_paths: &[&str]) -> Option<PathBuf> {
     })
 }
 
-fn find_pandoc() -> Option<PathBuf> {
+pub(crate) fn find_pandoc() -> Option<PathBuf> {
     find_bin(
         "pandoc",
         &["/opt/homebrew/bin/pandoc", "/usr/local/bin/pandoc"],

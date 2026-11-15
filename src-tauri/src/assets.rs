@@ -47,7 +47,7 @@ pub fn valid_folder(folder: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn extension_of(path: &Path) -> Option<String> {
+pub(crate) fn extension_of(path: &Path) -> Option<String> {
     path.extension()
         .map(|ext| ext.to_string_lossy().to_ascii_lowercase())
         .filter(|ext| IMAGE_EXTENSIONS.contains(&ext.as_str()))
@@ -71,7 +71,7 @@ pub fn matches_extension(bytes: &[u8], ext: &str) -> bool {
 }
 
 /// Keeps letters, digits, `-`, `_`, `.` and spaces; anything else becomes `-`.
-fn clean_stem(stem: &str) -> String {
+pub(crate) fn clean_stem(stem: &str) -> String {
     let cleaned: String = stem
         .chars()
         .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_' | '.' | ' ') { c } else { '-' })
@@ -85,7 +85,7 @@ fn clean_stem(stem: &str) -> String {
     }
 }
 
-fn unique_target(dir: &Path, stem: &str, ext: &str) -> PathBuf {
+pub(crate) fn unique_target(dir: &Path, stem: &str, ext: &str) -> PathBuf {
     let first = dir.join(format!("{stem}.{ext}"));
     if !first.exists() {
         return first;
@@ -102,7 +102,7 @@ fn unique_target(dir: &Path, stem: &str, ext: &str) -> PathBuf {
 
 /// Creates `<note dir>/<folder>` and returns it, refusing a folder that resolves
 /// outside the note's directory (for example through a symlink).
-fn image_dir(note_path: &str, folder: &str) -> Result<(PathBuf, PathBuf), String> {
+pub(crate) fn image_dir(note_path: &str, folder: &str) -> Result<(PathBuf, PathBuf), String> {
     valid_folder(folder)?;
     let note = Path::new(note_path);
     if !note.is_absolute() {
@@ -122,7 +122,7 @@ fn image_dir(note_path: &str, folder: &str) -> Result<(PathBuf, PathBuf), String
     Ok((note_dir, dir))
 }
 
-fn link_for(note_dir: &Path, file: &Path) -> Result<String, String> {
+pub(crate) fn link_for(note_dir: &Path, file: &Path) -> Result<String, String> {
     let relative = file
         .strip_prefix(note_dir)
         .map_err(|_| "The image is outside the note's folder.".to_string())?;
