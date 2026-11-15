@@ -5,18 +5,33 @@ import { engineKey, engineOptions, effortLevels, modelOptions } from "../ai/engi
 import type { ScreenDeps } from "./screen";
 import type { Engine } from "../ai/aisettings";
 import { button, caption, row, toggle, select, group } from "./controls";
+import { describeRecipe } from "../recipes/list";
+import { STARTER_RECIPES } from "../recipes/starters";
+import { freshRecipe, recipeFields, recipeValid, type RecipeDraft, type RecipeEditorDeps } from "./recipe-form";
+import type { RecipeHost } from "../recipes/host";
 export type ActionsPageDeps = {
   getFile(): ActionsFile;
   hasError(): boolean;
   save(file: ActionsFile): Promise<void>;
   run(action: SavedAction): void;
   openFile(): void;
+  /** The recipe editor's view of the open folder (R16). */
+  recipes?: RecipeEditorDeps;
+  /** In the app: the editor deps are derived from the recipe host on first use. */
+  recipeHost?: () => RecipeHost;
 };
 export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
   const api = deps.actions;
   if (!api) return;
   const page = document.createElement("div"); host.append(page);
   let draft: SavedAction | null = null;
+  let recipeDeps = api.recipes;
+  if (!recipeDeps && api.recipeHost) {
+    const recipeHost = api.recipeHost();
+    void import("../recipes/host").then(({ recipeEditorDeps }) => { recipeDeps = recipeEditorDeps(recipeHost, () => draw()); take(); draw(); });
+  }
+  function take(): void { const edit = recipeDeps?.takeEdit(); if (edit) draft = structuredClone(edit); }
+  take();
   let dragged = "";
   let deleted: { action: SavedAction; index: number } | null = null;
   const notice = document.createElement("div"); notice.className = "st-action-notice"; notice.setAttribute("role", "status");
@@ -38,8 +53,10 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     })));
     page.append(caption("My actions")); page.dataset.setting = "my-actions";
     if (api!.hasError()) { const warning = document.createElement("p"); warning.textContent = "ai-actions.json could not be read. Built-in actions still work; your file was not changed."; page.append(warning, button("Open file", api!.openFile)); }
+    // Every save is built from the full list by id: the sections below only filter what they draw.
     const actions = api!.getFile().actions;
-    for (const a of actions) {
+    const plain = actions.filter(a => !a.recipe);
+    for (const a of plain) {
       const item = row("my-actions", a.name, `${a.result === "edit" ? "Edit" : "Answer"} · ${a.input === "note" ? "whole note" : "selection, else whole note"} · ${a.engine ? engineName(a.engine.engine) : "Same as Chat"}${a.panel ? " · in panel" : ""}`, group(
         button("Edit", () => { draft = structuredClone(a); draw(); }),
         button("Duplicate", () => { draft = { ...structuredClone(a), id: crypto.randomUUID(), name: `${a.name.slice(0, 50)} copy` }; draw(); }),
@@ -54,11 +71,23 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
       item.addEventListener("drop", e => { e.preventDefault(); const next = [...actions]; const from = next.findIndex(x => x.id === dragged); if (from < 0) return; const to = next.findIndex(x => x.id === a.id); const [moved] = next.splice(from, 1); next.splice(to, 0, moved); void persist(next); });
       page.append(item);
     }
-    if (!actions.length) {
+    if (!plain.length) {
       const empty = document.createElement("p"); empty.textContent = "No actions yet. Save a prompt you use often. Start from one of these:"; page.append(empty);
       for (const [name, instruction, result] of [["Translate to English", "Translate the text to English. Preserve Markdown formatting. Output only the translation.", "edit"], ["Formal tone", "Rewrite the text in a formal tone. Preserve meaning and Markdown formatting.", "edit"], ["Extract action items", "List every action item as a Markdown task list, including owners when named. Output only the list.", "answer"]] as const) page.append(button(`＋ ${name}`, () => { draft = fresh(name, instruction, result); draw(); }));
     }
     page.append(button("＋ New action", () => { draft = fresh(); draw(); }));
+    page.append(caption("Recipes"));
+    const recipes = actions.filter((a): a is RecipeDraft => !!a.recipe);
+    for (const a of recipes) page.append(row("recipes", a.name, `${describeRecipe(a.recipe)} · ${a.engine ? engineName(a.engine.engine) : "Same as Chat"}`, group(
+      button("Edit", () => { draft = structuredClone(a); draw(); }),
+      button("Duplicate", () => { draft = { ...structuredClone(a), id: crypto.randomUUID(), name: `${a.name.slice(0, 50)} copy` }; draw(); }),
+      button("Delete", () => { deleted = { action: a, index: actions.indexOf(a) }; void persist(actions.filter(x => x.id !== a.id)); }),
+    )));
+    if (!recipes.length) {
+      const empty = document.createElement("p"); empty.textContent = "No recipes yet. A recipe saves inputs, an instruction and where the result goes. Start from one of these:"; page.append(empty);
+      for (const starter of STARTER_RECIPES) page.append(button(`＋ ${starter.name}`, () => { draft = { ...structuredClone(starter), id: crypto.randomUUID() }; draw(); }));
+    }
+    page.append(button("＋ New recipe", () => { draft = freshRecipe(); draw(); }));
     if (draft) form(draft);
     notice.replaceChildren();
     if (deleted) notice.append(document.createTextNode(`Deleted "${deleted.action.name}" · `), button("Undo", () => { const next = [...api!.getFile().actions]; next.splice(deleted!.index, 0, deleted!.action); deleted = null; void persist(next); }));
@@ -70,8 +99,18 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
       const input = document.createElement(key === "instruction" ? "textarea" : "input"); input.className = "st-text"; input.value = a[key]; input.maxLength = key === "name" ? 60 : 8000; input.setAttribute("aria-label", label); input.addEventListener("input", () => { a[key] = input.value; }); form.append(row("my-actions", label, null, input));
     }
     field("Name", "name"); field("Instruction", "instruction");
+    const recipe = a.recipe ? a as RecipeDraft : null;
+    const save = button("Save", () => { const next = validated(); if (next) { draft = null; void persist(next); } }, "primary");
+    if (recipe) {
+      recipeFields(form, recipe, recipeDeps, () => { save.disabled = !recipeValid(recipe); });
+      engineRows();
+      form.append(group(button("Cancel", () => { draft = null; draw(); }), save)); page.append(form);
+      return;
+    }
     form.append(row("my-actions", "Result", null, select("Result", [{ value: "edit", label: "Edit (review)" }, { value: "answer", label: "Answer in Chat" }], a.result, value => { a.result = value; })));
     form.append(row("my-actions", "Input", null, select("Input", [{ value: "selection-or-note", label: "Selection, else whole note" }, { value: "note", label: "Whole note" }], a.input, value => { a.input = value; })));
+    engineRows();
+    function engineRows(): void {
     const choices = engineOptions(deps.getAISettings(), deps.getClis(), a.engine?.engine ?? { kind: "none" });
     form.append(row("my-actions", "Engine", null, select("Engine", [{ value: "chat", label: "Same as Chat" }, ...choices], a.engine ? engineKey(a.engine.engine) : "chat", value => { a.engine = value === "chat" ? null : { engine: choices.find(x => x.value === value)!.engine, model: "", effort: "" }; draw(); })));
     if (a.engine) {
@@ -80,12 +119,13 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
       const custom = document.createElement("input"); custom.className = "st-text"; custom.value = engine.model; custom.setAttribute("aria-label", "Custom model"); custom.addEventListener("input", () => { engine.model = custom.value; }); form.append(custom);
       const levels = effortLevels(engine.engine); if (levels.length) form.append(row("my-actions", "Effort", null, select("Effort", [{ value: "", label: "Default" }, ...levels.map(value => ({ value, label: value }))], engine.effort, value => { engine.effort = value; })));
     }
+    }
     form.append(row("my-actions", "Show in AI panel", null, toggle("Show in AI panel", a.panel, value => { a.panel = value; })));
     function validated(): SavedAction[] | null {
       const next = api!.getFile().actions.filter(x => x.id !== a.id); const index = api!.getFile().actions.findIndex(x => x.id === a.id); next.splice(index < 0 ? next.length : index, 0, a);
-      if (!parseActions(JSON.stringify({ version: 2, actions: next }))) { notice.textContent = "Enter a unique name (up to 60 characters) and an instruction (up to 8,000 characters)."; return null; } return next;
+      if (!parseActions(JSON.stringify({ version: 2, actions: next }))) { notice.textContent = a.recipe ? "Enter a unique name (up to 60 characters), an instruction, and complete inputs and output." : "Enter a unique name (up to 60 characters) and an instruction (up to 8,000 characters)."; return null; } return next;
     }
-    form.append(group(button("Try on selection", () => { if (validated()) api!.run(a); }), button("Cancel", () => { draft = null; draw(); }), button("Save", () => { const next = validated(); if (next) { draft = null; void persist(next); } }, "primary"))); page.append(form);
+    form.append(group(button("Try on selection", () => { if (validated()) api!.run(a); }), button("Cancel", () => { draft = null; draw(); }), save)); page.append(form);
   }
   draw();
 }
