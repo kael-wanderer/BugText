@@ -18,6 +18,8 @@ Import brings outside material into your folder as an ordinary Markdown note. Th
 3. Paste the web address, or choose the file.
 4. BugText converts it and opens the new note. A result sheet shows what was kept, such as how many images and tables came through.
 
+![The Import Web Page sheet with an address and where the note will be saved](../images/notes/import/import-web-page.png)
+
 Every imported note gets three properties: `source` (the address or file), `imported_at` (when) and `source_digest` (a fingerprint of the original).
 
 ### What each kind keeps

@@ -19,6 +19,8 @@ The AI panel is a chat that already knows what you are looking at. It can read t
 2. The picker at the top chooses the engine and model. It is the same choice as Settings ▸ AI ▸ Use for ▸ Chat.
 3. Type and press <kbd>Return</kbd> to send; <kbd>⇧</kbd> <kbd>Return</kbd> starts a new line. **Cancel** stops a reply.
 
+![The chat panel beside a note, with the engine picker, quick actions, context chips and the message box](../images/ai/chat/chat-panel.png)
+
 ### Choose the context
 
 Two chips above the message box decide what goes with your question. Both start on:

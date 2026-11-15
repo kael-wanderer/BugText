@@ -35,6 +35,8 @@ Leave with <kbd>Esc</kbd>, <kbd>⌘</kbd> <kbd>[</kbd>, the Back button or <kbd>
 - **Images**: the image folder, how pasted images are named, and whether dropped images are copied and linked or opened.
 - **Templates**: the templates folder, the default folder for new notes, the date format, and where quick notes go.
 
+![Settings, Editing page, with soft wrap, wrap column, focus width, typewriter scrolling, spelling and navigation options](../images/reference/settings/editing.png)
+
 ### Export
 
 - **Tools**: which Pandoc and Typst BugText found, with **Check Now**.

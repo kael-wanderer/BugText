@@ -19,6 +19,8 @@ Open Settings (<kbd>⌘</kbd> <kbd>,</kbd>) ▸ **AI**.
 
 **Local CLI** lists the Claude Code, Codex CLI and Pi installs BugText found. Sign in to the CLI in Terminal as you normally would; BugText uses that sign-in. When a CLI works in your folder, macOS sandboxes it to that folder.
 
+![Settings, AI, Local CLI, listing Claude Code, Codex CLI and Pi with what each may touch and a Test button](../images/ai/set-up-ai/local-cli.png)
+
 ### An API connection
 
 1. Go to **API providers** and click **Add Connection…**. **Quick fill** sets up a known provider, or type a **Name** and **Server address** for Anthropic or any OpenAI-compatible server.
@@ -30,6 +32,8 @@ Addresses must use `https`, except a server on this Mac (`localhost`), so a loca
 ### Choose what each feature uses
 
 **Use for** has a row for **Chat** and for each quick action (Proofread, Rewrite, Summarize, Generate outline). For each, pick the engine, the model and the effort, or switch the feature off.
+
+![Settings, AI, Use for, with an engine, model and effort for Chat and each quick action](../images/ai/set-up-ai/use-for.png)
 
 ### Control what is sent
 

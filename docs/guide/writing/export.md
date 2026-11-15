@@ -19,6 +19,8 @@ When a note has to leave BugText — as a report, a handout or a picture for a c
 2. The export sheet shows the preset and checks that everything is ready: the export tools, the fonts, and every image the note links to.
 3. Pick a preset — **Standard**, **Handout** or **Report** — or one of your own, and click export to choose where to save.
 
+![The Export as PDF sheet with the Standard preset and checks for Pandoc, Typst and images](../images/writing/export/export-sheet.png)
+
 Presets set page size and margins, page numbers, font and line spacing, a title block, and an optional numbered table of contents. Make and edit your own under Settings ▸ Export.
 
 > [!NOTE]
