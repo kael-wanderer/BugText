@@ -62,7 +62,7 @@ Confirmed in the app:
 - AI folder search with the setting off: "Left out 1 superseded note: old.md".
 - the Project Overview for the root folder and for a sub-folder, Open Review, and that overview tabs are gone after a restart.
 
-Findings, none blocking. 1–4 fixed in `33ec78d` (each with a unit test; 1 is CSS only, not re-checked in the app); 5–9 left for the review:
+Findings, none blocking. 1–4 fixed in `33ec78d` (each with a unit test; 1 is CSS only, not re-checked in the app). After Fable's review (verdict: keep), 5 fixed in `209f085`, 6 in `2b1d100`, 7 in `2b8cf82`, and the raw error in the Mark as Superseded By… toast (`mark.ts`) in `11e90a0`, on `main`, each test first. 8 and 9 moved to the backlog in `docs/roadmap.md`:
 
 1. The Filter panel's Draft, Current and Superseded chips have no style, so the pressed one looks the same as the others (TRU-06). Fix: style `.filter-status-chips button` and `[aria-pressed="true"]`.
 2. With "Include superseded notes" on, the context record lists the superseded note's excerpt without marking it (TRU-07). The data is in `sent.excerpts[i].superseded`, but `context-sent.ts` does not show it. Fix: add "(superseded)" after the path.

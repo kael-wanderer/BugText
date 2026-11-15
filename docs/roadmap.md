@@ -178,6 +178,8 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 - 🔜 Saved views: check Rename, Duplicate and Delete in the app. Update selected is fixed (`77163be`).
 - 🔜 Filter responsiveness at 2,000 notes: measure the Rust scan, the IPC payload, and typing latency. JS index build is 85 ms.
 - 🔜 Live preview editing: first version is in the workflow WIP. Needs a spec before more work.
+- 🔜 Project Overview key documents show only the file name (`inner.md` for `sub/inner.md`), which is ambiguous in sub-folders. Show the path relative to the overview folder. (Trust and resume manual run, finding 8, TRU-12.)
+- 🔜 A dirty tab's status chip changes only after saving, because the chip reads the index built from disk. Feed the unsaved text to the chip. (Finding 9, TRU-04.)
 
 ### Tier 2 features
 
