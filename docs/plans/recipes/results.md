@@ -70,7 +70,16 @@ All 10 tasks are built and every automated check passes. Fable reviewed the bran
 
 Fable accepted the +3.31 kB startup chunk. Downgrade note: `ai-actions.json` version 2 is refused by older builds.
 
+## Manual run (2026-11-15, `npm run tauri dev`)
+
+RCP-01..12 all pass (details in `docs/test-cases/31-recipes.md`). Two bugs found and fixed with tests first:
+
+- `cfa6595`: the starter buttons disappeared once one recipe existed, so the other starters could not be added.
+- `f190c1b`: Add note… in the recipe editor kept no note (the app's file list is folder-relative; the editor expected absolute paths, and the unit test used absolute paths).
+
+Suite after both: 1,596 passed. UX notes, not fixed: a disabled Save looks the same as an enabled one and gives no reason; Accept into an open tab toasts "Wrote <note>" though nothing reached disk. The broken-YAML half of RCP-04 was not forced from a real model.
+
 ## Not done
 
-- Manual cases RCP-01..12 not run (no GUI run of this branch yet).
+- Release build (`npm run tauri build -- --no-bundle`) manual run.
 - No Windows or Linux check.
