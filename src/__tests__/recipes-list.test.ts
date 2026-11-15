@@ -75,6 +75,14 @@ describe("Recipes sheet", () => {
     expect(newRecipe).toHaveBeenLastCalledWith();
   });
 
+  it("keeps offering the starters once a recipe exists", () => {
+    const newRecipe = vi.fn();
+    openRecipes(host, { recipes: () => [recipe(STARTER_RECIPES[0].recipe!, "Mine")], status: async () => "", run: vi.fn(), newRecipe });
+    expect(host.textContent).not.toContain("No recipes yet.");
+    [...host.querySelectorAll("button")].find(b => b.textContent === "＋ Compare reports against my criteria")!.click();
+    expect(newRecipe).toHaveBeenCalledWith(STARTER_RECIPES[1]);
+  });
+
   it("renders names as text", () => {
     openRecipes(host, { recipes: () => [recipe(STARTER_RECIPES[0].recipe!, "<img src=x onerror=alert(1)>")], status: async () => "<img src=y>", run: vi.fn(), newRecipe: vi.fn() });
     expect(host.querySelector("img")).toBeNull();

@@ -56,10 +56,8 @@ export function openRecipes(host: HTMLElement, deps: {
     void deps.status(recipe).then(value => { status.textContent = value; }, () => {});
   }
   if (recipes.length) sheet.body.append(list);
-  else {
-    sheet.body.append(node("p", "No recipes yet."));
-    for (const starter of STARTER_RECIPES) sheet.body.append(action(`＋ ${starter.name}`, () => { sheet.close(); deps.newRecipe(starter); }));
-  }
+  else sheet.body.append(node("p", "No recipes yet."));
+  for (const starter of STARTER_RECIPES) sheet.body.append(action(`＋ ${starter.name}`, () => { sheet.close(); deps.newRecipe(starter); }));
   const create = action("New Recipe…", () => { sheet.close(); deps.newRecipe(); });
   const row = node("div"); row.className = "organize-actions"; row.append(create); sheet.body.append(row);
   (list.querySelector("button") ?? create).focus();

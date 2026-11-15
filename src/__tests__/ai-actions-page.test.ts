@@ -69,6 +69,12 @@ describe("Actions settings with recipes", () => {
     expect([...ui.host.querySelectorAll('[data-setting="my-actions"].st-row')].some(r => r.textContent?.includes("R1"))).toBe(false);
   });
 
+  it("keeps offering the starter recipes once a recipe exists", () => {
+    const ui = setup(mixed(), editorDeps());
+    expect(ui.host.textContent).not.toContain("No recipes yet.");
+    expect([...ui.host.querySelectorAll("button")].map(b => b.textContent)).toContain("＋ Weekly review");
+  });
+
   it("saves an edited recipe without touching plain actions", async () => {
     const ui = setup(mixed(), editorDeps());
     clickIn(rowOf(ui.host, "R1"), "Edit");

@@ -85,8 +85,8 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     )));
     if (!recipes.length) {
       const empty = document.createElement("p"); empty.textContent = "No recipes yet. A recipe saves inputs, an instruction and where the result goes. Start from one of these:"; page.append(empty);
-      for (const starter of STARTER_RECIPES) page.append(button(`＋ ${starter.name}`, () => { draft = { ...structuredClone(starter), id: crypto.randomUUID() }; draw(); }));
     }
+    for (const starter of STARTER_RECIPES) page.append(button(`＋ ${starter.name}`, () => { draft = { ...structuredClone(starter), id: crypto.randomUUID() }; draw(); }));
     page.append(button("＋ New recipe", () => { draft = freshRecipe(); draw(); }));
     if (draft) form(draft);
     notice.replaceChildren();
