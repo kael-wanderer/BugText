@@ -1,6 +1,6 @@
 # Capture while reading — results
 
-Branch `feat/capture`, built from `plan.md` in this folder (reading workflow Phase 3). Not merged, pushed or tagged; `bundleVersion` unchanged; no DMG built.
+Branch `feat/capture`, built from `plan.md` in this folder (reading workflow Phase 3). Merged to `main` on 2026-11-15 (`787816a`) and pushed; not tagged or released; `bundleVersion` unchanged; no DMG built.
 
 ## Status
 

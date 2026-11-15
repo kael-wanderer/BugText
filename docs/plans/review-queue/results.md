@@ -1,6 +1,6 @@
 # Review queue — results
 
-Branch `feat/review-queue`, built from `plan.md` in this folder. Not merged, pushed or tagged; `bundleVersion` unchanged.
+Branch `feat/review-queue`, built from `plan.md` in this folder. Merged to `main` on 2026-11-14 (`82d7c9b`) and pushed; not tagged or released; `bundleVersion` unchanged.
 
 ## Status
 

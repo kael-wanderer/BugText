@@ -1,10 +1,10 @@
 # Recipes — results
 
-Branch `feat/recipes` from `43fb775` (main), built from `plan.md` in this folder (reading workflow Phase 5a, spec 5.1–5.4). Not merged, pushed or tagged; `bundleVersion` unchanged; no DMG built.
+Branch `feat/recipes` from `43fb775` (main), built from `plan.md` in this folder (reading workflow Phase 5a, spec 5.1–5.4). Merged to `main` on 2026-11-15 (`d7c6a36`) and pushed; not tagged or released; `bundleVersion` unchanged; no DMG built.
 
 ## Status
 
-All 10 tasks are built and every automated check passes. Fable reviewed the branch: no Critical, 2 Important (fixed in `48c30b1`), 8 Minor (deferred, below). Verdict: fix first, then run RCP-01..12, then merge. The manual cases RCP-01 to RCP-12 in `docs/test-cases/31-recipes.md` are written and not run.
+All 10 tasks are built and every automated check passes. Fable reviewed the branch: no Critical, 2 Important (fixed in `48c30b1`), 8 Minor (deferred, below). Verdict: fix first, then run RCP-01..12, then merge. The manual cases RCP-01 to RCP-12 in `docs/test-cases/31-recipes.md` were run on 2026-11-15 in `npm run tauri dev`: all pass, findings under "Manual run".
 
 ## What was built, per task
 

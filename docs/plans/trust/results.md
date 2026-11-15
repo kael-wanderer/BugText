@@ -1,10 +1,10 @@
 # Trust and resume — results
 
-Branch `feat/trust-resume` from `787816a`, built from `plan.md` in this folder (reading workflow Phase 4). Not merged, pushed or tagged; `bundleVersion` unchanged; no DMG built.
+Branch `feat/trust-resume` from `787816a`, built from `plan.md` in this folder (reading workflow Phase 4). Merged to `main` on 2026-11-15 (`20fb4a1`) and pushed; not tagged or released; `bundleVersion` unchanged; no DMG built.
 
 ## Status
 
-All 9 tasks are built and every automated check passes. Not reviewed yet: Fable reviews the branch from `review-request.md`. The manual cases TRU-01 to TRU-14 in `docs/test-cases/30-trust-resume.md` were run on 2026-11-15 (Claude, release build, second display): all pass, findings under "Manual run".
+All 9 tasks are built and every automated check passes. Fable reviewed the branch from `review-request.md` (verdict: keep); its follow-up fixes are listed under "Manual run". The manual cases TRU-01 to TRU-14 in `docs/test-cases/30-trust-resume.md` were run on 2026-11-15 (Claude, release build, second display): all pass, findings under "Manual run".
 
 ## What was built, per task
 

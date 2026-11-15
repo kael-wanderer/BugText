@@ -1,10 +1,10 @@
 # Import — results
 
-Branch `feat/import` from `d7c6a36` (main), built from `plan.md` in this folder (reading workflow Phase 5b, spec 5.5). Not merged, pushed or tagged; `bundleVersion` unchanged; no DMG built. No new dependencies.
+Branch `feat/import` from `d7c6a36` (main), built from `plan.md` in this folder (reading workflow Phase 5b, spec 5.5). Merged to `main` on 2026-11-15 (`dddb8c6`) and pushed; not tagged or released; `bundleVersion` unchanged; no DMG built. No new dependencies.
 
 ## Status
 
-All 7 tasks are built and every automated check passes. The security review (Fable, see "For the security review" in `plan.md` and `review-request.md`) and the manual cases IMP-01..14 (`docs/test-cases/32-import.md`) have not been run.
+All 7 tasks are built and every automated check passes. Fable ran the security review from `review-request.md` (no Critical, 1 Important, 9 Minor; see "Review fixes"). The manual cases IMP-01..14 in `docs/test-cases/32-import.md` were run on 2026-11-15 in `npm run tauri dev`: all pass, findings under "Manual run".
 
 ## What was built, per task
 
@@ -76,10 +76,9 @@ IMP-01..14 all pass (details in `docs/test-cases/32-import.md`). Three bugs foun
 - The result sheet counted images before Pandoc ran ("54 images" for a note holding 38, "4" for one holding 0). The count now comes from the `![…](https://…)` images in the note. Test `counts the web images that reach the note`.
 - Starting an import while an import sheet was open stacked a second sheet; an older import finishing later reopened its sheet. Only the newest import owns the sheet now. Test `replaces the first import's sheet and silences the first import`.
 
-Suite after the fixes: 1,650 passed; startup chunk 661.70 kB. Not fixed, outside import: the ⌘K palette opens underneath an open sheet. Keychain: "Always Allow" does not survive a rebuild because the item's `partition_id` is the binary's cdhash ("BugText Local Dev" has no Team ID); see the owner note in the final report.
+Suite after the fixes: 1,650 passed; startup chunk 661.70 kB. Not fixed, outside import: the ⌘K palette opens underneath an open sheet. Keychain: "Always Allow" did not survive a rebuild. Likely cause, not proven: the item's `partition_id` is the binary's cdhash ("BugText Local Dev" has no Team ID). The release-build check in `a10993e` saw no prompt on rebuilds, so this needs a re-test with two consecutive `npm run build:app` builds.
 
 ## Not done
 
-- Security review of Tasks 1–3 (Fable).
 - Manual cases in the release build (IMP-14's CSP half).
 - No Windows or Linux check.
