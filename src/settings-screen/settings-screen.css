@@ -189,6 +189,12 @@
   margin-inline: auto;
 }
 
+/* Notes placed straight on the page set their own margins; keep them in the centred column. */
+.st-page > .st-note,
+.st-page > .st-scope {
+  margin-inline: auto;
+}
+
 .st-title {
   margin-top: 0;
   margin-bottom: 0;

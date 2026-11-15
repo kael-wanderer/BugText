@@ -57,3 +57,11 @@ it("saves a selected citation style and refreshes previews", async () => {
   expect(save).toHaveBeenCalledOnce(); expect(settings.export.citationStyle).toBe("ieee"); expect(refresh).toHaveBeenCalledOnce();
   host.remove();
 });
+
+it("keeps Check again in the page column, in a right-aligned button group", async () => {
+  const settings = parseSettings("{}"); const host = document.createElement("div");
+  const deps = { getSettings: () => settings, onSettingsChange: vi.fn(), exportTools: { diagnostics: vi.fn(async () => ({ pandoc: { found: true, version: "p", path: "/p" }, typst: { found: true, version: "t", path: "/t" }, fonts: [] })), copy: vi.fn() } } as unknown as ScreenDeps;
+  exportPage.render(host, deps); await Promise.resolve();
+  const again = Array.from(host.querySelectorAll("button")).find(b => b.textContent === "Check again")!;
+  expect(again.parentElement!.classList.contains("st-btns")).toBe(true);
+});
