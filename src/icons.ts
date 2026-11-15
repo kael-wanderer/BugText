@@ -32,5 +32,6 @@ export const FILE_ICON_TEXT: Readonly<Record<string, string>> = {
   sql: "SQL",
   pdf: "PDF",
   table: "TBL",
+  overview: "OV",
   file: "·",
 };

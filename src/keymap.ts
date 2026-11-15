@@ -67,6 +67,7 @@ export const KEYMAP_COMMANDS: KeymapCommand[] = [
   { id: "view.source_control", label: "Source Control", category: "View", default: "Ctrl+Shift+G", scope: "menu" },
   { id: "view.outline", label: "Outline", category: "View", default: "CmdOrCtrl+Alt+O", scope: "menu" },
   { id: "review.show", label: "Show Review Queue", category: "View", default: "", scope: "menu" },
+  { id: "view.project_overview", label: "Project Overview", category: "View", default: "", scope: "menu" },
   { id: "review.mark_reviewed", label: "Mark as Reviewed", category: "View", default: "", scope: "menu" },
   { id: "review.next_change", label: "Next Change", category: "View", default: "", scope: "menu" },
   { id: "review.previous_change", label: "Previous Change", category: "View", default: "", scope: "menu" },

@@ -1,5 +1,5 @@
 import { countWords } from "./status-bar/model";
-import type { TabMeta } from "./tabops";
+import { isVirtualTab, type TabMeta } from "./tabops";
 import type { LifecycleStatus } from "./lifecycle/model";
 import { lifecycleChip } from "./lifecycle/chip";
 import { revealScroll } from "./tab-reveal";
@@ -74,6 +74,8 @@ export type WindowHandlers = WindowViewHooks & {
   onGraphFolder?: () => void;
   onGraphNew?: () => void;
   renderTable?: (host: HTMLElement) => void;
+  /** Project Overview tab body for this folder (spec 4.4). */
+  renderOverview?: (host: HTMLElement, folder: string) => void;
   /** Lifecycle status shown as a chip after the tab name. */
   tabStatus?: (tab: TabMeta) => LifecycleStatus | null;
   livePreviewEnabled?: () => boolean;
@@ -196,7 +198,7 @@ export function createWindowView(
         if (destroyed || generation !== fullscreenGeneration) return;
         const state = getWindow(windowId);
         const tab = state?.tabs.find(t => t.id === state.activeTabId);
-        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || tab.tableView) {
+        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || isVirtualTab(tab)) {
           closeMermaidFullscreen();
           return;
         }
@@ -665,6 +667,7 @@ export function createWindowView(
     });
 
   const tableHost = document.createElement("div"); tableHost.className = "table-view"; tableHost.hidden = true; root.append(tableHost);
+  const overviewHost = document.createElement("div"); overviewHost.className = "overview-view"; overviewHost.hidden = true; root.append(overviewHost);
   function render(): void {
     const w = getWindow(windowId);
     if (!w) { closeMermaidFullscreen(); return; }
@@ -673,6 +676,8 @@ export function createWindowView(
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     tableHost.hidden = !active?.tableView || graphShown;
     if (!tableHost.hidden) h.renderTable?.(tableHost);
+    overviewHost.hidden = !active?.overview || graphShown;
+    if (active?.overview && !overviewHost.hidden) h.renderOverview?.(overviewHost, active.overview);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     root.querySelector<HTMLElement>(".wt-present")!.hidden = !markdownCard;
@@ -682,7 +687,7 @@ export function createWindowView(
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
-    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || active.tableView)) closeMermaidFullscreen();
+    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || isVirtualTab(active))) closeMermaidFullscreen();
     const language = fileLanguageInfo(activeName);
     // mode class
     root.classList.remove(
@@ -770,7 +775,7 @@ export function createWindowView(
       name.className = "tab-name";
       name.textContent = t.name;
       const detectedTabIcon = fileIcon(t.path ?? t.name, false);
-      const tabIconType = t.tableView ? "table" :
+      const tabIconType = t.tableView ? "table" : t.overview ? "overview" :
         detectedTabIcon === "file"
           ? fileLanguageInfo(t.path ?? t.name).icon
           : detectedTabIcon;
@@ -1280,6 +1285,7 @@ export function createWindowView(
     requestMeasure: () => editor.requestMeasure(),
     focus: () => {
       if (!tableHost.hidden) { tableHost.querySelector<HTMLElement>("tbody tr")?.focus(); return; }
+      if (!overviewHost.hidden) { overviewHost.querySelector<HTMLElement>("button")?.focus(); return; }
       focusedPane = "editor";
       editor.focus();
     },

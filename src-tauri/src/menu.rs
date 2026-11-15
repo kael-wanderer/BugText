@@ -251,6 +251,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let source_control = MenuItemBuilder::with_id("view.source_control", "Source Control").accelerator("Ctrl+Shift+G").build(app)?;
     let outline = MenuItemBuilder::with_id("view.outline", "Outline").accelerator("CmdOrCtrl+Alt+O").build(app)?;
     let review_show = MenuItemBuilder::with_id("review.show", "Show Review Queue").build(app)?;
+    let project_overview = MenuItemBuilder::with_id("view.project_overview", "Project Overview").build(app)?;
     let review_mark = MenuItemBuilder::with_id("review.mark_reviewed", "Mark as Reviewed").build(app)?;
     let review_next = MenuItemBuilder::with_id("review.next_change", "Next Change").build(app)?;
     let review_previous = MenuItemBuilder::with_id("review.previous_change", "Previous Change").build(app)?;
@@ -333,6 +334,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&outline)
         .item(&source_control)
         .item(&review_show)
+        .item(&project_overview)
         .item(&review_mark)
         .item(&review_next)
         .item(&review_previous)

@@ -3832,3 +3832,7 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 /* Capture: Notes and Add note in the window toolbar. */
 /* Text buttons size to their label; .wt-btn is a 28px icon square. */
 .wt-present, .wt-notes, .wt-addnote { width: auto; padding: 0 6px; white-space: nowrap; }
+/* Project Overview tab hides the editor panes (its own styles load with the tab). */
+.window:has(> .overview-view:not([hidden])) > .window-panes,
+.window:has(> .overview-view:not([hidden])) .window-status,
+.window:has(> .overview-view:not([hidden])) .window-toolbar { display: none !important; }
