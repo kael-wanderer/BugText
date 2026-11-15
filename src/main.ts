@@ -970,6 +970,9 @@ function commandItems(): PaletteItem[] {
     command("view.project_overview", "Project Overview", () => showOverview()),
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
+    command("file.import_web", "Import: Web Page…", () => startImport("web")),
+    command("file.import_word", "Import: Word Document…", () => startImport("word")),
+    command("file.import_csv", "Import: CSV…", () => startImport("csv")),
     command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
     command("file.mark_superseded", "Mark as Superseded By…", () => void markActiveSuperseded()),
     command("edit.extract_note", "Extract Selection to Note", () => withOrganize((actions) => actions.extractSelection())),
@@ -1673,6 +1676,14 @@ function recipeHost(): import("./recipes/host").RecipeHost {
     refreshExplorer: () => refreshExpandedDirs().then(refreshFileList),
     files: () => fileList, openActions: () => settingsScreen.open("ai", "actions"),
   };
+}
+/** File ▸ Import (spec 5.5). Everything under src/import loads on first use. */
+function startImport(kind: "web" | "word" | "csv"): void {
+  void import("./import/host").then(m => m.startImport(kind, {
+    folder: () => getState().folder, activePath: () => activeMeta()?.path ?? null, imagesFolder: () => currentSettings.images.folder,
+    linkIndex, workspaceIndex, refreshExplorer: () => refreshExpandedDirs().then(refreshFileList), openPath: path => doOpenPath(path),
+    sheetHost: () => document.getElementById("app")!,
+  }), () => showToast("Could not load import."));
 }
 function openRecipes(): void { withRecipes((recipes, host) => recipes.openRecipesList(host)); }
 function withRecipes(run: (recipes: typeof import("./recipes/host"), host: import("./recipes/host").RecipeHost) => unknown): void {
@@ -4506,6 +4517,12 @@ listenScoped<string>("menu", (event) => {
       return templateActions.quickNote();
     case "file.daily_note":
       return void openDailyNote();
+    case "file.import_web":
+      return startImport("web");
+    case "file.import_word":
+      return startImport("word");
+    case "file.import_csv":
+      return startImport("csv");
     case "file.new_typed_note":
       return withOrganize((actions) => void actions.newTypedNote());
     case "file.apply_note_type":

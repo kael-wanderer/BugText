@@ -59,6 +59,10 @@ You can also drag files from Finder:
 
 Existing destination files are not overwritten.
 
+**File → Import** turns a web page (https), a Word document or a CSV into a new note
+that records where it came from. Word and CSV originals are copied beside it. Needs
+`brew install pandoc`.
+
 ## Editing and saving
 
 Markdown documents show formatting controls for Bold, Italic, Heading, Link,

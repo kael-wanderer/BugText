@@ -42,6 +42,8 @@ mod templates;
 mod review_model;
 mod review_store;
 mod workflow_store;
+mod import_files;
+mod import_web;
 mod update_feed;
 
 use std::collections::{HashMap, HashSet};
@@ -272,6 +274,12 @@ pub fn run() {
             review_store::review_close,
             review_store::review_open,
             workflow_store::write_workflow_store,
+            import_files::import_html_to_markdown,
+            import_files::import_probe,
+            import_files::import_read_csv,
+            import_files::import_copy_original,
+            import_files::import_word,
+            import_web::import_fetch_page,
             update_feed::update_feed_fetch,
             app_build,
             mcp_server::mcp_set_enabled,
