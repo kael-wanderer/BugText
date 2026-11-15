@@ -166,8 +166,7 @@ or deleted. With no folder open, a CLI can only answer.
 - **MCP server:** lets a terminal AI client read and edit the open folder through
   BugText.
 
-API keys are stored in a private file in the app folder
-(`secrets/credentials.json`, readable only by your user account), never in `agent.json`. Document text and
+API keys are stored in the macOS Keychain, never in `agent.json`. Document text and
 attachments are sent as untrusted user context, never as system instructions.
 
 ## Settings

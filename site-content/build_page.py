@@ -167,8 +167,8 @@ features = [
                 "text": "Unsaved edits are drafted in the background and offered back after a crash. Each save keeps a local snapshot you can compare and restore.",
             },
             {
-                "title": "Keys kept private",
-                "text": "API keys are stored in a private file only your account can read, never in settings files.",
+                "title": "Keys in the Keychain",
+                "text": "API keys are stored in the macOS Keychain, never in settings files.",
             },
             {
                 "title": "Sandboxed AI runs",
@@ -224,8 +224,8 @@ faq = [
         "question": "Where are my files and settings stored?",
         "answer": (
             "Your notes stay where you put them, as plain files. Settings live in the "
-            "app's configuration folder on your Mac, and API keys are kept in a private "
-            "file only your account can read. BugText has no account and does not upload your files. When you "
+            "app's configuration folder on your Mac, and API keys are kept in the macOS "
+            "Keychain. BugText has no account and does not upload your files. When you "
             "use AI, the note text and passages you send go to the engine you chose."
         ),
     },
@@ -322,7 +322,7 @@ questions = [
     "Settings screen, per-feature AI engines, sandboxed agents, MCP server) ship only "
     "once that release is published. Confirm the page goes live with it.",
     "Platforms: CI also builds Windows (.exe/.msi) and Linux (.deb/.rpm/.AppImage) "
-    "installers, but the app is macOS-focused (Seatbelt sandbox, Dock icon). "
+    "installers, but the app is macOS-focused (Keychain, Seatbelt sandbox, Dock icon). "
     "Should the page list Windows and Linux, and are they tested?",
     "Minimum macOS version: the bundle inherits Tauri's default (10.13) and no "
     "minimum is set or tested. What should the requirements line state?",

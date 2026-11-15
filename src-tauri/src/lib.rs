@@ -209,9 +209,6 @@ pub fn run() {
             preview::respond(ctx.app_handle(), request)
         })
         .setup(|app| {
-            if let Ok(dir) = app.path().app_config_dir() {
-                secrets::init(dir);
-            }
             let m = menu::build(app.handle())?;
             app.set_menu(m)?;
             macos_dock::install(app.handle());

@@ -84,7 +84,8 @@ export function saveState(s: UIState): void {
 }
 
 // Tracks which HTTP providers have an API key saved, so the settings UI can show
-// a "Key saved" badge without asking the credentials store.
+// a "Key saved" badge without reading the OS keychain (which prompts for the
+// login password on macOS). The keychain is only read when a key is actually used.
 const SAVED_KEYS = "bugtext.savedKeys";
 const LEGACY_SAVED_KEYS = "bugtext.savedKeys";
 

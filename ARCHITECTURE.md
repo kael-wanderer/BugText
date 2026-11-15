@@ -32,14 +32,7 @@ Editor settings live at `<app config dir>/settings.json`. AI settings live in
 `uses`, `localCli`, and `maxContextChars`. Legacy `ai.json` migrates to that name;
 v1 settings receive an `agent.v1.json` backup. Startup persists v2 only after
 legacy key transfers succeed; malformed files and failed transfers retain the
-original for a retry. API keys live in `<app config dir>/secrets/credentials.json` (`secrets.rs`): one
-JSON map by id, file 0600 in a 0700 folder, written atomically under a lock; a file
-that is not valid JSON is moved aside as `credentials.json.bad-<time>`, a symlink is
-never followed. Not the OS keychain: an item is bound to the code signature, so each
-ad-hoc signed build asked for the login password. The coding CLI sandbox denies the
-`secrets/` folder after every allow, so a run cannot reach it even from a run folder
-that contains it. Keys saved in the Keychain by older builds are not migrated;
-Settings asks for them once.
+original for a retry. API keys stay in the OS keychain, never in the v2 file.
 
 Settings is a full-window screen (`src/settings-screen/`) laid over the workbench:
 `⌘,` / BugText ▸ Settings… / the activity-bar gear open it, and Esc, `⌘[`, Back, the

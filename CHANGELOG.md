@@ -69,7 +69,6 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Changed
-- API keys are saved in a private file in the app folder (`secrets/credentials.json`, readable only by your user account) instead of the macOS Keychain, so a new build no longer asks for your login password. Coding CLI runs cannot read it. Keys saved in the Keychain by earlier builds are not moved: enter them once in Settings ▸ AI. The old Keychain items (service `com.kael.bugtext`) can be deleted in Keychain Access.
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed

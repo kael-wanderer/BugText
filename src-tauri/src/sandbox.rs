@@ -6,8 +6,6 @@ pub struct SandboxPaths {
     pub config_dirs: Vec<PathBuf>,
     pub config_files: Vec<PathBuf>,
     pub exec_roots: Vec<PathBuf>,
-    /// BugText's saved API keys. Denied even when it lies inside the run folder.
-    pub secrets_dir: Option<PathBuf>,
 }
 
 pub fn profile() -> &'static str {
@@ -54,8 +52,6 @@ pub fn profile() -> &'static str {
 (allow file-write* (literal "/dev/null"))
 (allow file-read* (literal "/dev/tty"))
 (allow file-write* (literal "/dev/tty"))
-(deny file-read* (subpath (param "SECRETS")))
-(deny file-write* (subpath (param "SECRETS")))
 "#
 }
 
@@ -91,11 +87,6 @@ pub fn sandbox_args(paths: &SandboxPaths) -> Vec<String> {
             .unwrap_or_else(|| PathBuf::from("/nonexistent"));
         add_param(&mut args, &format!("EXEC_ROOT_{index}"), &path);
     }
-    let secrets = paths
-        .secrets_dir
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("/nonexistent"));
-    add_param(&mut args, "SECRETS", &secrets);
     args
 }
 
@@ -118,7 +109,6 @@ mod tests {
             config_dirs: vec![PathBuf::from("/Users/example/.claude")],
             config_files: vec![PathBuf::from("/Users/example/.claude.json")],
             exec_roots: vec![PathBuf::from("/opt/homebrew")],
-            secrets_dir: None,
         };
         let args = sandbox_args(&paths);
         assert!(args
@@ -169,7 +159,6 @@ mod tests {
                 config_dirs: Vec::new(),
                 config_files: Vec::new(),
                 exec_roots: vec![PathBuf::from("/bin")],
-                secrets_dir: None,
             },
             root,
         )
@@ -193,25 +182,6 @@ mod tests {
             "{output:?}"
         );
         let _ = fs::remove_file(outside);
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn sandbox_denies_secrets_dir_even_inside_workdir() {
-        let (mut paths, root) = test_paths("secrets");
-        let secrets = paths.workdir.join("secrets");
-        fs::create_dir_all(&secrets).unwrap();
-        fs::write(secrets.join("credentials.json"), "key").unwrap();
-        paths.secrets_dir = Some(secrets.clone());
-        let read = run_sandboxed(&paths, "cat \"$WORKDIR/secrets/credentials.json\"");
-        assert!(!read.status.success(), "{read:?}");
-        assert!(read.stdout.is_empty(), "{read:?}");
-        let write = run_sandboxed(&paths, "echo x > \"$WORKDIR/secrets/credentials.json\"");
-        assert!(!write.status.success(), "{write:?}");
-        assert_eq!(fs::read_to_string(secrets.join("credentials.json")).unwrap(), "key");
-        let other = run_sandboxed(&paths, "touch \"$WORKDIR/x\"");
-        assert!(other.status.success(), "{other:?}");
         let _ = fs::remove_dir_all(root);
     }
 
