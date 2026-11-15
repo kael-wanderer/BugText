@@ -25,6 +25,14 @@ export async function markSuperseded(path: string, deps: MarkDeps): Promise<void
   const root = deps.folder?.replace(/\/+$/, "");
   if (!root || !path.startsWith(`${root}/`)) { deps.toast("Open the note from a folder first."); return; }
   const self = path.slice(root.length + 1);
+  // Broken properties are refused before the picker, so no choice is asked for in vain.
+  try {
+    const before = deps.findOpen(path)?.text ?? await deps.read(path);
+    if (!supersedeChange(before, "x.md", deps.setProperty)) { deps.toast("Fix this note's properties first."); return; }
+  } catch {
+    deps.toast("Could not mark this note.");
+    return;
+  }
   const chosen = await deps.pick(deps.notes().filter((file) => file !== self));
   if (!chosen) return;
   const target = `${root}/${chosen}`;

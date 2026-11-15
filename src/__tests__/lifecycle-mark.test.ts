@@ -25,7 +25,7 @@ describe("markSuperseded", () => {
   it("snapshots then writes a closed note, offering every note but itself", async () => {
     const { d, calls } = deps();
     await markSuperseded("/r/a.md", d);
-    expect(calls).toEqual(["pick docs/b.md,c.md", "read", "snapshot", "write true true"]);
+    expect(calls).toEqual(["read", "pick docs/b.md,c.md", "read", "snapshot", "write true true"]);
     expect(d.toast).toHaveBeenCalledWith("Marked as superseded by b.md");
   });
   it("changes an open note through its editor only", async () => {
@@ -37,17 +37,26 @@ describe("markSuperseded", () => {
     expect(d.read).not.toHaveBeenCalled();
     expect(d.write).not.toHaveBeenCalled();
   });
-  it("refuses broken properties and writes nothing", async () => {
+  it("refuses broken properties in an open tab before the picker", async () => {
+    const apply = vi.fn();
+    const { d } = deps({ findOpen: () => ({ text: "---\nx: [\n---\n", apply }) });
+    await markSuperseded("/r/a.md", d);
+    expect(d.pick).not.toHaveBeenCalled();
+    expect(apply).not.toHaveBeenCalled();
+  });
+  it("refuses broken properties before the picker and writes nothing", async () => {
     const { d } = deps({ read: vi.fn(async () => "---\nx: [\n---\n") });
     await markSuperseded("/r/a.md", d);
     expect(d.toast).toHaveBeenCalledWith("Fix this note's properties first.");
+    expect(d.pick).not.toHaveBeenCalled();
     expect(d.snapshot).not.toHaveBeenCalled();
     expect(d.write).not.toHaveBeenCalled();
   });
   it("does nothing when the picker is cancelled, and no write when the snapshot fails", async () => {
     const cancelled = deps({ pick: vi.fn(async () => null) });
     await markSuperseded("/r/a.md", cancelled.d);
-    expect(cancelled.d.read).not.toHaveBeenCalled();
+    expect(cancelled.d.snapshot).not.toHaveBeenCalled();
+    expect(cancelled.d.write).not.toHaveBeenCalled();
     const failing = deps({ snapshot: vi.fn(async () => { throw new Error("disk full"); }) });
     await markSuperseded("/r/a.md", failing.d);
     expect(failing.d.write).not.toHaveBeenCalled();
