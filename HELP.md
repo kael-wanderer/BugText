@@ -149,6 +149,11 @@ Proofread and Rewrite show a diff to review before anything changes; Summarize a
 Generate outline answer in Chat. Each one can be switched off or given its own engine
 under **Settings → AI → Use for**.
 
+**Recipes** save a repeated job: which notes to read, what to ask, where the result goes
+(a note, Chat or the note's properties). Run one from **AI: Recipes…**; a sheet shows what
+will be sent first, and a re-run shows a diff before changing the note. Edit them under
+**Settings → AI → Actions**.
+
 When a coding CLI runs in the open folder it is sandboxed to that folder. Unsaved tabs
 get a Recovery snapshot first, and afterwards a card lists the files it added, changed
 or deleted. With no folder open, a CLI can only answer.
@@ -156,7 +161,7 @@ or deleted. With no folder open, a CLI can only answer.
 **Settings → AI** has these pages:
 
 - **Use for:** engine, model and effort for Chat and each quick action.
-- **Actions:** your saved actions.
+- **Actions:** your saved actions and recipes.
 - **Context:** how many folder-search excerpts to add, the maximum context characters,
   and files to exclude from AI context.
 - **Local CLI:** detected Claude Code, Codex CLI and Pi installs.
