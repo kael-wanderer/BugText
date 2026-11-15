@@ -41,7 +41,7 @@ describe("Actions settings", () => {
 const recipeAction = (id: string, name: string) => ({ id, name, instruction: "Review", result: "answer" as const, input: "note" as const, engine: null, panel: false,
   recipe: { inputs: [{ kind: "changed" as const, days: 7 }], output: { kind: "note" as const, path: "Reviews/{{date}}.md" } } });
 const mixed = (): ActionsFile => ({ version: 2, actions: [action("p1", "P1"), recipeAction("r1", "R1"), action("p2", "P2")] });
-const editorDeps = (over = {}) => ({ folder: () => "/r", notes: () => ["/r/a.md", "/r/b.md"], pickNote: vi.fn(async () => "/r/b.md"), views: () => [{ id: "v1", name: "Research" }], takeEdit: () => null, ...over });
+const editorDeps = (over = {}) => ({ folder: () => "/r", notes: () => ["a.md", "b.md"], pickNote: vi.fn(async () => "b.md"), views: () => [{ id: "v1", name: "Research" }], takeEdit: () => null, ...over });
 const rowOf = (host: HTMLElement, name: string) => [...host.querySelectorAll<HTMLElement>(".st-row")].find(r => r.querySelector(".st-row-label")?.textContent?.includes(name))!;
 const clickIn = (el: HTMLElement, label: string) => { const b = [...el.querySelectorAll("button")].find(b => b.textContent === label); expect(b, label).toBeTruthy(); b!.click(); };
 

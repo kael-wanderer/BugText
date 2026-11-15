@@ -37,7 +37,7 @@ export type RecipeHost = {
   views: (create: () => SavedViewStore) => SavedViewStore;
   chatPanel: () => AIPanel | null; // shows the panel first
   refreshExplorer: () => Promise<void>;
-  files: () => string[]; // absolute paths in the open folder
+  files: () => string[]; // the open folder's files, relative to it
   openActions: () => void; // Settings ▸ AI ▸ Actions
 };
 

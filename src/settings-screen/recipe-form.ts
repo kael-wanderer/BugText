@@ -4,7 +4,7 @@ import { button, group, row, select } from "./controls";
 
 export type RecipeEditorDeps = {
   folder(): string | null;
-  notes(): string[]; // absolute paths of the folder's notes
+  notes(): string[]; // the folder's notes, relative to it
   pickNote(files: string[]): Promise<string | null>;
   views(): { id: string; name: string }[];
   /** A recipe the editor should open with (from the Recipes sheet or a failed run), once. */
@@ -43,7 +43,6 @@ export function recipeFields(form: HTMLElement, draft: RecipeDraft, deps: Recipe
   const box = document.createElement("div"); box.className = "st-recipe-fields";
   form.append(box);
   const folder = deps?.folder() ?? null;
-  const prefix = folder ? folder.replace(/\/$/, "") + "/" : "";
 
   function inputControls(input: RecipeInput, index: number): HTMLElement {
     const controls = document.createElement("div"); controls.className = "st-recipe-input";
@@ -65,10 +64,10 @@ export function recipeFields(form: HTMLElement, draft: RecipeDraft, deps: Recipe
       });
       const add = button("Add note…", () => {
         if (!deps || !folder) return;
-        void deps.pickNote(deps.notes()).then(picked => {
-          if (!picked || !picked.startsWith(prefix)) return;
-          const relative = picked.slice(prefix.length);
-          if (!input.paths.includes(relative) && input.paths.length < 50) input.paths.push(relative);
+        const notes = deps.notes();
+        void deps.pickNote(notes).then(picked => {
+          if (!picked || !notes.includes(picked)) return;
+          if (!input.paths.includes(picked) && input.paths.length < 50) input.paths.push(picked);
           paint();
         });
       });
