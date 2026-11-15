@@ -126,3 +126,34 @@ finding give:
 
 Then list the decisions above that you disagree with. End with a one-line verdict for
 each branch: keep as is, fix on `main`, or revert.
+
+---
+
+## Outcome (2026-11-15, after Fable's review)
+
+Fable recommended reverting; the owner chose to revert. `609b34f` was reverted in
+`238ff68`: keys are back in the OS keychain, `keyring` restored, the `secrets/` sandbox
+deny removed with the folder. Instead, every handed-out build is signed with the stable
+self-signed identity "BugText Local Dev" through `APPLE_SIGNING_IDENTITY`
+(`npm run build:app`, `scripts/build-local-app.sh`, commits `2d7a696`, `b3c4c66`).
+
+Checked in the release build on the second display, using the `omlx` key (Test text
+model, a real request that needs the key):
+
+| Step | Build | Keychain prompt |
+|---|---|---|
+| 1. First signed build, launch, use a key | CDHash `077139de…` | none (the identity already had Always Allow from earlier dev runs signed with the same certificate) |
+| 2. Quit, relaunch the same build | same | none |
+| 3. Build again, launch | rebuild was byte-identical, so a second build was made with a temporary `bundleVersion` (not committed): CDHash `e78e28e5…` | none |
+
+Signature of every build:
+
+```
+Authority=BugText Local Dev
+designated => identifier "com.kael.bugtext" and certificate leaf = H"281139f5041e9ccaaa706f5945d9f41dfd0ee03b"
+```
+
+Seen on the way: in Settings ▸ AI ▸ API providers, Edit… opens the form at the top of
+the page, out of view when the list is scrolled, and Test shows no progress and leaves
+the status line unchanged when the result is the same, so both look like "nothing
+happens".
