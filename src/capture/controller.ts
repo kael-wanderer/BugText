@@ -2,7 +2,7 @@
 // Add note do. main.ts supplies the app services; this file holds the flow.
 
 import type { Settings } from "../settings";
-import { excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
+import { escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine } from "./format";
 import type { CaptureAction } from "./menu";
 import { pickNote } from "./note-picker";
 import type { Passage } from "./selection";
@@ -87,9 +87,12 @@ export function createCapture(host: CaptureHost) {
     const target = resolveTarget(src.folder, src.path, ref.title, result.target, host.now());
     if ("error" in target) { host.toast(target.error); return; }
     const link = linkTarget(absoluteOf(src.folder, target.relative), src.path, ref);
+    // A preview selection is rendered text: escape it so it renders back the same.
+    // An editor selection is already Markdown.
+    const text = passage.source === "preview" ? escapeMarkdown(result.text) : result.text;
     const entry = kind === "excerpt"
-      ? excerptBlock(result.text, label, link, isoDate(host.now()), result.comment)
-      : taskLine(result.text, link);
+      ? excerptBlock(text, label, link, isoDate(host.now()), result.comment)
+      : taskLine(text, link);
     const written = await write(src.folder, target, entry);
     if (!written) return;
     host.saveSettings(withRemembered(host.settings(), src.folder, kind, result.target));

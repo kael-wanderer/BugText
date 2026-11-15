@@ -39,6 +39,15 @@ export function linkTarget(fromNote: string, sourcePath: string, ref: SourceRef)
   return formatLinkTarget(fromNote, sourcePath, ref.anchor ?? undefined);
 }
 
+/** Rendered text (a preview selection) as Markdown that renders back to the same text:
+ *  backslash before \ ` * _ [ ] < > &, and before a block marker at the start of a line. */
+export function escapeMarkdown(text: string): string {
+  return text.split("\n").map((line) => line
+    .replace(/[\\`*_[\]<>&]/g, (c) => `\\${c}`)
+    .replace(/^(\s*)([#+-])/, "$1\\$2")
+    .replace(/^(\s*\d+)\./, "$1\\.")).join("\n");
+}
+
 const endWithNewline = (text: string): string => (text.endsWith("\n") ? text : `${text}\n`);
 
 /** The excerpt block of spec 3.2, ending with exactly one newline. */

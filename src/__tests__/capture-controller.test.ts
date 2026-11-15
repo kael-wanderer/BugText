@@ -71,6 +71,20 @@ describe("capture controller", () => {
     expect(t.files.get("/r/Daily/2026-11-14.md")).toContain("- [ ] Check the sync ([source](../docs/arch.md#sync-model))\n");
     expect(t.settings().capture.targets["/r"]?.task).toEqual({ kind: "daily" });
   });
+  it("escapes text selected in the preview and keeps editor text as written", async () => {
+    const preview = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "Map<K> for *args", line: 5, source: "preview" } }) });
+    let done = preview.capture.run("excerpt");
+    await Promise.resolve();
+    save();
+    await done;
+    expect(preview.files.get("/r/docs/arch.notes.md")).toContain("> Map\\<K\\> for \\*args\n");
+    const editor = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "`Map<K>` for *args*", line: 5, source: "editor" } }) });
+    done = editor.capture.run("task");
+    await Promise.resolve();
+    save();
+    await done;
+    expect(editor.files.get("/r/Daily/2026-11-14.md")).toContain("- [ ] `Map<K>` for *args* ([source]");
+  });
   it("tells the owner when a created note landed on another name", async () => {
     const t = setup();
     vi.mocked(t.writer.create).mockResolvedValueOnce("/r/docs/arch.notes 2.md");

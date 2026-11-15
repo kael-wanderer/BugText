@@ -2,6 +2,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { findQuote, findQuoteInSource, lineOffset } from "../capture/follow";
 import { captureQuote } from "../capture/link-quote";
+import { escapeMarkdown, excerptBlock } from "../capture/format";
+import { renderMarkdown } from "../preview";
 import { configureLinks, followLink } from "../links/follow";
 import { createLinkIndex } from "../links/index";
 
@@ -116,4 +118,22 @@ describe("lineOffset", () => {
     expect(lineOffset("a\nbc\nd", 3)).toBe(5);
     expect(lineOffset("a\nbc", 9)).toBe(4);
   });
+});
+
+describe("preview text round-trip", () => {
+  function rendered(markdown: string): HTMLElement {
+    const host = document.createElement("div");
+    host.append(document.createRange().createContextualFragment(renderMarkdown(markdown)));
+    return host;
+  }
+  for (const [source, selected] of [
+    ["## H\n\nUse `Map<String, Path>` for \\*args here.\n", "Map<String, Path> for *args"],
+    ["## H\n\nText with <b>tags</b> & \\# a hash.\n", "# a hash."],
+  ]) {
+    it(`reads back "${selected}" as selected`, () => {
+      expect(findQuote(rendered(source), selected, 1)?.toString().replace(/\s+/g, " ")).toBe(selected);
+      const notes = rendered(excerptBlock(escapeMarkdown(selected), "Doc › H", "doc.md#h", "2026-11-15", ""));
+      expect(captureQuote(notes.querySelector("a")!)).toBe(selected);
+    });
+  }
 });

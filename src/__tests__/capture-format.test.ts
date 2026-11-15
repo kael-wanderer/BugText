@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  companionPath, companionStarter, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine,
+  companionPath, companionStarter, escapeMarkdown, excerptBlock, linkLabel, linkTarget, noteEntry, sourceRef, taskLine,
 } from "../capture/format";
 
 const doc = "# Arch\n\n## Sync model\n\ntext";
@@ -74,5 +74,16 @@ describe("companion note", () => {
   });
   it("starts the companion with about: and a heading", () => {
     expect(companionStarter("docs/arch.md", "Architecture")).toBe("---\nabout: arch.md\n---\n\n# Notes on Architecture\n\n");
+  });
+});
+
+describe("escapeMarkdown", () => {
+  it("escapes inline Markdown characters", () => {
+    expect(escapeMarkdown("Map<String, Path> for *args & [x] `y` _z_ \\")).toBe(
+      "Map\\<String, Path\\> for \\*args \\& \\[x\\] \\`y\\` \\_z\\_ \\\\",
+    );
+  });
+  it("escapes block markers at the start of a line only", () => {
+    expect(escapeMarkdown("# a\n> b\n- c\n+ d\n12. e\nf - g 3. h")).toBe("\\# a\n\\> b\n\\- c\n\\+ d\n12\\. e\nf - g 3. h");
   });
 });
