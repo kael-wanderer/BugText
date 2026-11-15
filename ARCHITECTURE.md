@@ -163,6 +163,34 @@ and give "N sources changed since last run". The editor is `settings-screen/reci
 the Actions page saves the full list by id, so the My actions and Recipes sections are
 only filtered views.
 
+Import (`src/import/`, all lazy, plus `src-tauri/src/import_web.rs` and
+`import_files.rs`; spec 5.5): File ▸ Import ▸ Web Page…, Word Document…, CSV… run
+`importWeb` / `importFile` (`run.ts`) through `ImportDeps` (`host.ts`) and one sheet
+(`sheet.ts`). Only Rust touches the network: `import_fetch_page` takes https only, no
+userinfo, no `localhost`/`.local`/`.internal`/`.home.arpa`; each hop resolves the host
+once, `vet`s every address against `public_ip` (IANA special-purpose ranges, IPv4 and
+IPv6 including mapped, NAT64 and 6to4 forms) and pins the client to the first one with
+`ClientBuilder::resolve`, so the HTTP client never looks the name up again. The client
+has `https_only`, `no_proxy` and no automatic redirects; redirects are followed by hand,
+each one checked like the first address, four requests in all. Bodies must be HTML
+and are read up to 5 MB. The HTML is cleaned in the webview (`clean.ts`) in an inert
+`DOMParser` document, because Rust has no HTML parser and Pandoc's reader drops the
+elements a filter would need: page chrome and active elements are removed, a few
+attributes kept, links resolved against the final address (a `<base>` is ignored), non-http
+links unwrapped and non-https images removed. Pandoc then runs with fixed arguments and
+no shell: `--from html --to gfm-raw_html --wrap=none --sandbox` on stdin, or
+`--from docx --to gfm-raw_html --wrap=none --extract-media=<fresh temp dir> <canonical
+path>`; `gfm-raw_html` keeps raw HTML out of the note. `place_media` copies only regular
+image files whose bytes match their extension (200 at most, 25 MB each) from the temp dir
+into `<note dir>/<images folder>/` and rewrites the links in one pass; the temp dir is
+always removed. Originals go to `<images folder>/originals/` through `confined_dir`,
+numbered, never overwritten. The note is written by `create_from_template` (never
+overwrites) with `source`, `imported_at`, `source_digest` (and `title`) as JSON-quoted
+YAML (`note.ts`). "Already imported" is a link-index lookup by `source` before fetching
+and by `source_digest` after. CSV (`csv.ts`): RFC 4180, a table up to 500 rows and 50
+columns, else a link to the original. Errors are fixed strings; no address, page text
+or path is logged.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,
