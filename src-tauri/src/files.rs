@@ -424,6 +424,38 @@ pub fn write_ai_actions(app: tauri::AppHandle, contents: String) -> Result<(), S
     write_atomic(&path.to_string_lossy(), contents.as_bytes()).map_err(|_| "Cannot save actions".into())
 }
 
+const RECIPE_RUNS_LIMIT: usize = 2 * 1024 * 1024;
+
+/// Recipe run digests (`recipe-runs.json` in the app config folder). `"{}"` when missing.
+#[tauri::command]
+pub fn recipe_runs_read(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    let dir = app.path().app_config_dir().map_err(|_| "Cannot read recipe runs")?;
+    read_recipe_runs_at(&dir)
+}
+
+#[tauri::command]
+pub fn recipe_runs_write(app: tauri::AppHandle, contents: String) -> Result<(), String> {
+    use tauri::Manager;
+    let dir = app.path().app_config_dir().map_err(|_| "Cannot save recipe runs")?;
+    write_recipe_runs_at(&dir, &contents)
+}
+
+fn read_recipe_runs_at(dir: &Path) -> Result<String, String> {
+    match fs::read_to_string(dir.join("recipe-runs.json")) {
+        Ok(contents) => Ok(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok("{}".into()),
+        Err(_) => Err("Cannot read recipe runs".into()),
+    }
+}
+
+fn write_recipe_runs_at(dir: &Path, contents: &str) -> Result<(), String> {
+    if contents.len() > RECIPE_RUNS_LIMIT || serde_json::from_str::<serde_json::Value>(contents).is_err() {
+        return Err("Cannot save recipe runs".into());
+    }
+    write_atomic_raw(&dir.join("recipe-runs.json"), contents.as_bytes()).map_err(|_| "Cannot save recipe runs".into())
+}
+
 #[tauri::command]
 pub fn get_ai_settings(app: tauri::AppHandle, default: String) -> Result<SettingsFile, String> {
     use tauri::Manager;
@@ -1487,6 +1519,26 @@ mod async_file_command_tests {
         tauri::async_runtime::block_on(delete_to_trash(file.to_string_lossy().into_owned())).unwrap();
         assert!(!file.exists());
         assert!(tauri::async_runtime::block_on(delete_to_trash(file.to_string_lossy().into_owned())).is_err());
+        let _ = fs::remove_dir_all(dir);
+    }
+}
+
+#[cfg(test)]
+mod recipe_runs_tests {
+    use super::{read_recipe_runs_at, write_recipe_runs_at};
+    use std::fs;
+
+    #[test]
+    fn recipe_runs_roundtrip_and_refusals() {
+        let dir = std::env::temp_dir().join(format!("bugtext-recipe-runs-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(read_recipe_runs_at(&dir).unwrap(), "{}");
+        write_recipe_runs_at(&dir, r#"{"version":1,"runs":{}}"#).unwrap();
+        assert_eq!(read_recipe_runs_at(&dir).unwrap(), r#"{"version":1,"runs":{}}"#);
+        assert!(write_recipe_runs_at(&dir, "not json").is_err());
+        let big = format!("\"{}\"", "x".repeat(2 * 1024 * 1024 - 1));
+        assert!(write_recipe_runs_at(&dir, &big).is_err());
+        assert_eq!(read_recipe_runs_at(&dir).unwrap(), r#"{"version":1,"runs":{}}"#);
         let _ = fs::remove_dir_all(dir);
     }
 }

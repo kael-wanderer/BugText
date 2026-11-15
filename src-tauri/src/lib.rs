@@ -346,6 +346,8 @@ pub fn run() {
             files::get_ai_settings,
             files::read_ai_actions,
             files::write_ai_actions,
+            files::recipe_runs_read,
+            files::recipe_runs_write,
             recovery::recovery_write_draft,
             recovery::recovery_clear_draft,
             recovery::recovery_list_drafts,
