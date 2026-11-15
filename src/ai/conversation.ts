@@ -15,7 +15,7 @@ export type AttachedFile =
 
 export type RetrievedChunk = { path: string; heading: string; text: string; superseded?: true };
 
-function escapeAttribute(value: string): string {
+export function escapeAttribute(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
