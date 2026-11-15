@@ -142,6 +142,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     label: "Fonts and sizes",
     keywords: "font typeface in general",
   },
+  { id: "tasks-stamp", page: "editing", label: "Add completion date", keywords: "task done checkbox date stamp completed" },
   { id: "links-hover-preview", page: "editing", label: "Preview links on hover", keywords: "note link hover tooltip preview" },
   { id: "links-complete", page: "editing", label: "Suggest notes while typing links", keywords: "links completion notes markdown" },
   { id: "links-on-rename", page: "editing", label: "When renaming or moving notes", keywords: "links rename move backlinks ask never" },

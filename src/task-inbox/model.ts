@@ -1,6 +1,6 @@
 import type { IndexedNote } from "../links/index";
 import { scanMarkdownLines } from "../markdown-blocks";
-import { taskAt, taskToggleChange } from "../tasks";
+import { taskAt, taskToggleEdits, type TextChange } from "../tasks";
 import { tagAncestors, tagKey } from "../properties/tags";
 
 export type InboxTask = { path: string; source: string; line: number; offset: number; checked: boolean; text: string; heading: string };
@@ -28,10 +28,10 @@ export function inboxTasks(notes: IndexedNote[], filter: InboxFilter): InboxTask
     .sort((a, b) => a.path.localeCompare(b.path)).flatMap(noteTasks)
     .filter(task => filter.state === "all" || task.checked === (filter.state === "completed"));
 }
-export function inboxTaskChange(task: InboxTask, current: string) {
+export function inboxTaskChange(task: InboxTask, current: string, stamp: string | null = null): TextChange[] {
   if (current !== task.source) throw new Error("This task changed. Refresh the list and try again.");
   const line = current.split("\n")[task.line - 1];
-  const change = taskToggleChange(line, task.offset);
-  if (!change) throw new Error("This task is no longer available.");
-  return change;
+  const changes = taskToggleEdits(line, task.offset, stamp);
+  if (!changes.length) throw new Error("This task is no longer available.");
+  return changes;
 }

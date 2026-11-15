@@ -1443,6 +1443,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
   v.editor.setSpellCheck(currentSettings.editor.spellCheck);
   v.editor.setLineNumbers(ui.lineNumbers);
+  v.editor.setTaskStamp(() => (currentSettings.tasks.stampCompletion ? localToday() : null));
   views.set(windowId, v);
   return v;
 }

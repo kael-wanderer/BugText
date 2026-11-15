@@ -68,7 +68,7 @@ export function createOrganizeActions(host: OrganizeHost) {
       if (!folder || !task.path.startsWith(folder.replace(/\/$/, "") + "/")) throw new Error("The folder changed. Refresh the tasks list.");
       const source = await host.openForEdit(task.path);
       if (!source) throw new Error("Cannot edit this note here. Check whether another window has unsaved changes.");
-      const change = inboxTaskChange(task, source.text);
+      const [change] = inboxTaskChange(task, source.text); // the marker flip only; Task 6 moves this to task-inbox/write.ts
       await manualSnapshot(task.path, source.text, "Before task inbox edit", true);
       if (host.getFolder() !== folder) throw new Error("The folder changed. Reopen the task inbox.");
       if (!host.apply(source, change)) throw new Error("This note changed. Refresh the tasks list and try again.");

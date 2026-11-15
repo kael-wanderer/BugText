@@ -87,6 +87,8 @@ export const editingPage: SettingsPage = {
         ], settings.links.onRename, (onRename) => {
           const current = deps.getSettings(); deps.onSettingsChange({ ...current, links: { ...current.links, onRename } });
         })),
+      caption("Tasks"),
+      row("tasks-stamp", "Add completion date", "Checking a task adds ✅ and today's date; unchecking removes it.", toggle("Add completion date", settings.tasks.stampCompletion, stampCompletion => deps.onSettingsChange({ ...deps.getSettings(), tasks: { stampCompletion } }))),
       caption("Tables"),
       row(
         "table-format-on-edit",

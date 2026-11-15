@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Tasks: checking a task adds ` ✅ <date>` and unchecking removes it (Settings ▸ Editing ▸ Add completion date, on by default). A task may carry `due:YYYY-MM-DD` or `📅 YYYY-MM-DD`.
 - AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them labelled `[superseded]`. The context record lists what was left out.
 - Mark as Superseded By… (palette, File menu, Explorer) sets `status` and `superseded_by` in one step. The Filter panel has Draft, Current and Superseded chips.
 - Document status: `status: draft | current | superseded` shows a chip on the tab and the properties card; Reading view shows "Superseded by … · Open" and "Review was due …" from `superseded_by` and `review_by`.
