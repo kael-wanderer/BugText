@@ -968,6 +968,7 @@ function commandItems(): PaletteItem[] {
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
     command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
+    command("file.mark_superseded", "Mark as Superseded By…", () => void markActiveSuperseded()),
     command("edit.extract_note", "Extract Selection to Note", () => withOrganize((actions) => actions.extractSelection())),
     command("edit.show_tasks", "Tasks in Folder", () => withOrganize((actions) => actions.showTasks())),
     command("edit.writing_goal", "Set Writing Goal…", () => void openGoals(goalAnchor())),
@@ -3795,6 +3796,25 @@ async function updateLifecycleBar(wid: string): Promise<void> {
     leftOutOfAI: lifecycle.status === "superseded" && !includeSuperseded(),
   }, { open: target => void openSupersedingNote(target, notePath) });
 }
+function markActiveSuperseded(): Promise<void> {
+  const path = activeMeta()?.path;
+  if (!path || !isMarkdownFile(path)) { showToast("Open a Markdown note first."); return Promise.resolve(); }
+  return markSupersededNote(path);
+}
+async function markSupersededNote(path: string): Promise<void> {
+  const folder = getState().folder;
+  const [{ markSuperseded }, { pickNote }, { setProperty }] = await Promise.all([import("./lifecycle/mark"), import("./capture/note-picker"), loadProperties()]);
+  const writer = folder ? noteLinkWriter(folder, "Before mark superseded") : null;
+  await markSuperseded(path, {
+    folder, setProperty,
+    notes: () => fileList.filter((file) => isMarkdownFile(file)),
+    pick: (files) => pickNote(document, files),
+    findOpen: (p) => { const found = findTabByPath(getState().windows, p); if (!found) return null; const editor = editorForTab(found.tab.id); return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes, { isolate: true }) }; },
+    read: (p) => writer!.read(p), snapshot: (p, text) => writer!.snapshot(p, text),
+    write: async (p, contents, expected) => { await writer!.write(p, contents, expected); workspaceIndex.onFileChanged(p, contents); },
+    toast: (text) => showToast(text),
+  });
+}
 async function openSupersedingNote(target: string, notePath: string): Promise<void> {
   const folder = getState().folder;
   const { supersedingPath } = await import("./lifecycle/open");
@@ -4075,6 +4095,7 @@ initExplorer(
     onOpenSide: (path) => void openInSub(path),
     onCompare: (selectedPath, path) =>
       void compareFiles(selectedPath, path),
+    onMarkSuperseded: (path) => void markSupersededNote(path),
     onAddToChat: (path) => {
       void doOpenPath(path).then(() => setAIVisible(true));
     },
@@ -4411,6 +4432,8 @@ listenScoped<string>("menu", (event) => {
       return withOrganize((actions) => void actions.newTypedNote());
     case "file.apply_note_type":
       return withOrganize((actions) => void actions.applyNoteType());
+    case "file.mark_superseded":
+      return void markActiveSuperseded();
     case "file.open":
       return void doOpen();
     case "file.open_folder":

@@ -43,6 +43,7 @@ export type ExplorerActions = {
   onOpenSide?: (path: string) => void;
   onCompare?: (selectedPath: string, path: string) => void;
   onAddToChat?: (path: string) => void;
+  onMarkSuperseded?: (path: string) => void;
   onNewFromTemplate?: (directory: string) => void;
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
@@ -418,6 +419,9 @@ function rowMenu(node: TreeNode): MenuItem[] {
               },
       ),
       "separator",
+      ...(explorerActions.onMarkSuperseded && /\.(md|markdown)$/i.test(node.path)
+        ? [{ label: "Mark as Superseded By…", action: () => explorerActions.onMarkSuperseded!(node.path) }]
+        : []),
       {
         label: "Add File to Chat",
         action: () =>

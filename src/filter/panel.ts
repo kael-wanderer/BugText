@@ -44,6 +44,20 @@ export function createFilterPanel(host: HTMLElement, index: LinkIndex, open: (pa
     const clear = element("button", "Clear all"); clear.type = "button"; clear.addEventListener("click", () => { model.tags = []; model.rows = []; model.folder = null; model.mode = "all"; selectedView = null; render(); host.querySelector<HTMLButtonElement>("button")?.focus(); });
     const table = element("button", "Table view"); table.type = "button"; table.onclick = () => options.openTable?.();
     controls.append(chips, clear, table);
+    // Quick chips for the lifecycle status (spec 4.1): one status row at a time.
+    const statusChips = element("div", "", "filter-status-chips");
+    for (const [value, label] of [["draft", "Draft"], ["current", "Current"], ["superseded", "Superseded"]] as const) {
+      const index = model.rows.findIndex(row => row.key === "status" && row.op === "is");
+      const pressed = index >= 0 && model.rows[index].value.toLowerCase() === value;
+      const button = element("button", label, "properties-chip"); button.type = "button"; button.setAttribute("aria-pressed", String(pressed));
+      button.addEventListener("click", () => {
+        model.rows = model.rows.filter(row => !(row.key === "status" && row.op === "is"));
+        if (!pressed) model.rows.push({ key: "status", op: "is", value });
+        editingRow = -1; render();
+      });
+      statusChips.append(button);
+    }
+    controls.append(statusChips);
     const search = element("input"); search.placeholder = "Filter tags"; search.setAttribute("aria-label", "Filter tags"); search.value = tagSearch;
     const tagList = element("div", "", "filter-tags");
     function renderTags() {
