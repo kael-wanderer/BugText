@@ -47,7 +47,7 @@ export function parseCsv(text: string): string[][] {
 }
 
 function cell(text: string): string {
-  return text.replace(/\r\n|\r|\n/g, " ").replace(/\|/g, "\\|").replace(/</g, "&lt;").trim();
+  return text.replace(/\r\n|\r|\n/g, " ").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/</g, "&lt;").trim();
 }
 
 export function csvTable(rows: string[][]): { markdown: string } | { tooLarge: true; rows: number; columns: number } {

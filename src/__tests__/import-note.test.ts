@@ -38,6 +38,7 @@ describe("nameFrom", () => {
     expect(nameFrom("a".repeat(100))).toHaveLength(80);
     expect(nameFrom("")).toBe("Imported page");
     expect(nameFrom(" ... ")).toBe("Imported page");
+    expect(nameFrom("{{title}} on {{date}}")).toBe("title on date");
   });
 });
 

@@ -26,6 +26,9 @@ describe("csvTable", () => {
     const result = csvTable([["h"], ["x|y"], ["l1\nl2"], ["<b>"]]);
     expect(result).toEqual({ markdown: "| h |\n| --- |\n| x\\|y |\n| l1 l2 |\n| &lt;b> |\n" });
   });
+  it("escapes a backslash before a pipe so the cell does not split", () => {
+    expect(csvTable([["h"], ["a\\|b"]])).toEqual({ markdown: "| h |\n| --- |\n| a\\\\\\|b |\n" });
+  });
   it("pads short rows and names empty header cells", () => {
     expect(csvTable([["a", "b", ""], ["1"]])).toEqual({ markdown: "| a | b | Column 3 |\n| --- | --- | --- |\n| 1 |  |  |\n" });
   });

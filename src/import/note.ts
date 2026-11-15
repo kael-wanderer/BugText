@@ -20,11 +20,12 @@ export function importedNote(body: string, meta: ImportMeta): string {
   return lines.join("\n") + body;
 }
 
-/** A safe file stem: no control characters, path or shell-reserved characters, or leading dots. */
+/** A safe file stem: no control characters, path or shell-reserved characters, braces (the save path
+ * goes through `outputPath`, which fills `{{…}}`), or leading dots. */
 export function nameFrom(text: string): string {
   const cleaned = text
     // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, "")
+    .replace(/[\u0000-\u001f\u007f/\\:*?"<>|{}]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/^[.\s]+/, "");

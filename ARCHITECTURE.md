@@ -180,7 +180,9 @@ attributes kept, links resolved against the final address (a `<base>` is ignored
 links unwrapped and non-https images removed. Pandoc then runs with fixed arguments and
 no shell: `--from html --to gfm-raw_html --wrap=none --sandbox` on stdin, or
 `--from docx --to gfm-raw_html --wrap=none --extract-media=<fresh temp dir> <canonical
-path>`; `gfm-raw_html` keeps raw HTML out of the note. `place_media` copies only regular
+path>`; `gfm-raw_html` keeps raw HTML out of the note. Word import refuses Pandoc
+before 3.1.6 (`--extract-media` path escape, CVE-2023-35936 / CVE-2023-38745). A note is
+not created when the open folder changed during the import. `place_media` copies only regular
 image files whose bytes match their extension (200 at most, 25 MB each) from the temp dir
 into `<note dir>/<images folder>/` and rewrites the links in one pass; the temp dir is
 always removed. Originals go to `<images folder>/originals/` through `confined_dir`,

@@ -51,6 +51,23 @@ All 7 tasks are built and every automated check passes. The security review (Fab
 - T6: `importUI(host, { label, openNote })` takes those two options. Open Note and the folder-relative paths need them.
 - T6: no `styles.css` change. The sheet reuses the `organize.css` classes.
 
+## Review fixes (Fable: no Critical, 1 Important, 9 Minor; verdict "fix first")
+
+- Important 1: a Word import ran `--extract-media` on an untrusted `.docx` with any installed Pandoc; Pandoc 1.13–3.1.5 can write outside the media folder (CVE-2023-35936, CVE-2023-38745). `import_word` now reads `pandoc --version` and refuses below 3.1.6 with "Importing Word documents needs Pandoc 3.1.6 or later." Test `pandoc_version_floor_for_word` RED→GREEN. The web path already used `--sandbox` with stdin.
+- Minor 5 (taken, as the review suggested): a folder switch during an import created the note in the old folder and indexed it in the new one. The flow now fails with "The folder changed. Nothing was imported into the new folder." before `create`. Test RED→GREEN.
+- Minor 7 (taken): `{` and `}` are removed from default names, so a title holding `{{title}}` or `{{date}}` is not filled by `outputPath`. Test RED→GREEN.
+- Minor 8 (taken; a one-line fix that otherwise corrupts tables): a backslash in a CSV cell is escaped before the pipe, so `a\|b` stays one cell. Test RED→GREEN.
+- Checks after the fixes: tsc clean; `npm run test` 1,647 passed; `cargo test` 254 passed, 4 ignored; clippy clean; startup chunk 661.70 kB (unchanged).
+
+## Deferred minors (Fable review)
+
+2. `public_v6` is a deny-list; `64:ff9b:1::/48`, `::ffff:0:0:0/96`, `2001:2::/48`, `2001:10::/28`, `2001:20::/28`, `3fff::/20` pass. Suggested: allow only `2000::/3` minus the special ranges.
+3. DNS pin relies on reqwest matching the override key; a second lock would check `response.remote_addr()` against the vetted IP.
+4. Pandoc has no time limit and the busy sheet's Cancel is disabled; a hanging file leaves "Converting…" forever.
+6. (Disagrees with ruling T5) a Pandoc or CSV failure after the copy leaves the original in `originals/` and does not say so.
+9. Pages in other charsets (Shift-JIS, windows-1252) are decoded as lossy UTF-8.
+10. An `<img>` with no `src` counts toward "N images stay linked to the web".
+
 ## Not done
 
 - Security review of Tasks 1–3 (Fable).

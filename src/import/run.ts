@@ -41,6 +41,7 @@ const NO_FOLDER = "Open a folder to import into.";
 const NO_TEXT = "The page has no text to import.";
 const FAILED = "The import did not finish.";
 const TOO_LARGE = "The file is too large for a table.";
+const FOLDER_CHANGED = "The folder changed. Nothing was imported into the new folder.";
 
 type Target = { relativeDir: string; stem: string };
 
@@ -86,6 +87,7 @@ async function finish(
   problems: string[],
   copied?: string,
 ): Promise<void> {
+  if (deps.folder() !== folder) return ui.fail(FOLDER_CHANGED);
   let path: string;
   try {
     path = await deps.create({ folder, relativeDir: where.relativeDir, stem: where.stem, contents });

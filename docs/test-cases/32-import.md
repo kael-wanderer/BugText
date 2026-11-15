@@ -77,6 +77,8 @@ TLS wrapper, or `openssl s_server -accept 443 -www`) whose log shows any request
 - Expected: Both fail with `Importing needs Pandoc. Install it with: brew install pandoc`. For the web page nothing is created; for Word nothing but the copied original.
 - Status: [ ] Pass  Notes:
 
+- Also: with a Pandoc older than 3.1.6 on `PATH` (and none in `/opt/homebrew/bin`), a Word import fails with `Importing Word documents needs Pandoc 3.1.6 or later.` and copies nothing beyond the original.
+
 ### IMP-12 — No folder open
 
 - Steps: Close the folder; run each of the three Import commands from the palette.

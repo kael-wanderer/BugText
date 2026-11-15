@@ -25,6 +25,7 @@ pub const NOT_CSV: &str = "Choose a .csv file.";
 pub const SOURCE_GONE: &str = "The file no longer exists.";
 pub const SOURCE_LARGE: &str = "The file is larger than 50 MB.";
 pub const CSV_LARGE: &str = "too-large";
+pub const OLD_PANDOC: &str = "Importing Word documents needs Pandoc 3.1.6 or later.";
 const OUTSIDE: &str = "The import must stay inside the open folder.";
 const MAX_SOURCE_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_CSV_BYTES: u64 = 2 * 1024 * 1024;
@@ -79,6 +80,39 @@ fn run_pandoc(args: &[String], input: &[u8], dir: &Path) -> Result<String, Strin
         return Err(CONVERT.into());
     }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Pandoc before 3.1.6 can write outside the media folder through
+/// `--extract-media` (CVE-2023-35936, CVE-2023-38745), so a Word import needs at
+/// least that version. `text` is the output of `pandoc --version`.
+fn word_pandoc_ok(text: &str) -> bool {
+    let Some(version) = text.lines().next().and_then(|line| line.split_whitespace().nth(1)) else {
+        return false;
+    };
+    let mut parts = [0u32; 3];
+    for (slot, part) in parts.iter_mut().zip(version.split('.')) {
+        match part.parse() {
+            Ok(number) => *slot = number,
+            Err(_) => return false,
+        }
+    }
+    version.split('.').count() >= 2 && parts >= [3, 1, 6]
+}
+
+fn check_word_pandoc() -> Result<(), String> {
+    let pandoc = find_pandoc().ok_or(NO_PANDOC)?;
+    let output = Command::new(pandoc)
+        .arg("--version")
+        .current_dir(std::env::temp_dir())
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|_| OLD_PANDOC.to_string())?;
+    if word_pandoc_ok(&String::from_utf8_lossy(&output.stdout)) {
+        Ok(())
+    } else {
+        Err(OLD_PANDOC.into())
+    }
 }
 
 fn html_to_markdown(html: &str) -> Result<String, String> {
@@ -330,7 +364,7 @@ fn word(folder: &str, relative_dir: &str, images_folder: &str, path: &str) -> Re
     let (source, _) = source_file(path, "word", MAX_SOURCE_BYTES, SOURCE_LARGE)?;
     valid_folder(images_folder).map_err(|_| OUTSIDE.to_string())?;
     let note_dir = note_dir(folder, relative_dir)?;
-    find_pandoc().ok_or(NO_PANDOC)?;
+    check_word_pandoc()?;
     let temp = TempDir::new()?;
     let args = vec![
         "--from".to_string(),
@@ -542,6 +576,18 @@ mod tests {
         assert_eq!(problems, vec!["linked.png was left out.".to_string()]);
         assert!(!root.join("assets/linked.png").exists());
         assert!(!root.join("assets/x.png").exists());
+    }
+
+    #[test]
+    fn pandoc_version_floor_for_word() {
+        assert!(word_pandoc_ok("pandoc 3.11\nFeatures: +server +lua\n"));
+        assert!(word_pandoc_ok("pandoc 3.1.6"));
+        assert!(word_pandoc_ok("pandoc.exe 3.2"));
+        assert!(!word_pandoc_ok("pandoc 3.1.5"));
+        assert!(!word_pandoc_ok("pandoc 2.19.2"));
+        assert!(!word_pandoc_ok("pandoc 3.1"));
+        assert!(!word_pandoc_ok("garbage"));
+        assert!(!word_pandoc_ok(""));
     }
 
     #[test]

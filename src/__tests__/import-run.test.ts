@@ -222,6 +222,16 @@ describe("importFile", () => {
     expect(written(deps).contents).toContain("Original: [my \\[data\\].csv](<assets/originals/my data.csv>)\n");
   });
 
+  it("refuses to create the note when the folder changed during the import", async () => {
+    const { deps, ui } = setup({ answers: [{ savePath: "report.md", again: false }] });
+    const word = deps.word;
+    deps.word = vi.fn(async (args) => { deps.folder = () => "/g"; return word(args); });
+    await importFile("word", deps, ui);
+    expect(ui.fail).toHaveBeenCalledWith("The folder changed. Nothing was imported into the new folder.");
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.created).not.toHaveBeenCalled();
+  });
+
   it("says where the original went when the note cannot be created", async () => {
     const { deps, ui } = setup({ answers: [{ savePath: "report.md", again: false }] });
     deps.create = vi.fn(async () => Promise.reject("exists"));
