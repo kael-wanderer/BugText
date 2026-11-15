@@ -23,7 +23,7 @@ All 9 tasks are built and every automated check passes. Not reviewed yet: Fable 
 ## Checks (2026-11-15, at `a0a9554`)
 
 - `npx tsc --noEmit`: clean.
-- `npx vitest run`: 277 files, 1,487 tests passed.
+- `npx vitest run`: 277 files, 1,487 tests passed (1,488 at `33ec78d`).
 - `cargo test`: 235 passed, 4 ignored (plus the two single-test binaries), after the menu change in Task 8.
 - `cargo clippy --all-targets -- -D warnings`: clean.
 - `npm run build`: startup chunk `main-*.js` 656.92 kB. Baseline 648.28 kB at `787816a`: +8.64 kB, over the plan's +5 kB budget, 143 kB under the 800 kB limit. Overview model, view, styles and the task writer are separate lazy chunks.
@@ -62,7 +62,7 @@ Confirmed in the app:
 - AI folder search with the setting off: "Left out 1 superseded note: old.md".
 - the Project Overview for the root folder and for a sub-folder, Open Review, and that overview tabs are gone after a restart.
 
-Findings, none blocking:
+Findings, none blocking. 1–4 fixed in `33ec78d` (each with a unit test; 1 is CSS only, not re-checked in the app); 5–9 left for the review:
 
 1. The Filter panel's Draft, Current and Superseded chips have no style, so the pressed one looks the same as the others (TRU-06). Fix: style `.filter-status-chips button` and `[aria-pressed="true"]`.
 2. With "Include superseded notes" on, the context record lists the superseded note's excerpt without marking it (TRU-07). The data is in `sent.excerpts[i].superseded`, but `context-sent.ts` does not show it. Fix: add "(superseded)" after the path.

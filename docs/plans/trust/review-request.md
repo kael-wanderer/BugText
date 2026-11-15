@@ -25,7 +25,7 @@ decides what gets fixed.
 
 ## Scope
 
-- Range: `git diff 787816a..29d4e2a` (merge base with `main` to branch head).
+- Range: `git diff 787816a..33ec78d` (merge base with `main` to branch head).
 - Code commits: `3feb85a` to `a0a9554`. `93a9c52` (plan) and `29d4e2a` are docs.
 - Size: 52 source and test files, about 1,450 lines added. New modules in
   `src/lifecycle/`, `src/overview/`, `src/task-inbox/dates.ts` and `write.ts`,
@@ -47,7 +47,7 @@ decides what gets fixed.
 4. `docs/plans/trust/results.md`: per-task commits, checks and every ruling the build
    made.
 5. `ARCHITECTURE.md`, the "Trust and resume" paragraph after "Capture while reading".
-6. `docs/test-cases/30-trust-resume.md`: 14 manual cases, none run yet.
+6. `docs/test-cases/30-trust-resume.md`: 14 manual cases, run 2026-11-15.
 
 ## Current state
 
@@ -56,7 +56,7 @@ decides what gets fixed.
 - Startup chunk `main-*.js` 656.92 kB: +8.64 kB over `main` (648.28 kB), over the plan's
   +5 kB budget. New flows and the overview are lazy; the rest is `main.ts` wiring and
   `lifecycle/model.ts`, plus the AI panel change (the AI panel is in the startup chunk).
-- Not run in the app at all. No smoke run yet.
+- Manual cases TRU-01..14 run 2026-11-15 in the release build: all pass. Findings 1–4 fixed in `33ec78d`; 5–9 open (`results.md`, "Manual run").
 
 ## Where to look hardest
 
