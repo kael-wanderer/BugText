@@ -26,10 +26,14 @@ npm run tauri -- build "$@"
 
 APP="src-tauri/target/release/bundle/macos/BugText.app"
 if [ -d "$APP" ] && [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
-    if ! codesign -dv --verbose=2 "$APP" 2>&1 | grep -q "^Authority=$NAME\$"; then
+    # Read into a variable first: with pipefail, grep -q closing the pipe early
+    # would fail the check through codesign's SIGPIPE.
+    INFO="$(codesign -dv --verbose=2 "$APP" 2>&1)"
+    if ! printf '%s\n' "$INFO" | grep -q "^Authority=$NAME\$"; then
         echo "$APP is not signed by '$NAME'." >&2
         exit 1
     fi
     echo "Signed by '$NAME':"
-    codesign -d -r- "$APP" 2>&1 | grep designated
+    REQ="$(codesign -d -r- "$APP" 2>&1)"
+    printf '%s\n' "$REQ" | grep designated
 fi
