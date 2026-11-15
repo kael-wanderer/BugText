@@ -180,6 +180,8 @@ Status key: 🔜 pending · 🐞 bug to fix · ✅ done.
 - 🔜 Live preview editing: first version is in the workflow WIP. Needs a spec before more work.
 - 🔜 Project Overview key documents show only the file name (`inner.md` for `sub/inner.md`), which is ambiguous in sub-folders. Show the path relative to the overview folder. (Trust and resume manual run, finding 8, TRU-12.)
 - 🔜 A dirty tab's status chip changes only after saving, because the chip reads the index built from disk. Feed the unsaved text to the chip. (Finding 9, TRU-04.)
+- 🐞 Settings ▸ AI ▸ API providers: Edit… opens the form at the top of the page, out of view when the list is scrolled to the connection, so it looks like nothing happened. Scroll the form into view (or open it in place under the connection). Seen 2026-11-15.
+- 🐞 Settings ▸ AI ▸ API providers: Test Connection and Test text model show no progress and leave the status line unchanged when the result repeats, so a test looks like it did nothing. Show "Testing…" while running and a time on the result. Seen 2026-11-15.
 
 ### Tier 2 features
 
