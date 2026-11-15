@@ -1,4 +1,7 @@
 import { countWords } from "./status-bar/model";
+import { isVirtualTab, type TabMeta } from "./tabops";
+import type { LifecycleStatus } from "./lifecycle/model";
+import { lifecycleChip } from "./lifecycle/chip";
 import { revealScroll } from "./tab-reveal";
 import { createGraphView } from "./graph/view";
 import { createGraphTab } from "./graph/tab";
@@ -71,6 +74,10 @@ export type WindowHandlers = WindowViewHooks & {
   onGraphFolder?: () => void;
   onGraphNew?: () => void;
   renderTable?: (host: HTMLElement) => void;
+  /** Project Overview tab body for this folder (spec 4.4). */
+  renderOverview?: (host: HTMLElement, folder: string) => void;
+  /** Lifecycle status shown as a chip after the tab name. */
+  tabStatus?: (tab: TabMeta) => LifecycleStatus | null;
   livePreviewEnabled?: () => boolean;
   onStatusChange?: () => void;
   onWordCount?: (tabId: string, count: number, text: string) => void;
@@ -150,6 +157,7 @@ export type WindowView = {
   openFind: () => boolean;
   /** Host for the review bar, above the panes. */
   reviewHost: HTMLElement;
+  lifecycleHost: HTMLElement;
   /** The reading view's scroll container. */
   previewElement: HTMLElement;
   /** The editor pane, for reading where a selection sits. */
@@ -190,7 +198,7 @@ export function createWindowView(
         if (destroyed || generation !== fullscreenGeneration) return;
         const state = getWindow(windowId);
         const tab = state?.tabs.find(t => t.id === state.activeTabId);
-        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || tab.tableView) {
+        if (!tab || tab.id !== tabId || normalizeDocumentViewMode(tab.path ?? tab.name, state!.mode) === "editor" || graphShown || isVirtualTab(tab)) {
           closeMermaidFullscreen();
           return;
         }
@@ -227,6 +235,7 @@ export function createWindowView(
       </div>
     </div>
     <div class="review-bar" role="region" aria-label="Review" hidden></div>
+    <div class="lifecycle-bar" role="region" aria-label="Document status" hidden></div>
     <div class="window-panes">
       <div class="pane pane-editor">
         <div class="format-toolbar" role="toolbar" aria-label="Markdown formatting">
@@ -658,6 +667,7 @@ export function createWindowView(
     });
 
   const tableHost = document.createElement("div"); tableHost.className = "table-view"; tableHost.hidden = true; root.append(tableHost);
+  const overviewHost = document.createElement("div"); overviewHost.className = "overview-view"; overviewHost.hidden = true; root.append(overviewHost);
   function render(): void {
     const w = getWindow(windowId);
     if (!w) { closeMermaidFullscreen(); return; }
@@ -666,6 +676,8 @@ export function createWindowView(
     const active = w.tabs.find((tab) => tab.id === w.activeTabId);
     tableHost.hidden = !active?.tableView || graphShown;
     if (!tableHost.hidden) h.renderTable?.(tableHost);
+    overviewHost.hidden = !active?.overview || graphShown;
+    if (active?.overview && !overviewHost.hidden) h.renderOverview?.(overviewHost, active.overview);
     const activeName = active?.path ?? active?.name;
     const markdownCard = !!active && isMarkdownFile(activeName);
     root.querySelector<HTMLElement>(".wt-present")!.hidden = !markdownCard;
@@ -675,7 +687,7 @@ export function createWindowView(
     }
     const modes = documentViewModes(activeName);
     const effectiveMode = normalizeDocumentViewMode(activeName, w.mode);
-    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || active.tableView)) closeMermaidFullscreen();
+    if (fullscreenTabId !== null && (!active || active.id !== fullscreenTabId || effectiveMode === "editor" || graphShown || isVirtualTab(active))) closeMermaidFullscreen();
     const language = fileLanguageInfo(activeName);
     // mode class
     root.classList.remove(
@@ -763,7 +775,7 @@ export function createWindowView(
       name.className = "tab-name";
       name.textContent = t.name;
       const detectedTabIcon = fileIcon(t.path ?? t.name, false);
-      const tabIconType = t.tableView ? "table" :
+      const tabIconType = t.tableView ? "table" : t.overview ? "overview" :
         detectedTabIcon === "file"
           ? fileLanguageInfo(t.path ?? t.name).icon
           : detectedTabIcon;
@@ -782,7 +794,10 @@ export function createWindowView(
         keep.addEventListener("click", event => { event.stopPropagation(); h.onKeepTab?.(windowId, t.id); });
         tab.append(keep);
       }
-      tab.append(dot, tabIcon, name, close);
+      tab.append(dot, tabIcon, name);
+      const status = h.tabStatus?.(t);
+      if (status) tab.append(lifecycleChip(document, status));
+      tab.append(close);
       tabbarEl.appendChild(tab);
       if (t.id === w.activeTabId) activeTabEl = tab;
     }
@@ -1239,6 +1254,7 @@ export function createWindowView(
 
   return {
     reviewHost: root.querySelector<HTMLElement>(".review-bar")!,
+    lifecycleHost: root.querySelector<HTMLElement>(".lifecycle-bar")!,
     previewElement: previewPane,
     editorElement: editorPane,
     refreshNotes,
@@ -1269,6 +1285,7 @@ export function createWindowView(
     requestMeasure: () => editor.requestMeasure(),
     focus: () => {
       if (!tableHost.hidden) { tableHost.querySelector<HTMLElement>("tbody tr")?.focus(); return; }
+      if (!overviewHost.hidden) { overviewHost.querySelector<HTMLElement>("button")?.focus(); return; }
       focusedPane = "editor";
       editor.focus();
     },

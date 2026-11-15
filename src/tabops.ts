@@ -6,7 +6,14 @@ export type TabMeta = {
   pinned?: boolean;
   temporary?: boolean;
   tableView?: boolean;
+  /** Project Overview tab for this absolute folder path (spec 4.4). */
+  overview?: string;
 };
+
+/** Table view and Project Overview tabs show generated content, not a file. */
+export function isVirtualTab(tab: TabMeta): boolean {
+  return !!(tab.tableView || tab.overview);
+}
 
 export function findByPath(tabs: TabMeta[], path: string): TabMeta | undefined {
   return tabs.find((tab) => tab.path === path);

@@ -1,6 +1,8 @@
 import "./compact.css";
 import { loadProperties, propertiesModule } from "./loader";
 import type { PropertyEdit } from "./edit";
+import { lifecycleOf } from "../lifecycle/model";
+import { lifecycleChip } from "../lifecycle/chip";
 
 type Apply = (source: string, edit: PropertyEdit) => boolean;
 
@@ -46,7 +48,10 @@ export function createPropertiesCard(host: HTMLElement, show: () => string | nul
     const sourceButton = document.createElement("button"); sourceButton.type = "button"; sourceButton.textContent = "Show source";
     sourceButton.addEventListener("click", () => { sourceShown = true; render(); onShowSource(); });
     if (result) actions.append(sourceButton);
-    header.append(title, actions); host.append(header);
+    header.append(title);
+    const status = result?.ok ? lifecycleOf(result.props).status : null;
+    if (status) header.append(lifecycleChip(document, status));
+    header.append(actions); host.append(header);
     if (result && !result.ok) {
       const error = document.createElement("div"); error.className = "properties-error";
       error.textContent = `Properties could not be read — line ${result.line}: ${result.error}`;

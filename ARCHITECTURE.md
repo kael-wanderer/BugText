@@ -110,6 +110,28 @@ sanitized preview DOM is never changed; in editor-only view it selects the sourc
 `open` returns the window it used, so a ⌘-click into the Sub pane jumps and highlights
 there. The Notes button counts excerpt and note lines in the companion note.
 
+Trust and resume (`src/lifecycle/`, `src/task-inbox/`, `src/overview/`): a note's
+`status` (draft, current, superseded, case-insensitive), `superseded_by` (a relative path
+or Markdown link) and `review_by` (YYYY-MM-DD) are read by `lifecycle/model.ts`, the one
+piece loaded at startup. `main.ts` keeps `statusByPath` from the link index for the chip
+after a tab's name (`lifecycle/chip.ts`, also on the properties card) and for AI folder
+search. The Reading view bar (`bar.ts`) says "Superseded by <name>" with Open
+(`open.ts` opens only `.md` notes inside the folder) and "Review was due <date>".
+Mark as Superseded By… (`mark.ts`, lazy) writes `status` and `superseded_by` as one
+change: through the editor for an open tab, else after a "Before mark superseded"
+Recovery snapshot with `write_file_atomic` and the expected text. Folder search asks for
+`k * 2` excerpts and `ai/superseded.ts` drops superseded ones (or tags them
+`status="superseded"` when Settings ▸ AI includes them), so the context keeps `k`; the
+context record lists what was left out. Task due dates (`due:` or `📅`) and the completion
+stamp ` ✅ date` (`tasks.ts`, Settings ▸ Editing) feed Tasks in Folder, which groups by
+due date and ticks through `task-inbox/write.ts`: an open tab through its editor, a
+closed note after a "Before task edit" snapshot, refusing when the folder or note
+changed. Project Overview is a virtual tab (`TabMeta.overview` = folder, not restored,
+`isVirtualTab` in `tabops.ts`); `overview/model.ts` builds it from the link index and the
+review snapshot on each change (key documents, `type: decision` notes, `#question` /
+`#blocker` tasks, next actions, changes since review), `view.ts` renders text-only rows,
+and Copy as Markdown links relative to the folder.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,

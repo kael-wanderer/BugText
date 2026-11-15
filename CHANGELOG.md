@@ -7,6 +7,13 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Decision note type (`type: decision`, `date`, `status: current`).
+- Project Overview (View menu, palette, Explorer folder menu): a generated tab with key documents, decisions, open questions and blockers, next actions and changes since review, each linked to its source. Tasks can be ticked there. Copy as Markdown.
+- Tasks in Folder groups tasks by Overdue, Today, This week, Later and No date, and ticks tasks in closed notes after a Recovery snapshot.
+- Tasks: checking a task adds ` ✅ <date>` and unchecking removes it (Settings ▸ Editing ▸ Add completion date, on by default). A task may carry `due:YYYY-MM-DD` or `📅 YYYY-MM-DD`.
+- AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them labelled `[superseded]`. The context record lists what was left out.
+- Mark as Superseded By… (palette, File menu, Explorer) sets `status` and `superseded_by` in one step. The Filter panel has Draft, Current and Superseded chips.
+- Document status: `status: draft | current | superseded` shows a chip on the tab and the properties card; Reading view shows "Superseded by … · Open" and "Review was due …" from `superseded_by` and `review_by`.
 - Capture while reading: select text in a Markdown note and choose Excerpt, Task, Ask AI or Copy link. An excerpt is saved as a quote with a link back to its heading, a task as a checklist line; both go to the note's companion notes file, today's daily note or a note you choose, remembered per folder. Text selected in Reading view is saved with Markdown characters escaped, so the saved quote reads exactly as selected. A note that is closed gets a Recovery snapshot first; an open one changes as one undo step. Edit menu: Save Excerpt… (⇧⌘E), Task from Selection…. Ask AI on text selected in Reading view sends the whole passage, even when its source has inline formatting.
 - Following an excerpt or task link opens the source at its heading and highlights the quoted passage. An excerpt whose passage is gone says it changed since it was saved; a task, which holds your own words, just opens at the heading. A missing image's placeholder is never saved as part of a quote.
 - The Notes button in the window toolbar shows how many entries a document's companion notes file holds and opens it in the Sub pane, creating it when missing. HTML pages also get Add note, titled from the page's `<title>`. View menu: Open Notes.
@@ -65,6 +72,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Filter panel: the pressed Draft, Current or Superseded chip now looks pressed.
+- AI context record: with Include superseded notes on, an excerpt from a superseded note is marked "(superseded)".
+- Ticking a task in an open, unsaved note from Tasks in Folder or Project Overview now updates the list at once instead of after saving.
+- Project Overview Copy as Markdown writes tasks as plain bullets, so pasting it into a note in the folder no longer adds new open tasks.
 - Review: the margin mark beside a changed one-line paragraph now runs the full height of the block instead of a few pixels.
 - Review: a note that another tool replaces while BugText is saving it is no longer recorded as reviewed with the other tool's content.
 - Review: a new note's line count no longer counts the final newline as an extra line, so an empty note shows +0 and a one-line note +1.

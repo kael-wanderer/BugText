@@ -43,6 +43,8 @@ export type ExplorerActions = {
   onOpenSide?: (path: string) => void;
   onCompare?: (selectedPath: string, path: string) => void;
   onAddToChat?: (path: string) => void;
+  onMarkSuperseded?: (path: string) => void;
+  onOverview?: (folder: string) => void;
   onNewFromTemplate?: (directory: string) => void;
   onHideExplorer?: () => void;
   onToggleLineNumbers?: () => void;
@@ -418,6 +420,9 @@ function rowMenu(node: TreeNode): MenuItem[] {
               },
       ),
       "separator",
+      ...(explorerActions.onMarkSuperseded && /\.(md|markdown)$/i.test(node.path)
+        ? [{ label: "Mark as Superseded By…", action: () => explorerActions.onMarkSuperseded!(node.path) }]
+        : []),
       {
         label: "Add File to Chat",
         action: () =>
@@ -452,6 +457,9 @@ function rowMenu(node: TreeNode): MenuItem[] {
     { label: "New Folder", action: () => startCreate(directory, "dir") },
     { label: "New from Template…", action: () => explorerActions.onNewFromTemplate?.(directory) },
     "separator",
+    ...(explorerActions.onOverview
+      ? [{ label: "Project Overview", action: () => explorerActions.onOverview!(node.path) }, "separator" as const]
+      : []),
     { label: "Rename", action: () => startRename(node.path, node.name) },
     {
       label: "Duplicate",

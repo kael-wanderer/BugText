@@ -68,3 +68,14 @@ it("keeps expansion per tab and forgets it when the tab closes", async () => {
   forgetPropertiesExpansion("tab-a"); card.render();
   expect(toggle().getAttribute("aria-expanded")).toBe("false");
 });
+
+it("shows a chip for a known status only", () => {
+  const host = document.createElement("div");
+  let source = "---\nstatus: Draft\n---\nbody";
+  const card = createPropertiesCard(host, () => source, vi.fn()); card.render();
+  const chip = host.querySelector(".lifecycle-chip");
+  expect(chip?.className).toBe("lifecycle-chip is-draft");
+  expect(chip?.textContent).toBe("draft");
+  source = "---\nstatus: archived\n---\nbody"; card.render();
+  expect(host.querySelector(".lifecycle-chip")).toBeNull();
+});

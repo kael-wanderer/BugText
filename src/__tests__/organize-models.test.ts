@@ -31,7 +31,7 @@ describe("task inbox", () => {
   });
   it("changes only the selected duplicate marker and refuses stale text", () => {
     const source = "- [ ] same\n- [ ] same\n";
-    const task = noteTasks(note(source))[1]; const change = inboxTaskChange(task, source);
+    const task = noteTasks(note(source))[1]; const [change] = inboxTaskChange(task, source);
     expect(source.slice(0, change.from) + change.insert + source.slice(change.to)).toBe("- [ ] same\n- [x] same\n");
     expect(() => inboxTaskChange(task, "\n" + source)).toThrow("changed");
   });

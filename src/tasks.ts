@@ -27,12 +27,28 @@ export function taskToggleChange(line: string, lineStart: number): TextChange | 
   return { from, to: from + 1, insert: task.checked ? " " : "x" };
 }
 
+const STAMP = /[ \t]*✅[ \t]*\d{4}-\d{2}-\d{2}[ \t]*$/u;
+
+/** The marker flip plus, with a stamp, " ✅ <stamp>" added on check or a trailing ✅ date removed on uncheck. */
+export function taskToggleEdits(line: string, lineStart: number, stamp: string | null): TextChange[] {
+  const flip = taskToggleChange(line, lineStart);
+  if (!flip) return [];
+  if (stamp === null) return [flip];
+  const found = STAMP.exec(line);
+  if (flip.insert === "x") {
+    if (found) return [flip];
+    const end = line.trimEnd().length;
+    return [flip, { from: lineStart + end, to: lineStart + end, insert: ` ✅ ${stamp}` }];
+  }
+  return found ? [flip, { from: lineStart + found.index, to: lineStart + line.length, insert: "" }] : [flip];
+}
+
 /**
  * Toggle Task over 1-based `lineNumbers` of a "\n"-separated source: tasks flip,
  * list items gain `[ ] `, other text lines become `- [ ] ` items. Code, front
  * matter, commented-out and blank lines are left alone.
  */
-export function toggleTaskChanges(source: string, lineNumbers: number[]): TextChange[] {
+export function toggleTaskChanges(source: string, lineNumbers: number[], stamp: string | null = null): TextChange[] {
   const wanted = new Set(lineNumbers);
   const scanned = scanMarkdownLines(source);
   const changes: TextChange[] = [];
@@ -42,9 +58,9 @@ export function toggleTaskChanges(source: string, lineNumbers: number[]): TextCh
     start += line.length + 1;
     const info = scanned[index];
     if (!wanted.has(index + 1) || info.code || !line.trim() || info.text !== line) return;
-    const toggle = taskToggleChange(line, lineStart);
-    if (toggle) {
-      changes.push(toggle);
+    const toggle = taskToggleEdits(line, lineStart, stamp);
+    if (toggle.length) {
+      changes.push(...toggle);
       return;
     }
     const item = LIST_ITEM.exec(line);

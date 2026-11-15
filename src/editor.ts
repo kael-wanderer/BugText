@@ -35,7 +35,7 @@ import {
 import { scanMarkdownLines } from "./markdown-blocks";
 import { runTableCommand, tableContextAt, tableKeymap } from "./table-keys";
 import type { TableCommand, TableContext } from "./table";
-import { taskToggleChange, toggleTaskChanges } from "./tasks";
+import { taskToggleEdits, toggleTaskChanges } from "./tasks";
 
 export type EditorDocumentKind =
   | "markdown"
@@ -109,6 +109,8 @@ export type EditorHandle = {
    * or scroll; false when that line is no longer a task.
    */
   toggleTaskAt(id: string, line: number): boolean;
+  /** Today's date for the completion stamp, or null when stamping is off (spec 4.3). */
+  setTaskStamp(stamp: () => string | null): void;
   /** The table cell under the cursor, or null outside a table. */
   tableContext(): TableContext | null;
   runTableCommand(command: TableCommand): boolean;
@@ -245,6 +247,7 @@ export function createEditor(
     onChange(id, text);
   };
   let activeId: string | null = null;
+  let taskStamp: () => string | null = () => null;
   let softWrapMode: SoftWrapMode = "window";
   let wrapColumn = 80;
   let lineNums = true;
@@ -589,18 +592,19 @@ export function createEditor(
         const lastPos = range.to > range.from && state.doc.lineAt(range.to).from === range.to ? range.to - 1 : range.to;
         for (let n = first; n <= state.doc.lineAt(lastPos).number; n++) lines.add(n);
       }
-      const changes = toggleTaskChanges(state.doc.toString(), [...lines]);
+      const changes = toggleTaskChanges(state.doc.toString(), [...lines], taskStamp());
       if (!changes.length) return false;
       view.dispatch({ changes, userEvent: "input.task" });
       view.focus();
       return true;
     },
+    setTaskStamp(stamp) { taskStamp = stamp; },
     toggleTaskAt(id, line) {
       const state = id === activeId ? view.state : states.get(id);
       if (!state || line < 1 || line > state.doc.lines) return false;
       const info = state.doc.line(line);
-      const change = taskToggleChange(info.text, info.from);
-      if (!change) return false;
+      const change = taskToggleEdits(info.text, info.from, taskStamp());
+      if (!change.length) return false;
       if (id === activeId) {
         view.dispatch({ changes: change, userEvent: "input.task" });
         return true;

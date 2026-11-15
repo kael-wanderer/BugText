@@ -1,4 +1,5 @@
 import { showToast } from "../toast";
+import { pickExcerpts } from "./superseded";
 import { isContextExcluded, exclusionMessage, relativeContextPath } from "./context-exclude";
 import { parseContextChips, renderContextChips } from "./context-chips";
 import { renderContextSent, type ContextSent } from "./context-sent";
@@ -88,6 +89,8 @@ export type AIPanelDeps = {
   getWorkingDir(): string | null;
   getFileList(): { path: string; name: string }[];
   getWorkspaceContext(): { k: number };
+  /** Lifecycle status: true for a note with status: superseded (spec 4.2). */
+  isSuperseded?(path: string): boolean;
   windowLabel?: string;
   historyKey: string;
   legacyHistoryKey?: string;
@@ -553,14 +556,15 @@ export function createAIPanel(
           retrieved = await workspaceIndex.query(
             workingDir,
             prompt,
-            deps.getWorkspaceContext().k,
+            deps.getWorkspaceContext().k * 2,
             doc.path ?? undefined,
           );
         } catch {
           appendBubble("system", "Workspace context unavailable.");
         }
       }
-      retrieved = retrieved.filter(chunk => !excluded(chunk.path));
+      const picked = pickExcerpts(retrieved.filter(chunk => !excluded(chunk.path)), deps.getWorkspaceContext().k, path => deps.isSuperseded?.(path) ?? false, settings.context.includeSuperseded);
+      retrieved = picked.kept;
       const includeNote = sentChips.note && !excluded(doc.path);
       const built = buildMessages({
         history,
@@ -573,7 +577,7 @@ export function createAIPanel(
         retrieved,
         maxContextChars: settings.maxContextChars,
       });
-      contextSent = built.context;
+      contextSent = picked.leftOut.length ? { ...built.context, leftOut: picked.leftOut.map(path => ({ path })) } : built.context;
       contextSent.files.push(...cliAttachmentPaths.filter(path => !excluded(path)).map(path => ({ name: basename(path), pathOnly: true })));
       cliAttachmentPaths = cliAttachmentPaths.filter(path => !excluded(path));
       if (built.truncatedChars)

@@ -216,6 +216,7 @@ import {
   otherTabIds,
   savedTabIds,
   tabIdsRightOf,
+  isVirtualTab,
   type TabMeta,
 } from "./tabops";
 import { findNode } from "./treeops";
@@ -233,6 +234,8 @@ import { tableCommandFromId, tableMenuItems } from "./table-menu";
 import type { TableCommand } from "./table";
 import helpDoc from "../HELP.md?raw";
 import { forgetPropertiesExpansion } from "./properties/card";
+import { lifecycleOf, localToday, type LifecycleStatus } from "./lifecycle/model";
+import { loadProperties } from "./properties/loader";
 
 const workspaceIndex = createWorkspaceIndex(() => currentAISettings.context.exclude);
 const diagnostics = createDiagnostics();
@@ -299,7 +302,7 @@ const mentionsSection = createMentionsSection({
 });
 const linksPanel = createLinksPanel(outlineView.linksHost, linkIndex, () => {
   const tab = activeMeta();
-  return tab && !tab.tableView && views.has(getState().activeWindowId) && !views.get(getState().activeWindowId)!.graphActive() && isMarkdownFile(tab.path ?? tab.name)
+  return tab && !isVirtualTab(tab) && views.has(getState().activeWindowId) && !views.get(getState().activeWindowId)!.graphActive() && isMarkdownFile(tab.path ?? tab.name)
     ? { path: tab.path ?? `${getState().folder}/untitled.md`, text: activeView().editor.getText(tab.id) } : null;
 }, (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line)); }, (line) => activeView().jumpToLine(line), (target) => {
   const tab = activeMeta();
@@ -451,7 +454,7 @@ function focusOverlayOpen(): boolean {
   return document.body.classList.contains("settings-active") || !!document.querySelector('.recovery-scrim, [aria-modal="true"], #palette:not(.hidden), .preview-find:not(.hidden), .cm-search, .cm-tooltip-autocomplete');
 }
 const focusMode = createFocusMode({
-  eligible: () => { const tab = activeMeta(), view = views.get(getState().activeWindowId); return !!tab && !!view && isFocusEligible({ pathOrName: tab.path ?? tab.name, tableView: !!tab.tableView, graphActive: view.graphActive() }); },
+  eligible: () => { const tab = activeMeta(), view = views.get(getState().activeWindowId); return !!tab && !!view && isFocusEligible({ pathOrName: tab.path ?? tab.name, tableView: isVirtualTab(tab), graphActive: view.graphActive() }); },
   overlayOpen: focusOverlayOpen,
   captureView: () => { const view = activeView(), tab = activeMeta()!; focusSource = { windowId: getState().activeWindowId, tabId: tab.id }; const selection = view.editor.getSelection(); return { topLine: view.editor.visibleTopLine(), selection: { from: selection.from, to: selection.to } }; },
   restoreView: snapshot => { const source = focusSource; focusSource = null; requestAnimationFrame(() => { if (!source || getState().activeWindowId !== source.windowId || activeMeta()?.id !== source.tabId) return; const editor = activeView().editor; editor.requestMeasure(); const top = focusExitScroll(snapshot, editor.getSelection()); if (top === null) editor.scrollCaretIntoView(); else editor.scrollLineToTop(top, false); }); },
@@ -466,7 +469,7 @@ async function present(fromCursor: boolean): Promise<void> {
       saveSettingsFromPanel({ ...currentSettings, presentation: { ...currentSettings.presentation, ...patch } });
     presentController = createPresentController({
       host: document.body,
-      text: () => { const tab = activeMeta(); return tab && !tab.tableView && isMarkdownFile(tab.path ?? tab.name) && !activeView().graphActive() ? activeView().editor.getText(tab.id) : null; },
+      text: () => { const tab = activeMeta(); return tab && !isVirtualTab(tab) && isMarkdownFile(tab.path ?? tab.name) && !activeView().graphActive() ? activeView().editor.getText(tab.id) : null; },
       notePath: () => activeMeta()?.path ?? null,
       cursorLine: () => { const tab = activeMeta(); if (!tab) return 1; const editor = activeView().editor; return editor.getText(tab.id).slice(0, editor.cursorOffset(tab.id)).split("\n").length; },
       capture: () => { focusMode.exit(); settingsScreen.close(); const view = activeView(); view.captureReadingPosition(); return { view, windowId: getState().activeWindowId, tabId: activeMeta()?.id }; },
@@ -505,7 +508,7 @@ function refreshStatusBar(): void {
   const session = writingSession.state();
   statusBar.update({
     enabled: currentSettings.showStatusBar,
-    pathOrName: tab && editor && !tab.tableView ? tab.path ?? tab.name : null,
+    pathOrName: tab && editor && !isVirtualTab(tab) ? tab.path ?? tab.name : null,
     cursor: editor?.cursorPosition() ?? { line: 1, column: 1 },
     selection: editor?.getSelection().text ?? "",
     words: tab ? statusWordCounts.get(tab.id) ?? 0 : 0,
@@ -545,7 +548,7 @@ function goalAnchor(): HTMLElement {
 }
 function goalNote() {
   const tab = activeMeta(), view = views.get(getState().activeWindowId);
-  if (!tab || !view || tab.tableView || (isPdfFile(tab.path ?? tab.name) || isHtmlFile(tab.path ?? tab.name))) return null;
+  if (!tab || !view || isVirtualTab(tab) || (isPdfFile(tab.path ?? tab.name) || isHtmlFile(tab.path ?? tab.name))) return null;
   const source = view.editor.getText(tab.id);
   return { source, markdown: isMarkdownFile(tab.path ?? tab.name),
     current: () => activeMeta()?.id === tab.id && view.editor.getText(tab.id) === source,
@@ -948,6 +951,7 @@ function saveAISettingsFromPanel(settings: AISettings): void {
   if (disabledChat) setAIVisible(false);
   applyAIVisibility();
   aiPanel?.render();
+  refreshLifecycleBars();
   writeAISettings(settings);
 }
 
@@ -963,9 +967,11 @@ function commandItems(): PaletteItem[] {
   return [
     ...gitPaletteItems(gitAvailable, openGitControl),
     command("show_table_view", "Show Table View", () => { void showTableView(); }),
+    command("view.project_overview", "Project Overview", () => showOverview()),
     command("new", "New File", newDoc),
     command("file.new_typed_note", "New Typed Note", () => withOrganize((actions) => void actions.newTypedNote())),
     command("file.apply_note_type", "Apply Note Type", () => withOrganize((actions) => void actions.applyNoteType())),
+    command("file.mark_superseded", "Mark as Superseded By…", () => void markActiveSuperseded()),
     command("edit.extract_note", "Extract Selection to Note", () => withOrganize((actions) => actions.extractSelection())),
     command("edit.show_tasks", "Tasks in Folder", () => withOrganize((actions) => actions.showTasks())),
     command("edit.writing_goal", "Set Writing Goal…", () => void openGoals(goalAnchor())),
@@ -1091,6 +1097,8 @@ const handlers = {
   },
   onGraphFolder: () => { void pickFolder().then(folder => { if (folder) void openFolder(folder); }); },
   renderTable: renderTableSurface,
+  renderOverview: renderOverviewTab,
+  tabStatus: (tab: TabMeta) => (tab.path ? statusByPath.get(tab.path) ?? null : null),
   livePreviewEnabled: () => livePreviewOn,
   onActivateTab: (wid: string, tid: string) => activateTab(wid, tid),
   onCloseTab: (wid: string, tid: string) => void closeTab(wid, tid),
@@ -1148,6 +1156,7 @@ const handlers = {
   onPreviewRendered: (wid: string) => {
     reviewRenders.set(wid, (reviewRenders.get(wid) ?? 0) + 1);
     if (review.snapshot()?.items.length) void updateReviewBar(wid);
+    void updateLifecycleBar(wid);
   },
   onNavigation: (wid: string) => { if (wid === getState().activeWindowId && views.has(wid)) { updateOutline(); aiPanel?.resize(); } },
   onStatusChange: refreshStatusBar,
@@ -1437,6 +1446,7 @@ function makeView(windowId: string, isMain: boolean): WindowView {
   v.editor.setTypewriter(currentSettings.editor.typewriterScrolling);
   v.editor.setSpellCheck(currentSettings.editor.spellCheck);
   v.editor.setLineNumbers(ui.lineNumbers);
+  v.editor.setTaskStamp(() => (currentSettings.tasks.stampCompletion ? localToday() : null));
   views.set(windowId, v);
   return v;
 }
@@ -1457,6 +1467,44 @@ async function showTableView(): Promise<void> {
   await loadFilterPanel();
   try { await linkIndex.ensure(); renderAll(); } catch { showToast("Could not index notes."); }
 }
+// Project Overview (spec 4.4): a generated tab per folder, rebuilt from the index and the review queue.
+function showOverview(folder = getState().folder): void {
+  if (!folder) { showToast("Open a folder first."); return; }
+  focusMode.exit();
+  settingsScreen.close();
+  const w = activeWindow();
+  const existing = w.tabs.find(tab => tab.overview === folder);
+  if (existing) activateTab(w.id, existing.id);
+  else {
+    const id = nextId();
+    views.get(w.id)!.editor.openState(id, "");
+    patchWindow(w.id, { tabs: [...w.tabs, { id, path: null, name: `Overview — ${basename(folder)}`, dirty: false, overview: folder }], activeTabId: id });
+    renderAll();
+  }
+  void linkIndex.ensure().then(renderAll, () => showToast("Could not index notes."));
+}
+const overviewKeys = new WeakMap<HTMLElement, unknown[]>();
+let indexVersion = 0; // linkIndex.notes() is a fresh array per call; the overview keys on this instead.
+linkIndex.subscribe(() => { indexVersion++; });
+function renderOverviewTab(host: HTMLElement, folder: string): void {
+  const snapshot = review.snapshot(), today = localToday();
+  const key = [folder, indexVersion, snapshot, today];
+  const last = overviewKeys.get(host);
+  if (last && last.every((part, i) => part === key[i])) return;
+  overviewKeys.set(host, key);
+  void Promise.all([import("./overview/model"), import("./overview/view"), import("./task-inbox/write")]).then(([model, view, write]) => {
+    if (overviewKeys.get(host) !== key) return;
+    const overview = model.buildOverview({ folder, reviewRoot: snapshot?.folder ?? null, notes: linkIndex.notes(), review: snapshot?.items ?? [], today, now: Date.now() });
+    view.renderOverview(host, overview, {
+      today,
+      open: (path, line) => { void doOpenPath(path).then(() => activeView().jumpToLine(line ?? 1)); },
+      toggle: task => write.toggleTask(task, taskWriter()),
+      copy: async markdown => { try { await writeClipboardText(markdown); showToast("Copied"); } catch { showToast("Could not copy."); } },
+      openReview: () => { settingsScreen.close(); setReviewActive(true); },
+    });
+  });
+}
+reviewListeners.push(() => { if (getState().windows.some(w => w.tabs.some(tab => tab.overview))) for (const v of views.values()) v.render(); });
 function renderTableSurface(host: HTMLElement): void {
   let surface = tableSurfaces.get(host);
   if (!surface) {
@@ -1501,6 +1549,17 @@ function filterPanelModel() {
 let currentTableFilter: import("./properties/filter-query").FilterModel | null = null;
 const indexRender = createFrameCoalescer(renderAll);
 linkIndex.subscribe(() => indexRender.request());
+// Lifecycle status per note (spec 4.1), for tab chips and AI folder search.
+const statusByPath = new Map<string, LifecycleStatus>();
+linkIndex.subscribe(() => {
+  const next = new Map<string, LifecycleStatus>();
+  for (const note of linkIndex.notes()) { const status = lifecycleOf(note.properties).status; if (status) next.set(note.path, status); }
+  const same = next.size === statusByPath.size && [...next].every(([path, status]) => statusByPath.get(path) === status);
+  if (same) return;
+  statusByPath.clear(); for (const [path, status] of next) statusByPath.set(path, status);
+  for (const view of views.values()) view.render();
+  refreshLifecycleBars();
+});
 
 function renderAll(): void {
   refreshFirstRunHint();
@@ -1582,6 +1641,23 @@ function travelHistory(direction: "back" | "forward"): void {
 type OrganizeActions = ReturnType<typeof import("./notes/actions").createOrganizeActions>;
 let organizeActions: OrganizeActions | undefined;
 // Loaded on first use so the organize code (extract, tasks, note types) stays out of the startup bundle.
+/** Ticks tasks from Tasks in Folder and Project Overview (spec 4.3). */
+function taskWriter(): import("./task-inbox/write").TaskWriteDeps {
+  const folder = getState().folder;
+  return {
+    folder: () => (getState().folder === folder ? folder : null),
+    findOpen: (path) => {
+      const found = findTabByPath(getState().windows, path); if (!found) return null;
+      const editor = editorForTab(found.tab.id);
+      return { text: editor.getText(found.tab.id), apply: (changes) => { editor.applyChanges(found.tab.id, changes, { isolate: true }); return true; } };
+    },
+    read: (path) => invoke<string>("read_file", { path }),
+    snapshot: async (path, text) => { await manualSnapshot(path, text, "Before task edit", true); },
+    write: async (path, contents, expected) => { if (getState().folder !== folder) throw new Error("The folder changed. Refresh the tasks list."); await invoke("write_file_atomic", { path, contents, folder, expected }); },
+    changed: (path, text, saved) => { linkIndex.onFileChanged(path, text, saved); workspaceIndex.onFileChanged(path, text); },
+    stamp: () => (currentSettings.tasks.stampCompletion ? localToday() : null),
+  };
+}
 function withOrganize(run: (actions: OrganizeActions) => void): void {
   if (organizeActions) { run(organizeActions); return; }
   void import("./notes/actions").then(({ createOrganizeActions }) => {
@@ -1603,16 +1679,10 @@ function withOrganize(run: (actions: OrganizeActions) => void): void {
       },
       index: linkIndex,
       openPath: async (path) => { await doOpenPath(path); },
-      // Only tabs open in the active window can be edited in place; others report that the note must be opened first.
-      openForEdit: async (path) => {
-        const tab = activeWindow().tabs.find((candidate) => candidate.path === path);
-        if (!tab) return null;
-        const editor = activeView().editor;
-        return { tabId: tab.id, path, text: editor.getText(tab.id), revision: editor.revision(tab.id), from: 0, to: 0 };
-      },
       refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
       afterDiskWrite,
       getTemplates: () => currentSettings.templates,
+      taskWriter,
     });
     run(organizeActions!);
   });
@@ -2240,7 +2310,7 @@ async function finishBoundSave(binding: SaveBinding, target: string): Promise<vo
 
 async function doSave(saveAs = false): Promise<boolean> {
   const t = activeMeta();
-  if (!t || t.tableView) return false;
+  if (!t || isVirtualTab(t)) return false;
   const view = activeView();
   if (isPdfFile(t.path ?? t.name)) {
     if (saveAs) {
@@ -3252,6 +3322,7 @@ function buildAIPanel(): void {
     getWorkspaceContext: () => ({
       k: currentSettings.workspaceContextK,
     }),
+    isSuperseded: (path: string) => statusByPath.get(path) === "superseded",
     getActions: availableActions,
     runAction: runQuickActionById,
     windowLabel: nativeWindowLabel,
@@ -3754,6 +3825,61 @@ reviewListeners.push((snapshot, error) => {
   refreshReviewBars();
 });
 
+// Lifecycle bar (spec 4.1): superseded and review-due lines over a note in Reading view.
+const lifecycleBarKeys = new Map<string, string>();
+/** Settings ▸ AI ▸ Context ▸ Include superseded notes. */
+const includeSuperseded = (): boolean => currentAISettings.context.includeSuperseded;
+function refreshLifecycleBars(): void { for (const wid of views.keys()) void updateLifecycleBar(wid); }
+async function updateLifecycleBar(wid: string): Promise<void> {
+  const view = views.get(wid);
+  const windowState = getWindow(wid);
+  if (!view || !windowState) return;
+  const tab = windowState.tabs.find(t => t.id === windowState.activeTabId);
+  const shown = windowState.mode === "preview" && tab?.path && isMarkdownFile(tab.path) ? tab : null;
+  const text = shown ? view.editor.getText(shown.id) : "";
+  const key = shown ? `${shown.id}|${localToday()}|${includeSuperseded()}|${text}` : "";
+  if (lifecycleBarKeys.get(wid) === key) return;
+  lifecycleBarKeys.set(wid, key);
+  if (!shown) { view.lifecycleHost.replaceChildren(); view.lifecycleHost.hidden = true; return; }
+  const [{ readProperties }, { renderLifecycleBar }] = await Promise.all([loadProperties(), import("./lifecycle/bar")]);
+  if (lifecycleBarKeys.get(wid) !== key) return;
+  const result = readProperties(text);
+  const lifecycle = lifecycleOf(result?.ok ? result.props : null);
+  const notePath = shown.path!;
+  renderLifecycleBar(view.lifecycleHost, {
+    lifecycle, today: localToday(),
+    leftOutOfAI: lifecycle.status === "superseded" && !includeSuperseded(),
+  }, { open: target => void openSupersedingNote(target, notePath) });
+}
+function markActiveSuperseded(): Promise<void> {
+  const path = activeMeta()?.path;
+  if (!path || !isMarkdownFile(path)) { showToast("Open a Markdown note first."); return Promise.resolve(); }
+  return markSupersededNote(path);
+}
+async function markSupersededNote(path: string): Promise<void> {
+  const folder = getState().folder;
+  const [{ markSuperseded }, { pickNote }, { setProperty }] = await Promise.all([import("./lifecycle/mark"), import("./capture/note-picker"), loadProperties()]);
+  const writer = folder ? noteLinkWriter(folder, "Before mark superseded") : null;
+  await markSuperseded(path, {
+    folder, setProperty,
+    notes: () => fileList.filter((file) => isMarkdownFile(file)),
+    pick: (files) => pickNote(document, files),
+    findOpen: (p) => { const found = findTabByPath(getState().windows, p); if (!found) return null; const editor = editorForTab(found.tab.id); return { text: editor.getText(found.tab.id), apply: (changes) => editor.applyChanges(found.tab.id, changes, { isolate: true }) }; },
+    read: (p) => writer!.read(p), snapshot: (p, text) => writer!.snapshot(p, text),
+    write: async (p, contents, expected) => { await writer!.write(p, contents, expected); workspaceIndex.onFileChanged(p, contents); },
+    toast: (text) => showToast(text),
+  });
+}
+async function openSupersedingNote(target: string, notePath: string): Promise<void> {
+  const folder = getState().folder;
+  const { supersedingPath } = await import("./lifecycle/open");
+  const resolved = supersedingPath(target, notePath, folder);
+  if ("error" in resolved) { showToast(resolved.error); return; }
+  try { await invoke<string>("read_file", { path: resolved.path, folder }); }
+  catch { showToast(`Note not found: ${basename(resolved.path)}`); return; }
+  await doOpenPath(resolved.path);
+}
+
 // Review bar and change marks for a queued note in Reading view.
 const reviewBarKeys = new Map<string, string>();
 const reviewRenders = new Map<string, number>();
@@ -4024,6 +4150,8 @@ initExplorer(
     onOpenSide: (path) => void openInSub(path),
     onCompare: (selectedPath, path) =>
       void compareFiles(selectedPath, path),
+    onMarkSuperseded: (path) => void markSupersededNote(path),
+    onOverview: (folder) => showOverview(folder),
     onAddToChat: (path) => {
       void doOpenPath(path).then(() => setAIVisible(true));
     },
@@ -4200,7 +4328,7 @@ watchSelections(document, () => {
   const win = getState().windows.find((w) => w.id === getState().activeWindowId);
   const tab = win?.tabs.find((t) => t.id === win.activeTabId);
   const view = win && views.get(win.id);
-  if (!win || !tab || !view || tab.tableView) return null;
+  if (!win || !tab || !view || isVirtualTab(tab)) return null;
   return { pane: win.mode !== "editor" ? view.previewElement : null, editorDom: view.editorElement, markdown: isMarkdownFile(tab.path ?? tab.name) };
 }, (rect) => {
   if (captureMenu) { captureMenu.show(rect); return; }
@@ -4272,6 +4400,7 @@ subscribe(() => {
   persistUiState();
   scheduleWindowReport();
   if (review.snapshot()?.items.length || reviewBarKeys.size) refreshReviewBars();
+  refreshLifecycleBars();
 });
 
 const refreshOnFocus = createFocusDeduper(() => {
@@ -4359,6 +4488,8 @@ listenScoped<string>("menu", (event) => {
       return withOrganize((actions) => void actions.newTypedNote());
     case "file.apply_note_type":
       return withOrganize((actions) => void actions.applyNoteType());
+    case "file.mark_superseded":
+      return void markActiveSuperseded();
     case "file.open":
       return void doOpen();
     case "file.open_folder":
@@ -4409,6 +4540,7 @@ listenScoped<string>("menu", (event) => {
       toggleGit(); return;
     case "review.show":
       settingsScreen.close(); setReviewActive(true); return;
+    case "view.project_overview": return showOverview();
     case "review.mark_reviewed": return void markActiveReview(getState().activeWindowId, "reviewed");
     case "review.next_change": return stepReviewChange(getState().activeWindowId, 1);
     case "review.previous_change": return stepReviewChange(getState().activeWindowId, -1);

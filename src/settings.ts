@@ -91,6 +91,8 @@ export type Settings = {
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
   review: { track: boolean };
+  /** Checking a task adds " ✅ <date>" (spec 4.3). */
+  tasks: { stampCompletion: boolean };
   capture: { targets: Record<string, CaptureTargets> };
   onboarding: { hintDismissed: boolean };
   focus: { width: "narrow" | "standard" | "wide" };
@@ -135,6 +137,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
   review: { track: true },
+  tasks: { stampCompletion: true },
   capture: { targets: {} },
   onboarding: { hintDismissed: true },
   focus: { width: "standard" },
@@ -194,6 +197,7 @@ function defaults(): Settings {
     templates: { ...DEFAULT_SETTINGS.templates },
     performance: { ...DEFAULT_SETTINGS.performance },
     review: { ...DEFAULT_SETTINGS.review },
+    tasks: { ...DEFAULT_SETTINGS.tasks },
     capture: { targets: {} },
     onboarding: { ...DEFAULT_SETTINGS.onboarding },
     focus: { ...DEFAULT_SETTINGS.focus },
@@ -366,6 +370,7 @@ export function parseSettings(raw: string): Settings {
     templates: parseTemplates(data.templates),
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
     review: { track: (data.review as { track?: unknown } | undefined)?.track !== false },
+    tasks: { stampCompletion: (data.tasks as { stampCompletion?: unknown } | undefined)?.stampCompletion !== false },
     capture: parseCapture(data.capture),
     onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
     focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },

@@ -40,7 +40,7 @@ export type AISettings = {
   enabled: Record<FeatureId, boolean>;
   uses: Partial<Record<FeatureId, UseRow>>;
   localCli: LocalCli;
-  context: { exclude: string[] };
+  context: { exclude: string[]; includeSuperseded: boolean };
   maxContextChars: number;
 };
 
@@ -60,7 +60,7 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
     codex: { codexHome: "", executablePath: "", proxyBaseUrl: "" },
     pi: { executablePath: "" },
   },
-  context: { exclude: [] },
+  context: { exclude: [], includeSuperseded: false },
   maxContextChars: 120_000,
 };
 
@@ -235,7 +235,10 @@ function parseV2(data: Record<string, unknown>): AISettings {
     enabled,
     uses,
     localCli: parseLocalCli(data.localCli),
-    context: { exclude: Array.isArray(record(data.context)?.exclude) ? (record(data.context)!.exclude as unknown[]).filter((p): p is string => typeof p === "string") : [] },
+    context: {
+      exclude: Array.isArray(record(data.context)?.exclude) ? (record(data.context)!.exclude as unknown[]).filter((p): p is string => typeof p === "string") : [],
+      includeSuperseded: record(data.context)?.includeSuperseded === true,
+    },
     maxContextChars,
   };
 }

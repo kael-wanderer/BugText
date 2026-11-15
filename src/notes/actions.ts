@@ -6,7 +6,7 @@ import { showToast } from "../toast";
 import { planExtraction, extractionReplacement, type SourceBinding, type SourceChange } from "./extract-plan";
 import { organizeSheet, node, action, field } from "./sheet";
 import { showTaskInbox } from "../task-inbox/panel";
-import { inboxTaskChange } from "../task-inbox/model";
+import type { TaskWriteDeps } from "../task-inbox/write";
 import { showNoteTypeSheet } from "../note-types/sheet";
 
 export type OrganizeHost = {
@@ -17,11 +17,11 @@ export type OrganizeHost = {
   apply: (source: SourceBinding, change: SourceChange) => boolean;
   index: LinkIndex;
   openPath: (path: string, line?: number) => Promise<void>;
-  /** Must refuse conflicting dirty ownership in other native windows. */
-  openForEdit: (path: string) => Promise<SourceBinding | null>;
   refreshExplorer: () => Promise<void>;
   afterDiskWrite: (path: string) => void;
   getTemplates: () => TemplateSettings;
+  /** Writer for ticking tasks in open or closed notes (spec 4.3). */
+  taskWriter: () => TaskWriteDeps;
 };
 
 export function createOrganizeActions(host: OrganizeHost) {
@@ -63,17 +63,7 @@ export function createOrganizeActions(host: OrganizeHost) {
   const showTasks = () => showTaskInbox(host.host(), {
     index: host.index, folder: host.getFolder,
     open: task => host.openPath(task.path, task.line),
-    toggle: async task => {
-      const folder = host.getFolder();
-      if (!folder || !task.path.startsWith(folder.replace(/\/$/, "") + "/")) throw new Error("The folder changed. Refresh the tasks list.");
-      const source = await host.openForEdit(task.path);
-      if (!source) throw new Error("Cannot edit this note here. Check whether another window has unsaved changes.");
-      const change = inboxTaskChange(task, source.text);
-      await manualSnapshot(task.path, source.text, "Before task inbox edit", true);
-      if (host.getFolder() !== folder) throw new Error("The folder changed. Reopen the task inbox.");
-      if (!host.apply(source, change)) throw new Error("This note changed. Refresh the tasks list and try again.");
-      host.index.onFileChanged(task.path, source.text.slice(0, change.from) + change.insert + source.text.slice(change.to), false);
-    },
+    toggle: async task => { const { toggleTask } = await import("../task-inbox/write"); await toggleTask(task, host.taskWriter()); },
   });
   return { extractSelection, showTasks, newTypedNote: () => showNoteTypeSheet(host, false), applyNoteType: () => showNoteTypeSheet(host, true) };
 }

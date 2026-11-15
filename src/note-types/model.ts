@@ -7,6 +7,7 @@ export type NoteType = { id: string; name: string; template: string; fields: Pre
 export const DEFAULT_NOTE_TYPES: NoteType[] = [
   { id: "meeting", name: "Meeting", template: "", fields: [{ key: "date", kind: "date", value: "{{date}}" }, { key: "participants", kind: "list", value: [] }, { key: "tags", kind: "list", value: [] }] },
   { id: "project", name: "Project", template: "", fields: [{ key: "status", kind: "text", value: "planned" }, { key: "category", kind: "text", value: "" }, { key: "tags", kind: "list", value: [] }] },
+  { id: "decision", name: "Decision", template: "", fields: [{ key: "type", kind: "text", value: "decision" }, { key: "date", kind: "date", value: "{{date}}" }, { key: "status", kind: "text", value: "current" }] },
   { id: "reading", name: "Reading", template: "", fields: [{ key: "source", kind: "text", value: "" }, { key: "status", kind: "text", value: "to-read" }, { key: "tags", kind: "list", value: [] }] },
 ];
 export function validNoteType(value: unknown): value is NoteType {
@@ -34,6 +35,7 @@ export function applyPreset(source: string, values: Record<string, PresetField["
 }
 export function defaultTypeBody(id: string): string {
   if (id === "meeting") return "# {{title}}\n\n## Agenda\n\n## Notes\n\n## Actions\n\n- [ ] \n";
+  if (id === "decision") return "# {{title}}\n\n## Decision\n\n## Why\n\n## Alternatives considered\n";
   if (id === "project") return "# {{title}}\n\n## Goal\n\n## Next steps\n\n- [ ] \n\n## References\n";
   return "# {{title}}\n\n## Summary\n\n## Quotes\n\n## Questions\n";
 }

@@ -31,6 +31,15 @@ describe("editor tasks and tables", () => {
     expect(editor.revision("note")).toBe(before + 2);
     expect(editor.revision("other-revision-test")).toBe(0);
   });
+  it("stamps a checked task and undoes marker and stamp in one step", () => {
+    const { editor, view } = setup("- [ ] a", 0);
+    editor.setTaskStamp(() => "2026-11-12");
+    expect(editor.toggleTaskAt("note", 1)).toBe(true);
+    expect(view.state.doc.toString()).toBe("- [x] a ✅ 2026-11-12");
+    undo(view);
+    expect(view.state.doc.toString()).toBe("- [ ] a");
+    editor.setTaskStamp(() => null);
+  });
   it("toggles a task from the preview without moving the cursor, undone in one step", () => {
     const text = "- [ ] a\n- [ ] b";
     const { editor, view } = setup(text, 2);
