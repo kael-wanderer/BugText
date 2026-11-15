@@ -4,7 +4,7 @@ Branch `feat/capture`, built from `plan.md` in this folder (reading workflow Pha
 
 ## Status
 
-All 8 tasks are built and every automated check passes. Fable reviewed the branch on 2026-11-15: fit to merge after two fixes, both done, plus three optional small ones (see "Review fixes"). A smoke run of the main path was done on 2026-11-14 in the release build on the second display (below). The manual checks CAP-01 to CAP-12 in `docs/test-cases/29-capture.md` have not been run; next they are run with the owner.
+All 8 tasks are built and every automated check passes. Fable reviewed the branch on 2026-11-15: fit to merge after two fixes, both done, plus three optional small ones (see "Review fixes"). A smoke run of the main path was done on 2026-11-14 in the release build on the second display (below). The manual checks CAP-01 to CAP-12 in `docs/test-cases/29-capture.md` were run on 2026-11-15 (Claude, release build, second display): all pass, findings under "Manual run".
 
 ## What was built, per task
 
@@ -74,6 +74,22 @@ Not covered by the smoke run: review queue state after the writes, Recovery "Bef
 ### Clean-up after the run
 
 `settings.json` restored from the backup taken before the run (the run had written `capture.targets` for the test folder); `agent.json` unchanged. The owner's Recovery drafts were not touched. The test folder is in the session scratchpad.
+
+## Manual run (2026-11-15, release build, second display)
+
+All 12 cases pass. Folder with `doc.md` (`# Architecture`, `## Sync model`, `## Types` with inline code and bold, `## Hostile` with `<img onerror>` and `](evil)`), `inbox.md`, `page.html`. `settings.json` restored from the backup afterwards; `agent.json` unchanged; clipboard restored.
+
+Findings, none blocking:
+
+1. Editing the task text in the sheet breaks the way back: the task link's quote is the edited text, so following `source` says "This passage changed after it was saved." though the passage is unchanged. Fix idea: follow a task link by its heading and line only, or keep the original quote out of the task text.
+2. A preview selection that crosses a broken image saves the sanitizer placeholder "Image not found · x" in the quote (CAP-12). The link back still highlights the passage.
+3. Ask AI over a passage with inline Markdown selects every source line of the paragraph, including a line not selected in the preview (CAP-08). Intended by the review fix; noted.
+4. The selection menu can reappear at a stale position after clicking a toolbar mode button (CAP-01).
+5. "Write the task first." stays after typing until Save is pressed again (CAP-05).
+6. Add note on an HTML page uses the file stem as the link title, not the page's `<title>` (CAP-11).
+7. Not checked in the app: the per-folder default in a second folder (CAP-05, unit-tested), and pasting the copied link (CAP-09).
+
+Seen, not from this branch: a plain click on a link in the Sub pane moves the target note into the Sub window.
 
 ## Backlog
 
