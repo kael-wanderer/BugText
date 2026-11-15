@@ -105,7 +105,7 @@ No screen recording was made (optional).
 - **Cards:**
   - **Plain files** (11/40) — Notes are ordinary .md and .txt files. Open them in any other editor, or put the folder in your own sync service. (113/200)
   - **Recovery and history** (20/40) — Unsaved edits are drafted in the background and offered back after a crash. Each save keeps a local snapshot you can compare and restore. (137/200)
-  - **Keys in the Keychain** (20/40) — API keys are stored in the macOS Keychain, never in settings files. (67/200)
+  - **Keys kept private** (20/40) — API keys are stored in a private file only your account can read, never in settings files. (67/200)
   - **Sandboxed AI runs** (17/40) — Coding agents run in a macOS sandbox limited to the open folder, and BugText lists every file they changed. (107/200)
   - **Offline OCR** (11/40) — PDF text recognition runs inside the app with no network connection. English and Vietnamese are included. (105/200)
   - **Open source** (11/40) — BugText is MIT licensed and its source code is public on GitHub. (64/200)
@@ -130,7 +130,7 @@ BugText is free. It is open source under the MIT license. AI providers you conne
 
 **5. Where are my files and settings stored?** (39/120)
 
-Your notes stay where you put them, as plain files. Settings live in the app's configuration folder on your Mac, and API keys are kept in the macOS Keychain. BugText has no account and does not upload your files. When you use AI, the note text and passages you send go to the engine you chose. (293/600)
+Your notes stay where you put them, as plain files. Settings live in the app's configuration folder on your Mac, and API keys are kept in a private file only your account can read. BugText has no account and does not upload your files. When you use AI, the note text and passages you send go to the engine you chose. (293/600)
 
 **6. Does it work offline? Does it sync?** (35/120)
 
@@ -183,7 +183,7 @@ What's new:
 ## Questions for owner
 
 1. This page describes the current main branch. Several described features (rename, Settings screen, per-feature AI engines, sandboxed agents, MCP server) ship only once that release is published. Confirm the page goes live with it.
-2. Platforms: CI also builds Windows (.exe/.msi) and Linux (.deb/.rpm/.AppImage) installers, but the app is macOS-focused (Keychain, Seatbelt sandbox, Dock icon). Should the page list Windows and Linux, and are they tested?
+2. Platforms: CI also builds Windows (.exe/.msi) and Linux (.deb/.rpm/.AppImage) installers, but the app is macOS-focused (Seatbelt sandbox, Dock icon). Should the page list Windows and Linux, and are they tested?
 3. Minimum macOS version: the bundle inherits Tauri's default (10.13) and no minimum is set or tested. What should the requirements line state?
 4. Signing: the build is ad hoc signed and not notarized, so the FAQ mentions the Gatekeeper prompt. Confirm, or tell me if Developer ID signing is planned.
 5. Category: I used Productivity. The admin's category list was not available to me.

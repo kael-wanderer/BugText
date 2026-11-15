@@ -61,7 +61,8 @@ Rules that hold everywhere:
   check the path (symlinks included) before reading or writing, and write atomically.
 - **Writes behind the user's back get a Recovery snapshot first**, and open tabs change
   through the editor (dirty state, one undo step), never by writing under them.
-- **API keys live in the OS keychain**, never in `agent.json` or logs. Connection
+- **API keys live in `<app config dir>/secrets/credentials.json`** (file 0600, `secrets.rs`),
+  never in `agent.json` or logs, and the coding CLI sandbox denies that folder. Connection
   addresses require HTTPS, except loopback HTTP.
 - **Coding CLIs** run only through the typed `ai_run` spec: Rust builds the arguments,
   prompts go on stdin, and macOS runs are sandboxed with no unsandboxed fallback.

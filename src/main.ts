@@ -722,7 +722,7 @@ function writeAISettings(next: AISettings): void {
         .catch(() => {});
     },
     () => {
-      void message("Couldn't move API keys to the keychain — settings not saved", {
+      void message("Couldn't move API keys to the credentials file — settings not saved", {
         title: "AI settings",
         kind: "error",
       });
@@ -824,7 +824,7 @@ async function getSavedAIKeyIds(): Promise<ReadonlySet<string>> {
     try {
       if (await invoke<boolean>("has_secret", { id })) ids.add(id);
     } catch {
-      // A locked keychain leaves the saved-key state unknown until the next load.
+      // An unreadable credentials file leaves the saved-key state unknown until the next load.
     }
   }
   return ids;
