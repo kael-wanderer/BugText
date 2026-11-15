@@ -4159,12 +4159,9 @@ async function askAboutPassage(passage: Passage): Promise<void> {
   const view = win && views.get(win.id);
   if (!win?.activeTabId || !view) return;
   if (passage.source === "preview") {
-    const { findQuoteInSource, lineOffset } = await import("./capture/follow");
-    const text = view.editor.getText(win.activeTabId);
-    const start = lineOffset(text, passage.line);
-    const found = findQuoteInSource(text, passage.quote, start);
-    if (found) view.editor.selectRange(found[0], found[1]);
-    else { const end = text.indexOf("\n", start); view.editor.selectRange(start, end < 0 ? text.length : end); }
+    const { askRange } = await import("./capture/ask");
+    const [from, to] = askRange(view.editor.getText(win.activeTabId), passage);
+    view.editor.selectRange(from, to);
   }
   setAIVisible(true);
   requestAnimationFrame(() => aiPanel?.focusInput());

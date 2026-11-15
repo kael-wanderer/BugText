@@ -24,7 +24,7 @@ function setup(overrides: Partial<CaptureHost> = {}) {
   };
   const host: CaptureHost = {
     doc: document,
-    active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "The sync runs", line: 5, source: "preview" } }),
+    active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "The sync runs", line: 5, endLine: 5, source: "preview" } }),
     writer: () => writer,
     settings: () => settings,
     saveSettings: vi.fn((next: Settings) => { settings = next; }),
@@ -72,13 +72,13 @@ describe("capture controller", () => {
     expect(t.settings().capture.targets["/r"]?.task).toEqual({ kind: "daily" });
   });
   it("escapes text selected in the preview and keeps editor text as written", async () => {
-    const preview = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "Map<K> for *args", line: 5, source: "preview" } }) });
+    const preview = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "Map<K> for *args", line: 5, endLine: 5, source: "preview" } }) });
     let done = preview.capture.run("excerpt");
     await Promise.resolve();
     save();
     await done;
     expect(preview.files.get("/r/docs/arch.notes.md")).toContain("> Map\\<K\\> for \\*args\n");
-    const editor = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "`Map<K>` for *args*", line: 5, source: "editor" } }) });
+    const editor = setup({ active: () => ({ folder: "/r", path: "/r/docs/arch.md", text: SOURCE, passage: { quote: "`Map<K>` for *args*", line: 5, endLine: 5, source: "editor" } }) });
     done = editor.capture.run("task");
     await Promise.resolve();
     save();
@@ -96,7 +96,7 @@ describe("capture controller", () => {
     expect(t.host.openInSub).toHaveBeenCalledWith("/r/docs/arch.notes 2.md");
   });
   it("refuses a note outside the open folder", async () => {
-    const t = setup({ active: () => ({ folder: null, path: "/x/a.md", text: "a", passage: { quote: "a", line: 1, source: "editor" } }) });
+    const t = setup({ active: () => ({ folder: null, path: "/x/a.md", text: "a", passage: { quote: "a", line: 1, endLine: 1, source: "editor" } }) });
     await t.capture.run("excerpt");
     expect(t.host.toast).toHaveBeenCalledWith("Open the note from a folder to save excerpts.");
     expect(document.querySelector(".capture-sheet")).toBeNull();
@@ -122,7 +122,7 @@ describe("capture controller", () => {
   it("hands the passage to Ask AI", async () => {
     const t = setup();
     await t.capture.run("ask");
-    expect(t.host.ask).toHaveBeenCalledWith({ quote: "The sync runs", line: 5, source: "preview" });
+    expect(t.host.ask).toHaveBeenCalledWith({ quote: "The sync runs", line: 5, endLine: 5, source: "preview" });
   });
   it("Notes button creates the companion note with its starter, then opens it", async () => {
     const t = setup();

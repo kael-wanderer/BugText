@@ -39,11 +39,16 @@ describe("previewPassage", () => {
   it("maps a preview selection to its block's data-line", () => {
     const { pane: p, second } = pane();
     const text = second.firstChild!;
-    expect(previewPassage(p, select(text, 0, text, 6))).toEqual({ quote: "Second", line: 8, source: "preview" });
+    expect(previewPassage(p, select(text, 0, text, 6))).toEqual({ quote: "Second", line: 8, endLine: Infinity, source: "preview" });
   });
   it("uses the start block when the range spans blocks", () => {
     const { pane: p, first, second } = pane();
     expect(previewPassage(p, select(first.firstChild!, 6, second.firstChild!, 6))?.line).toBe(3);
+  });
+  it("ends at the line before the block after the selection's end block", () => {
+    const { pane: p, first, second } = pane();
+    expect(previewPassage(p, select(first.firstChild!, 0, first.firstChild!, 5))).toMatchObject({ line: 3, endLine: 6 });
+    expect(previewPassage(p, select(first.firstChild!, 0, second.firstChild!, 5))).toMatchObject({ line: 3, endLine: Infinity });
   });
   it("returns null outside the pane, when collapsed, and for whitespace", () => {
     const { pane: p, first } = pane();
@@ -61,7 +66,7 @@ describe("previewPassage", () => {
 
 describe("editorPassage", () => {
   it("returns the editor selection's first line", () => {
-    expect(editorPassage("Sync model text", { from: 4, to: 6 })).toEqual({ quote: "Sync model text", line: 4, source: "editor" });
+    expect(editorPassage("Sync model text", { from: 4, to: 6 })).toEqual({ quote: "Sync model text", line: 4, endLine: 6, source: "editor" });
     expect(editorPassage("  ", { from: 1, to: 1 })).toBeNull();
     expect(editorPassage("x", null)).toBeNull();
   });

@@ -1,7 +1,9 @@
 // The passage the owner selected, from the rendered preview or the editor, with the
 // source line it starts on.
 
-export type Passage = { quote: string; line: number; source: "editor" | "preview" };
+/** `line`..`endLine` are the 1-based source lines the passage spans; a preview passage ends
+ *  at the line before the next block (Infinity after the last block). */
+export type Passage = { quote: string; line: number; endLine: number; source: "editor" | "preview" };
 
 const QUOTE_LIMIT = 2000;
 
@@ -14,14 +16,25 @@ export function cleanQuote(text: string): string {
   return `${(space > 0 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
-function lineOf(node: Node | null, pane: HTMLElement): number | null {
+function blockOf(node: Node | null, pane: HTMLElement): { element: HTMLElement; line: number } | null {
   let element: Element | null = node instanceof Element ? node : node?.parentElement ?? null;
   while (element && element !== pane) {
     const line = Number((element as HTMLElement).dataset?.line);
-    if (Number.isInteger(line) && line > 0) return line;
+    if (Number.isInteger(line) && line > 0) return { element: element as HTMLElement, line };
     element = element.parentElement;
   }
   return null;
+}
+
+/** The line before the first block after `end` (outside it) that starts on a later line. */
+function lastLineOf(end: { element: HTMLElement; line: number }, pane: HTMLElement): number {
+  for (const element of pane.querySelectorAll<HTMLElement>("[data-line]")) {
+    if (end.element.contains(element)) continue;
+    if (!(end.element.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+    const line = Number(element.dataset.line);
+    if (line > end.line) return line - 1;
+  }
+  return Infinity;
 }
 
 /** Selection inside a rendered Markdown preview pane; null when empty or outside it. */
@@ -31,13 +44,15 @@ export function previewPassage(pane: HTMLElement, selection: Selection | null): 
   if (!pane.contains(range.startContainer) || !pane.contains(range.endContainer)) return null;
   const quote = cleanQuote(selection.toString());
   if (!quote) return null;
-  const line = lineOf(range.startContainer, pane);
-  return line === null ? null : { quote, line, source: "preview" };
+  const start = blockOf(range.startContainer, pane);
+  const end = blockOf(range.endContainer, pane);
+  if (!start) return null;
+  return { quote, line: start.line, endLine: end ? lastLineOf(end, pane) : start.line, source: "preview" };
 }
 
 /** The editor's selected text and its 1-based line range; null when empty. */
 export function editorPassage(text: string, lines: { from: number; to: number } | null): Passage | null {
   if (!lines) return null;
   const quote = cleanQuote(text);
-  return quote ? { quote, line: lines.from, source: "editor" } : null;
+  return quote ? { quote, line: lines.from, endLine: lines.to, source: "editor" } : null;
 }
