@@ -58,7 +58,7 @@ folder already baselined (opened once before), a Chat engine for CAP-08. Back up
 ### CAP-08 — Ask AI from a preview selection
 
 - Steps: In Reading view select a sentence ▸ Ask AI.
-- Expected: The AI panel opens with the caret in its message box and the Selection context chip showing the sentence (the matching source range is selected in the editor).
+- Expected: The AI panel opens with the caret in its message box and the Selection context chip showing the sentence (the matching source range is selected in the editor). Repeat with two sentences that contain `inline code` and **bold**: the chip holds every source line of the selected passage, not the first line only.
 - Status: [ ] Pass  Notes:
 
 ### CAP-09 — Copy link
@@ -82,5 +82,5 @@ folder already baselined (opened once before), a Chat engine for CAP-08. Back up
 ### CAP-12 — Hostile text in a quote
 
 - Steps: Put a paragraph `Look <img src=x onerror=alert(1)> and ](evil) here` in the source. Select it in the editor ▸ Excerpt ▸ Save. Open the companion note in Reading view, then click its link.
-- Expected: The sheet shows the text literally. No alert runs anywhere; the companion note's preview shows the text through the sanitizer. The attribution link still opens the source and highlights the passage (or reports it changed if the rendered text differs).
+- Expected: The sheet shows the text literally. No alert runs anywhere. Selected in Reading view instead, the rendered text is saved with backslash escapes and the notes preview shows it exactly as selected; the companion note's preview shows the text through the sanitizer. The attribution link still opens the source and highlights the passage (or reports it changed if the rendered text differs).
 - Status: [ ] Pass  Notes:

@@ -4,7 +4,7 @@ Branch `feat/capture`, built from `plan.md` in this folder (reading workflow Pha
 
 ## Status
 
-All 8 tasks are built and every automated check passes. A smoke run of the main path was done on 2026-11-14 in the release build on the second display (below). The manual checks CAP-01 to CAP-12 in `docs/test-cases/29-capture.md` have not been run; the owner runs or delegates them. Next: Fable reviews the diff (`git diff main...feat/capture`).
+All 8 tasks are built and every automated check passes. Fable reviewed the branch on 2026-11-15: fit to merge after two fixes, both done, plus three optional small ones (see "Review fixes"). A smoke run of the main path was done on 2026-11-14 in the release build on the second display (below). The manual checks CAP-01 to CAP-12 in `docs/test-cases/29-capture.md` have not been run; next they are run with the owner.
 
 ## What was built, per task
 
@@ -45,6 +45,16 @@ Each is a `Ruling:` line in the ledger.
 12. Present, Notes and Add note size to their label: `.wt-btn` is a fixed 28 px square, so "Present" already overflowed it and "Notes" landed on top of it (found in the smoke run).
 13. Extra tests beyond the plan's lists: front matter and title-as-heading in `format`, empty task text, the note sheet, `lineOffset`, the controller flow.
 
+## Review fixes (Fable, 2026-11-15)
+
+| # | Commit | Fix | Test |
+|---|---|---|---|
+| 1 | `21d4126` | Preview-selected text is rendered text: `escapeMarkdown` (backslash before `\` `` ` `` `*` `_` `[` `]` `<` `>` `&`, and before a line-start `#`, `>`, `-`, `+`, `N.`) is applied to excerpt and task text when the passage came from the preview. Editor selections stay raw. | `capture-format` escapeMarkdown; `capture-follow` round-trip: "Map<String, Path> for *args" and a quote line starting "# " render back as selected and are found again in the source preview; `capture-controller` preview escaped, editor raw. |
+| 2 | `5a84ec0` | Ask AI from the preview: `Passage.endLine` (the end block's line through the line before the next block; Infinity after the last block). `src/capture/ask.ts` `askRange` selects the exact passage, or lines `line..endLine` with trailing blank lines dropped when inline Markdown makes the rendered text differ. | `capture-ask` (inline code and bold), `capture-selection` endLine. |
+| 3 | `9eaeb31` | Optional: `about:` value written as a quoted YAML string; an editor quote that opens a code fence is closed; `settings.json` is written only when the remembered target changes (the default target needs no write). | `capture-format` closeFence and quoted about:; `capture-controller` code fence, settings written once. |
+
+After the fixes: `npx vitest run` 1,420 passed; `tsc` clean; `cargo test` 235 passed; startup chunk 647.93 kB.
+
 ## Smoke run (2026-11-14, release build, second display)
 
 Folder with `doc.md` (`# Architecture`, `## Sync model`, `## Storage`).
@@ -64,6 +74,15 @@ Not covered by the smoke run: review queue state after the writes, Recovery "Bef
 ### Clean-up after the run
 
 `settings.json` restored from the backup taken before the run (the run had written `capture.targets` for the test folder); `agent.json` unchanged. The owner's Recovery drafts were not touched. The test folder is in the session scratchpad.
+
+## Backlog
+
+From Fable's review, not fixed in this phase:
+
+- A hand-written quote whose last line starts "— [link]" is read as a capture link; following it may toast "This passage changed after it was saved."
+- `page.md` and `page.html` in one folder share the companion `page.notes.md`.
+- The Notes count goes stale after the companion note is edited by hand (it is re-read when a capture writes or the cache is cleared, not on every save).
+- Choose Note… on a symlink that points out of the folder: the frontend reads the target into a Recovery snapshot before Rust refuses the append. Nothing is written, but the outside file's text lands in Recovery.
 
 ## Left open for the owner
 
