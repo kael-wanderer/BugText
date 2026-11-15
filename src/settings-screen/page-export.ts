@@ -22,7 +22,7 @@ export const exportPage: SettingsPage = {
         if (info && !info.found) controls.append(button("Copy", () => { void deps.exportTools?.copy(`brew install ${name}`); }));
         host.append(row(`export-${name}`, label, null, controls));
       }
-      host.append(button("Check again", () => { void check(true); }), caption("Citations"));
+      host.append(group(button("Check again", () => { void check(true); })), caption("Citations"));
       const citationStyle = document.createElement("select"); citationStyle.setAttribute("aria-label", "Citation style");
       for (const [value, label] of [["chicago", "Chicago author-date"], ["apa", "APA 7th"], ["ieee", "IEEE"]]) { const option = document.createElement("option"); option.value = value; option.textContent = label; citationStyle.append(option); }
       citationStyle.value = deps.getSettings().export.citationStyle ?? "chicago";
