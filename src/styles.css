@@ -3788,3 +3788,36 @@ body.settings-active #review-panel, body.focus-active #review-panel { visibility
 .pane-preview .review-changed.review-current { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%); }
 .outline-row.review-changed > span:last-child::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
 .ai-run-summary .ai-run-review { align-self: flex-start; margin-top: 6px; padding: 3px 10px; font: inherit; font-size: 12px; color: var(--bg); background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; cursor: pointer; }
+
+/* ---------- Capture while reading ---------- */
+.capture-menu { position: fixed; z-index: 900; display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); font-size: 12.5px; }
+.capture-menu[hidden] { display: none; }
+.capture-menu button { padding: 5px 10px; color: var(--text); font: inherit; background: none; border: 0; border-radius: 5px; cursor: default; }
+.capture-menu button:hover, .capture-menu button:focus-visible { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text-strong); }
+.capture-sheet-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: #0008; }
+.capture-sheet { display: grid; gap: 10px; width: min(460px, calc(100vw - 32px)); padding: 18px 20px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.capture-sheet h2 { margin: 0; font-size: 14px; color: var(--text-strong); }
+.capture-sheet label { display: grid; gap: 5px; }
+.capture-sheet input:not([type]), .capture-sheet textarea { padding: 6px 8px; color: var(--text); font: inherit; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; }
+.capture-quote { max-height: 140px; margin: 0; padding: 6px 10px; overflow: auto; white-space: pre-wrap; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.capture-source, .capture-hint { margin: 0; color: var(--muted); font-size: 12px; }
+.capture-targets { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; border: 0; }
+.capture-targets legend { padding: 0 0 4px; color: var(--muted); }
+.capture-targets label { display: inline-flex; align-items: center; gap: 4px; }
+.capture-error:empty { display: none; }
+.capture-error { margin: 0; color: var(--danger, #e06c75); }
+.capture-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.capture-picker-box { display: grid; gap: 6px; width: min(420px, calc(100vw - 32px)); max-height: 60vh; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.capture-picker-box input { padding: 6px 8px; color: var(--text); font: inherit; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 5px; }
+.capture-picker-box ul { margin: 0; padding: 0; overflow: auto; list-style: none; }
+.capture-picker-box li { padding: 5px 8px; border-radius: 4px; cursor: default; }
+.capture-picker-box li:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+/* Capture: the passage a followed excerpt or task link points back to. */
+::highlight(capture-quote) {
+  background-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* Capture: Notes and Add note in the window toolbar. */
+/* Text buttons size to their label; .wt-btn is a 28px icon square. */
+.wt-present, .wt-notes, .wt-addnote { width: auto; padding: 0 6px; white-space: nowrap; }

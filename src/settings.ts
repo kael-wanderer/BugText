@@ -52,6 +52,12 @@ export const APP_ICON_IDS = [
 export type AppIconId = (typeof APP_ICON_IDS)[number];
 export const DEFAULT_APP_ICON: AppIconId = "bt-lettermark";
 
+/** Where an excerpt or a task is saved (capture while reading). */
+export type CaptureTarget = { kind: "companion" } | { kind: "daily" } | { kind: "note"; relative: string };
+export type CaptureTargets = { excerpt: CaptureTarget; task: CaptureTarget };
+/** Folders whose remembered capture targets are kept; the oldest is dropped first. */
+export const CAPTURE_FOLDER_LIMIT = 50;
+
 export type Settings = {
   export: ExportSettings;
   git: { showSourceControl: boolean };
@@ -85,6 +91,7 @@ export type Settings = {
   templates: TemplateSettings;
   performance: { largeFolders: "auto" | "off" };
   review: { track: boolean };
+  capture: { targets: Record<string, CaptureTargets> };
   onboarding: { hintDismissed: boolean };
   focus: { width: "narrow" | "standard" | "wide" };
   editor: { typewriterScrolling: boolean; spellCheck: boolean };
@@ -128,6 +135,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tables: { formatOnEdit: true, pasteAsTable: true },
   performance: { largeFolders: "auto" },
   review: { track: true },
+  capture: { targets: {} },
   onboarding: { hintDismissed: true },
   focus: { width: "standard" },
   editor: { typewriterScrolling: false, spellCheck: true },
@@ -186,6 +194,7 @@ function defaults(): Settings {
     templates: { ...DEFAULT_SETTINGS.templates },
     performance: { ...DEFAULT_SETTINGS.performance },
     review: { ...DEFAULT_SETTINGS.review },
+    capture: { targets: {} },
     onboarding: { ...DEFAULT_SETTINGS.onboarding },
     focus: { ...DEFAULT_SETTINGS.focus },
     editor: { ...DEFAULT_SETTINGS.editor },
@@ -224,6 +233,26 @@ function parseTemplates(raw: unknown): TemplateSettings {
     inboxFile: text(value.inboxFile, fallback.inboxFile) || fallback.inboxFile,
     lastUsed: text(value.lastUsed, fallback.lastUsed),
   };
+}
+
+function parseCaptureTarget(raw: unknown, fallback: CaptureTarget): CaptureTarget {
+  const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  if (value.kind === "companion" || value.kind === "daily") return { kind: value.kind };
+  if (value.kind === "note" && typeof value.relative === "string" && value.relative.trim()) return { kind: "note", relative: value.relative.trim() };
+  return fallback;
+}
+
+function parseCapture(raw: unknown): { targets: Record<string, CaptureTargets> } {
+  const targets: Record<string, CaptureTargets> = {};
+  const value = (raw && typeof raw === "object" ? raw : {}) as { targets?: unknown };
+  const entries = Object.entries(value.targets && typeof value.targets === "object" ? value.targets as Record<string, unknown> : {})
+    .filter(([folder, entry]) => folder && entry && typeof entry === "object")
+    .slice(-CAPTURE_FOLDER_LIMIT);
+  for (const [folder, entry] of entries) {
+    const e = entry as Record<string, unknown>;
+    targets[folder] = { excerpt: parseCaptureTarget(e.excerpt, { kind: "companion" }), task: parseCaptureTarget(e.task, { kind: "daily" }) };
+  }
+  return { targets };
 }
 
 function parseKeymap(raw: unknown): Record<string, string> {
@@ -337,6 +366,7 @@ export function parseSettings(raw: string): Settings {
     templates: parseTemplates(data.templates),
     performance: { largeFolders: (data.performance as { largeFolders?: unknown } | undefined)?.largeFolders === "off" ? "off" : "auto" },
     review: { track: (data.review as { track?: unknown } | undefined)?.track !== false },
+    capture: parseCapture(data.capture),
     onboarding: { hintDismissed: (data.onboarding as { hintDismissed?: unknown } | undefined)?.hintDismissed !== false },
     focus: { width: (data.focus as { width?: unknown } | undefined)?.width === "narrow" ? "narrow" : (data.focus as { width?: unknown } | undefined)?.width === "wide" ? "wide" : "standard" },
     editor: { typewriterScrolling: (data.editor as { typewriterScrolling?: unknown } | undefined)?.typewriterScrolling === true, spellCheck: (data.editor as { spellCheck?: unknown } | undefined)?.spellCheck !== false },

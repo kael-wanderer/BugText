@@ -1137,3 +1137,46 @@ mod flag_tests {
         assert_eq!(item(&s, "b.md").unwrap().state, State::Changed);
     }
 }
+
+/// Capture while reading writes through `append_note` and `create_from_template`. These
+/// pin that both count as the owner's own writes (docs/plans/capture/plan.md).
+#[cfg(test)]
+mod capture_write_tests {
+    use super::tests::{env, item};
+    use crate::templates::{append_text_at, create_file_exclusive_at};
+
+    #[test] fn append_to_a_reviewed_note_stays_reviewed() {
+        let e = env();
+        e.put("a.md", b"# A\n");
+        e.scan(&["a.md"]);
+        append_text_at(&e.f(), "a.md", "> q\n").unwrap();
+        let s = e.scan(&["a.md"]);
+        assert!(item(&s, "a.md").is_none(), "{:?}", s.items);
+    }
+    #[test] fn append_to_a_changed_note_keeps_it_changed() {
+        let e = env();
+        e.put("a.md", b"# A\n");
+        e.scan(&["a.md"]);
+        e.put("a.md", b"# A\noutside\n");
+        assert!(item(&e.scan(&["a.md"]), "a.md").is_some());
+        append_text_at(&e.f(), "a.md", "> q\n").unwrap();
+        let s = e.scan(&["a.md"]);
+        assert!(item(&s, "a.md").is_some(), "an owner append must not hide an outside change");
+    }
+    #[test] fn created_companion_is_reviewed_not_new() {
+        let e = env();
+        e.put("a.md", b"# A\n");
+        e.scan(&["a.md"]);
+        create_file_exclusive_at(&e.f(), "", "a.notes", "---\nabout: a.md\n---\n\n> q\n").unwrap();
+        let s = e.scan(&["a.md", "a.notes.md"]);
+        assert!(s.items.is_empty(), "{:?}", s.items);
+    }
+    #[test] fn created_daily_note_in_a_new_folder_is_reviewed() {
+        let e = env();
+        e.put("a.md", b"# A\n");
+        e.scan(&["a.md"]);
+        create_file_exclusive_at(&e.f(), "Daily", "2026-11-14", "# 2026-11-14\n\n- [ ] t\n").unwrap();
+        let s = e.scan(&["a.md", "Daily/2026-11-14.md"]);
+        assert!(s.items.is_empty(), "{:?}", s.items);
+    }
+}

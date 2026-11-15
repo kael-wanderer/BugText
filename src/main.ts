@@ -50,6 +50,12 @@ import { configureCitationCompletion } from "./citations/complete";
 import { configureLinkCompletion } from "./links/complete";
 import { showInsertLinkPicker } from "./links/insert-picker";
 import { configureLinks, followEditorLink, followLink, refreshPreviewLinks } from "./links/follow";
+import { watchSelections } from "./capture/trigger";
+import { companionPath } from "./capture/paths";
+import { countEntries, notesLabel } from "./capture/notes-button";
+import type { Passage } from "./capture/selection";
+import type { CaptureAction, CaptureMenu } from "./capture/menu";
+import type { Capture } from "./capture/controller";
 import { createHoverCard } from "./links/hover-card";
 import { createLinkIndex, compactKnown, type LinkScan } from "./links/index";
 import { createDiagnostics } from "./perf/diagnostics";
@@ -1163,6 +1169,9 @@ const handlers = {
     void doSave(false);
   },
   onPresent: (wid: string) => { setState({ activeWindowId: wid }); void present(false); },
+  notesLabel: (path: string) => notesButtonLabel(path),
+  onNotes: (wid: string) => { setState({ activeWindowId: wid }); void withCapture((c) => c.openNotes()); },
+  onAddNote: (wid: string) => { setState({ activeWindowId: wid }); void withCapture((c) => c.addNote()); },
   onOpen: (wid: string) => {
     setState({ activeWindowId: wid });
     void doOpen();
@@ -4053,8 +4062,12 @@ configureLinks({
   index: linkIndex,
   hoverCard, hoverPreview: () => currentSettings.links.hoverPreview,
   context: linkContext,
-  open: async (path, other) => { if (other && getState().windows.some((w) => w.id === "sub")) await openInSub(path); else await doOpenPath(path); },
-  jump: (line) => activeView().jumpToLine(line),
+  open: async (path, other) => {
+    if (other && getState().windows.some((w) => w.id === "sub")) { await openInSub(path); return "sub"; }
+    await doOpenPath(path);
+  },
+  jump: (line, windowId) => ((windowId && views.get(windowId)) || activeView()).jumpToLine(line),
+  highlight: (quote, fromLine, windowId) => highlightQuote(quote, fromLine, windowId ?? getState().activeWindowId),
   openPdfAt: (page, annotation) => activeView().openPdfPage(page, annotation),
   read: async (path) => {
     const found = findTabByPath(getState().windows, path);
@@ -4063,6 +4076,139 @@ configureLinks({
   create: async (folder, path) => { await invoke("create_link_note", { folder, path }); linkIndex.onFileChanged(path, ""); },
   toast: (text, action) => showToast(text, 6000, action),
 });
+
+/** Shows a captured quote in the window that opened its note: the preview when it is
+ *  visible, otherwise the editor selection. Waits briefly for the preview to render. */
+async function highlightQuote(quote: string, fromLine: number, windowId: string): Promise<boolean> {
+  const view = views.get(windowId);
+  const win = getState().windows.find((w) => w.id === windowId);
+  if (!view || !win?.activeTabId) return false;
+  const { findQuote, findQuoteInSource, lineOffset, showQuote } = await import("./capture/follow");
+  if (win.mode === "editor") {
+    const text = view.editor.getText(win.activeTabId);
+    const found = findQuoteInSource(text, quote, lineOffset(text, fromLine));
+    if (found) view.editor.selectRange(found[0], found[1]);
+    return Boolean(found);
+  }
+  for (let tries = 0; tries < 20; tries++) {
+    const range = findQuote(view.previewElement, quote, fromLine);
+    if (range) { showQuote(view.previewElement, range); return true; }
+    await new Promise((done) => window.setTimeout(done, 30));
+  }
+  return false;
+}
+
+// Capture while reading. The menu, sheet and writer load on first use.
+let capture: Capture | null = null;
+async function withCapture(run: (c: Capture) => Promise<void>): Promise<void> {
+  if (!capture) {
+    const [{ createCapture }, selection] = await Promise.all([import("./capture/controller"), import("./capture/selection")]);
+    capture = createCapture({
+      doc: document,
+      active: () => activeCaptureNote(selection),
+      writer: (folder) => ({
+        folder,
+        findOpen: (path) => {
+          const found = findTabByPath(getState().windows, path);
+          return found ? { tabId: found.tab.id, text: editorForTab(found.tab.id).getText(found.tab.id) } : null;
+        },
+        appendToTab: (tabId, text) => editorForTab(tabId).appendText(tabId, text),
+        exists: async (path) => { try { await invoke("file_stat", { path }); return true; } catch { return false; } },
+        read: (path) => invoke<string>("read_file", { path }),
+        snapshot: (path, text, label) => manualSnapshot(path, text, label, true),
+        append: (root, relative, text) => invoke<string>("append_note", { folder: root, relative, text }),
+        create: (args) => invoke<string>("create_from_template", args),
+        recordStat,
+        afterWrite: (path) => {
+          void invoke<string>("read_file", { path }).then((text) => {
+            workspaceIndex.onFileChanged(path, text);
+            linkIndex.onFileChanged(path, text);
+          }).catch(() => {});
+        },
+        refreshExplorer: async () => { await refreshExpandedDirs(); await refreshFileList(); },
+      }),
+      settings: () => currentSettings,
+      saveSettings: (next) => { currentSettings = next; void writeSettings(next).catch(() => {}); },
+      noteFiles: () => fileList.filter((file) => isMarkdownFile(file)),
+      openInSub: (path) => openInSub(path),
+      copy: (text) => writeClipboardText(text),
+      ask: (passage) => void askAboutPassage(passage),
+      toast: (text, action) => showToast(text, 6000, action),
+      written: (path) => { notesCounts.delete(path); void loadNotesCount(path); },
+      now: () => new Date(),
+    });
+  }
+  await run(capture);
+}
+function runCapture(action: CaptureAction): void { void withCapture((c) => c.run(action)); }
+
+function activeCaptureNote({ editorPassage, previewPassage }: typeof import("./capture/selection")): { folder: string | null; path: string | null; text: string; passage: Passage | null } | null {
+  const win = getState().windows.find((w) => w.id === getState().activeWindowId);
+  const tab = win?.tabs.find((t) => t.id === win.activeTabId);
+  const view = win && views.get(win.id);
+  if (!win || !tab || !view) return null;
+  const text = view.editor.getText(tab.id);
+  const fromPreview = win.mode !== "editor" ? previewPassage(view.previewElement, document.getSelection()) : null;
+  const fromEditor = win.mode !== "preview" ? editorPassage(view.editor.getSelection().text, view.editor.selectionLines()) : null;
+  return { folder: getState().folder, path: tab.path, text, passage: fromPreview ?? fromEditor };
+}
+
+/** Ask AI about a passage: select it in the source so the panel's Selection chip carries it. */
+async function askAboutPassage(passage: Passage): Promise<void> {
+  const win = getState().windows.find((w) => w.id === getState().activeWindowId);
+  const view = win && views.get(win.id);
+  if (!win?.activeTabId || !view) return;
+  if (passage.source === "preview") {
+    const { askRange } = await import("./capture/ask");
+    const [from, to] = askRange(view.editor.getText(win.activeTabId), passage);
+    view.editor.selectRange(from, to);
+  }
+  setAIVisible(true);
+  requestAnimationFrame(() => aiPanel?.focusInput());
+}
+
+// The Notes button: entries in each companion note, read when a document becomes active.
+const notesCounts = new Map<string, number>();
+function companionOf(path: string): string | null {
+  const folder = getState().folder?.replace(/\/+$/, "");
+  if (!folder || !path.startsWith(`${folder}/`) || !(isMarkdownFile(path) || isHtmlFile(path))) return null;
+  const relative = companionPath(path.slice(folder.length + 1));
+  return relative ? `${folder}/${relative}` : null;
+}
+function notesButtonLabel(path: string): string | null {
+  const companion = companionOf(path);
+  if (!companion) return null;
+  if (!notesCounts.has(companion)) void loadNotesCount(companion);
+  return notesLabel(notesCounts.get(companion) ?? 0);
+}
+async function loadNotesCount(companion: string): Promise<void> {
+  notesCounts.set(companion, notesCounts.get(companion) ?? 0);
+  const open = findTabByPath(getState().windows, companion);
+  let count = 0;
+  if (open) count = countEntries(editorForTab(open.tab.id).getText(open.tab.id));
+  else {
+    try { await invoke("file_stat", { path: companion }); count = countEntries(await invoke<string>("read_file", { path: companion })); }
+    catch { count = 0; }
+  }
+  if (notesCounts.get(companion) === count) return;
+  notesCounts.set(companion, count);
+  views.forEach((view) => view.refreshNotes());
+}
+
+let captureMenu: CaptureMenu | null = null;
+watchSelections(document, () => {
+  const win = getState().windows.find((w) => w.id === getState().activeWindowId);
+  const tab = win?.tabs.find((t) => t.id === win.activeTabId);
+  const view = win && views.get(win.id);
+  if (!win || !tab || !view || tab.tableView) return null;
+  return { pane: win.mode !== "editor" ? view.previewElement : null, editorDom: view.editorElement, markdown: isMarkdownFile(tab.path ?? tab.name) };
+}, (rect) => {
+  if (captureMenu) { captureMenu.show(rect); return; }
+  void import("./capture/menu").then(({ createCaptureMenu }) => {
+    captureMenu ??= createCaptureMenu(document, runCapture);
+    captureMenu.show(rect);
+  });
+}, () => captureMenu?.hide());
 
 makeView("main", true);
 if (ui.aiVisible) buildAIPanel();
@@ -4277,6 +4423,9 @@ listenScoped<string>("menu", (event) => {
     }
     case "edit.toggle_task":
       return void activeView().editor.toggleTasks();
+    case "edit.capture_excerpt": return void runCapture("excerpt");
+    case "edit.capture_task": return void runCapture("task");
+    case "view.companion_note": return void withCapture((c) => c.openNotes());
     case "edit.extract_note":
       return withOrganize((actions) => actions.extractSelection());
     case "edit.show_tasks":

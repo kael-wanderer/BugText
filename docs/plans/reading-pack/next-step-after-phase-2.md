@@ -2,6 +2,13 @@
 
 For Fable. Paste everything below the line into a new session opened in the BugText repo.
 
+> **Superseded on 2026-11-14 by the owner's corrections.** Fable does not plan Phases 3,
+> 4 or 5a: Claude writes those plans and builds them, and Fable reviews the diff only.
+> Fable plans Phase 5b (import) later. Before Phase 3, BUG-041 (tab strip) and BUG-042
+> (second window close) were fixed on `fix/window-tabs`; BUG-043 to BUG-045 were
+> recorded open. The Phase 3 plan is `docs/plans/capture/plan.md`. The owner hands out
+> a build with Phases 1 and 2 before Phase 3 starts.
+
 ---
 
 Phase 2 of the reading workflow, the Review Queue, is merged into `main`. Decide the

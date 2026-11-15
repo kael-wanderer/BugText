@@ -310,3 +310,10 @@ it("restores optional conversation chips and saved Context sent", async () => {
   expect(note.getAttribute("aria-pressed")).toBe("false"); note.click();
   await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ contextChips: { note: true, search: false, files: [] } })));
 });
+it("focusInput puts the caret in the message box", () => {
+  document.body.append(root);
+  const panel = createAIPanel(root, deps);
+  panel.focusInput();
+  expect(document.activeElement).toBe(root.querySelector("textarea.ai-input"));
+  root.remove();
+});

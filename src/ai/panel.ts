@@ -103,6 +103,7 @@ export type AIPanel = {
   resetWorkspaceContext(): void;
   updateWorkspaceFile(path: string, text: string): void;
   removeWorkspaceFile(path: string): void;
+  focusInput(): void;
 };
 function basename(path: string): string {
   return path.split(/[\\/]/).pop() || path;
@@ -705,6 +706,7 @@ export function createAIPanel(
   });
   render();
   return {
+    focusInput() { input.focus(); },
     async runAction(action, actionDeps) {
       await historyReady;
       if (remotelyLocked || activeRequest) return;

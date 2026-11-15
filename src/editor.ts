@@ -65,6 +65,8 @@ export type EditorHandle = {
   applyPropertyEdit(id: string, edit: PropertyEdit): void;
   applyChanges(id: string, changes: { from: number; to: number; insert: string }[], options?: { isolate?: boolean; cursor?: number }): void;
   getSelection(): { from: number; to: number; text: string };
+  /** 1-based first and last line of the main selection; null when the selection is empty. */
+  selectionLines(): { from: number; to: number } | null;
   replaceRange(from: number, to: number, text: string): void;
   selectRange(from: number, to: number): void;
   /** Document position under a viewport point, or null when outside the text. */
@@ -435,6 +437,11 @@ export function createEditor(
       const updated = agentChangeTransaction(state, changes, options).state;
       states.set(id, updated);
       changed(id, updated.doc.toString());
+    },
+    selectionLines() {
+      const selection = view.state.selection.main;
+      if (selection.empty) return null;
+      return { from: view.state.doc.lineAt(selection.from).number, to: view.state.doc.lineAt(selection.to).number };
     },
     getSelection() {
       const selection = view.state.selection.main;

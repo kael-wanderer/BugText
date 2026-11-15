@@ -89,6 +89,27 @@ matches its reviewed version. Tracked: `.md`, `.markdown`, `.html`, `.htm`; not 
 a hidden component, and notes matched by `context.exclude`. Settings ▸ General ▸ Review
 queue (`review.track`) turns it off.
 
+Capture while reading (`src/capture/`): selecting text in a Markdown note shows a small
+menu (Excerpt, Task, Ask AI, Copy link). `trigger.ts` and the tiny `link-quote.ts`,
+`paths.ts` and `notes-button.ts` load at startup; the menu, sheet, note picker, writer and
+`controller.ts` (the flow) load on first use. `selection.ts` reads the passage and its
+source line from the preview (nearest `data-line`) or the editor. `format.ts` writes the
+plain Markdown: an excerpt is a quote ending `> — [Title › Heading](path#anchor) · date`,
+a task is `- [ ] text ([source](path#anchor))`. Targets (`targets.ts`) are the companion
+note `<stem>.notes.md` beside the document, today's `Daily/YYYY-MM-DD.md`, or a chosen
+note, remembered per folder in `settings.json` under `capture.targets` (50 folders).
+`write.ts` is the only writer, with three routes the review hook counts as the owner's:
+a target open in a tab changes through `editor.appendText` (one undo step, no disk write);
+a closed note gets a "Before capture" Recovery snapshot, then `append_note`; a missing note
+is created with `create_from_template`, which never overwrites (a returned "<stem> 2.md"
+is reported and opened). Following a capture link (`links/follow.ts` with `captureQuote`)
+opens the source at the heading, then `capture/follow.ts` finds the quote again
+(whitespace runs compare equal, from the heading's line onward, then the whole note) and
+highlights it with the CSS Custom Highlight API (`::highlight(capture-quote)`, 4 s), so the
+sanitized preview DOM is never changed; in editor-only view it selects the source range.
+`open` returns the window it used, so a ⌘-click into the Sub pane jumps and highlights
+there. The Notes button counts excerpt and note lines in the companion note.
+
 Settings changes broadcast the Tauri event `bugtext://settings-changed`
 (`src/settings-sync.ts`, payload `{file, from}`). Other windows reload that file and
 refresh the screen; the sender ignores its own event so reloads never re-broadcast,
