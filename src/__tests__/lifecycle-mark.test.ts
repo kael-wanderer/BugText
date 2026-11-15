@@ -60,7 +60,8 @@ describe("markSuperseded", () => {
     const failing = deps({ snapshot: vi.fn(async () => { throw new Error("disk full"); }) });
     await markSuperseded("/r/a.md", failing.d);
     expect(failing.d.write).not.toHaveBeenCalled();
-    expect(failing.d.toast).toHaveBeenCalledWith("Could not mark this note: disk full");
+    expect(failing.d.toast).toHaveBeenCalledWith("Could not mark this note.");
+    expect(vi.mocked(failing.d.toast).mock.calls.flat().join(" ")).not.toContain("disk full");
   });
   it("refuses a note outside the folder", async () => {
     const { d } = deps();

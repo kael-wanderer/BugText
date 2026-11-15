@@ -48,7 +48,8 @@ export async function markSuperseded(path: string, deps: MarkDeps): Promise<void
       await deps.write(path, text.slice(0, change.from) + change.insert + text.slice(change.to), text);
     }
     deps.toast(`Marked as superseded by ${fileName(chosen)}`);
-  } catch (error) {
-    deps.toast(`Could not mark this note: ${error instanceof Error ? error.message : String(error)}`);
+  } catch {
+    // A fixed message: a raw error can carry a path or system text not meant for a toast.
+    deps.toast("Could not mark this note.");
   }
 }
