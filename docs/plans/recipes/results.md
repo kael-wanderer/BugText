@@ -4,7 +4,7 @@ Branch `feat/recipes` from `43fb775` (main), built from `plan.md` in this folder
 
 ## Status
 
-All 10 tasks are built and every automated check passes. Not reviewed yet: Fable reviews the branch from `review-request.md`. The manual cases RCP-01 to RCP-12 in `docs/test-cases/31-recipes.md` are written and not run.
+All 10 tasks are built and every automated check passes. Fable reviewed the branch: no Critical, 2 Important (fixed in `48c30b1`), 8 Minor (deferred, below). Verdict: fix first, then run RCP-01..12, then merge. The manual cases RCP-01 to RCP-12 in `docs/test-cases/31-recipes.md` are written and not run.
 
 ## What was built, per task
 
@@ -19,7 +19,7 @@ All 10 tasks are built and every automated check passes. Not reviewed yet: Fable
 | 7 | `2363aaf` | `recipes/run.ts` `runRecipe` (R4, R8, R15, R5). |
 | 8 | `661f258` | `recipes/sheet.ts` run, progress, review, result sheets; `AIPanel.runPrepared` (R13); `recipes/host.ts`; `Recipe: <name>` palette entries. |
 | 9 | `9083045` | `recipes/list.ts` (AI: Recipes…, status per R11), `starters.ts`, Settings recipe editor `settings-screen/recipe-form.ts`, Actions page saving by id (R6, R16); `ai.recipes` command; CHANGELOG. |
-| 10 | this commit | ARCHITECTURE paragraph, HELP paragraph, test cases RCP-01..12, feature map row, this file. |
+| 10 | `6faa176` | ARCHITECTURE paragraph, HELP paragraph, test cases RCP-01..12, feature map row, this file. |
 
 ## Checks (2026-11-15, at `9083045` plus docs)
 
@@ -50,6 +50,25 @@ All 10 tasks are built and every automated check passes. Not reviewed yet: Fable
 - T10: manual case ids are `RCP-`, because `REC-` is Recovery (`24-recovery.md`).
 - T10: the HELP paragraph puts the startup chunk 0.31 kB over budget (see Checks). Trimming it further or loading `HELP.md` on demand is the owner's call.
 - Final review is Fable's via `review-request.md` (owner's model split), not a subagent reviewer.
+
+## Review fixes (`48c30b1`)
+
+- Remote images in generated notes: a source with hidden instructions could make the reply embed `![](https://…?q=<other sources' text>)`, which preview would fetch (CSP `img-src https:`). `generatedNote` now turns remote, protocol-relative and reference images into plain links and shows HTML that loads a resource (`img`, `svg`, `picture`, `source`, `video`, `audio`, `track`, or a `src`/`srcset`/`poster`/`background`/`style` attribute) as text. Local images stay. Cost: such HTML inside a code block of a generated note shows `&lt;`.
+- Completed tasks counted twice: the tasks input now skips the output note and notes this recipe generated, so a second Weekly review in the same week lists each task once.
+- Checks after the fixes: tsc clean, `npm run test` 1,594 passed, startup chunk 660.50 kB (unchanged). cargo not rerun (no Rust change).
+
+## Deferred minors (Fable review)
+
+3. `path.ts`: the extension rule runs on the filled path, so `out/{{title}}` from `report.final.md` is refused.
+4. Save accepts `a.txt`, `a//b`, `./x` output paths; they fail only at Run.
+5. Completed tasks read the index source, not unsaved tab text.
+6. `recipe-runs.json` is never pruned; at 2 MB `recordRun` fails silently and statuses freeze.
+7. No one-run-at-a-time guard: the same recipe started twice runs two streams.
+8. Chat off, locked or busy, or an empty reply, shows only after the run sheet is confirmed (Fable's half-disagreement with the T8 ruling).
+9. `sealBlockContent` is case-sensitive (`</CONTEXT>`, `</context >`), app-wide.
+10. A reply opening `---`, heading, `---` parses as comment-only front matter.
+
+Fable accepted the +3.31 kB startup chunk. Downgrade note: `ai-actions.json` version 2 is refused by older builds.
 
 ## Not done
 
