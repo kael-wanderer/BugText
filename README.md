@@ -138,8 +138,9 @@ it from **Settings ▸ General ▸ Open agent.json**. Its top-level keys are
 tokens). Older `ai.json` / version 1 files migrate automatically, keeping an
 `agent.v1.json` backup.
 
-> **Security note:** API keys are stored in your macOS Keychain under service
-> `com.kael.bugtext`, never in `agent.json`.
+> **Security note:** API keys are stored in `<app config dir>/secrets/credentials.json`,
+> readable only by your user account (file mode 0600), never in `agent.json`.
+> Sandboxed coding CLI runs cannot read that folder.
 
 ## Architecture
 
@@ -189,7 +190,7 @@ src-tauri/src/
   cli_args.rs      CLI argument builder; cli_scan.rs detects installed CLIs
   sandbox.rs       macOS Seatbelt profile for CLI runs
   mcp_*.rs         MCP stdio bridge, socket server, path confinement, client setup
-  secrets.rs       API keys in the OS keychain (keyring crate)
+  secrets.rs       API keys in a private credentials file
   export.rs        pandoc/typst export
   menu.rs          native menu bar
   native_windows.rs independent Tauri window creation and focused-window routing

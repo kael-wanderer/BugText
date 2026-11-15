@@ -174,6 +174,7 @@ fn prepare_command(
         config_dirs: vec![config_dir.clone()],
         config_files,
         exec_roots,
+        secrets_dir: crate::secrets::store_dir(),
     };
 
     let mut command = Command::new("/usr/bin/sandbox-exec");
