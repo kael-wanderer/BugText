@@ -73,6 +73,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Reading view: a `superseded_by` that is not a note in the folder, such as a web address, shows in full ("Superseded by https://example.com/x.md") instead of only its last part.
 - Mark as Superseded By…: a failed write shows "Could not mark this note." instead of the raw system error.
 - Mark as Superseded By… on a note with broken properties says so before the note picker opens, not after a note is chosen.
 - Filter panel: the pressed Draft, Current or Superseded chip now looks pressed.

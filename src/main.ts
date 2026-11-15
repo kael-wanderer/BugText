@@ -3841,7 +3841,7 @@ async function updateLifecycleBar(wid: string): Promise<void> {
   if (lifecycleBarKeys.get(wid) === key) return;
   lifecycleBarKeys.set(wid, key);
   if (!shown) { view.lifecycleHost.replaceChildren(); view.lifecycleHost.hidden = true; return; }
-  const [{ readProperties }, { renderLifecycleBar }] = await Promise.all([loadProperties(), import("./lifecycle/bar")]);
+  const [{ readProperties }, { renderLifecycleBar }, { supersedingPath }] = await Promise.all([loadProperties(), import("./lifecycle/bar"), import("./lifecycle/open")]);
   if (lifecycleBarKeys.get(wid) !== key) return;
   const result = readProperties(text);
   const lifecycle = lifecycleOf(result?.ok ? result.props : null);
@@ -3849,6 +3849,7 @@ async function updateLifecycleBar(wid: string): Promise<void> {
   renderLifecycleBar(view.lifecycleHost, {
     lifecycle, today: localToday(),
     leftOutOfAI: lifecycle.status === "superseded" && !includeSuperseded(),
+    targetInFolder: lifecycle.supersededBy ? "path" in supersedingPath(lifecycle.supersededBy, notePath, getState().folder) : true,
   }, { open: target => void openSupersedingNote(target, notePath) });
 }
 function markActiveSuperseded(): Promise<void> {

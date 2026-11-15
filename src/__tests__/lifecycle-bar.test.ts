@@ -15,6 +15,13 @@ describe("renderLifecycleBar", () => {
     [...host.querySelectorAll("button")].find((b) => b.textContent === "Open")!.click();
     expect(open).toHaveBeenCalledWith("docs/sync-design.md");
   });
+  it("shows the full target when it is not a note in the folder", () => {
+    const host = document.createElement("div");
+    renderLifecycleBar(host, { lifecycle: life({ status: "superseded", supersededBy: "https://example.com/x.md" }), today: "2026-11-15", leftOutOfAI: false, targetInFolder: false }, { open: vi.fn() });
+    expect(host.textContent).toContain("Superseded by https://example.com/x.md");
+    renderLifecycleBar(host, { lifecycle: life({ status: "superseded", supersededBy: "docs/b.md" }), today: "2026-11-15", leftOutOfAI: false, targetInFolder: true }, { open: vi.fn() });
+    expect(host.textContent).toContain("Superseded by b.md");
+  });
   it("shows an overdue review date, alone or with the superseded line", () => {
     const host = document.createElement("div");
     renderLifecycleBar(host, { lifecycle: life({ reviewBy: "2026-11-01" }), today: "2026-11-15", leftOutOfAI: false }, { open: vi.fn() });

@@ -2,7 +2,9 @@
 // Note names and paths are set with textContent.
 import { reviewDue, shortDate, type Lifecycle } from "./model";
 
-export type LifecycleBarInput = { lifecycle: Lifecycle; today: string; leftOutOfAI: boolean };
+/** targetInFolder false: superseded_by is not a note in the open folder (a web address, a
+ * path outside), so the bar shows it whole instead of its last segment. */
+export type LifecycleBarInput = { lifecycle: Lifecycle; today: string; leftOutOfAI: boolean; targetInFolder?: boolean };
 export type LifecycleBarDeps = { open: (target: string) => void };
 
 const lastSegment = (target: string): string => target.replace(/\\/g, "/").replace(/\/+$/, "").split("/").pop() || target;
@@ -17,7 +19,7 @@ export function renderLifecycleBar(host: HTMLElement, input: LifecycleBarInput |
     line.className = "lifecycle-line is-superseded";
     const target = input.lifecycle.supersededBy;
     const text = doc.createElement("span");
-    text.textContent = target ? `Superseded by ${lastSegment(target)}` : "Superseded";
+    text.textContent = target ? `Superseded by ${input.targetInFolder === false ? target : lastSegment(target)}` : "Superseded";
     line.append(text);
     if (target) {
       const open = doc.createElement("button");
