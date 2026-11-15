@@ -689,7 +689,7 @@ const mcpHandler = createMcpHandler({
   },
 });
 
-let currentActions: ActionsFile = { version: 1, actions: [] };
+let currentActions: ActionsFile = { version: 2, actions: [] };
 let actionsError = false;
 let actionsPath = "";
 async function reloadActions(): Promise<void> {

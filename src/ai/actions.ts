@@ -21,7 +21,7 @@ export function runnableActions(settings: AISettings, saved: SavedAction[]): Run
       result: a.kind === "edit" ? "edit" as const : "answer" as const,
       input: "selection-or-note" as const, engine: null, feature: a.feature, panel: true,
     })),
-    ...saved,
+    ...saved.filter(a => !a.recipe),
   ];
 }
 

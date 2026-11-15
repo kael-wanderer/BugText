@@ -83,7 +83,7 @@ export function renderActions(host: HTMLElement, deps: ScreenDeps): void {
     form.append(row("my-actions", "Show in AI panel", null, toggle("Show in AI panel", a.panel, value => { a.panel = value; })));
     function validated(): SavedAction[] | null {
       const next = api!.getFile().actions.filter(x => x.id !== a.id); const index = api!.getFile().actions.findIndex(x => x.id === a.id); next.splice(index < 0 ? next.length : index, 0, a);
-      if (!parseActions(JSON.stringify({ version: 1, actions: next }))) { notice.textContent = "Enter a unique name (up to 60 characters) and an instruction (up to 8,000 characters)."; return null; } return next;
+      if (!parseActions(JSON.stringify({ version: 2, actions: next }))) { notice.textContent = "Enter a unique name (up to 60 characters) and an instruction (up to 8,000 characters)."; return null; } return next;
     }
     form.append(group(button("Try on selection", () => { if (validated()) api!.run(a); }), button("Cancel", () => { draft = null; draw(); }), button("Save", () => { const next = validated(); if (next) { draft = null; void persist(next); } }, "primary"))); page.append(form);
   }

@@ -4,7 +4,7 @@ import { renderActions } from "../settings-screen/page-ai-actions";
 import type { ScreenDeps } from "../settings-screen/screen";
 import type { ActionsFile } from "../ai/actions-store";
 import { DEFAULT_AI_SETTINGS } from "../ai/aisettings";
-function setup(initial: ActionsFile = { version: 1, actions: [] }) {
+function setup(initial: ActionsFile = { version: 2, actions: [] }) {
   let file = initial;
   const host = document.createElement("div");
   const save = vi.fn(async (next: ActionsFile) => { file = next; });
@@ -22,17 +22,17 @@ describe("Actions settings", () => {
     expect(ui.file().actions[0].name).toContain("<img"); expect(ui.host.querySelector("img")).toBeNull();
   });
   it("deletes and restores with Undo", async () => {
-    const ui = setup({ version: 1, actions: [action("one", "One")] }); ui.click("Delete");
+    const ui = setup({ version: 2, actions: [action("one", "One")] }); ui.click("Delete");
     await vi.waitFor(() => expect(ui.host.textContent).toContain("Deleted \"One\" · ")); ui.click("Undo");
     await vi.waitFor(() => expect(ui.file().actions).toHaveLength(1));
   });
   it("reorders on drag and drop", async () => {
-    const ui = setup({ version: 1, actions: [action("one", "One"), action("two", "Two")] });
+    const ui = setup({ version: 2, actions: [action("one", "One"), action("two", "Two")] });
     const rows = ui.host.querySelectorAll('[draggable="true"]'); rows[1].dispatchEvent(new Event("dragstart")); rows[0].dispatchEvent(new Event("drop", { cancelable: true }));
     await vi.waitFor(() => expect(ui.file().actions.map(a => a.id)).toEqual(["two", "one"]));
   });
   it("moves a row down onto the next row", async () => {
-    const ui = setup({ version: 1, actions: [action("one", "One"), action("two", "Two"), action("three", "Three")] });
+    const ui = setup({ version: 2, actions: [action("one", "One"), action("two", "Two"), action("three", "Three")] });
     const rows = ui.host.querySelectorAll('[draggable="true"]'); rows[0].dispatchEvent(new Event("dragstart")); rows[1].dispatchEvent(new Event("drop", { cancelable: true }));
     await vi.waitFor(() => expect(ui.file().actions.map(a => a.id)).toEqual(["two", "one", "three"]));
   });
