@@ -1,8 +1,10 @@
 export type ContextSent = {
   note?: { label: string; path: string; chars: number };
-  excerpts: { path: string; chars: number }[];
+  excerpts: { path: string; chars: number; superseded?: true }[];
   files: { name: string; chars?: number; pathOnly?: boolean }[];
   trimmed: number; action?: boolean;
+  /** Superseded notes folder search left out (spec 4.2). */
+  leftOut?: { path: string }[];
 };
 export function renderContextSent(value: unknown, open: (path: string) => void): HTMLElement | null {
   if (!value || typeof value !== "object") return null;
@@ -20,6 +22,8 @@ export function renderContextSent(value: unknown, open: (path: string) => void):
     for (const path of paths) { const link = document.createElement("button"); link.type = "button"; link.textContent = path; link.addEventListener("click", () => open(path)); li.append(link); }
   } else if (data.action) item("No folder excerpts (actions send only their input)");
   for (const file of data.files) if (file && typeof file.name === "string") item(`File · ${file.name}${file.pathOnly ? " (path only, CLI)" : typeof file.chars === "number" ? ` (${file.chars.toLocaleString("en-US")} chars)` : ""}`);
+  const leftOut = Array.isArray(data.leftOut) ? data.leftOut.filter(e => e && typeof e.path === "string").map(e => e.path.split("/").pop() ?? e.path) : [];
+  if (leftOut.length) item(`Left out ${leftOut.length} superseded ${leftOut.length === 1 ? "note" : "notes"}: ${leftOut.join(", ")}`);
   if (data.trimmed > 0) item(`trimmed to fit (−${data.trimmed.toLocaleString("en-US")} chars)`);
   if (!list.children.length) item("No document, folder excerpts or files");
   return details;

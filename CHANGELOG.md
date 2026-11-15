@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- AI folder search leaves out notes with `status: superseded`; Settings ▸ AI ▸ Context ▸ Include superseded notes sends them labelled `[superseded]`. The context record lists what was left out.
 - Mark as Superseded By… (palette, File menu, Explorer) sets `status` and `superseded_by` in one step. The Filter panel has Draft, Current and Superseded chips.
 - Document status: `status: draft | current | superseded` shows a chip on the tab and the properties card; Reading view shows "Superseded by … · Open" and "Review was due …" from `superseded_by` and `review_by`.
 - Capture while reading: select text in a Markdown note and choose Excerpt, Task, Ask AI or Copy link. An excerpt is saved as a quote with a link back to its heading, a task as a checklist line; both go to the note's companion notes file, today's daily note or a note you choose, remembered per folder. Text selected in Reading view is saved with Markdown characters escaped, so the saved quote reads exactly as selected. A note that is closed gets a Recovery snapshot first; an open one changes as one undo step. Edit menu: Save Excerpt… (⇧⌘E), Task from Selection…. Ask AI on text selected in Reading view sends the whole passage, even when its source has inline formatting.

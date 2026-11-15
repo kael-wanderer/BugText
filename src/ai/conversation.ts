@@ -13,7 +13,7 @@ export type AttachedFile =
   | { kind: "text"; name: string; content: string }
   | { kind: "image"; name: string; dataUrl: string };
 
-export type RetrievedChunk = { path: string; heading: string; text: string };
+export type RetrievedChunk = { path: string; heading: string; text: string; superseded?: true };
 
 function escapeAttribute(value: string): string {
   return value
@@ -62,12 +62,12 @@ export function buildMessages(options: {
     });
   }
   for (const chunk of options.retrieved ?? []) {
-    included.push(chars => { sent.excerpts.push({ path: chunk.path, chars }); });
+    included.push(chars => { sent.excerpts.push({ path: chunk.path, chars, ...(chunk.superseded ? { superseded: true as const } : {}) }); });
     const source = escapeAttribute(
       `${chunk.path}${chunk.heading ? `#${chunk.heading}` : ""}`,
     );
     blocks.push({
-      prefix: `<context source="${source}">\n`,
+      prefix: `<context source="${source}"${chunk.superseded ? ' status="superseded"' : ""}>\n`,
       content: sealBlockContent("context", chunk.text),
       suffix: "\n</context>",
     });

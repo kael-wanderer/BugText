@@ -268,6 +268,9 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     keywords: "context limit",
   },
   {
+    id: "context-superseded", page: "ai", sub: "context", label: "Include superseded notes", keywords: "superseded status replaced context",
+  },
+  {
     id: "context-files",
     page: "ai",
     label: "Folder search excerpts",

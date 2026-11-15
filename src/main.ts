@@ -950,6 +950,7 @@ function saveAISettingsFromPanel(settings: AISettings): void {
   if (disabledChat) setAIVisible(false);
   applyAIVisibility();
   aiPanel?.render();
+  refreshLifecycleBars();
   writeAISettings(settings);
 }
 
@@ -3268,6 +3269,7 @@ function buildAIPanel(): void {
     getWorkspaceContext: () => ({
       k: currentSettings.workspaceContextK,
     }),
+    isSuperseded: (path: string) => statusByPath.get(path) === "superseded",
     getActions: availableActions,
     runAction: runQuickActionById,
     windowLabel: nativeWindowLabel,
@@ -3772,8 +3774,8 @@ reviewListeners.push((snapshot, error) => {
 
 // Lifecycle bar (spec 4.1): superseded and review-due lines over a note in Reading view.
 const lifecycleBarKeys = new Map<string, string>();
-/** Settings ▸ AI ▸ Context ▸ Include superseded notes (Task 4). */
-const includeSuperseded = (): boolean => false;
+/** Settings ▸ AI ▸ Context ▸ Include superseded notes. */
+const includeSuperseded = (): boolean => currentAISettings.context.includeSuperseded;
 function refreshLifecycleBars(): void { for (const wid of views.keys()) void updateLifecycleBar(wid); }
 async function updateLifecycleBar(wid: string): Promise<void> {
   const view = views.get(wid);

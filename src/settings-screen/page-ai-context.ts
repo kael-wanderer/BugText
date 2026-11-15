@@ -1,4 +1,4 @@
-import { button, row, group, stepper } from "./controls";
+import { button, row, group, stepper, toggle } from "./controls";
 import type { ScreenDeps } from "./screen";
 export function renderContext(host: HTMLElement, deps: Pick<ScreenDeps, "getAISettings" | "getSettings" | "onAISettingsChange" | "onSettingsChange">): void {
   const patterns = document.createElement("div");
@@ -21,5 +21,6 @@ export function renderContext(host: HTMLElement, deps: Pick<ScreenDeps, "getAISe
   draw();
   host.append(row("context-exclude", "Never send to AI", "Patterns relative to the open folder. Not indexed, not offered by @, refused as attachments. A local CLI agent with folder access can still open these files itself.", patterns));
   host.append(row("context-files", "Folder search excerpts", "Added to each question while Folder search is on.", stepper({ ariaLabel: "Folder search excerpts", value: deps.getSettings().workspaceContextK, min: 1, max: 20, onChange: workspaceContextK => deps.onSettingsChange({ ...deps.getSettings(), workspaceContextK }) })));
+  host.append(row("context-superseded", "Include superseded notes", "Off: notes with status: superseded are left out of folder search. On: their excerpts are sent and marked [superseded].", toggle("Include superseded notes", deps.getAISettings().context.includeSuperseded, includeSuperseded => { const next = structuredClone(deps.getAISettings()); next.context.includeSuperseded = includeSuperseded; deps.onAISettingsChange(next); })));
   host.append(row("context-chars", "Maximum context characters", null, stepper({ ariaLabel: "Maximum context characters", value: deps.getAISettings().maxContextChars, min: 4000, max: 2000000, step: 1000, onChange: value => { const next = structuredClone(deps.getAISettings()); next.maxContextChars = value; deps.onAISettingsChange(next); } })));
 }
