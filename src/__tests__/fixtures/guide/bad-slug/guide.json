@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "product": "bugmind",
+  "title": "Fixture",
+  "groups": [
+    {
+      "title": "G",
+      "pages": [
+        {
+          "slug": "Cleanup/Page",
+          "title": "Page",
+          "summary": "Bad slug."
+        }
+      ]
+    }
+  ]
+}

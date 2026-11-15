@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "product": "bugtext",
+  "title": "BugText Guide",
+  "groups": [
+    {
+      "title": "Start Here",
+      "pages": [
+        { "slug": "start-here/what-is-bugtext", "title": "What is BugText?", "summary": "A one-minute tour: a fast Mac editor for Markdown notes, PDFs and code, with AI that stays under your control." },
+        { "slug": "start-here/install", "title": "Install BugText", "summary": "Drag BugText to Applications, open it past the Not Opened warning, and keep it updated." },
+        { "slug": "start-here/first-five-minutes", "title": "Your first five minutes", "summary": "Open a folder, write a first note with a preview beside it, and find anything with the command palette." }
+      ]
+    },
+    {
+      "title": "Recipes",
+      "pages": [
+        { "slug": "recipes/check-what-ai-changed", "title": "Check what an AI agent changed", "summary": "Let a coding agent work in your notes, then see every file it touched and review each change before you accept it." },
+        { "slug": "recipes/keep-a-web-page", "title": "Keep a web page as a note", "summary": "Import a page, read it, save the parts that matter and turn them into tasks." },
+        { "slug": "recipes/fix-a-pdf", "title": "Fix a PDF without another app", "summary": "Correct a typo, cover a line, sign or reorder pages in a PDF, with the original kept safe." }
+      ]
+    },
+    {
+      "title": "Write",
+      "pages": [
+        { "slug": "writing/editor-basics", "title": "Editor basics", "summary": "View modes, the format bar, checklists, tables, pasted images and saving." },
+        { "slug": "writing/markdown-extras", "title": "Diagrams, callouts and more", "summary": "Mermaid diagrams, math, callouts, footnotes and code blocks in the preview." },
+        { "slug": "writing/templates-and-daily-notes", "title": "Templates and daily notes", "summary": "Start notes from templates or note types, keep a daily note, and jot a line with Quick Note." },
+        { "slug": "writing/focus-and-goals", "title": "Focus, goals and spelling", "summary": "Write in focus mode, set a word goal, and let macOS check your spelling." },
+        { "slug": "writing/present", "title": "Present a note", "summary": "Show a Markdown note as slides with speaker notes and a presenter window." },
+        { "slug": "writing/export", "title": "Export and citations", "summary": "Save a note as PDF, Word or an image, with presets and citations from your reference library." }
+      ]
+    },
+    {
+      "title": "Notes and folders",
+      "pages": [
+        { "slug": "notes/folders-and-workspaces", "title": "Folders, windows and workspaces", "summary": "Work in a folder of notes, split the window, open more windows, and save layouts as workspaces." },
+        { "slug": "notes/search-and-replace", "title": "Search and replace", "summary": "Find in a note, find in the whole folder, filter by tag or property, and replace across files safely." },
+        { "slug": "notes/links-and-graph", "title": "Links, bookmarks and graph", "summary": "Link notes to each other, see backlinks and unlinked mentions, jump with bookmarks, and look at the graph." },
+        { "slug": "notes/properties-and-tasks", "title": "Properties, tasks and status", "summary": "Give notes properties and a status, track tasks across a folder, and see a project at a glance." },
+        { "slug": "notes/import", "title": "Import a web page, Word or CSV", "summary": "Turn a web page, a Word document or a CSV file into a Markdown note that remembers where it came from." },
+        { "slug": "notes/history-and-git", "title": "History, recovery and Git", "summary": "Get back unsaved work after a crash, restore an older version, and commit to Git without leaving the app." }
+      ]
+    },
+    {
+      "title": "Read and review",
+      "pages": [
+        { "slug": "reading/capture", "title": "Capture while reading", "summary": "Save an excerpt or a task from what you are reading, with a link back to the exact passage." },
+        { "slug": "reading/review-queue", "title": "Review queue", "summary": "See which notes changed outside your own editing, what changed in each, and mark them reviewed." }
+      ]
+    },
+    {
+      "title": "PDFs",
+      "pages": [
+        { "slug": "pdf/read-and-annotate", "title": "Read and annotate PDFs", "summary": "Read, search, highlight and comment on PDFs, and send your highlights to a note." },
+        { "slug": "pdf/edit-pdf", "title": "Edit a PDF", "summary": "Add or replace text, cover parts of a page, recognise scanned text, and reorder pages." }
+      ]
+    },
+    {
+      "title": "AI",
+      "pages": [
+        { "slug": "ai/set-up-ai", "title": "Set up AI", "summary": "Connect a coding CLI or an API provider, and choose which engine each AI feature uses." },
+        { "slug": "ai/chat", "title": "Chat with your notes", "summary": "Ask about the open note or the whole folder, attach files, and apply answers as reviewed edits." },
+        { "slug": "ai/actions-and-recipes", "title": "Quick actions and recipes", "summary": "Proofread or rewrite in one step, save your own actions, and turn repeated jobs into recipes." },
+        { "slug": "ai/mcp-server", "title": "Connect an AI agent", "summary": "Let Claude Code or Codex read and edit your notes through BugText's MCP server." }
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        { "slug": "reference/settings", "title": "Settings", "summary": "What each Settings page controls: General, Editing, Export, Git, Themes, Shortcuts and AI." },
+        { "slug": "reference/keyboard-shortcuts", "title": "Keyboard shortcuts", "summary": "The default keys for files, views, writing and navigation, and how to change them." },
+        { "slug": "reference/privacy", "title": "Privacy", "summary": "Your notes stay on your Mac. What BugText sends over the network, and only when you ask it to." },
+        { "slug": "reference/troubleshooting", "title": "Troubleshooting", "summary": "Fixes for the Not Opened warning, Keychain prompts, missing export tools and other common problems." }
+      ]
+    }
+  ]
+}

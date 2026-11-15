@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "product": "bugmind",
+  "title": "Fixture",
+  "groups": [
+    {
+      "title": "G",
+      "pages": [
+        {
+          "slug": "a/one",
+          "title": "One",
+          "summary": "The first page."
+        }
+      ]
+    },
+    {
+      "title": "H",
+      "pages": [
+        {
+          "slug": "b/two",
+          "title": "Two",
+          "summary": "The second page."
+        }
+      ]
+    }
+  ],
+  "redirects": {
+    "a/old": "a/one"
+  }
+}
