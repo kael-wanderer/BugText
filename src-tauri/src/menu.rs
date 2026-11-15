@@ -386,6 +386,8 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .build()?;
 
     let help = MenuItemBuilder::with_id("help.guide", "BugText Help").build(app)?;
+    let online_guide =
+        MenuItemBuilder::with_id("help.online_guide", "BugText Guide Online").build(app)?;
     let check_updates =
         MenuItemBuilder::with_id("help.check_updates", "Check for Updates…").build(app)?;
     let automatic_updates =
@@ -393,6 +395,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .build(app)?;
     let help_menu = SubmenuBuilder::new(app, "Help")
         .item(&help)
+        .item(&online_guide)
         .separator()
         .item(&check_updates)
         .item(&automatic_updates)

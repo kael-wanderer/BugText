@@ -225,6 +225,8 @@ import { createWindowView, type WindowView } from "./windowview";
 import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert";
 import { createNoteImages } from "./note-images";
 import { showToast } from "./toast";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { GUIDE_BASE_URL } from "./guide/guideLinks";
 import { createTemplateActions } from "./templates/actions";
 import { templatesFolder } from "./templates/library";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
@@ -1037,6 +1039,7 @@ function commandItems(): PaletteItem[] {
     command("historySnapshot", "Snapshot Now", snapshotActiveDocument),
     command("historyShow", "Show Version History", showActiveHistory),
     command("help", "BugText Help", openHelp),
+    command("help.online_guide", "BugText Guide Online", () => void openOnlineGuide()),
     ...availableActions().map((action) =>
       command(action.id, `AI: ${action.name}`, () =>
         runQuickActionById(action.id),
@@ -2852,6 +2855,14 @@ function openHelp(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "BugText Help", text: helpDoc });
 }
 
+async function openOnlineGuide(): Promise<void> {
+  try {
+    await openUrl(GUIDE_BASE_URL);
+  } catch {
+    showToast(`Could not open the browser. The guide is at ${GUIDE_BASE_URL}`, 8000);
+  }
+}
+
 let renameNotes: IndexedNote[] = [];
 function handleExplorerPathChange(from: string, to: string | null): void {
   const folder = getState().folder;
@@ -4644,6 +4655,8 @@ listenScoped<string>("menu", (event) => {
       return void setAsDefault("pdf");
     case "help.guide":
       return openHelp();
+    case "help.online_guide":
+      return void openOnlineGuide();
     case "help.check_updates":
       return void checkForUpdates();
     case "help.automatic_updates":
