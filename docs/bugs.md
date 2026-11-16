@@ -51,6 +51,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-043 | 2026-11-14 | Windows | Minor | REV-16 (28-review-queue) | New windows open on the primary display, not on the display of the window they came from | open |
 | BUG-044 | 2026-11-14 | Review queue | Minor | REV-08 (28-review-queue) | Hovering a queue row shows its buttons inside the row, which makes it taller and moves the rows below | open |
 | BUG-045 | 2026-11-14 | AI panel / run card | Minor | REV-03 (28-review-queue) | The "+ new-file" line in a run's changed-files card is dark green on the dark panel and hard to read | open |
+| BUG-046 | 2026-11-16 | Updates | Major | Code review (Bugler update parity) | A new build of the running version was never offered: the app compared the feed's `0.4.0-build.254` with a bare `0.4.0` | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -412,3 +413,15 @@ Copy this template for each new bug:
 - **Notes:** Not investigated.
 - **Status:** open.
 
+### BUG-046 — New builds of the running version were never offered
+
+- **Feature / test case:** Update check (Settings ▸ General, Help ▸ Check for Updates…)
+- **Severity:** Major
+- **Environment:** macOS, 0.4.0 (build 253)
+- **Steps to reproduce:**
+  1. Publish `{"version":"0.4.0-build.254", ...}` in the kael.io.vn feed.
+  2. In 0.4.0 (build 253), check for updates.
+- **Expected:** Build 254 is offered.
+- **Actual:** "BugText 0.4.0 is the latest version." The app compared against `0.4.0` without its build, and a release outranks its own prereleases, so no build of the running version could ever be newer.
+- **Notes:** Fixed by comparing the running build as `<version>-build.<bundleVersion>` (`appFeedVersion` in `src/updater.ts`), as Bugler does. Merged 1bb8cfb.
+- **Status:** fixed (unreleased).
