@@ -41,7 +41,7 @@ beforeEach(() => {
     getModelsCache: () => ({}),
     onOpenSettingsFile: vi.fn(),
     onOpenAISettingsFile: vi.fn(),
-    onCheckForUpdates: vi.fn(),
+    
     getActiveTabName: () => null,
     getAppVersion: async () => "1",
     setDockIcon: async () => {},

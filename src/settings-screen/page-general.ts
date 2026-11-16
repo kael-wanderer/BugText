@@ -3,7 +3,46 @@ import { button, caption, group, pageHeader, row, segmented, toggle, stepper } f
 import { fontPicker } from "./fonts";
 import { defaultZoneSize } from "./page-editing";
 import { DEFAULT_SETTINGS, type Settings } from "../settings";
-import type { SettingsPage } from "./screen";
+import { updateButtonLabel, updateStatusText } from "../updater";
+import type { ScreenDeps, SettingsPage } from "./screen";
+
+/**
+ * Check for updates, answered in the row itself: the button follows the check
+ * (Check Now, Checking…, Retry, Download <version>) and the line under the label
+ * says what was found. Opening the page checks when the last answer is stale.
+ */
+function updatesRow(deps: ScreenDeps, version: HTMLElement): HTMLElement {
+  const updates = deps.updates;
+  const action = button("Check Now", () => {
+    const state = updates?.check.state();
+    if (state?.kind === "update" && state.releaseUrl) updates?.openRelease(state.releaseUrl);
+    else void updates?.check.check();
+  });
+  const node = row("check-updates", "Check for updates", null, group(version, action));
+  const status = document.createElement("p");
+  status.className = "st-note";
+  status.setAttribute("role", "status");
+  node.querySelector(".st-row-text")?.append(status);
+  if (!updates) {
+    action.disabled = true;
+    return node;
+  }
+  const paint = (): void => {
+    const state = updates.check.state();
+    action.textContent = updateButtonLabel(state);
+    action.disabled = state.kind === "checking";
+    action.classList.toggle("primary", state.kind === "update" && Boolean(state.releaseUrl));
+    status.textContent = updateStatusText(state) ?? "";
+    status.hidden = !status.textContent;
+    status.classList.toggle("st-note-error", state.kind === "failed");
+  };
+  updates.check.onChange(() => {
+    if (node.isConnected) paint();
+  });
+  paint();
+  updates.check.checkIfStale();
+  return node;
+}
 
 export const generalPage: SettingsPage = {
   id: "general",
@@ -69,7 +108,7 @@ export const generalPage: SettingsPage = {
       row(
         "update-mode",
         "Update checks",
-        "Automatic checks at most once a day. A new version opens its download page.",
+        "Automatic checks run at most once a day and announce a new version once.",
         segmented(
           "Update checks",
           [
@@ -91,13 +130,8 @@ export const generalPage: SettingsPage = {
         version.textContent = `Version ${v}`;
       })
       .catch(() => {});
+    host.append(updatesRow(deps, version));
     host.append(
-      row(
-        "check-updates",
-        "Check for updates",
-        null,
-        group(version, button("Check Now", () => deps.onCheckForUpdates())),
-      ),
       caption("Settings files"),
       row(
         "settings-files",

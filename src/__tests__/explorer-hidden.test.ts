@@ -50,7 +50,7 @@ describe("General page", () => {
       onSettingsChange: (next: Settings) => { settings = next; },
       getAppVersion: async () => "test",
       isMac: false,
-      onCheckForUpdates: vi.fn(), onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
+      onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
     } as unknown as ScreenDeps;
     const host = document.createElement("div");
     generalPage.render(host, deps);

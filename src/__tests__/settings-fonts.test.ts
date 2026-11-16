@@ -92,7 +92,7 @@ describe("typography pages", () => {
       onSettingsChange: (next: Settings) => { settings = next; },
       getAppVersion: async () => "test",
       isMac: false,
-      onCheckForUpdates: vi.fn(), onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
+      onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
       openPage: vi.fn(),
     } as unknown as ScreenDeps;
   });

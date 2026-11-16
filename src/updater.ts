@@ -1,13 +1,10 @@
-import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
-import { confirm, message } from "@tauri-apps/plugin-dialog";
-import { openUrl } from "@tauri-apps/plugin-opener";
-
 // Updates are offered, never installed: the hosted feed names the newest
 // version and its download page, and a newer version opens that page in the
-// browser.
+// browser. Settings ▸ General shows the answer inline; the automatic daily
+// check announces a version once, with a notice, and never opens a dialog.
 
 const LAST_CHECK_KEY = "bugtext.updater.lastCheck";
+const LAST_NOTIFIED_KEY = "bugtext.updater.lastNotified";
 export const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export type UpdateFeed = { version: string; releaseUrl: string | null };
@@ -75,67 +72,166 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-function readLastCheck(): number | null {
+/**
+ * The version the feed is compared against. The build number becomes a numeric
+ * prerelease (`0.4.0-build.254`), so builds of one version order by build and a
+ * new build is offered even when the version is unchanged. The feed publishes
+ * the same shape; a bare `0.4.0` would outrank every build of itself.
+ */
+export function appFeedVersion(version: string, build: string | null): string {
+  const core = version.trim() || "0";
+  const number = build?.trim() ?? "";
+  return /^\d+$/.test(number) ? `${core}-build.${Number(number)}` : core;
+}
+
+export type UpdateStatus =
+  | { kind: "up-to-date" }
+  | { kind: "update"; version: string; releaseUrl: string | null }
+  | { kind: "failed"; message: string };
+
+export type UpdateSource = {
+  fetchFeed(): Promise<string>;
+  currentVersion(): Promise<string>;
+};
+
+/** One check against the feed. Never throws: a failure is a status. */
+export async function fetchUpdateStatus(source: UpdateSource): Promise<UpdateStatus> {
+  let body: string;
   try {
-    const value = Number(localStorage.getItem(LAST_CHECK_KEY));
-    return Number.isFinite(value) && value > 0 ? value : null;
+    body = await source.fetchFeed();
+  } catch (error) {
+    const text = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+    return { kind: "failed", message: text || "Could not reach the update server. Check your connection." };
+  }
+  const feed = parseUpdateFeed(body);
+  if (!feed) return { kind: "failed", message: "The update feed could not be read, so no version was compared." };
+  const current = await source.currentVersion();
+  return compareVersions(feed.version, current) > 0
+    ? { kind: "update", version: feed.version, releaseUrl: feed.releaseUrl }
+    : { kind: "up-to-date" };
+}
+
+/** A feed version for people: `0.4.0-build.254` reads as `0.4.0 (254)`. */
+export function displayVersion(version: string): string {
+  const match = /^v?(\d+\.\d+\.\d+)-build\.(\d+)$/.exec(version);
+  return match ? `${match[1]} (${match[2]})` : version;
+}
+
+export type UpdateCheckState = { kind: "idle" } | { kind: "checking" } | UpdateStatus;
+
+/** What the Settings button says in each state. A failure says Retry, never "up to date". */
+export function updateButtonLabel(state: UpdateCheckState): string {
+  switch (state.kind) {
+    case "checking": return "Checking…";
+    case "failed": return "Retry";
+    case "up-to-date": return "Check Again";
+    case "update": return state.releaseUrl ? `Download ${displayVersion(state.version)}` : "Check Again";
+    default: return "Check Now";
+  }
+}
+
+/** The line under the Settings row, or null when the button says enough. */
+export function updateStatusText(state: UpdateCheckState): string | null {
+  switch (state.kind) {
+    case "failed": return state.message;
+    case "up-to-date": return "BugText is up to date.";
+    case "update":
+      return state.releaseUrl
+        ? `BugText ${displayVersion(state.version)} is available.`
+        : `BugText ${displayVersion(state.version)} is available, but the feed names no download page.`;
+    default: return null;
+  }
+}
+
+/** Results older than this are checked again when Settings ▸ General opens. */
+export const UPDATE_RESULT_FRESH_MS = 5 * 60 * 1000;
+
+/**
+ * The Settings check: one state shared by every render of the page, so a page
+ * rebuilt by another setting shows the same answer instead of checking again.
+ */
+export type UpdateCheck = {
+  state(): UpdateCheckState;
+  /** Checks now unless a check is running. */
+  check(): Promise<void>;
+  /** Checks when nothing was checked yet or the answer is stale. */
+  checkIfStale(): void;
+  /** One listener: the page that is on screen. */
+  onChange(listener: (() => void) | null): void;
+};
+
+export function createUpdateCheck(source: UpdateSource, now: () => number = Date.now): UpdateCheck {
+  let state: UpdateCheckState = { kind: "idle" };
+  let checkedAt = 0;
+  let listener: (() => void) | null = null;
+  const set = (next: UpdateCheckState): void => {
+    state = next;
+    listener?.();
+  };
+  const check = async (): Promise<void> => {
+    if (state.kind === "checking") return;
+    set({ kind: "checking" });
+    const result = await fetchUpdateStatus(source);
+    checkedAt = now();
+    set(result);
+  };
+  return {
+    state: () => state,
+    check,
+    checkIfStale() {
+      if (state.kind === "checking") return;
+      if (state.kind === "idle" || now() - checkedAt >= UPDATE_RESULT_FRESH_MS) void check();
+    },
+    onChange(next) {
+      listener = next;
+    },
+  };
+}
+
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function recordCheck(now = Date.now()): void {
+function writeStored(key: string, value: string): void {
   try {
-    localStorage.setItem(LAST_CHECK_KEY, String(now));
+    localStorage.setItem(key, value);
   } catch {
     // Without storage the next automatic check simply comes sooner.
   }
 }
 
-export async function checkForUpdates(interactive = true): Promise<void> {
-  recordCheck();
-  try {
-    const feed = parseUpdateFeed(await invoke<string>("update_feed_fetch"));
-    if (!feed) throw new Error("The update feed could not be read, so no version was compared.");
-    const current = await getVersion();
-    if (compareVersions(feed.version, current) <= 0) {
-      if (interactive) {
-        await message(`BugText ${current} is the latest version.`, {
-          title: "Check for Updates",
-          kind: "info",
-        });
-      }
-      return;
-    }
-    if (!feed.releaseUrl) {
-      await message(`BugText ${feed.version} is available. You have ${current}.`, {
-        title: "Update Available",
-        kind: "info",
-      });
-      return;
-    }
-    const accepted = await confirm(
-      `BugText ${feed.version} is available. You have ${current}.\n\nOpen the download page?`,
-      { title: "Update Available", kind: "info", okLabel: "Download", cancelLabel: "Later" },
-    );
-    if (accepted) await openUrl(feed.releaseUrl);
-  } catch (error) {
-    if (interactive) {
-      await message(error instanceof Error ? error.message : String(error), {
-        title: "Unable to Check for Updates",
-        kind: "error",
-      });
-    }
-  }
+function readLastCheck(): number | null {
+  const value = Number(readStored(LAST_CHECK_KEY));
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-export function startDailyUpdateChecks(isEnabled: () => boolean): () => void {
-  const run = (): void => {
-    if (shouldCheckForUpdates(isEnabled(), readLastCheck())) {
-      void checkForUpdates(false);
-    }
+/** True when this version was not announced yet; records it as announced. */
+export function claimUpdateNotice(version: string): boolean {
+  if (readStored(LAST_NOTIFIED_KEY) === version) return false;
+  writeStored(LAST_NOTIFIED_KEY, version);
+  return true;
+}
+
+/**
+ * Automatic checks: at launch and hourly, each at most once a day. A newer
+ * version is announced once through `notify`; failures stay silent.
+ */
+export function startDailyUpdateChecks(
+  isEnabled: () => boolean,
+  source: UpdateSource,
+  notify: (update: { version: string; releaseUrl: string | null }) => void,
+): () => void {
+  const run = async (): Promise<void> => {
+    if (!shouldCheckForUpdates(isEnabled(), readLastCheck())) return;
+    writeStored(LAST_CHECK_KEY, String(Date.now()));
+    const status = await fetchUpdateStatus(source);
+    if (status.kind === "update" && claimUpdateNotice(status.version)) notify(status);
   };
-  run();
-  const timer = window.setInterval(run, 60 * 60 * 1000);
-  return () => window.clearInterval(timer);
+  void run();
+  const timer = globalThis.setInterval(() => void run(), 60 * 60 * 1000);
+  return () => globalThis.clearInterval(timer);
 }

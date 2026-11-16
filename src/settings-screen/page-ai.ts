@@ -15,7 +15,7 @@ export type AiPageDeps = {
 export const aiPage: SettingsPage = {
   id: "ai",
   render(host, deps, sub = "use-for") {
-    pageHeader(host, "ai");
+    pageHeader(host, "ai", sub);
     if (sub === "use-for" || sub === "context" || sub === "actions") {
       const section = document.createElement("div");
       host.append(section);
