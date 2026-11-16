@@ -7,6 +7,8 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- Each Settings page has a Guide link next to its title that opens the guide page explaining it (AI ▸ Actions and AI ▸ MCP open their own pages). The guide test checks every linked page is published.
+- Settings ▸ General ▸ Check for updates answers in the row: Checking…, up to date, Retry with the reason a check failed, or Download <version> opening the download page. Opening the page checks again when the last answer is older than five minutes. Help ▸ Check for Updates… opens this row instead of a dialog.
 - Help ▸ BugText Guide Online (also in the palette) opens the user guide at kael.io.vn/projects/bugtext/docs in the browser; HELP.md links to it too. The guide pages carry screenshots.
 - User guide: 30 pages in `docs/guide/` (Start Here, Recipes, Write, Notes and folders, Read and review, PDFs, AI, Reference), published by kael.io.vn at `/projects/bugtext/docs`. `npm run test` checks it: every listed page exists, frontmatter matches `guide.json`, links and images resolve, no HTML but `<kbd>`, and every slug in `published-slugs.txt` still answers.
 - File ▸ Import: Web Page…, Word Document… and CSV… (also in the palette) turn a web page, a `.docx` or a `.csv` into a new note with `source`, `imported_at` and `source_digest` properties. Web pages are fetched over https only from public addresses, cleaned of scripts, navigation and page chrome, and converted by Pandoc; tables whose cells hold paragraphs or lists become plain paragraphs instead of being dropped; images stay linked to the web. Word images are copied into the images folder; the original Word or CSV file is copied to `<images folder>/originals/` and linked from the note. A CSV up to 500 rows and 50 columns becomes a table. Importing the same address or file again offers to open the earlier note. Needs `brew install pandoc` (Word documents need Pandoc 3.1.6 or later).
@@ -73,10 +75,12 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Changed
+- Automatic update checks announce a new version once, as a notice with Download, instead of a dialog at launch.
 - Builds are signed with the stable local identity "BugText Local Dev" (`npm run build:app`, which sets `APPLE_SIGNING_IDENTITY`), so after an update the macOS Keychain keeps "Always Allow" for saved API keys instead of asking for the login password again. The first build signed this way asks once per saved key.
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Update checks compared the feed's `0.4.0-build.254` with a bare `0.4.0`, so no build of the running version was ever offered. The running build now compares as `<version>-build.<build>`.
 - Settings: the General page's note about PDF zoom and the Check again buttons on the Export and Git pages sat at the left edge of the window, outside the settings column. They now line up with the rest of the page (Check again at the right, like other buttons).
 - Settings ▸ AI ▸ Context: Include superseded notes now describes the tag as it is sent (`status="superseded"`), not as `[superseded]`.
 - Reading view: a `superseded_by` that is not a note in the folder, such as a web address, shows in full ("Superseded by https://example.com/x.md") instead of only its last part.

@@ -50,9 +50,9 @@ Choose **BugText** ▸ **Set BugText as Default** ▸ **As Markdown Editor** (or
 
 ### Keep BugText up to date
 
-- Choose **Help** ▸ **Check for Updates…** to check now.
-- Turn on **Help** ▸ **Automatically Check for Updates** (also in Settings ▸ General) to check at most once a day.
-- When a newer version exists, BugText offers to open its download page in your browser. Download the new disk image and drag BugText into Applications again, replacing the old copy. Your settings, notes and saved API keys are kept.
+- Choose **Help** ▸ **Check for Updates…** to check now. Settings ▸ General opens and the **Check for updates** row shows the answer.
+- Turn on **Help** ▸ **Automatically Check for Updates** (also in Settings ▸ General) to check at most once a day. A notice appears once for each new version.
+- When a newer version exists, the button reads **Download** and the version, and opens its download page in your browser. Download the new disk image and drag BugText into Applications again, replacing the old copy. Your settings, notes and saved API keys are kept.
 
 ## What it will not do
 

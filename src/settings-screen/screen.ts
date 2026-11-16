@@ -67,7 +67,10 @@ export type ScreenDeps = AiPageDeps & {
   onOpenSettingsFile: () => void;
   onManageWorkspaces?: () => void;
   onOpenAISettingsFile: () => void;
-  onCheckForUpdates: () => void;
+  /** Opens one page of the online guide, by its slug. */
+  onOpenGuide?: (slug: string) => void;
+  /** Settings ▸ General's update check; absent where the app cannot be reached. */
+  updates?: { check: import("../updater").UpdateCheck; openRelease(url: string): void };
   /** Template folder helpers; absent in contexts that cannot reach the app. */
   templates?: {
     resolveFolder: (custom: string) => Promise<string>;
@@ -133,6 +136,11 @@ export function createSettingsScreen(
   const pane = document.getElementById("settings-pane")!;
   const gear = document.getElementById("ab-settings");
   pane.tabIndex = -1;
+  // Each page header's Guide link carries its slug; one listener opens them all.
+  pane.addEventListener("click", (event) => {
+    const link = (event.target as Element | null)?.closest?.<HTMLElement>("[data-guide]");
+    if (link && pane.contains(link)) deps.onOpenGuide?.(link.dataset.guide ?? "");
+  });
 
   let open = false;
   let query = "";

@@ -33,7 +33,7 @@ function statusText(status: ReturnType<McpPageDeps["getStatus"]>): string {
 
 export function renderMcpPage(host: HTMLElement, deps: McpPageDeps): void {
   host.replaceChildren();
-  pageHeader(host, "ai");
+  pageHeader(host, "ai", "mcp");
   const page = document.createElement("div");
   page.className = "st-mcp-page";
   page.append(caption("MCP SERVER"));

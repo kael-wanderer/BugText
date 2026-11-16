@@ -224,10 +224,15 @@ also shows the file type, cursor line/column, and word count where applicable.
 
 ## Updates
 
-Choose **Help → Check for Updates…** for a manual check. Enable automatic checks
-from Settings → General → Update checks or **Help → Automatically Check for Updates**.
-BugText checks at most once per 24 hours. When a newer version exists it offers to open
-the download page in your browser; it never installs anything itself.
+Choose **Help → Check for Updates…** for a manual check: Settings → General opens and
+the Check for updates row shows the answer. When a newer version exists the button
+reads **Download <version>** and opens the download page in your browser; it never
+installs anything itself. Enable automatic checks from Settings → General → Update
+checks or **Help → Automatically Check for Updates**. BugText then checks at most once
+per 24 hours and shows a notice once for each new version.
+
+Each Settings page has a **Guide** link at the top that opens the matching page of the
+online guide.
 
 ## Export
 

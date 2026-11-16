@@ -1,7 +1,8 @@
 // Shared DOM builders for settings pages. Every user-visible string is set
 // through textContent / value, never through innerHTML.
 
-import { PAGE_LEDES, SETTINGS_PAGES, type SettingsPageId } from "./registry";
+import { settingsGuideSlug } from "../guide/guideLinks";
+import { PAGE_LEDES, SETTINGS_PAGES, type AiSubPage, type SettingsPageId } from "./registry";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -10,10 +11,19 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return node;
 }
 
-/** Page title (h2) and lede for a settings page. */
-export function pageHeader(host: HTMLElement, page: SettingsPageId): void {
+/**
+ * Page title (h2), a link to the guide page that explains it, and the lede.
+ * The link only carries its slug; the settings screen opens it.
+ */
+export function pageHeader(host: HTMLElement, page: SettingsPageId, sub?: AiSubPage): void {
   const label = SETTINGS_PAGES.find((p) => p.id === page)?.label ?? page;
-  host.append(el("h2", "st-title", label), el("p", "st-lede", PAGE_LEDES[page]));
+  const head = el("div", "st-title-row");
+  const guide = el("button", "st-guide-link", "Guide");
+  guide.type = "button";
+  guide.dataset.guide = settingsGuideSlug(page, sub);
+  guide.title = `Open the BugText Guide on ${label}`;
+  head.append(el("h2", "st-title", label), guide);
+  host.append(head, el("p", "st-lede", PAGE_LEDES[page]));
 }
 
 /** Uppercase section caption. */

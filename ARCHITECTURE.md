@@ -386,10 +386,20 @@ are remapped. Copy and extraction write separately and leave the source untouche
 
 Update checks read `https://kael.io.vn/projects/bugtext/latest.json`
 (`{version, release_url}`), fetched in Rust (`update_feed.rs`, the host sends no
-CORS headers). A newer semantic version offers to open the `https` release page in
-the browser; the app never downloads or installs itself, so there is no updater
-plugin or signing key. Settings ▸ General offers Manual (no background checks) and
-Automatic (at most once per 24 hours).
+CORS headers). The running build is compared as `<version>-build.<bundleVersion>`
+(`appFeedVersion` in `updater.ts`), so a new build of an unchanged version is offered;
+the feed publishes the same shape. The app never downloads or installs itself, so
+there is no updater plugin or signing key. Settings ▸ General ▸ Check for updates
+answers inline from one shared `UpdateCheck` (Check Now, Checking…, Retry with the
+reason, Download <version> opening the `https` release page) and re-checks on open
+when the answer is older than five minutes; Help ▸ Check for Updates… opens that page
+and checks. Manual means no background checks; Automatic checks at most once per 24
+hours and announces each new version once, as a toast with Download, never a dialog.
+
+Guide links: `src/guide/guideLinks.ts` maps each Settings page (and AI ▸ Actions,
+AI ▸ MCP) to a published guide slug. The page header's Guide link carries the slug
+in `data-guide`; the settings screen opens it in the browser. The guide test checks
+every linked slug against `docs/guide/published-slugs.txt`.
 
 Source Control finds the installed Git executable like export tools and runs only explicit
 user actions, with Rust-built arguments and an environment allowlist; BugText does not handle

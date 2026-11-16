@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, type Settings } from "../settings";
 import { themePage } from "../settings-screen/page-theme";
 import { generalPage } from "../settings-screen/page-general";
 import { restoreSettingFocus, settingFocusKey, type ScreenDeps } from "../settings-screen/screen";
+import { createUpdateCheck } from "../updater";
 
 let settings: Settings;
 let deps: ScreenDeps;
@@ -15,7 +16,7 @@ beforeEach(() => {
     onSettingsChange: (next: Settings) => { settings = next; },
     getAppVersion: async () => "test",
     isMac: false,
-    onCheckForUpdates: vi.fn(), onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
+    onOpenSettingsFile: vi.fn(), onOpenAISettingsFile: vi.fn(),
   } as unknown as ScreenDeps;
 });
 
@@ -141,4 +142,43 @@ it("leaves focus alone when it was outside any settings row", () => {
   expect(settingFocusKey(pane, document.body as unknown as Element)).toBeNull();
   expect(restoreSettingFocus(pane, null)).toBe(false);
   expect(restoreSettingFocus(pane, { setting: "no-such-row", index: 0 })).toBe(false);
+});
+
+it("every settings page header links to its guide page", () => {
+  const host = document.createElement("div");
+  themePage.render(host, deps);
+  const link = host.querySelector<HTMLButtonElement>("[data-guide]")!;
+  expect(link.textContent).toBe("Guide");
+  expect(link.dataset.guide).toBe("reference/settings");
+});
+
+it("General answers the update check in its row and opens the download page", async () => {
+  const openRelease = vi.fn();
+  const check = createUpdateCheck({
+    fetchFeed: async () => JSON.stringify({ version: "0.4.0-build.254", release_url: "https://kael.io.vn/api/download/releases/x" }),
+    currentVersion: async () => "0.4.0-build.253",
+  });
+  deps = { ...deps, updates: { check, openRelease } } as ScreenDeps;
+  const host = document.createElement("div");
+  document.body.append(host);
+  generalPage.render(host, deps);
+  const row = host.querySelector('[data-setting="check-updates"]')!;
+  const action = Array.from(row.querySelectorAll("button")).pop()!;
+  await vi.waitFor(() => expect(action.textContent).toBe("Download 0.4.0 (254)"));
+  expect(row.querySelector('[role="status"]')!.textContent).toBe("BugText 0.4.0 (254) is available.");
+  action.dispatchEvent(new Event("click"));
+  expect(openRelease).toHaveBeenCalledWith("https://kael.io.vn/api/download/releases/x");
+  host.remove();
+});
+
+it("General shows a failed check as Retry with the reason", async () => {
+  const check = createUpdateCheck({ fetchFeed: () => Promise.reject("The update server did not answer in time."), currentVersion: async () => "0.4.0" });
+  deps = { ...deps, updates: { check, openRelease: vi.fn() } } as ScreenDeps;
+  const host = document.createElement("div");
+  document.body.append(host);
+  generalPage.render(host, deps);
+  const row = host.querySelector('[data-setting="check-updates"]')!;
+  await vi.waitFor(() => expect(Array.from(row.querySelectorAll("button")).pop()!.textContent).toBe("Retry"));
+  expect(row.querySelector('[role="status"]')!.textContent).toBe("The update server did not answer in time.");
+  host.remove();
 });

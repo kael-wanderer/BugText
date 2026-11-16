@@ -21,7 +21,7 @@ Leave with <kbd>Esc</kbd>, <kbd>⌘</kbd> <kbd>[</kbd>, the Back button or <kbd>
 - **Performance**: **Large folders** refreshes big folders less often.
 - **Review queue**: turn change tracking on or off. See [Review queue](../reading/review-queue.md).
 - **Session**: **Reopen workspace windows** at launch, and **Manage workspaces**.
-- **Updates**: Manual, or Automatic (at most once a day).
+- **Updates**: Manual, or Automatic (at most once a day, with a notice once per new version). **Check for updates** shows the answer in the row: up to date, the reason a check failed with **Retry**, or **Download** and the new version.
 - **Settings files**: open `settings.json` or `agent.json` as text.
 
 ### Editing

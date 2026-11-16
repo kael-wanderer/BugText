@@ -193,7 +193,7 @@ import { draftIdFor, type DraftRecord } from "./recovery-policy";
 import { completeSave, runSerialized, type SaveBinding } from "./save-binding";
 import { cleanText } from "./clean-text";
 import { showRecoveryReview } from "./recovery-review";
-import { checkForUpdates, startDailyUpdateChecks } from "./updater";
+import { appFeedVersion, createUpdateCheck, displayVersion, startDailyUpdateChecks, type UpdateSource } from "./updater";
 import {
   freshState,
   loadState,
@@ -226,7 +226,7 @@ import { dirOf, folderLabel, isImagePath, localImageLinks } from "./image-insert
 import { createNoteImages } from "./note-images";
 import { showToast } from "./toast";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { GUIDE_BASE_URL } from "./guide/guideLinks";
+import { guideUrl } from "./guide/guideLinks";
 import { createTemplateActions } from "./templates/actions";
 import { templatesFolder } from "./templates/library";
 import { readText } from "@tauri-apps/plugin-clipboard-manager";
@@ -2855,12 +2855,40 @@ function openHelp(): void {
   openInWindow(getState().activeWindowId, { path: null, name: "BugText Help", text: helpDoc });
 }
 
-async function openOnlineGuide(): Promise<void> {
+async function openOnlineGuide(slug = ""): Promise<void> {
+  const url = guideUrl(slug);
   try {
-    await openUrl(GUIDE_BASE_URL);
+    await openUrl(url);
   } catch {
-    showToast(`Could not open the browser. The guide is at ${GUIDE_BASE_URL}`, 8000);
+    showToast(`Could not open the browser. The guide is at ${url}`, 8000);
   }
+}
+
+// ---- Updates ----
+const updateSource: UpdateSource = {
+  fetchFeed: () => invoke<string>("update_feed_fetch"),
+  currentVersion: async () => {
+    const [version, build] = await Promise.all([
+      getVersion(),
+      invoke<string | null>("app_build").catch(() => null),
+    ]);
+    return appFeedVersion(version, build);
+  },
+};
+const updateCheck = createUpdateCheck(updateSource);
+
+async function openReleasePage(url: string): Promise<void> {
+  try {
+    await openUrl(url);
+  } catch {
+    showToast(`Could not open the browser. The download page is at ${url}`, 8000);
+  }
+}
+
+/** Help ▸ Check for Updates… shows the answer where Settings keeps it. */
+function checkForUpdatesNow(): void {
+  settingsScreen.open("general");
+  void updateCheck.check();
 }
 
 let renameNotes: IndexedNote[] = [];
@@ -3588,7 +3616,8 @@ const settingsScreen = createSettingsScreen(
       openFolder: () => templateActions.openTemplatesFolder(),
       newTemplate: () => templateActions.newTemplate(),
     },
-    onCheckForUpdates: () => void checkForUpdates(),
+    onOpenGuide: (slug) => void openOnlineGuide(slug),
+    updates: { check: updateCheck, openRelease: (url) => void openReleasePage(url) },
     getActiveTabName: () => activeMeta()?.name ?? null,
     getAppVersion: async () => {
       const [version, build] = await Promise.all([
@@ -4658,7 +4687,7 @@ listenScoped<string>("menu", (event) => {
     case "help.online_guide":
       return void openOnlineGuide();
     case "help.check_updates":
-      return void checkForUpdates();
+      return checkForUpdatesNow();
     case "help.automatic_updates":
       return toggleAutomaticUpdates();
   }
@@ -4934,7 +4963,11 @@ async function boot(): Promise<void> {
   await rescanClis();
   modelsCache = await loadModelsCache();
   if (isPrimaryNativeWindow) {
-    startDailyUpdateChecks(() => currentSettings.updateMode === "auto");
+    startDailyUpdateChecks(() => currentSettings.updateMode === "auto", updateSource, (update) => {
+      const text = `BugText ${displayVersion(update.version)} is available.`;
+      const url = update.releaseUrl;
+      showToast(text, 15000, url ? { label: "Download", run: () => void openReleasePage(url) } : undefined);
+    });
   }
 
   if (isPrimaryNativeWindow && currentSettings.restoreSession) {
