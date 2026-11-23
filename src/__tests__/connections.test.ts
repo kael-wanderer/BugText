@@ -61,6 +61,18 @@ it("redacts rejected keys", async () => {
     message: "The key was rejected.",
   });
 });
+it("says the key could not be read when none was sent (Keychain denied or empty)", async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  vi.mocked(invoke).mockResolvedValueOnce(null);
+  const f = vi.fn().mockResolvedValue(new Response("", { status: 401 }));
+  vi.stubGlobal("fetch", f);
+  expect(await listModels(c)).toEqual({
+    ok: false,
+    message:
+      "BugText could not read the API key for A. Allow BugText when macOS asks for the Keychain, or save the key again in Settings ▸ AI.",
+  });
+  expect(f.mock.calls[0][1].headers.Authorization).toBeUndefined();
+});
 it("uses native Anthropic discovery and authentication", async () => {
   const f = vi
     .fn()

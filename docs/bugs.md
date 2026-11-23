@@ -48,11 +48,13 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-040 | 2026-11-14 | Preview / Mermaid | Minor | — | A diagram with a syntax error left Mermaid's error graphic below the window and pushed the layout | fixed (unreleased) |
 | BUG-041 | 2026-11-14 | Tabs | Minor | REV runs (28-review-queue) | With more tabs than fit, the tab strip showed the first tabs while a later note was open; the active tab was scrolled out of view | fixed (unreleased) |
 | BUG-042 | 2026-11-14 | Windows | Major | REV-16 (28-review-queue) | A second window did not close from its close button | fixed (unreleased) |
-| BUG-043 | 2026-11-14 | Windows | Minor | REV-16 (28-review-queue) | New windows open on the primary display, not on the display of the window they came from | open |
-| BUG-044 | 2026-11-14 | Review queue | Minor | REV-08 (28-review-queue) | Hovering a queue row shows its buttons inside the row, which makes it taller and moves the rows below | open |
-| BUG-045 | 2026-11-14 | AI panel / run card | Minor | REV-03 (28-review-queue) | The "+ new-file" line in a run's changed-files card is dark green on the dark panel and hard to read | open |
+| BUG-043 | 2026-11-14 | Windows | Minor | REV-16 (28-review-queue) | New windows open on the primary display, not on the display of the window they came from | fixed (unreleased) |
+| BUG-044 | 2026-11-14 | Review queue | Minor | REV-08 (28-review-queue) | Hovering a queue row shows its buttons inside the row, which makes it taller and moves the rows below | fixed (unreleased) |
+| BUG-045 | 2026-11-14 | AI panel / run card | Minor | REV-03 (28-review-queue) | The "+ new-file" line in a run's changed-files card is dark green on the dark panel and hard to read | fixed (unreleased) |
 | BUG-046 | 2026-11-16 | Updates | Major | Code review (Bugler update parity) | A new build of the running version was never offered: the app compared the feed's `0.4.0-build.254` with a bare `0.4.0` | fixed (unreleased) |
 | BUG-047 | 2026-11-23 | Import | Major | Manual run (IMP) | Cancel could not stop a running import: Cancel was disabled while busy, and Esc closed the sheet but the import went on, reopened the sheet and created the note; a hanging Pandoc left "Converting…" forever | fixed (unreleased) |
+| BUG-048 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Denying BugText's Keychain request made chat say "The key was rejected." although no key was sent | fixed (unreleased) |
+| BUG-049 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Claude Code as the chat engine failed with "Failed to refresh OAuth token: can't save to the Keychain" inside the sandbox | open |
 
 > Delete the example row once real bugs are logged.
 
@@ -385,8 +387,8 @@ Copy this template for each new bug:
   2. File ▸ New Window (⇧⌘N).
 - **Expected:** The new window opens on the display of the window it came from.
 - **Actual:** It opens on the primary display, at (730, 323) in screen points.
-- **Notes:** Not investigated.
-- **Status:** open.
+- **Notes:** `create` in `native_windows.rs` centred every new window on the primary display. It now cascades 28 pt from the focused window and keeps the window inside that window's display (`cascade`, unit-tested). Checked on one display in build 255: the new window opened at (438, 116) beside its source at (410, 88). Not re-run on two displays (the Mac has one now).
+- **Status:** fixed (unreleased).
 
 ### BUG-044 — Hovering a review queue row moves the rows below
 
@@ -398,8 +400,8 @@ Copy this template for each new bug:
   2. Move the pointer over the first row.
 - **Expected:** The row shows Mark reviewed, Later and Dismiss without the list moving.
 - **Actual:** The buttons appear inside the row on a new line, the row grows, and every row below moves down; moving the pointer down the list keeps reflowing it, and a click aimed at a row can land on a different one.
-- **Notes:** Not investigated.
-- **Status:** open.
+- **Notes:** `.review-actions` switched from `display: none` to `display: flex` on hover, adding a line to the row. The buttons are now laid over the meta line (`position: absolute`, one line, `visibility` toggled), so the row keeps its height. Checked in build 255: rows below stay put on hover.
+- **Status:** fixed (unreleased).
 
 ### BUG-045 — Low-contrast new-file line on the AI run card
 
@@ -411,8 +413,8 @@ Copy this template for each new bug:
   2. Look at the run's "Changed N files" card.
 - **Expected:** Every file line is readable.
 - **Actual:** The "+ <file>" line for a created file is dark green on the dark panel and barely readable; the "~ <file>" line for an edited file is fine.
-- **Notes:** Not investigated.
-- **Status:** open.
+- **Notes:** the colours were fixed `#2e7d32` / `#c62828`, 2.2–3.3:1 on dark themes. Created files now use the theme's `--tok-string` (4.0–11:1 across all 20 themes) and deleted files a red mixed half with `--text`. Not seen in the app: the coding CLI could not run in the check (see BUG-049).
+- **Status:** fixed (unreleased).
 
 ### BUG-046 — New builds of the running version were never offered
 
@@ -439,3 +441,28 @@ Copy this template for each new bug:
 - **Actual:** Cancel was greyed out. Esc (or the header Close) closed the sheet, but the import kept running: when the fetch finished the sheet opened again with "Imported …" and the note was created. A Pandoc conversion that hung left "Converting…" with no way out.
 - **Notes:** `busy()` in `src/import/sheet.ts` disabled Cancel (as the plan asked), and nothing told the flow the sheet had closed; `show()` then opened a new sheet for the result. Fixed: the sheet records a close during progress as a cancel (`ImportUI.cancelled()`), stays closed, and `src/import/run.ts` stops before converting, before Pandoc and before creating the note. A Word import cancelled after its original was copied leaves that copy in `originals/`. Esc also did nothing while busy: replacing the sheet's content removed the focused field, so focus fell to the page outside the sheet's Escape handler; `busy()` now focuses Cancel. Pandoc runs under a 60-second limit (`run_limited` in `import_files.rs`). Verified in the signed build 255: Cancel and Esc during "Fetching the page…" close the sheet, and it stays closed after the fetch ends. Deferred minor 4 of the import review.
 - **Status:** fixed (unreleased).
+
+### BUG-048 — Denied Keychain access reported as a rejected key
+
+- **Feature / test case:** AI chat with an API connection that uses a key
+- **Severity:** Minor
+- **Environment:** macOS, signed build 255, omlx connection
+- **Steps to reproduce:**
+  1. With a new build, send a chat message; macOS asks for the login Keychain password.
+  2. Click Deny.
+- **Expected:** A message saying the key could not be read.
+- **Actual:** "The key was rejected." The refused read returns no key, the request goes out without one, the server answers 401, and the app blames the key.
+- **Notes:** `request` in `src/ai/connections.ts` now reports a 401 on a bearer connection sent without a key as "BugText could not read the API key for <name>…". A connection without a key still sends its request, since some local servers need none.
+- **Status:** fixed (unreleased).
+
+### BUG-049 — Claude Code cannot refresh its sign-in inside the sandbox
+
+- **Feature / test case:** AI chat with Claude Code as the engine
+- **Severity:** Minor
+- **Environment:** macOS, signed build 255, Claude Code sign-in due to end 2026-11-25..28
+- **Steps to reproduce:**
+  1. Pick Claude Code in the chat engine picker and ask a question when its sign-in token needs refreshing.
+- **Expected:** An answer, or a clear message to sign in again.
+- **Actual:** The reply shows "Failed to refresh OAuth token: can't save to the Keychain… If sandboxed, use `claude setup-token`".
+- **Notes:** The CLI sandbox does not let the CLI write the Keychain, so a token refresh fails. Workaround: run `claude` once in Terminal to refresh, or `claude setup-token`. A fix would allow the Keychain write for the Claude profile or show a plain sign-in message. Not investigated further.
+- **Status:** open.

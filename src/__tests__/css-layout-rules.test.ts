@@ -25,6 +25,8 @@ describe("review queue rows (BUG-044)", () => {
     expect(actions).toMatch(/position:\s*absolute/);
     expect(actions).not.toMatch(/display:\s*none/);
     expect(rules(".review-row:hover .review-actions")).not.toMatch(/display:/);
+    // Out of the flow the buttons shrink to the row; wrapped, they covered the file name.
+    expect(actions).toMatch(/white-space:\s*nowrap/);
   });
 });
 

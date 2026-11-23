@@ -16,9 +16,13 @@ Import brings outside material into your folder as an ordinary Markdown note. Th
 1. Open the folder the note should go in.
 2. Choose **File** ▸ **Import** and then **Web Page…**, **Word Document…** or **CSV…** (also in <kbd>⌘</kbd> <kbd>K</kbd>).
 3. Paste the web address, or choose the file.
-4. BugText converts it and opens the new note. A result sheet shows what was kept, such as how many images and tables came through.
+4. Click **Import**. BugText converts it into a new note.
 
 ![The Import Web Page sheet with an address and where the note will be saved](../images/notes/import/import-web-page.png)
+
+A result sheet says where the note was saved and lists anything worth knowing, such as images that stay linked to the web. **Open Note** opens it; **Done** closes the sheet.
+
+![The import result sheet: Imported research/Queueing theory - Wikipedia.md, with 9 images staying linked to the web, and Done and Open Note buttons](../images/notes/import/import-result.png)
 
 Every imported note gets three properties: `source` (the address or file), `imported_at` (when) and `source_digest` (a fingerprint of the original).
 
