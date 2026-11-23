@@ -81,13 +81,54 @@ describe("import sheet", () => {
     expect(document.querySelector("h2")?.textContent).toBe("Import CSV");
   });
 
-  it("shows progress with the buttons disabled", () => {
+  it("shows progress with Import disabled and Cancel enabled", () => {
     const ui = importUI(document.body);
     void ui.ask({ kind: "csv", savePath: "d.md", earlier: null });
     button("Import").click();
     ui.busy("Reading the file…");
     expect(text()).toContain("Reading the file…");
-    for (const b of document.querySelectorAll<HTMLButtonElement>(".organize-actions button")) expect(b.disabled).toBe(true);
+    expect(button("Import").disabled).toBe(true);
+    expect(button("Cancel").disabled).toBe(false);
+    expect(ui.cancelled()).toBe(false);
+  });
+
+  it("keeps focus in the sheet during progress so Esc reaches it", () => {
+    const ui = importUI(document.body);
+    void ui.ask({ kind: "web", savePath: "", earlier: null });
+    expect(document.activeElement?.tagName).toBe("INPUT");
+    ui.busy("Fetching the page…");
+    expect(document.activeElement).toBe(button("Cancel"));
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(0);
+    expect(ui.cancelled()).toBe(true);
+  });
+
+  it.each([
+    ["Cancel", () => button("Cancel").click()],
+    ["Close", () => button("Close").click()],
+    ["Escape", () => document.querySelector(".organize-scrim")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))],
+  ])("%s during progress cancels the import and keeps the sheet closed", async (_name, dismiss) => {
+    const ui = importUI(document.body);
+    ui.busy("Fetching the page…");
+    dismiss();
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(0);
+    expect(ui.cancelled()).toBe(true);
+    ui.busy("Converting the page…");
+    ui.result({ path: "/f/a.md", problems: [] });
+    ui.fail("late error");
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(0);
+    await expect(ui.ask({ kind: "web", savePath: "", earlier: null })).resolves.toBeNull();
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(0);
+  });
+
+  it("closing the question or the result is not a cancel of a running import", async () => {
+    const ui = importUI(document.body);
+    const asked = ui.ask({ kind: "csv", savePath: "d.md", earlier: null });
+    button("Cancel").click();
+    await asked;
+    ui.result({ path: "/f/a.md", problems: [] });
+    button("Done").click();
+    expect(ui.cancelled()).toBe(false);
   });
 
   it("shows the result with its problems", () => {

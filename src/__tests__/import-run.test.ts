@@ -36,13 +36,23 @@ function setup(options: { answers?: Answer[]; notes?: IndexedNote[]; html?: stri
     created: vi.fn(),
     open: vi.fn(),
   };
+  const state = { cancelled: false };
   const ui = {
     ask: vi.fn(async () => (calls.push("ask"), answers.shift() ?? null)),
     busy: vi.fn(),
     result: vi.fn(),
     fail: vi.fn(),
+    cancelled: () => state.cancelled,
   } satisfies ImportUI;
-  return { deps, ui, calls };
+  /** Makes `step` cancel the import from the sheet while it is running. */
+  const cancelDuring = <K extends keyof ImportDeps>(step: K) => {
+    const original = deps[step] as (...args: unknown[]) => unknown;
+    deps[step] = ((...args: unknown[]) => {
+      state.cancelled = true;
+      return original(...args);
+    }) as ImportDeps[K];
+  };
+  return { deps, ui, calls, cancelDuring };
 }
 
 function written(deps: ImportDeps): { relativeDir: string; stem: string; contents: string } {
@@ -156,6 +166,40 @@ describe("importWeb", () => {
     const { deps, ui } = setup({ answers: [{ address: "https://e.com/a", savePath: "notes/page", again: false }] });
     await importWeb(deps, ui);
     expect(written(deps)).toMatchObject({ relativeDir: "notes", stem: "page" });
+  });
+});
+
+describe("cancelling a running import", () => {
+  it("stops a web import after the fetch: nothing converted or created", async () => {
+    const { deps, ui, calls, cancelDuring } = setup({ answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }] });
+    cancelDuring("fetchPage");
+    await importWeb(deps, ui);
+    expect(calls).toEqual(["ask", "fetch:https://e.com/a"]);
+    expect(deps.create).not.toHaveBeenCalled();
+    expect(deps.created).not.toHaveBeenCalled();
+  });
+
+  it("stops a web import during conversion: nothing created", async () => {
+    const { deps, ui, calls, cancelDuring } = setup({ answers: [{ address: "https://e.com/a", savePath: "a.md", again: false }] });
+    cancelDuring("htmlToMarkdown");
+    await importWeb(deps, ui);
+    expect(calls).toEqual(["ask", "fetch:https://e.com/a", "convert"]);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("stops a Word import after the copy: Pandoc not run, nothing created", async () => {
+    const { deps, ui, calls, cancelDuring } = setup({ answers: [{ savePath: "r.md", again: false }] });
+    cancelDuring("copyOriginal");
+    await importFile("word", deps, ui);
+    expect(calls).toEqual(["pick:word", "probe:word", "ask", "copy"]);
+    expect(deps.create).not.toHaveBeenCalled();
+  });
+
+  it("stops a CSV import while reading: nothing created", async () => {
+    const { deps, ui, cancelDuring } = setup({ answers: [{ savePath: "d.md", again: false }] });
+    cancelDuring("readCsv");
+    await importFile("csv", deps, ui);
+    expect(deps.create).not.toHaveBeenCalled();
   });
 });
 

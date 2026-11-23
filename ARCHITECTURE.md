@@ -177,7 +177,7 @@ and are read up to 5 MB. The HTML is cleaned in the webview (`clean.ts`) in an i
 `DOMParser` document, because Rust has no HTML parser and Pandoc's reader drops the
 elements a filter would need: page chrome and active elements are removed, a few
 attributes kept, links resolved against the final address (a `<base>` is ignored), non-http
-links unwrapped and non-https images removed. A table whose cells hold block content is flattened into blocks, because `gfm-raw_html` would write it as a bare `[TABLE]`. Only the newest import owns the sheet (`sheet.ts`): starting another closes the older sheet, and a slower older import finishing later shows nothing. Pandoc then runs with fixed arguments and
+links unwrapped and non-https images removed. A table whose cells hold block content is flattened into blocks, because `gfm-raw_html` would write it as a bare `[TABLE]`. Only the newest import owns the sheet (`sheet.ts`): starting another closes the older sheet, and a slower older import finishing later shows nothing. Closing the sheet while it shows progress (Cancel, Close, Esc) sets `ImportUI.cancelled()`; the sheet stays closed and the flow stops before converting, before Pandoc and before `create`. Pandoc then runs under a 60-second limit (`run_limited`) with fixed arguments and
 no shell: `--from html --to gfm-raw_html --wrap=none --sandbox` on stdin, or
 `--from docx --to gfm-raw_html --wrap=none --extract-media=<fresh temp dir> <canonical
 path>`; `gfm-raw_html` keeps raw HTML out of the note. Word import refuses Pandoc
