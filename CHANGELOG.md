@@ -80,6 +80,10 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Review sidebar: hovering a row no longer makes it taller and moves the rows below; its buttons now sit over the row's details line.
+- AI run card: the lines for created and deleted files take their colours from the theme, so they are readable on dark themes.
+- File ▸ New Window opens beside the window you are using, on that window's display, instead of in the middle of the primary display.
+- AI chat: when BugText could not read an API key (for example after Deny on the Keychain request), the error now says so instead of "The key was rejected."
 - File ▸ Import: Cancel was disabled while a page was fetched or converted, Esc did nothing, and closing the sheet did not stop the import, so the sheet came back with the result and the note was still created. Cancel, Close and Esc now stop a running import: no note is created and the sheet stays closed. A Pandoc conversion that runs longer than a minute is stopped with "Pandoc took longer than a minute and was stopped."
 - Update checks compared the feed's `0.4.0-build.254` with a bare `0.4.0`, so no build of the running version was ever offered. The running build now compares as `<version>-build.<build>`.
 - Settings: the General page's note about PDF zoom and the Check again buttons on the Export and Git pages sat at the left edge of the window, outside the settings column. They now line up with the rest of the page (Check again at the right, like other buttons).

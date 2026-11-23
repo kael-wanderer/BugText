@@ -146,7 +146,15 @@ async function request(
       throw new DOMException("AI request cancelled.", "AbortError");
     throw new Error("Could not reach the server.");
   }
-  if (!response.ok) throw new Error(statusError(response.status));
+  if (!response.ok) {
+    // A bearer connection with no key read (Keychain refused, or never saved) was
+    // sent without one; the 401 is about the missing key, not a wrong one.
+    if (response.status === 401 && c.auth === "bearer" && !key)
+      throw new Error(
+        `BugText could not read the API key for ${c.name}. Allow BugText when macOS asks for the Keychain, or save the key again in Settings ▸ AI.`,
+      );
+    throw new Error(statusError(response.status));
+  }
   return response;
 }
 export async function listModels(c: Connection): Promise<TestResult> {
