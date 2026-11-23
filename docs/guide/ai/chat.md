@@ -36,6 +36,10 @@ Click 📎, drop files on the panel, or type `@` to pick a file from the folder.
 
 ### Use the answer
 
+Under each reply BugText says how many notes it searched, which model answered and how long it took, and links the notes it used.
+
+![A chat reply answering from the folder's notes, with the notes searched, the model, the time taken and links to escalation-rules.md and the routing review](../images/ai/chat/chat-answer.png)
+
 Each reply offers **Copy**, **Insert at cursor**, **Replace selection…** and **Save as new note**. Replace selection shows the change as a difference first; nothing changes until you accept it, and BugText takes a snapshot so you can undo it later.
 
 ### Let a coding agent work
