@@ -63,7 +63,7 @@ All 7 tasks are built and every automated check passes. Fable ran the security r
 
 2. `public_v6` is a deny-list; `64:ff9b:1::/48`, `::ffff:0:0:0/96`, `2001:2::/48`, `2001:10::/28`, `2001:20::/28`, `3fff::/20` pass. Suggested: allow only `2000::/3` minus the special ranges.
 3. DNS pin relies on reqwest matching the override key; a second lock would check `response.remote_addr()` against the vetted IP.
-4. Pandoc has no time limit and the busy sheet's Cancel is disabled; a hanging file leaves "Converting…" forever.
+4. Pandoc has no time limit and the busy sheet's Cancel is disabled; a hanging file leaves "Converting…" forever. **Fixed 2026-11-23 as BUG-047** (Cancel stops the import; Pandoc limited to 60 s).
 6. (Disagrees with ruling T5) a Pandoc or CSV failure after the copy leaves the original in `originals/` and does not say so.
 9. Pages in other charsets (Shift-JIS, windows-1252) are decoded as lossy UTF-8.
 10. An `<img>` with no `src` counts toward "N images stay linked to the web".

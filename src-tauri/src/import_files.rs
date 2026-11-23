@@ -16,7 +16,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 pub const NO_PANDOC: &str = "Importing needs Pandoc. Install it with: brew install pandoc";
 pub const CONVERT: &str = "Pandoc could not convert this file.";
@@ -25,11 +26,13 @@ pub const NOT_CSV: &str = "Choose a .csv file.";
 pub const SOURCE_GONE: &str = "The file no longer exists.";
 pub const SOURCE_LARGE: &str = "The file is larger than 50 MB.";
 pub const CSV_LARGE: &str = "too-large";
+pub const PANDOC_SLOW: &str = "Pandoc took longer than a minute and was stopped.";
 pub const OLD_PANDOC: &str = "Importing Word documents needs Pandoc 3.1.6 or later.";
 const OUTSIDE: &str = "The import must stay inside the open folder.";
 const MAX_SOURCE_BYTES: u64 = 50 * 1024 * 1024;
 const MAX_CSV_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_MEDIA_FILES: usize = 200;
+const PANDOC_LIMIT: Duration = Duration::from_secs(60);
 
 #[derive(Serialize, Debug)]
 pub struct Probe {
@@ -57,29 +60,61 @@ async fn blocking<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(job).await.map_err(|_| CONVERT.to_string())?
 }
 
-/// Runs Pandoc with fixed arguments, `input` on stdin (written from a thread so a
-/// full stdout pipe cannot deadlock), and returns stdout.
+/// Runs Pandoc with fixed arguments, `input` on stdin, and returns stdout.
 fn run_pandoc(args: &[String], input: &[u8], dir: &Path) -> Result<String, String> {
     let pandoc = find_pandoc().ok_or(NO_PANDOC)?;
-    let mut child = Command::new(pandoc)
-        .args(args)
-        .current_dir(dir)
+    let mut command = Command::new(pandoc);
+    command.args(args).current_dir(dir);
+    let output = run_limited(&mut command, input, PANDOC_LIMIT)?;
+    if !output.status.success() {
+        return Err(CONVERT.into());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+/// Runs `command` with `input` on stdin and stops it once `limit` has passed.
+/// Stdin is written and stdout read from their own threads so a full pipe
+/// cannot deadlock; stderr is discarded.
+fn run_limited(command: &mut Command, input: &[u8], limit: Duration) -> Result<Output, String> {
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|_| CONVERT.to_string())?;
     let mut stdin = child.stdin.take().ok_or(CONVERT)?;
+    let mut stdout = child.stdout.take().ok_or(CONVERT)?;
     let input = input.to_vec();
     let writer = std::thread::spawn(move || {
         let _ = stdin.write_all(&input);
     });
-    let output = child.wait_with_output().map_err(|_| CONVERT.to_string())?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = stdout.read_to_end(&mut bytes);
+        bytes
+    });
+    let deadline = Instant::now() + limit;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(25)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = writer.join();
+                let _ = reader.join();
+                return Err(PANDOC_SLOW.into());
+            }
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(CONVERT.into());
+            }
+        }
+    };
     let _ = writer.join();
-    if !output.status.success() {
-        return Err(CONVERT.into());
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    let stdout = reader.join().map_err(|_| CONVERT.to_string())?;
+    Ok(Output { status, stdout, stderr: Vec::new() })
 }
 
 /// Pandoc before 3.1.6 can write outside the media folder through
@@ -422,6 +457,24 @@ mod tests {
     use super::*;
     use std::fs;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn run_limited_returns_stdout_of_a_quick_command() {
+        let mut command = Command::new("/bin/cat");
+        let output = run_limited(&mut command, b"hello", Duration::from_secs(5)).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"hello");
+    }
+
+    #[test]
+    fn run_limited_stops_a_command_past_its_limit() {
+        let mut command = Command::new("/bin/sleep");
+        command.arg("30");
+        let started = std::time::Instant::now();
+        let result = run_limited(&mut command, &[], Duration::from_millis(200));
+        assert_eq!(result.unwrap_err(), PANDOC_SLOW);
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
 
     const PNG: &[u8] = &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];
 

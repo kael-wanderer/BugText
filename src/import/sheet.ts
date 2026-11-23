@@ -33,6 +33,11 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
   let content = node("div");
   let title = "Import";
   let pending: ((answer: Answer) => void) | null = null;
+  // Closing the sheet while `busy` shows progress cancels the import: the flow
+  // stops before writing anything and the sheet stays closed.
+  let running = false;
+  let cancelled = false;
+  const silent = () => stale() || cancelled;
 
   const settle = (answer: Answer) => {
     const resolve = pending;
@@ -45,7 +50,11 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       sheet = organizeSheet(host, heading);
       content = node("div");
       sheet.body.append(content);
-      sheet.cleanup(() => settle(null));
+      sheet.cleanup(() => {
+        if (running) cancelled = true;
+        running = false;
+        settle(null);
+      });
     } else {
       sheet.body.setAttribute("aria-label", heading);
       const h2 = sheet.body.querySelector("h2");
@@ -69,7 +78,8 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
   return {
     ask({ kind, address, savePath, earlier }) {
       settle(null);
-      if (stale()) return Promise.resolve(null);
+      if (silent()) return Promise.resolve(null);
+      running = false;
       const body = show(TITLES[kind]);
       const addressInput = node("input");
       addressInput.type = "url";
@@ -131,18 +141,19 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       });
     },
     busy(text) {
-      if (stale()) return;
+      if (silent()) return;
       const body = show(title);
+      running = true;
       const status = node("p", text);
       status.setAttribute("role", "status");
       const cancel = action("Cancel", close);
       const submit = action("Import", () => {});
-      cancel.disabled = true;
       submit.disabled = true;
       body.append(status, actions(cancel, submit));
     },
     result({ path, problems }) {
-      if (stale()) return;
+      if (silent()) return;
+      running = false;
       const body = show(title);
       body.append(node("p", `Imported ${label(path)}`));
       if (problems.length > 0) {
@@ -159,7 +170,8 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
     },
     fail(text) {
       settle(null);
-      if (stale()) return;
+      if (silent()) return;
+      running = false;
       const body = show(title);
       const error = node("p", text);
       error.className = "organize-error";
@@ -168,5 +180,6 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       body.append(error, actions(done));
       done.focus();
     },
+    cancelled: () => cancelled,
   };
 }

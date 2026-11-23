@@ -17,6 +17,8 @@ export type ImportUI = {
   busy: (text: string) => void;
   result: (args: { path: string; problems: string[] }) => void;
   fail: (text: string) => void;
+  /** True once the person closed the sheet while the import was running. */
+  cancelled: () => boolean;
 };
 
 export type ImportDeps = {
@@ -92,6 +94,7 @@ async function finish(
   problems: string[],
   copied?: string,
 ): Promise<void> {
+  if (ui.cancelled()) return;
   if (deps.folder() !== folder) return ui.fail(FOLDER_CHANGED);
   let path: string;
   try {
@@ -130,6 +133,7 @@ export async function importWeb(deps: ImportDeps, ui: ImportUI): Promise<void> {
   } catch (error) {
     return ui.fail(message(error));
   }
+  if (ui.cancelled()) return;
   if (!asked) {
     const same = earlierImport(deps.notes(), folder, { digest: page.digest });
     if (same) {
@@ -204,6 +208,7 @@ export async function importFile(kind: "word" | "csv", deps: ImportDeps, ui: Imp
   } catch (error) {
     return ui.fail(message(error));
   }
+  if (ui.cancelled()) return;
   try {
     if (kind === "word") {
       const converted = await deps.word({ folder, relativeDir: where.relativeDir, imagesFolder, path });

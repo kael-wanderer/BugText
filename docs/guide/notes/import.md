@@ -30,6 +30,8 @@ Every imported note gets three properties: `source` (the address or file), `impo
 
 If you import the same address or file again, BugText offers to open the note you made last time instead of making a second one.
 
+While an import runs, **Cancel** (or Esc) stops it and no note is created. A conversion that takes longer than a minute is stopped.
+
 > [!NOTE]
 > Web pages and Word documents are converted with Pandoc: `brew install pandoc`. Word documents need Pandoc 3.1.6 or later. CSV needs nothing extra.
 

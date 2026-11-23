@@ -52,6 +52,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-044 | 2026-11-14 | Review queue | Minor | REV-08 (28-review-queue) | Hovering a queue row shows its buttons inside the row, which makes it taller and moves the rows below | open |
 | BUG-045 | 2026-11-14 | AI panel / run card | Minor | REV-03 (28-review-queue) | The "+ new-file" line in a run's changed-files card is dark green on the dark panel and hard to read | open |
 | BUG-046 | 2026-11-16 | Updates | Major | Code review (Bugler update parity) | A new build of the running version was never offered: the app compared the feed's `0.4.0-build.254` with a bare `0.4.0` | fixed (unreleased) |
+| BUG-047 | 2026-11-23 | Import | Major | Manual run (IMP) | Cancel could not stop a running import: Cancel was disabled while busy, and Esc closed the sheet but the import went on, reopened the sheet and created the note; a hanging Pandoc left "Converting…" forever | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -424,4 +425,17 @@ Copy this template for each new bug:
 - **Expected:** Build 254 is offered.
 - **Actual:** "BugText 0.4.0 is the latest version." The app compared against `0.4.0` without its build, and a release outranks its own prereleases, so no build of the running version could ever be newer.
 - **Notes:** Fixed by comparing the running build as `<version>-build.<bundleVersion>` (`appFeedVersion` in `src/updater.ts`), as Bugler does. Merged 1bb8cfb.
+- **Status:** fixed (unreleased).
+
+### BUG-047 — Cancel could not stop a running import
+
+- **Feature / test case:** File ▸ Import (web page, Word, CSV) / IMP
+- **Severity:** Major
+- **Environment:** macOS, 0.4.0 (build 254), commit `fed826f`
+- **Steps to reproduce:**
+  1. File ▸ Import ▸ Web Page…, enter an address on a slow server, click Import.
+  2. While "Fetching the page…" shows, try Cancel, then press Esc.
+- **Expected:** The import stops, the sheet closes and no note is created.
+- **Actual:** Cancel was greyed out. Esc (or the header Close) closed the sheet, but the import kept running: when the fetch finished the sheet opened again with "Imported …" and the note was created. A Pandoc conversion that hung left "Converting…" with no way out.
+- **Notes:** `busy()` in `src/import/sheet.ts` disabled Cancel (as the plan asked), and nothing told the flow the sheet had closed; `show()` then opened a new sheet for the result. Fixed: the sheet records a close during progress as a cancel (`ImportUI.cancelled()`), stays closed, and `src/import/run.ts` stops before converting, before Pandoc and before creating the note. A Word import cancelled after its original was copied leaves that copy in `originals/`. Pandoc runs under a 60-second limit (`run_limited` in `import_files.rs`). Deferred minor 4 of the import review.
 - **Status:** fixed (unreleased).
