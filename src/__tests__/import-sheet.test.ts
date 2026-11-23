@@ -92,6 +92,17 @@ describe("import sheet", () => {
     expect(ui.cancelled()).toBe(false);
   });
 
+  it("keeps focus in the sheet during progress so Esc reaches it", () => {
+    const ui = importUI(document.body);
+    void ui.ask({ kind: "web", savePath: "", earlier: null });
+    expect(document.activeElement?.tagName).toBe("INPUT");
+    ui.busy("Fetching the page…");
+    expect(document.activeElement).toBe(button("Cancel"));
+    document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(document.querySelectorAll(".organize-scrim")).toHaveLength(0);
+    expect(ui.cancelled()).toBe(true);
+  });
+
   it.each([
     ["Cancel", () => button("Cancel").click()],
     ["Close", () => button("Close").click()],

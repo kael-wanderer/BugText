@@ -150,6 +150,8 @@ export function importUI(host: HTMLElement, options: ImportSheetOptions = {}): I
       const submit = action("Import", () => {});
       submit.disabled = true;
       body.append(status, actions(cancel, submit));
+      // The focused field was just removed; keep focus in the sheet so Esc reaches it.
+      cancel.focus();
     },
     result({ path, problems }) {
       if (silent()) return;
