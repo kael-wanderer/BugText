@@ -71,8 +71,10 @@ Rules that hold everywhere:
 - **Build number:** `bundle.macOS.bundleVersion` in `tauri.conf.json`. Raise it by one
   for every build handed out, even when the version is unchanged; never reuse one.
   Build every handed-out build with `npm run build:app` (signs with the "BugText Local
-  Dev" identity through `APPLE_SIGNING_IDENTITY`), never plain `npm run tauri build`:
-  an ad-hoc signature makes the Keychain ask for the password again after an update.
+  Dev" identity through `APPLE_SIGNING_IDENTITY`), never plain `npm run tauri build`.
+  Even so, each new build asks once for the Keychain password before reading a saved
+  key (the certificate has no Team ID, so macOS ties "Always Allow" to the exact
+  build). Decided 2026-11-23: accept one prompt per update; no Apple Developer cert.
 - **Heavy engines load on demand** so the startup chunk stays under the 800 kB
   warning limit in `vite.config.ts`.
 - Document PDF/DOCX export needs `brew install pandoc typst`.
