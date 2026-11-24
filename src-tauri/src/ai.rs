@@ -58,7 +58,10 @@ pub async fn ai_run(app: tauri::AppHandle, request_id: String, spec: CliRunSpec)
     }
     #[cfg(target_os = "macos")]
     {
-        let (mut command, workdir, run_root, secret) = prepare_command(&spec)?;
+        let (mut command, _workdir, run_root, secrets) = prepare_command(&spec)?;
+        let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+        let config_dir = cli_config_dir(&spec.tool, spec.config_dir.as_deref(), &home);
+        let tool = spec.tool.clone();
         let tool_label = match spec.tool.as_str() {
             "claude" => "Claude Code",
             "codex" => "Codex CLI",
@@ -95,7 +98,13 @@ pub async fn ai_run(app: tauri::AppHandle, request_id: String, spec: CliRunSpec)
         let stream_id = request_id.clone();
         thread::spawn(move || {
             run_child(
-                stream_app, stream_id, child, secret, workdir, run_root, tool_label,
+                stream_app,
+                stream_id,
+                child,
+                secrets,
+                run_root,
+                tool_label,
+                move |text: &str| sign_in_hint(&tool, text, &config_dir, &home),
             );
         });
     }
@@ -108,7 +117,7 @@ static RUN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 #[cfg(target_os = "macos")]
 fn prepare_command(
     spec: &CliRunSpec,
-) -> Result<(Command, PathBuf, PathBuf, Option<String>), String> {
+) -> Result<(Command, PathBuf, PathBuf, Vec<String>), String> {
     if !["claude", "codex", "pi"].contains(&spec.tool.as_str()) {
         return Err("Unsupported CLI tool".into());
     }
@@ -223,21 +232,80 @@ fn prepare_command(
         }
         _ => unreachable!(),
     }
+    let mut secrets = Vec::new();
     let secret = crate::secrets::get_secret(format!("cli-{}", spec.tool));
-    if let Some(secret_value) = secret.as_deref() {
-        match spec.tool.as_str() {
-            "claude" => {
-                command.env("ANTHROPIC_API_KEY", secret_value);
+    match spec.tool.as_str() {
+        "claude" => {
+            // A sign-in token from `claude setup-token` lets Claude Code run without
+            // refreshing its own sign-in, which it cannot save from the sandbox.
+            let proxied = spec
+                .proxy_base_url
+                .as_deref()
+                .is_some_and(|value| !value.is_empty());
+            let token = crate::secrets::get_secret(CLAUDE_TOKEN_ID.into());
+            for (name, value) in claude_auth_env(secret.as_deref(), token.as_deref(), proxied) {
+                command.env(name, value);
             }
-            "codex" => {
+            secrets.extend(token);
+        }
+        "codex" => {
+            if let Some(secret_value) = secret.as_deref() {
                 command
                     .env("OPENAI_API_KEY", secret_value)
                     .env("CODEX_API_KEY", secret_value);
             }
-            _ => {}
         }
+        _ => {}
     }
-    Ok((command, workdir, run_root, secret))
+    secrets.extend(secret);
+    secrets.retain(|value| !value.is_empty());
+    Ok((command, workdir, run_root, secrets))
+}
+
+/// Keychain id of the optional Claude Code sign-in token (Settings ▸ AI ▸ Local CLI).
+pub const CLAUDE_TOKEN_ID: &str = "cli-claude-token";
+
+/// How Claude Code is authenticated for a run: an API key if one is saved,
+/// otherwise a saved sign-in token, otherwise its own sign-in. The sign-in token is
+/// an Anthropic account credential, so it is never sent through a proxy.
+fn claude_auth_env(
+    api_key: Option<&str>,
+    token: Option<&str>,
+    proxied: bool,
+) -> Vec<(&'static str, String)> {
+    if let Some(key) = api_key.filter(|value| !value.is_empty()) {
+        return vec![("ANTHROPIC_API_KEY", key.to_string())];
+    }
+    if proxied {
+        return Vec::new();
+    }
+    token
+        .filter(|value| !value.is_empty())
+        .map(|value| vec![("CLAUDE_CODE_OAUTH_TOKEN", value.to_string())])
+        .unwrap_or_default()
+}
+
+/// A plain message for a Claude Code run that failed because its sign-in could not
+/// be refreshed: the sandbox does not let it rewrite the login keychain.
+fn sign_in_hint(tool: &str, text: &str, config_dir: &Path, home: &Path) -> Option<String> {
+    if tool != "claude" {
+        return None;
+    }
+    let lower = text.to_lowercase();
+    let signed_out = ["oauth token", "auth login", "/login", "setup-token", "not logged in"]
+        .iter()
+        .any(|marker| lower.contains(marker));
+    if !signed_out {
+        return None;
+    }
+    let dir = config_dir
+        .strip_prefix(home)
+        .map(|rest| format!("~/{}", rest.to_string_lossy()))
+        .unwrap_or_else(|_| config_dir.to_string_lossy().into_owned());
+    Some(format!(
+        "Claude Code needs you to sign in again. In Terminal, run: CLAUDE_CONFIG_DIR={dir} claude auth login. \
+         To stop this happening, add a sign-in token in Settings ▸ AI ▸ Local CLI ▸ Claude Code."
+    ))
 }
 
 #[cfg(target_os = "macos")]
@@ -345,10 +413,10 @@ fn run_child(
     app: tauri::AppHandle,
     request_id: String,
     mut child: std::process::Child,
-    secret: Option<String>,
-    workdir: PathBuf,
+    secrets: Vec<String>,
     run_root: PathBuf,
     tool_label: &'static str,
+    hint: impl Fn(&str) -> Option<String>,
 ) {
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -387,7 +455,7 @@ fn run_child(
         while let Ok(chunk) = receiver.try_recv() {
             all_output.push_str(&chunk);
             pending.push_str(&chunk);
-            emit_redacted_chunks(&app, &request_id, &mut pending, secret.as_deref(), false);
+            emit_redacted_chunks(&app, &request_id, &mut pending, &secrets, false);
         }
         match child.try_wait() {
             Ok(Some(status)) => break Some(status),
@@ -419,7 +487,7 @@ fn run_child(
         all_output.push_str(&chunk);
         pending.push_str(&chunk);
     }
-    emit_redacted_chunks(&app, &request_id, &mut pending, secret.as_deref(), true);
+    emit_redacted_chunks(&app, &request_id, &mut pending, &secrets, true);
     let stderr = stderr_thread.join().unwrap_or_default();
     if timed_out {
         emit_error(&app, &request_id, "Timed out after 10 minutes".into());
@@ -431,8 +499,10 @@ fn run_child(
             },
         );
     } else {
-        let sanitized_stderr = redact(&stderr, secret.as_deref());
-        let message = if start.elapsed() < Duration::from_secs(2)
+        let sanitized_stderr = redact(&stderr, &secrets);
+        let message = if let Some(message) = hint(&format!("{all_output}\n{stderr}")) {
+            message
+        } else if start.elapsed() < Duration::from_secs(2)
             && all_output.is_empty()
             && (sanitized_stderr.to_lowercase().contains("sandbox")
                 || sanitized_stderr.contains("Operation not permitted"))
@@ -458,7 +528,6 @@ fn run_child(
         requests.remove(&request_id);
     }
     let _ = std::fs::remove_dir_all(run_root);
-    let _ = workdir;
 }
 
 #[cfg(target_os = "macos")]
@@ -466,29 +535,23 @@ fn emit_redacted_chunks(
     app: &tauri::AppHandle,
     request_id: &str,
     pending: &mut String,
-    secret: Option<&str>,
+    secrets: &[String],
     flush: bool,
 ) {
-    let Some(secret) = secret.filter(|value| !value.is_empty()) else {
-        if !pending.is_empty() {
-            let chunk = std::mem::take(pending);
-            let _ = app.emit(
-                "ai-chunk",
-                Chunk {
-                    request_id: request_id.into(),
-                    chunk,
-                },
-            );
+    for secret in secrets.iter().filter(|value| !value.is_empty()) {
+        while let Some(index) = pending.find(secret.as_str()) {
+            pending.replace_range(index..index + secret.len(), "[redacted]");
         }
-        return;
-    };
-    while let Some(index) = pending.find(secret) {
-        pending.replace_range(index..index + secret.len(), "[redacted]");
     }
+    // Hold back enough text that a secret split across chunks is still caught.
     let keep = if flush {
         0
     } else {
-        secret.chars().count().saturating_sub(1)
+        secrets
+            .iter()
+            .map(|secret| secret.chars().count().saturating_sub(1))
+            .max()
+            .unwrap_or(0)
     };
     let count = pending.chars().count().saturating_sub(keep);
     if count == 0 {
@@ -513,11 +576,11 @@ fn emit_redacted_chunks(
 }
 
 #[cfg(target_os = "macos")]
-fn redact(value: &str, secret: Option<&str>) -> String {
-    secret
-        .filter(|value| !value.is_empty())
-        .map(|secret| value.replace(secret, "[redacted]"))
-        .unwrap_or_else(|| value.to_string())
+fn redact(value: &str, secrets: &[String]) -> String {
+    secrets
+        .iter()
+        .filter(|secret| !secret.is_empty())
+        .fold(value.to_string(), |text, secret| text.replace(secret.as_str(), "[redacted]"))
 }
 
 #[cfg(target_os = "macos")]
@@ -644,5 +707,63 @@ mod review_tests {
         let start = Instant::now();
         terminate_and_schedule_kill(u32::MAX);
         assert!(start.elapsed().as_millis() < 500);
+    }
+}
+
+#[cfg(test)]
+mod sign_in_tests {
+    use super::{claude_auth_env, redact, sign_in_hint};
+    use std::path::Path;
+
+    #[test]
+    fn a_saved_sign_in_token_reaches_claude_code() {
+        assert_eq!(
+            claude_auth_env(None, Some("sk-ant-oat01-abc"), false),
+            vec![("CLAUDE_CODE_OAUTH_TOKEN", "sk-ant-oat01-abc".to_string())]
+        );
+    }
+
+    #[test]
+    fn the_sign_in_token_never_goes_to_a_proxy() {
+        assert!(claude_auth_env(None, Some("sk-ant-oat01-abc"), true).is_empty());
+        assert_eq!(
+            claude_auth_env(Some("proxy-key"), Some("sk-ant-oat01-abc"), true),
+            vec![("ANTHROPIC_API_KEY", "proxy-key".to_string())]
+        );
+    }
+
+    #[test]
+    fn an_api_key_wins_over_the_sign_in_token() {
+        assert_eq!(
+            claude_auth_env(Some("sk-ant-api03-key"), Some("sk-ant-oat01-abc"), false),
+            vec![("ANTHROPIC_API_KEY", "sk-ant-api03-key".to_string())]
+        );
+        assert!(claude_auth_env(None, None, false).is_empty());
+        assert!(claude_auth_env(Some(""), Some(""), false).is_empty());
+    }
+
+    #[test]
+    fn claude_sign_in_failures_get_a_plain_message() {
+        let home = Path::new("/Users/me");
+        let config = Path::new("/Users/me/.claude");
+        let message = sign_in_hint(
+            "claude",
+            "Failed to refresh OAuth token: can't save to the Keychain. If sandboxed, use `claude setup-token`",
+            config,
+            home,
+        )
+        .unwrap();
+        assert!(message.starts_with("Claude Code needs you to sign in again."));
+        assert!(message.contains("CLAUDE_CONFIG_DIR=~/.claude claude auth login"));
+        assert!(message.contains("Settings ▸ AI ▸ Local CLI"));
+        assert!(sign_in_hint("claude", "OAuth token has expired. Please run /login", config, home).is_some());
+        assert!(sign_in_hint("claude", "Rate limited", config, home).is_none());
+        assert!(sign_in_hint("codex", "Failed to refresh OAuth token", config, home).is_none());
+    }
+
+    #[test]
+    fn every_secret_is_redacted() {
+        let secrets = vec!["key-one".to_string(), "tok-two".to_string()];
+        assert_eq!(redact("a key-one b tok-two", &secrets), "a [redacted] b [redacted]");
     }
 }

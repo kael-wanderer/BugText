@@ -309,7 +309,12 @@ on stdin. On macOS every run uses a Seatbelt sandbox confined to the open folder
 per-run temporary directory, tool config/install paths and required system reads.
 Sandbox paths are passed as parameters, with no unsandboxed fallback. No folder
 means answer-only in a private temporary directory; Pi is always answer-only.
-The child environment is cleared and rebuilt from an allowlist. Runs time out at
+The child environment is cleared and rebuilt from an allowlist. The sandbox may read
+but not write `~/Library/Keychains` (saving an item replaces `login.keychain-db`), so
+Claude Code cannot renew its own sign-in in a run: an optional sign-in token
+(`cli-claude-token`, from `claude setup-token`) is passed as `CLAUDE_CODE_OAUTH_TOKEN`
+unless an API key is saved or a proxy is set, and a sign-in failure is reported with
+the `claude auth login` command for the profile in use. Runs time out at
 10 minutes, and cancellation stops the process group before file reconciliation.
 Before a folder-writing run, dirty open tabs receive labeled Recovery snapshots;
 afterward the changed-files card lists added/modified/deleted files, and affected

@@ -54,7 +54,7 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-046 | 2026-11-16 | Updates | Major | Code review (Bugler update parity) | A new build of the running version was never offered: the app compared the feed's `0.4.0-build.254` with a bare `0.4.0` | fixed (unreleased) |
 | BUG-047 | 2026-11-23 | Import | Major | Manual run (IMP) | Cancel could not stop a running import: Cancel was disabled while busy, and Esc closed the sheet but the import went on, reopened the sheet and created the note; a hanging Pandoc left "Converting…" forever | fixed (unreleased) |
 | BUG-048 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Denying BugText's Keychain request made chat say "The key was rejected." although no key was sent | fixed (unreleased) |
-| BUG-049 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Claude Code as the chat engine failed with "Failed to refresh OAuth token: can't save to the Keychain" inside the sandbox | open |
+| BUG-049 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Claude Code as the chat engine failed with "Failed to refresh OAuth token: can't save to the Keychain" inside the sandbox | fixed |
 
 > Delete the example row once real bugs are logged.
 
@@ -464,5 +464,5 @@ Copy this template for each new bug:
   1. Pick Claude Code in the chat engine picker and ask a question when its sign-in token needs refreshing.
 - **Expected:** An answer, or a clear message to sign in again.
 - **Actual:** The reply shows "Failed to refresh OAuth token: can't save to the Keychain… If sandboxed, use `claude setup-token`".
-- **Notes:** The CLI sandbox does not let the CLI write the Keychain, so a token refresh fails. Workaround: run `claude` once in Terminal to refresh, or `claude setup-token`. A fix would allow the Keychain write for the Claude profile or show a plain sign-in message. Not investigated further.
-- **Status:** open.
+- **Notes:** The sandbox allows reading `~/Library/Keychains` but not writing it. Tested 2026-11-24: saving an item needs write and unlink on `login.keychain-db` itself (macOS replaces the file), so allowing it would let any sandboxed run delete or replace the login keychain. Not done. Instead, Settings ▸ AI ▸ Local CLI ▸ Claude Code has an optional sign-in token (from `claude setup-token`), kept in BugText's Keychain entry `cli-claude-token` and passed as `CLAUDE_CODE_OAUTH_TOKEN`, so Claude Code never needs to refresh. A saved API key still wins, the token is never sent when a proxy is set, and it is redacted from output. Without a token, a sign-in failure now reads "Claude Code needs you to sign in again" with the exact `CLAUDE_CONFIG_DIR=… claude auth login` command for the profile in use. Workaround used 2026-11-24: `CLAUDE_CONFIG_DIR=~/.claude claude auth login`.
+- **Status:** fixed (unreleased).

@@ -67,11 +67,38 @@ export function renderLocalCli(
     }
   }
   function keyControls(tool: "claude" | "codex"): HTMLElement {
+    return secretControls(`cli-${tool}`, `${CLI_LABELS[tool]} API key`, "API key", "key");
+  }
+  // Optional token from `claude setup-token`: Claude Code cannot refresh its own
+  // sign-in from inside the sandbox, so a long-lived token keeps runs working.
+  function tokenControls(): HTMLElement {
+    const box = secretControls(
+      "cli-claude-token",
+      "Claude Code sign-in token",
+      "Sign-in token",
+      "token",
+    );
+    box.append(
+      text(
+        "p",
+        "Optional. Run claude setup-token in Terminal and paste the token here so runs keep working when the sign-in expires. Not sent through a proxy.",
+        "st-note",
+      ),
+    );
+    return box;
+  }
+  function secretControls(
+    id: string,
+    inputLabel: string,
+    title: string,
+    noun: string,
+  ): HTMLElement {
     const box = document.createElement("div");
     box.className = "st-cli-key";
-    const id = `cli-${tool}`;
-    const saved = text("p", "Checking saved key…", "st-note");
-    const input = textInput(`${CLI_LABELS[tool]} API key`, "");
+    const none = noun === "key" ? "No API key saved" : `No ${noun} saved`;
+    const some = `A ${noun} is saved`;
+    const saved = text("p", `Checking saved ${noun}…`, "st-note");
+    const input = textInput(inputLabel, "");
     input.type = "password";
     input.autocomplete = "new-password";
     const error = text("p", "", "st-note");
@@ -84,14 +111,14 @@ export function renderLocalCli(
       revision++;
       void invoke("delete_secret", { id })
         .then(() => {
-          saved.textContent = "No API key saved";
+          saved.textContent = none;
           input.value = "";
           input.hidden = false;
           replace.hidden = true;
           remove.hidden = true;
         })
         .catch(() => {
-          error.textContent = "Could not remove the saved key.";
+          error.textContent = `Could not remove the saved ${noun}.`;
         });
     });
     replace.hidden = true;
@@ -99,14 +126,14 @@ export function renderLocalCli(
     void invoke<boolean>("has_secret", { id })
       .then((has) => {
         if (revision !== 0) return;
-        saved.textContent = has ? "A key is saved" : "No API key saved";
+        saved.textContent = has ? some : none;
         input.hidden = has;
         replace.hidden = !has;
         remove.hidden = !has;
       })
       .catch(() => {
         if (revision === 0)
-          saved.textContent = "Could not check the saved key.";
+          saved.textContent = `Could not check the saved ${noun}.`;
       });
     input.addEventListener("blur", () => {
       const secret = input.value;
@@ -116,20 +143,20 @@ export function renderLocalCli(
       input.disabled = true;
       void invoke("set_secret", { id, secret })
         .then(() => {
-          saved.textContent = "A key is saved";
+          saved.textContent = some;
           input.hidden = true;
           replace.hidden = false;
           remove.hidden = false;
           error.textContent = "";
         })
         .catch(() => {
-          error.textContent = "Could not save the API key.";
+          error.textContent = noun === "key" ? "Could not save the API key." : `Could not save the ${noun}.`;
         })
         .finally(() => {
           input.disabled = false;
         });
     });
-    box.append(text("span", "API key"), saved, replace, remove, input, error);
+    box.append(text("span", title), saved, replace, remove, input, error);
     return box;
   }
   function draw(): void {
@@ -249,6 +276,7 @@ export function renderLocalCli(
           details.append(keyControls(tool));
       }
       if (tool === "codex") details.append(keyControls(tool));
+      if (tool === "claude") details.append(tokenControls());
       card.append(details);
       if (info?.found) {
         const result = text("p", "", "st-note");
