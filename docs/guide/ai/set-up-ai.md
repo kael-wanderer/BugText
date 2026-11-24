@@ -19,6 +19,8 @@ Open Settings (<kbd>⌘</kbd> <kbd>,</kbd>) ▸ **AI**.
 
 **Local CLI** lists the Claude Code, Codex CLI and Pi installs BugText found. Sign in to the CLI in Terminal as you normally would; BugText uses that sign-in. When a CLI works in your folder, macOS sandboxes it to that folder.
 
+The sandbox stops Claude Code from renewing its own sign-in. If a run says Claude Code needs you to sign in again, run the command it shows in Terminal. To avoid that, run `claude setup-token` in Terminal and paste the token into **Advanced ▸ Sign-in token** on the Claude Code card.
+
 ![Settings, AI, Local CLI, listing Claude Code, Codex CLI and Pi with what each may touch and a Test button](../images/ai/set-up-ai/local-cli.png)
 
 ### An API connection

@@ -283,7 +283,7 @@ export const SETTING_ENTRIES: SettingEntry[] = [
     page: "ai",
     label: "Claude Code",
     sub: "local-cli",
-    keywords: "account proxy executable",
+    keywords: "account proxy executable sign-in token setup-token",
   },
   {
     id: "cli-codex",

@@ -144,3 +144,34 @@ it("deletes the Claude CLI key when its proxy URL changes", async () => {
     expect(invoke).toHaveBeenCalledWith("delete_secret", { id: "cli-claude" }),
   );
 });
+it("saves a Claude Code sign-in token in its own Keychain entry", async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  const host = await render();
+  const input = host.querySelector(
+    '[aria-label="Claude Code sign-in token"]',
+  ) as HTMLInputElement;
+  expect(input.type).toBe("password");
+  expect(host.textContent).toContain("claude setup-token");
+  input.value = "sk-ant-oat01-abc";
+  input.dispatchEvent(new Event("blur"));
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("set_secret", {
+      id: "cli-claude-token",
+      secret: "sk-ant-oat01-abc",
+    }),
+  );
+  expect(input.value).toBe("");
+});
+it("keeps the sign-in token when the proxy URL changes", async () => {
+  const { invoke } = await import("@tauri-apps/api/core");
+  const host = await render();
+  const input = host.querySelector(
+    '[aria-label="Claude Code Proxy base URL"]',
+  ) as HTMLInputElement;
+  input.value = "https://proxy.example/v1";
+  input.dispatchEvent(new Event("blur"));
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("delete_secret", { id: "cli-claude" }),
+  );
+  expect(invoke).not.toHaveBeenCalledWith("delete_secret", { id: "cli-claude-token" });
+});

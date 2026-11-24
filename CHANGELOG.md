@@ -80,6 +80,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
 
 ### Fixed
+- Claude Code runs no longer fail with "Failed to refresh OAuth token: can't save to the Keychain" without a way out (BUG-049). The sandbox still does not let a run rewrite the login keychain; instead Settings ▸ AI ▸ Local CLI ▸ Claude Code takes an optional sign-in token from `claude setup-token`, kept in the Keychain and never sent through a proxy, and a run that needs a new sign-in says so with the exact `claude auth login` command for the profile in use.
 - Review sidebar: hovering a row no longer makes it taller and moves the rows below; its buttons now sit over the row's details line.
 - AI run card: the lines for created and deleted files take their colours from the theme, so they are readable on dark themes.
 - File ▸ New Window opens beside the window you are using, on that window's display, instead of in the middle of the primary display.
