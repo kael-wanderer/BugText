@@ -33,6 +33,8 @@ export type SearchPanelDeps = {
   onOpenHit: (path: string, line: number, page?: number, match?: string) => void;
   /** Opens a folder-relative path, confined to the folder; works for files the scan left out. */
   onOpenFile?: (relative: string) => void;
+  /** Right-click on a result: `open` is what a click does; `line` is set for a content hit. */
+  onResultMenu?: (x: number, y: number, target: { path: string; relative: string; line?: number; open: () => void }) => void;
   /** Shows every file match, in the palette. */
   onShowAllFiles?: (query: string) => void;
   readPreview?: (path: string) => Promise<string>;
@@ -84,6 +86,7 @@ export function createSearchPanel(
   // Outside Replace, rows open on one click; `selectedKey` is the keyboard selection, `lastOpenedKey` marks where you left off.
   let fileMatches: FileMatches = { query: "", rows: [], total: 0 };
   let lastOpenedKey = "", lastQuery = "";
+  const collapsed = new Set<string>();
   const openers = new Map<string, () => void>();
   const rowKeys = (): string[] => [...results.querySelectorAll<HTMLElement>("[data-row-key]")].map(row => row.dataset.rowKey!);
   const currentKey = (): string => { const keys = rowKeys(); return keys.includes(selectedKey) ? selectedKey : keys[0] ?? ""; };
@@ -157,6 +160,14 @@ export function createSearchPanel(
       const head = document.createElement(replaceOpen ? "div" : "button");
       head.className = "search-file";
       head.title = relative;
+      const folded = !replaceOpen && collapsed.has(relative);
+      if (!replaceOpen) {
+        const twisty = document.createElement("span"); twisty.className = "search-twisty";
+        twisty.textContent = folded ? "▸" : "▾"; twisty.setAttribute("role", "button");
+        twisty.setAttribute("aria-label", folded ? "Show matches" : "Hide matches"); twisty.setAttribute("aria-expanded", String(!folded));
+        twisty.addEventListener("click", event => { event.stopPropagation(); toggleGroup(relative); });
+        head.append(twisty);
+      }
       appendFileName(head, relative, []);
       const count = document.createElement("span"); count.className = "search-count"; count.textContent = String(fileHits.length); head.append(count);
       if (!replaceOpen) {
@@ -165,9 +176,10 @@ export function createSearchPanel(
         const first = fileHits[0];
         openers.set(key, () => void openHit(first, matchedText(first, query)));
         head.addEventListener("click", () => openKey(key));
+        withMenu(head, key, first.path, relative);
       }
       group.appendChild(head);
-      for (const hit of fileHits) {
+      for (const hit of folded ? [] : fileHits) {
         const row = document.createElement("button");
         row.type = "button";
         row.className = "search-hit";
@@ -218,6 +230,7 @@ export function createSearchPanel(
           const match = hit.snippet.slice(highlighted.start, highlighted.end);
           openers.set(key, () => void openHit(hit, match));
           row.addEventListener("click", () => openKey(key));
+          if (!hit.page) withMenu(row, key, hit.path, relative, hit.line);
         }
         group.appendChild(row);
       }
@@ -243,6 +256,29 @@ export function createSearchPanel(
     if (replaceOpen && selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
       const first = results.querySelector<HTMLButtonElement>(".search-hit"); if (first) first.click(); else { selectedKey = ""; preview.clear(); }
     }
+  }
+
+  function joinFolder(relative: string): string {
+    const folder = deps.getFolder() ?? "";
+    const separator = folder.includes("\\") ? "\\" : "/";
+    return `${folder.replace(/[\\/]$/, "")}${separator}${relative}`;
+  }
+
+  function withMenu(row: HTMLElement, key: string, path: string, relative: string, line?: number): void {
+    if (!deps.onResultMenu) return;
+    row.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      selectedKey = key; markSelection();
+      deps.onResultMenu?.(event.clientX, event.clientY, { path, relative, line, open: () => openKey(key) });
+    });
+  }
+
+  function toggleGroup(relative: string, open?: boolean): void {
+    const fold = open === undefined ? !collapsed.has(relative) : !open;
+    if (fold) collapsed.add(relative); else collapsed.delete(relative);
+    // A hidden hit can't stay selected; the selection moves to its file.
+    if (fold && selectedKey.startsWith("hit:") && results.querySelector(`.search-hit.selected`)?.closest(".search-group")?.querySelector<HTMLElement>(".search-file")?.title === relative) selectedKey = `head:${relative}`;
+    render(lastQuery);
   }
 
   function matchedText(hit: SearchHit, query: string): string {
@@ -277,6 +313,7 @@ export function createSearchPanel(
       if (file.exact) { const badge = document.createElement("span"); badge.className = "search-exact"; badge.textContent = "exact"; row.append(badge); }
       openers.set(key, () => deps.onOpenFile?.(file.path));
       row.addEventListener("click", () => openKey(key));
+      withMenu(row, key, joinFolder(file.path), file.path);
       group.append(row);
     }
     if (fileMatches.total > fileMatches.rows.length && deps.onShowAllFiles) {
@@ -301,7 +338,7 @@ export function createSearchPanel(
     const folder = deps.getFolder();
     const query = input.value.trim();
     state = new SearchRun(); progress.hidden = true; results.replaceChildren(); notes.replaceChildren(); input.removeAttribute("aria-invalid");
-    if (query !== lastQuery) { selectedKey = ""; lastOpenedKey = ""; lastQuery = query; }
+    if (query !== lastQuery) { selectedKey = ""; lastOpenedKey = ""; lastQuery = query; collapsed.clear(); }
     fileMatches = { query: "", rows: [], total: 0 };
     if (!folder) { groupValid = false; updateButton(); status.textContent = "Open a folder to search its files."; return; }
     if (query.length < (replaceOpen ? 1 : 2)) { groupValid = false; updateButton(); status.textContent = query ? "Type at least 2 characters." : ""; return; }
@@ -383,7 +420,13 @@ export function createSearchPanel(
     openSelected();
   });
   results.addEventListener("keydown", event => {
-    if (replaceOpen || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
+    if (replaceOpen) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const relative = results.querySelector<HTMLElement>(".selected")?.closest(".search-group")?.querySelector<HTMLElement>(".search-file")?.title;
+      if (relative) { event.preventDefault(); toggleGroup(relative, event.key === "ArrowRight"); results.querySelector<HTMLElement>(".selected")?.focus(); }
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault(); moveSelection(event.key === "ArrowDown" ? 1 : -1);
     results.querySelector<HTMLElement>(".selected")?.focus();
   });

@@ -3798,6 +3798,24 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
     });
   },
   onShowAllFiles: query => palette.open(query),
+  onResultMenu: (x, y, target) => {
+    showContextMenu(x, y, [
+      { label: "Open", action: target.open },
+      { label: "Open to the Side", action: () => void openInSub(target.path).then(() => { if (target.line) views.get("sub")?.editor.gotoLine(target.line); }) },
+      "separator",
+      { label: "Reveal in Finder", action: () => void revealInFinder(target.path) },
+      {
+        label: "Reveal in Explorer View",
+        action: () => {
+          if (!getState().explorerVisible) document.getElementById("ab-explorer")?.click();
+          void revealExplorerPath(target.path);
+        },
+      },
+      "separator",
+      { label: "Copy Path", action: () => void copyText(target.path) },
+      { label: "Copy Relative Path", action: () => void copyText(target.relative) },
+    ]);
+  },
 });
 
 let gitAvailable = false;
