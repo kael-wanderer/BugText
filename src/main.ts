@@ -119,6 +119,7 @@ import {
 } from "./filesys";
 import { runExclusiveFileOp } from "./file-op-guard";
 import { createPalette, type PaletteItem } from "./palette";
+import { windowTitle } from "./window-title";
 import { openBinaryHistoryPanel, openHistoryPanel } from "./historyview";
 import { markdownOutline } from "./outline";
 import { addRecent, loadRecent, saveRecent } from "./recent";
@@ -388,6 +389,8 @@ function persistUiState(): void {
   window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(flushUiState, 300);
 }
+let workspaceDisplayName: string | null = null;
+let shownWindowTitle = "";
 const workspaceController = createWorkspaceController({
   io: workspacesIO(nativeWindowLabel),
   capture: () => {
@@ -403,8 +406,8 @@ const workspaceController = createWorkspaceController({
   },
   display: name => {
     queueMicrotask(() => void refreshPinnedMenu());
-    document.title = name ? `${name} — BugText` : "BugText";
-    void currentNativeWindow?.setTitle(document.title).catch(() => {});
+    workspaceDisplayName = name;
+    refreshWindowTitle();
     const header = document.querySelector<HTMLElement>("#explorer");
     if (!header) return;
     let element = header.querySelector<HTMLElement>(".workspace-name");
@@ -432,6 +435,22 @@ if (!isPrimaryNativeWindow) void currentNativeWindow?.onCloseRequested(async () 
   await workspaceController.flush().catch(() => {});
   await updateReopen(workspacesIO(nativeWindowLabel), id, null).catch(() => {});
 });
+
+function refreshWindowTitle(): void {
+  const s = getState();
+  const pane = s.windows.find(w => w.id === s.activeWindowId);
+  const tab = pane?.tabs.find(t => t.id === pane.activeTabId);
+  const title = windowTitle({
+    fileName: tab?.name ?? null,
+    dirty: tab?.dirty ?? false,
+    folderName: s.folder ? basename(s.folder) : null,
+    workspaceName: workspaceDisplayName,
+  });
+  if (title === shownWindowTitle) return;
+  shownWindowTitle = title;
+  document.title = title;
+  void currentNativeWindow?.setTitle(title).catch(() => {});
+}
 
 function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
@@ -4441,6 +4460,7 @@ function scheduleWindowReport(): void {
 
 subscribe(() => {
   refreshStatusBar();
+  refreshWindowTitle();
   const s = getState();
   if (s.folder !== indexedFolder) {
     if (!indexedFolder && s.folder) markOnboarded();
