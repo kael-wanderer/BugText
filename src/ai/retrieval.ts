@@ -110,6 +110,21 @@ export function buildIndex(chunks: Chunk[]): RetrievalIndex {
   };
 }
 
+// Common English words that say nothing about which note a question is about. They are
+// dropped from the query only (the index keeps them), unless nothing else is left.
+const QUERY_STOP_WORDS = new Set(("a about above after again all am an and any are as at be because been before being " +
+  "below between both but by can could did do does doing down during each few for from further had has have having he " +
+  "her here hers him his how i if in into is it its just me more most my no nor not now of off on once only or other " +
+  "our ours out over own same she should so some such than that the their theirs them then there these they this those " +
+  "through to too under until up very was we were what when where which while who whom why will with would you your " +
+  "yours tell show give please answer explain describe").split(" "));
+
+export function queryTerms(query: string): Set<string> {
+  const all = tokenize(query);
+  const kept = all.filter((term) => !QUERY_STOP_WORDS.has(term));
+  return new Set(kept.length ? kept : all);
+}
+
 export function retrieveScored(
   index: RetrievalIndex,
   query: string,
@@ -117,7 +132,7 @@ export function retrieveScored(
   excludePath?: string,
 ): { chunk: Chunk; score: number }[] {
   if (index.n === 0) return [];
-  const terms = new Set(tokenize(query));
+  const terms = queryTerms(query);
   const scored: { i: number; score: number }[] = [];
 
   for (let i = 0; i < index.n; i += 1) {

@@ -50,6 +50,20 @@ describe("retrieve (BM25)", () => {
     expect(retrieve(index, "decision", 1)[0].path).toBe("/f/decisions/Booking provider.md");
   });
 
+  it("does not let common words like 'the' and 'why' outrank the words that matter", () => {
+    const index = buildIndex([
+      { path: "/f/Launch talk.md", heading: "Why now", text: "Why did we do it? The menu is in the window and we did it on the day." },
+      { path: "/f/Booking provider.md", heading: "Decision", text: "Use TableNow for online bookings, embedded on the book a table page." },
+      { path: "/f/Kickoff.md", heading: "Kickoff", text: "Launch before the holiday menu." },
+    ]);
+    expect(retrieve(index, "Which booking provider did we pick, and why?", 1)[0].path).toBe("/f/Booking provider.md");
+  });
+
+  it("still searches when a query is made only of common words", () => {
+    const index = buildIndex([{ path: "/f/a.md", heading: "", text: "why not" }, { path: "/f/b.md", heading: "", text: "menu" }]);
+    expect(retrieve(index, "why", 1)[0]?.path).toBe("/f/a.md");
+  });
+
   it("handles an empty index", () => {
     expect(retrieve(buildIndex([]), "anything", 5)).toEqual([]);
   });

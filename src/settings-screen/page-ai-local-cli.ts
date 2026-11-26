@@ -199,8 +199,10 @@ export function renderLocalCli(
         ),
       );
       if (tool === "claude" && (info?.accounts.length ?? 0) > 1) {
-        card.append(
-          text("label", "Account"),
+        const account = document.createElement("label");
+        account.className = "st-cli-account";
+        account.append(
+          text("span", "Account", "st-cli-account-name"),
           select(
             `${label} Account`,
             info!.accounts.map((a) => ({ value: a.dir, label: a.label })),
@@ -208,6 +210,7 @@ export function renderLocalCli(
             (value) => update("claude", "configDir", value),
           ),
         );
+        card.append(account);
       }
       const tags = document.createElement("div");
       tags.className = "st-cli-tags";

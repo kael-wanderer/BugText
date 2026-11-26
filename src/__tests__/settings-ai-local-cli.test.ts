@@ -94,9 +94,13 @@ it("shows Account only with multiple Claude accounts", async () => {
   expect(host.querySelector('[aria-label="Claude Code Account"]')).toBeNull();
   clis[0].accounts.push({ label: "work", dir: "/home/.claude-work" });
   host = await render();
-  expect(
-    host.querySelector('[aria-label="Claude Code Account"]'),
-  ).not.toBeNull();
+  const account = host.querySelector('[aria-label="Claude Code Account"]');
+  expect(account).not.toBeNull();
+  // The label and its menu sit in one spaced row, not run together.
+  const row = account!.parentElement;
+  expect(row?.tagName).toBe("LABEL");
+  expect(row?.className).toBe("st-cli-account");
+  expect(row?.querySelector(".st-cli-account-name")?.textContent).toBe("Account");
 });
 it("rejects unsafe proxy without saving", async () => {
   const host = await render();

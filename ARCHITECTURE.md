@@ -300,7 +300,8 @@ Note/selection and Folder search chips default on; keyword retrieval adds up to
 `workspaceContextK` chunks while search is on. The Unicode tokenizer keeps runs of
 letters, digits and combining marks whole, normalizes composed accents, and adds
 a diacritic-free second token (including `đ` to `d`) only for Latin-script words.
-Query terms are de-duplicated before keyword scoring. Each chunk is indexed with its
+Query terms are de-duplicated before keyword scoring, and common English
+words (`QUERY_STOP_WORDS`) are dropped from the query unless nothing else is left. Each chunk is indexed with its
 note's file name and section heading as well as its body. Replies render through `ai/reply-markdown.ts` (markdown-it with
 HTML and images off, then `sanitizeHtml`; the Markdown source is kept for saving and
 copying; links open notes inside the folder or the browser). Replies show timing, model and

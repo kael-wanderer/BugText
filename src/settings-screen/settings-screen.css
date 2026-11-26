@@ -863,6 +863,18 @@
   border-radius: 50%;
   background: var(--st-surface-2);
 }
+.st-cli-account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+}
+
+.st-cli-account-name {
+  font-size: var(--st-t-md);
+  color: var(--text-strong);
+}
+
 .st-cli-tags {
   display: flex;
   gap: 6px;
