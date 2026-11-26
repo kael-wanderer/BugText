@@ -76,13 +76,18 @@ export function chunkDocument(
   return chunks;
 }
 
+function noteName(path: string): string {
+  return (path.split(/[\\/]/).pop() ?? "").replace(/\.(md|markdown|txt)$/i, "");
+}
+
 export function buildIndex(chunks: Chunk[]): RetrievalIndex {
   const tf: Map<string, number>[] = [];
   const lengths: number[] = [];
   const df = new Map<string, number>();
 
   for (const chunk of chunks) {
-    const tokens = tokenize(chunk.text);
+    // A chunk is found by its note's name and section heading too, not only its body.
+    const tokens = tokenize(`${noteName(chunk.path)}\n${chunk.heading}\n${chunk.text}`);
     const counts = new Map<string, number>();
     for (const token of tokens) {
       counts.set(token, (counts.get(token) ?? 0) + 1);

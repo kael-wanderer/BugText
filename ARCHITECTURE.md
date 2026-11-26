@@ -300,7 +300,8 @@ Note/selection and Folder search chips default on; keyword retrieval adds up to
 `workspaceContextK` chunks while search is on. The Unicode tokenizer keeps runs of
 letters, digits and combining marks whole, normalizes composed accents, and adds
 a diacritic-free second token (including `đ` to `d`) only for Latin-script words.
-Query terms are de-duplicated before keyword scoring. Replies show timing, model and
+Query terms are de-duplicated before keyword scoring. Each chunk is indexed with its
+note's file name and section heading as well as its body. Replies show timing, model and
 source links, with Copy, Insert at cursor, Replace selection (source-bound diff
 review), and Save as new note. The compose input and running reply survive settings
 refreshes. File references arrive via 📎, drag-drop or fuzzy `@`-mention. CLI agents

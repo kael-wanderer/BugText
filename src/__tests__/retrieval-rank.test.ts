@@ -40,6 +40,16 @@ describe("retrieve (BM25)", () => {
     expect(hits[0].path).toBe("/a.md");
   });
 
+  it("matches a note by its file name and section heading, not only its body", () => {
+    const index = buildIndex([
+      { path: "/f/decisions/Booking provider.md", heading: "Decision", text: "Use TableNow for online bookings." },
+      { path: "/f/Daily/2026-11-15.md", heading: "2026-11-15", text: "Read the comparison on the train." },
+    ]);
+    const hits = retrieve(index, "what did we decide about the booking provider", 2);
+    expect(hits[0].path).toBe("/f/decisions/Booking provider.md");
+    expect(retrieve(index, "decision", 1)[0].path).toBe("/f/decisions/Booking provider.md");
+  });
+
   it("handles an empty index", () => {
     expect(retrieve(buildIndex([]), "anything", 5)).toEqual([]);
   });
