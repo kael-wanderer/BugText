@@ -9,6 +9,13 @@
 
   <body class="view-split">
     <div id="app">
+      <header id="titlebar" data-tauri-drag-region>
+        <button id="goto-file" type="button" aria-label="Go to file or command">
+          <span class="goto-icon" aria-hidden="true">⌕</span>
+          <span class="goto-label">Go to file or command</span>
+          <kbd>⌘K</kbd>
+        </button>
+      </header>
       <div class="workbench">
         <nav id="activitybar" aria-label="Primary">
           <button

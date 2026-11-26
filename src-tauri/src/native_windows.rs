@@ -79,6 +79,9 @@ pub fn create(app: &AppHandle, reserved_label: Option<&str>) -> tauri::Result<We
     .title("BugText")
     .inner_size(WINDOW_SIZE.0, WINDOW_SIZE.1)
     .min_inner_size(640.0, 420.0);
+    // The app draws its own title strip (with Go to file) under the traffic lights.
+    #[cfg(target_os = "macos")]
+    let builder = builder.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
     match place {
         Some((x, y)) => builder.position(x, y),
         None => builder.center(),

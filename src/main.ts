@@ -449,6 +449,8 @@ function refreshWindowTitle(): void {
   });
   if (title === shownWindowTitle) return;
   shownWindowTitle = title;
+  const gotoLabel = document.querySelector<HTMLElement>("#goto-file .goto-label");
+  if (gotoLabel) gotoLabel.textContent = s.folder ? `Go to file — ${workspaceDisplayName || basename(s.folder)}` : "Go to file or command";
   document.title = title;
   void currentNativeWindow?.setTitle(title).catch(() => {});
 }
@@ -1117,6 +1119,10 @@ const palette = createPalette(() => [
   ...outlineItems(),
   ...commandItems(),
 ], { folder: () => getState().folder });
+
+// macOS windows use an overlay title bar; its strip holds Go to file, which opens the palette.
+if (/Mac/.test(navigator.userAgent)) document.body.classList.add("overlay-titlebar");
+document.getElementById("goto-file")?.addEventListener("click", () => palette.open());
 
 let lastMarkdownFocus: { windowId: string; tabId: string } | null = null;
 

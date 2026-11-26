@@ -7,6 +7,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
 ## [Unreleased]
 
 ### Added
+- macOS: a Go to file button in the middle of the title bar opens the ⌘K palette and shows which folder the window has open. The title bar is now drawn by BugText (drag it to move the window, double-click to zoom); the window title still names the file and folder in the Dock and Window menus.
 - The Dock menu lists up to five recent folders (right-click the BugText icon). Choosing one brings forward the window that already shows it, or opens it in a new window. Folders that no longer exist are left out.
 - Each Settings page has a Guide link next to its title that opens the guide page explaining it (AI ▸ Actions and AI ▸ MCP open their own pages). The guide test checks every linked page is published.
 - Settings ▸ General ▸ Check for updates answers in the row: Checking…, up to date, Retry with the reason a check failed, or Download <version> opening the download page. Opening the page checks again when the last answer is older than five minutes. Help ▸ Check for Updates… opens this row instead of a dialog.
