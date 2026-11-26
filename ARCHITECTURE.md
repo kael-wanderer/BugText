@@ -438,3 +438,5 @@ window; `presenter.html` is a separate entry with only event and close permissio
 The running snapshot does not receive live updates.
 
 The sidebar width (`resize.ts`) goes up to 70% of the window while the editor keeps 320 px. A narrower window shows the sidebar narrower without changing the saved width; double-clicking the edge resets it to 240 px. While the sidebar, AI panel or pane edge is dragged, preview iframes take no pointer events. Long file names in the Explorer cut in the middle (`appendMiddleEllipsisName`) so the end and extension stay visible, and a cut name shows its folder-relative path on hover.
+
+The Dock menu (`macos_dock.rs`) lists pinned workspaces, then up to 5 recent folders (`recent_folders.rs`) that still exist. Each window sends the shared recent list through `set_recent_folders` when it is saved and when the window gains focus. Choosing a folder brings forward the window that last reported it (the MCP window registry), or opens a new window that takes the folder with `take_window_folder` at boot.

@@ -12,6 +12,35 @@ mod platform {
 
     static APP: OnceLock<AppHandle> = OnceLock::new();
     static DOCK_IDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static DOCK_FOLDERS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+    unsafe extern "C-unwind" fn open_recent_folder_action(
+        _delegate: *mut AnyObject,
+        _command: Sel,
+        sender: *mut NSMenuItem,
+    ) {
+        let Some(app) = APP.get() else {
+            return;
+        };
+        let Some(sender) = (unsafe { sender.as_ref() }) else {
+            return;
+        };
+        let folder = DOCK_FOLDERS
+            .lock()
+            .ok()
+            .and_then(|folders| folders.get(sender.tag() as usize).cloned());
+        if let Some(folder) = folder {
+            crate::recent_folders::open_folder_window(app, folder);
+        }
+    }
+
+    fn section_label(mtm: MainThreadMarker, title: &str) -> Retained<NSMenuItem> {
+        let title = NSString::from_str(title);
+        let empty = NSString::from_str("");
+        let item = unsafe { NSMenuItem::initWithTitle_action_keyEquivalent(NSMenuItem::alloc(mtm), &title, None, &empty) };
+        item.setEnabled(false);
+        item
+    }
 
     unsafe extern "C-unwind" fn open_workspace_action(
         _delegate: *mut AnyObject,
@@ -84,6 +113,37 @@ mod platform {
             if !items.is_empty() {
                 menu.addItem(&NSMenuItem::separatorItem(mtm));
             }
+            let folders = app
+                .state::<crate::recent_folders::RecentFoldersState>()
+                .folders
+                .lock()
+                .map(|folders| folders.clone())
+                .unwrap_or_default();
+            if let Ok(mut known) = DOCK_FOLDERS.lock() {
+                *known = folders.clone();
+            }
+            if !folders.is_empty() {
+                menu.addItem(&section_label(mtm, "Recent Folders"));
+                for (index, folder) in folders.iter().enumerate() {
+                    let name = NSString::from_str(&crate::recent_folders::display_name(folder));
+                    let empty = NSString::from_str("");
+                    let item = unsafe {
+                        NSMenuItem::initWithTitle_action_keyEquivalent(
+                            NSMenuItem::alloc(mtm),
+                            &name,
+                            Some(sel!(bugtextOpenRecentFolder:)),
+                            &empty,
+                        )
+                    };
+                    item.setTag(index as isize);
+                    item.setToolTip(Some(&NSString::from_str(folder)));
+                    unsafe {
+                        item.setTarget(delegate.as_ref());
+                    }
+                    menu.addItem(&item);
+                }
+                menu.addItem(&NSMenuItem::separatorItem(mtm));
+            }
         }
         let item_title = NSString::from_str("New Window");
         let empty = NSString::from_str("");
@@ -135,6 +195,15 @@ mod platform {
                     unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut NSMenuItem),
                     Imp,
                 >(open_workspace_action),
+                action_types,
+            );
+            class_addMethod(
+                class_ptr,
+                sel!(bugtextOpenRecentFolder:),
+                std::mem::transmute::<
+                    unsafe extern "C-unwind" fn(*mut AnyObject, Sel, *mut NSMenuItem),
+                    Imp,
+                >(open_recent_folder_action),
                 action_types,
             );
             class_addMethod(

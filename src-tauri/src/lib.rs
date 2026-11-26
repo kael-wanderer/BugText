@@ -35,6 +35,7 @@ mod presenter;
 mod pdf_drafts;
 mod pdf_annotations;
 mod preview;
+mod recent_folders;
 mod recovery;
 mod sandbox;
 mod secrets;
@@ -204,6 +205,7 @@ pub fn run() {
         .manage(presenter::PresenterOwner::default())
         .manage(workspaces::WorkspaceState::default())
         .manage(pinned_workspaces::PinnedState::default())
+        .manage(recent_folders::RecentFoldersState::default())
         .manage(preview::PreviewRoots::default())
         .manage(preview::PreviewDocs::default())
         .manage(workflow_store::WorkflowStoreState::default())
@@ -379,6 +381,8 @@ pub fn run() {
             window_tile,
             native_windows::new_window,
             pinned_workspaces::set_pinned_workspaces,
+            recent_folders::set_recent_folders,
+            recent_folders::take_window_folder,
             workspaces::read_workspaces,
             workspaces::write_workspaces,
             workspaces::workspace_claim,
