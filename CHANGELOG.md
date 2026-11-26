@@ -75,6 +75,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Changed
+- The window title names what the window shows: `file — folder` (the workspace name when one is open, `●` before the file when it has unsaved changes, the folder alone when no file is open). Two BugText windows now appear by name in the Dock menu and the Window menu instead of both as "BugText".
 - Automatic update checks announce a new version once, as a notice with Download, instead of a dialog at launch.
 - Builds are signed with the stable local identity "BugText Local Dev" (`npm run build:app`, which sets `APPLE_SIGNING_IDENTITY`), so after an update the macOS Keychain keeps "Always Allow" for saved API keys instead of asking for the login password again. The first build signed this way asks once per saved key.
 - Mermaid 12 (12.3): diagrams keep the previous dagre layout and classic look, with the same strict security settings. Clears the bundled KaTeX advisory.
