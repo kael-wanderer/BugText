@@ -55,6 +55,9 @@ table and a detail block below. Reference the failing test-case ID.
 | BUG-047 | 2026-11-23 | Import | Major | Manual run (IMP) | Cancel could not stop a running import: Cancel was disabled while busy, and Esc closed the sheet but the import went on, reopened the sheet and created the note; a hanging Pandoc left "Converting…" forever | fixed (unreleased) |
 | BUG-048 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Denying BugText's Keychain request made chat say "The key was rejected." although no key was sent | fixed (unreleased) |
 | BUG-049 | 2026-11-23 | AI | Minor | Manual run (guide screenshots) | Claude Code as the chat engine failed with "Failed to refresh OAuth token: can't save to the Keychain" inside the sandbox | fixed |
+| BUG-050 | 2026-11-26 | AI / folder search | Minor | Manual run (guide screenshots) | Chat folder search missed `decisions/Booking provider.md` when asked about "the booking provider": a note's name and headings were not searched | fixed (unreleased) |
+| BUG-051 | 2026-11-26 | AI / folder search | Minor | Manual run (guide screenshots) | Common words in a question ("the", "did", "why") let unrelated notes outrank the note the question was about | fixed (unreleased) |
+| BUG-052 | 2026-11-26 | Settings / AI | Minor | Manual run (guide screenshots) | Settings ▸ AI ▸ Local CLI: the Claude Code "Account" label ran into its menu with no space | fixed (unreleased) |
 
 > Delete the example row once real bugs are logged.
 
@@ -465,4 +468,39 @@ Copy this template for each new bug:
 - **Expected:** An answer, or a clear message to sign in again.
 - **Actual:** The reply shows "Failed to refresh OAuth token: can't save to the Keychain… If sandboxed, use `claude setup-token`".
 - **Notes:** The sandbox allows reading `~/Library/Keychains` but not writing it. Tested 2026-11-24: saving an item needs write and unlink on `login.keychain-db` itself (macOS replaces the file), so allowing it would let any sandboxed run delete or replace the login keychain. Not done. Instead, Settings ▸ AI ▸ Local CLI ▸ Claude Code has an optional sign-in token (from `claude setup-token`), kept in BugText's Keychain entry `cli-claude-token` and passed as `CLAUDE_CODE_OAUTH_TOKEN`, so Claude Code never needs to refresh. A saved API key still wins, the token is never sent when a proxy is set, and it is redacted from output. Without a token, a sign-in failure now reads "Claude Code needs you to sign in again" with the exact `CLAUDE_CONFIG_DIR=… claude auth login` command for the profile in use. Workaround used 2026-11-24: `CLAUDE_CONFIG_DIR=~/.claude claude auth login`. Verified 2026-11-24 in signed build 256: with the config directory set to an empty profile (`loggedIn: false`), Claude Code Test answered using the saved token.
+- **Status:** fixed (unreleased).
+
+### BUG-050 — Folder search missed a note named in the question
+
+- **Feature / test case:** AI chat with Folder search on
+- **Severity:** Minor
+- **Environment:** macOS, signed build 257, Café demo folder
+- **Steps to reproduce:**
+  1. Open a folder with `decisions/Booking provider.md` (heading "Booking provider", body "Use TableNow…").
+  2. Ask chat "What did we decide about the booking provider?".
+- **Expected:** The decision note is among the excerpts sent, and the answer names TableNow.
+- **Actual:** The note ranked 6th, chat sends 5 excerpts, and the answer said no decision was recorded.
+- **Notes:** `buildIndex` in `src/ai/retrieval.ts` scored only each chunk's body; "provider" appeared only in the file name and heading. Each chunk is now indexed with its note's name and section heading as well. Verified in signed build 258: the note is a source and the answer names TableNow.
+- **Status:** fixed (unreleased).
+
+### BUG-051 — Common words outranked the words that matter
+
+- **Feature / test case:** AI chat with Folder search on
+- **Severity:** Minor
+- **Environment:** macOS, build 258, Café demo folder
+- **Steps to reproduce:**
+  1. Ask "Which booking provider did we pick, and why?".
+- **Expected:** The booking notes rank first.
+- **Actual:** `Launch talk.md` ranked first because it holds "why", "did" and "we".
+- **Notes:** `queryTerms` in `src/ai/retrieval.ts` drops common English words from the query (the index keeps them); a question made only of such words still searches with them. Checked against the demo folder: the booking notes now rank first.
+- **Status:** fixed (unreleased).
+
+### BUG-052 — Account label ran into its menu
+
+- **Feature / test case:** Settings ▸ AI ▸ Local CLI, Claude Code with more than one account
+- **Severity:** Minor
+- **Environment:** macOS, signed build 257
+- **Expected:** "Account" and its menu in one row with space between them.
+- **Actual:** "Accountdefault" with no gap.
+- **Notes:** The label and the select were appended to the card separately. They now sit in one `label.st-cli-account` row with a 10 px gap. Verified in signed build 260; guide screenshot `ai/set-up-ai/local-cli.png` retaken.
 - **Status:** fixed (unreleased).
