@@ -2528,6 +2528,24 @@ body.no-folder .explorer-empty {
   text-overflow: ellipsis;
 }
 
+/* Middle ellipsis: the head shrinks, the tail (end of name and extension) stays. */
+.tree-name:has(.tree-name-head) {
+  display: flex;
+  min-width: 0;
+}
+
+.tree-name-head {
+  min-width: 2ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-name-tail {
+  flex: none;
+  white-space: nowrap;
+}
+
 .tree-input {
   flex: 1;
   min-width: 0;

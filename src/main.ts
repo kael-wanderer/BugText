@@ -143,7 +143,7 @@ import {
   type ExportFormat,
   type ExportItem,
 } from "./export-options";
-import { initResize } from "./resize";
+import { applySidebarWidth, initResize } from "./resize";
 import { clearPdfEditDraft, hasPdfEditDraft } from "./pdfview";
 import {
   applySettings,
@@ -3574,7 +3574,7 @@ setState({
   explorerVisible: ui.explorerVisible,
   explorerWidth: ui.explorerWidth,
 });
-document.documentElement.style.setProperty("--explorer-w", `${ui.explorerWidth}px`);
+applySidebarWidth(ui.explorerWidth);
 document.body.classList.toggle("explorer-hidden", !ui.explorerVisible);
 function agentPanelWidth(width = ui.aiWidth): number {
   return clampAgentPanelWidth(width, {
@@ -4922,7 +4922,7 @@ async function switchWorkspace(workspace: Workspace): Promise<void> {
     ui = { ...ui, sidebarView: sidebar.view === "outline" ? "outline" : "explorer", outlineTab: sidebar.outlineTab === "links" || sidebar.outlineTab === "filter" ? sidebar.outlineTab : "outline" };
     setState({ explorerVisible: sidebar.visible, explorerWidth: sidebar.width });
     document.body.classList.toggle("explorer-hidden", !sidebar.visible);
-    document.documentElement.style.setProperty("--explorer-w", `${sidebar.width}px`);
+    applySidebarWidth(sidebar.width);
     applySidebarView();
     outlineView.selectTab(ui.outlineTab ?? "outline");
     setAIVisible(workspace.layout.aiVisible);
