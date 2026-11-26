@@ -123,7 +123,7 @@ import { windowTitle } from "./window-title";
 import { lineMatchRange } from "./line-match";
 import { openBinaryHistoryPanel, openHistoryPanel } from "./historyview";
 import { markdownOutline } from "./outline";
-import { addRecent, loadRecent, saveRecent } from "./recent";
+import { addRecent, loadRecent, onRecentSaved, saveRecent } from "./recent";
 import { breadcrumbsPath, joinPath, parentPath, relativePath } from "./paths";
 import { createFromTemplate } from "./templates/library";
 import { dailyNotePlan } from "./notes/daily";
@@ -4943,6 +4943,22 @@ async function openWorkspaceWindow(workspace: Workspace): Promise<void> {
 }
 
 /** A window created by workspace_open_window opens the workspace it was made for. */
+// The Dock menu lists recent folders; every window sends the shared list when it changes or gains focus.
+const syncDockFolders = (folders = loadRecent().folders): void => { void invoke("set_recent_folders", { folders }).catch(() => {}); };
+onRecentSaved(items => syncDockFolders(items.folders));
+window.addEventListener("focus", () => syncDockFolders());
+syncDockFolders();
+
+/** A window opened from a Dock recent folder opens that folder. */
+async function openPendingFolder(): Promise<void> {
+  const folder = await invoke<string | null>("take_window_folder").catch(() => null);
+  if (!folder) return;
+  await openFolder(folder);
+  const items = loadRecent();
+  saveRecent({ ...items, folders: addRecent(items.folders, folder) });
+  await refreshFileList();
+}
+
 async function openPendingWorkspace(): Promise<void> {
   const id = await invoke<string | null>("take_window_workspace").catch(() => null);
   if (!id) return;
@@ -5043,6 +5059,7 @@ async function boot(): Promise<void> {
   sessionReady = true;
   persistUiState();
   if (!isPrimaryNativeWindow) await openPendingWorkspace();
+  await openPendingFolder();
   if (isPrimaryNativeWindow) {
     await restoreDrafts({ review: () => openRecoveryReview(), restoreAll: () => openRecoveryReview(true), host: windowsHost.querySelector<HTMLElement>('.window[data-window-id="main"]')! });
   }

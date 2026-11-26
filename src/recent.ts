@@ -25,6 +25,14 @@ export function loadRecent(key = DEFAULT_RECENT_KEY): RecentItems {
   }
 }
 
+let onSaved: ((items: RecentItems) => void) | null = null;
+
+/** Called after every save of the default list (the Dock menu mirrors recent folders). */
+export function onRecentSaved(listener: (items: RecentItems) => void): void {
+  onSaved = listener;
+}
+
 export function saveRecent(items: RecentItems, key = DEFAULT_RECENT_KEY): void {
   localStorage.setItem(key, JSON.stringify(items));
+  if (key === DEFAULT_RECENT_KEY) onSaved?.(items);
 }

@@ -253,6 +253,15 @@ pub fn mcp_report_window(window: tauri::WebviewWindow, folder: Option<String>, o
     state.core.lock().expect("MCP state poisoned").windows.insert(window.label().to_string(), report);
 }
 
+/// The window whose open folder satisfies `matches`, from what each window last reported.
+pub fn window_with_folder(state: &McpState, matches: impl Fn(&std::path::Path) -> bool) -> Option<String> {
+    let core = state.core.lock().ok()?;
+    core.windows
+        .iter()
+        .find(|(_, report)| report.folder.as_deref().is_some_and(&matches))
+        .map(|(label, _)| label.clone())
+}
+
 pub fn drop_window(state: &McpState, label: &str) {
     state.core.lock().expect("MCP state poisoned").windows.remove(label);
 }
