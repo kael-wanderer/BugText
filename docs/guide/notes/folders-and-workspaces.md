@@ -31,6 +31,8 @@ The **Toggle Sub window** button in the window toolbar adds a second pane, calle
 
 **File** ▸ **New Window** (<kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>N</kbd>), or right-click BugText in the Dock, opens another window with its own folder and tabs. **Window** ▸ **Move to Left Half** and **Move to Right Half** tile it on the current screen.
 
+Each window is named after its file and folder, for example `Project plan.md — Cafe Website`, so the Dock and the **Window** menu tell windows apart. Right-clicking BugText in the Dock also lists your recent folders: choosing one brings forward the window that has it open, or opens it in a new window.
+
 ### Workspaces
 
 1. Arrange a window the way you like it: folder, tabs, split.

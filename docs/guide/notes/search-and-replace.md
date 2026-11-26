@@ -21,7 +21,11 @@ BugText can search one note, every file in the folder (PDFs included), or just t
 
 1. Press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>F</kbd> or click Search in the activity bar.
 2. Type what you are looking for. Use **Aa** for matching case, the whole-word button, and **.\*** for a regular expression.
-3. Results are grouped by file with highlighted snippets. Click one to open the file at that line, or a PDF at that page.
+3. Files whose name matches come first, under **Files**. Pasting a path, such as `docs/plans/launch.md`, lists that file at the top; press <kbd>Return</kbd> to open it.
+4. Matches inside files follow, grouped by file. Click a line to open the file there with the match selected, or a PDF at that page. Click a file name to open it at its first match, or its arrow to hide its matches.
+5. <kbd>↑</kbd> and <kbd>↓</kbd> move through the results and <kbd>Return</kbd> opens one. The results stay, so you can open the next; the last one you opened is marked.
+
+Right-click a result to open it to the side, reveal it in Finder or the Explorer, or copy its path. In a git repository, files that git ignores (`.gitignore`) are not searched, and neither are `node_modules` or compiled Python files.
 
 Add operators to narrow the search:
 

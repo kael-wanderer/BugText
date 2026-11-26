@@ -31,9 +31,9 @@ BugText remembers the folder, your tabs and where you were in each one for next 
 
 ### Find anything with ⌘K
 
-Press <kbd>⌘</kbd> <kbd>K</kbd> and start typing:
+Press <kbd>⌘</kbd> <kbd>K</kbd>, or click **Go to file** in the middle of the title bar, and start typing:
 
-- Part of a file name opens that file.
+- Part of a file name opens that file. You can also paste a path; add `:42` to open it at line 42.
 - Part of a command name runs it, for example `daily` for **Open Daily Note** or `graph` for **Graph: Open Local Graph**.
 
 To search inside every file instead, press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>F</kbd>.
