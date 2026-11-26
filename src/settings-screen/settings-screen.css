@@ -44,7 +44,7 @@
    workbench grid underneath keeps its exact layout. */
 #settings-rail {
   position: fixed;
-  top: 0;
+  top: var(--titlebar-h, 0px);
   bottom: 0;
   left: 48px;
   width: var(--explorer-w, 240px);
@@ -171,7 +171,7 @@
 
 #settings-pane {
   position: fixed;
-  top: 0;
+  top: var(--titlebar-h, 0px);
   right: 0;
   bottom: 0;
   left: calc(48px + var(--explorer-w, 240px));
