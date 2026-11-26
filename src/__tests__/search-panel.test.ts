@@ -170,4 +170,28 @@ describe("search panel as a list to act on", () => {
     expect(onOpenHit).not.toHaveBeenCalled();
     expect(host.textContent).toContain("This result changed since the search");
   });
+
+  it("collapses a file's hits from its arrow without opening it", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("a.md")) : Promise.resolve());
+    const onOpenHit = vi.fn();
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit });
+    const input = host.querySelector("input")!; input.value = "hello"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
+    host.querySelector<HTMLElement>(".search-twisty")!.click();
+    expect(host.querySelector(".search-hit")).toBeNull();
+    expect(host.querySelector(".search-twisty")?.getAttribute("aria-expanded")).toBe("false");
+    host.querySelector<HTMLElement>(".search-twisty")!.click();
+    expect(host.querySelector(".search-hit")).not.toBeNull();
+    expect(onOpenHit).not.toHaveBeenCalled();
+  });
+
+  it("offers a menu on right-click with the hit's path, relative path and line", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("docs/a.md")) : Promise.resolve());
+    const onResultMenu = vi.fn();
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => ["docs/a.md"], onOpenHit: () => {}, onResultMenu });
+    const input = host.querySelector("input")!; input.value = "a.md"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
+    host.querySelector(".search-file-match")!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(onResultMenu).toHaveBeenLastCalledWith(0, 0, expect.objectContaining({ path: "/a/docs/a.md", relative: "docs/a.md", line: undefined }));
+    host.querySelector(".search-hit")!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(onResultMenu).toHaveBeenLastCalledWith(0, 0, expect.objectContaining({ path: "/a/docs/a.md", relative: "docs/a.md", line: 1 }));
+  });
 });

@@ -95,6 +95,45 @@ fn walk_files_capped(dir: &Path, root: &Path, out: &mut Vec<String>, is_current:
     false
 }
 
+/// Folders that are never worth searching, even without a `.gitignore` saying so.
+fn is_noise_dir(name: &str) -> bool {
+    name == "node_modules" || name == "__pycache__"
+}
+
+/// Files for search and the palette: like `walk_files_capped`, but honouring `.gitignore`,
+/// `.git/info/exclude` and `.ignore` the way git does (only inside a git repository, so a
+/// stray `.gitignore` above an unrelated folder hides nothing). Sorted, capped at `WALK_CAP`.
+pub(crate) fn walk_search_files(root: &Path, is_current: &impl Fn() -> bool) -> (Vec<String>, bool) {
+    let mut out = Vec::new();
+    let walker = ignore::WalkBuilder::new(root)
+        .hidden(true)
+        .git_ignore(true)
+        .git_exclude(true)
+        .git_global(false)
+        .ignore(true)
+        .parents(true)
+        .require_git(true)
+        .follow_links(false)
+        .sort_by_file_name(|a, b| a.cmp(b))
+        .filter_entry(|entry| entry.depth() == 0 || !(should_skip(&entry.file_name().to_string_lossy()) || is_noise_dir(&entry.file_name().to_string_lossy())))
+        .build();
+    for entry in walker.flatten() {
+        if !is_current() {
+            return (out, false);
+        }
+        if entry.depth() == 0 || entry.file_type().is_some_and(|kind| kind.is_dir()) {
+            continue;
+        }
+        if out.len() >= WALK_CAP {
+            return (out, true);
+        }
+        if let Ok(relative) = entry.path().strip_prefix(root) {
+            out.push(relative.to_string_lossy().into_owned());
+        }
+    }
+    (out, false)
+}
+
 #[tauri::command]
 pub async fn list_dir(path: String) -> Result<Vec<Entry>, String> {
     tauri::async_runtime::spawn_blocking(move || read_entries(&path)).await.map_err(|_| "File read failed")?
@@ -102,7 +141,7 @@ pub async fn list_dir(path: String) -> Result<Vec<Entry>, String> {
 
 #[tauri::command]
 pub async fn list_files_recursive(folder: String) -> Result<Vec<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || walk_files_counted(Path::new(&folder)).0).await.map_err(|_| "File read failed".into())
+    tauri::async_runtime::spawn_blocking(move || walk_search_files(Path::new(&folder), &|| true).0).await.map_err(|_| "File read failed".into())
 }
 
 #[derive(Serialize)]
@@ -261,6 +300,7 @@ pub(crate) fn is_known_binary(extension: &str) -> bool {
         "zip", "gz", "tgz", "bz2", "xz", "7z", "rar", "dmg", "pkg",
         "ttf", "otf", "woff", "woff2", "docx", "xlsx", "pptx", "key", "numbers", "pages",
         "sqlite", "db", "exe", "dll", "dylib", "so", "o", "a", "class", "jar", "wasm",
+        "pyc", "pyo", "pyd", "bin", "iso", "psd",
     ];
     BINARY.iter().any(|known| extension.eq_ignore_ascii_case(known))
 }
@@ -271,8 +311,8 @@ fn search_folder_at(
     is_current: impl Fn() -> bool,
 ) -> SearchResult {
     let mut result = SearchResult::default();
-    let mut files = Vec::new();
-    result.walk_limit = walk_files_capped(root, root, &mut files, &is_current);
+    let (files, walk_limit) = walk_search_files(root, &is_current);
+    result.walk_limit = walk_limit;
     if !is_current() { result.cancelled = true; return result; }
     for relative in files {
         if !is_current() {
@@ -1241,7 +1281,7 @@ mod drop_copy_tests {
 
 #[cfg(test)]
 mod walk_tests {
-    use super::{should_skip, walk_files};
+    use super::{should_skip, walk_files, walk_search_files};
     use std::fs;
 
     #[test]
@@ -1251,6 +1291,39 @@ mod walk_tests {
         assert!(should_skip(".DS_Store"));
         assert!(!should_skip("notes.md"));
         assert!(!should_skip("src"));
+    }
+
+    #[test]
+    fn search_walk_honours_gitignore_inside_a_repository() {
+        let tmp = std::env::temp_dir().join("bugtext_search_walk_test");
+        let _ = fs::remove_dir_all(&tmp);
+        for dir in [".git", "build", "docs", "src/__pycache__", "node_modules/pkg"] {
+            fs::create_dir_all(tmp.join(dir)).unwrap();
+        }
+        fs::write(tmp.join(".gitignore"), "build/\n*.log\n").unwrap();
+        for file in ["build/report.md", "docs/a.md", "docs/run.log", "src/app.py", "src/__pycache__/app.pyc", "node_modules/pkg/index.js", ".env"] {
+            fs::write(tmp.join(file), "x").unwrap();
+        }
+
+        let (out, capped) = walk_search_files(&tmp, &|| true);
+
+        assert!(!capped);
+        assert_eq!(out, vec!["docs/a.md".to_string(), "src/app.py".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn search_walk_ignores_gitignore_outside_a_repository() {
+        let tmp = std::env::temp_dir().join("bugtext_search_walk_nogit_test");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("build")).unwrap();
+        fs::write(tmp.join(".gitignore"), "build/\n").unwrap();
+        fs::write(tmp.join("build/notes.md"), "x").unwrap();
+
+        let (out, _) = walk_search_files(&tmp, &|| true);
+
+        assert_eq!(out, vec!["build/notes.md".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]

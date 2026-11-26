@@ -1098,6 +1098,19 @@ button.search-file:hover,
   text-align: left;
 }
 
+.search-twisty {
+  flex: none;
+  width: 12px;
+  margin-left: -4px;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.search-twisty:hover {
+  color: var(--text-strong);
+}
+
 .search-count {
   flex: none;
   margin-left: auto;
