@@ -394,7 +394,10 @@ body.resizing-panes {
   user-select: none;
 }
 
-body.resizing-panes iframe {
+/* An HTML or PDF preview frame would swallow the drag once the pointer is over it. */
+body.resizing-panes iframe,
+body.resizing-explorer iframe,
+body.resizing-ai iframe {
   pointer-events: none;
 }
 
@@ -1034,7 +1037,12 @@ body.search-active #search-panel {
 }
 
 .search-group {
-  margin-bottom: 6px;
+  padding: 4px 0;
+}
+
+/* A line between files so one file's hits don't run into the next. */
+.search-group + .search-group {
+  border-top: 1px solid var(--border);
 }
 
 .search-file,
@@ -1176,9 +1184,11 @@ button.search-file:hover,
   text-overflow: ellipsis;
 }
 
+/* Matched text reads as the theme's accent colour, not as a pale block. */
 .search-snippet mark {
-  color: inherit;
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-radius: 2px;
 }
 
