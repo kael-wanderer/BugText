@@ -73,4 +73,34 @@ describe("command palette", () => {
 
     expect(document.querySelectorAll(".palette-row")).toHaveLength(0);
   });
+
+  it("shows the file name in bold first and the folder after it", () => {
+    const palette = createPalette(() => [
+      { id: "f", label: "docs/prompts/2026-11-26-codex-skit.md", kind: "file", run: vi.fn() },
+    ]);
+    palette.open();
+    type(document.querySelector<HTMLInputElement>(".palette-input")!, "skit");
+
+    expect(labels()).toEqual(["2026-11-26-codex-skit.md"]);
+    expect(document.querySelector(".palette-detail")?.textContent).toBe("docs/prompts");
+    expect(document.querySelector(".palette-hit")).not.toBeNull();
+  });
+
+  it("marks a pasted exact path and opens it at a pasted line", () => {
+    const run = vi.fn();
+    const openAt = vi.fn();
+    const palette = createPalette(() => [
+      { id: "a", label: "docs/prompts/2026-11-26-codex-skit.md", kind: "file", run, openAt },
+      { id: "b", label: "docs/prompts/2026-11-26-codex-skit.md.bak", kind: "file", run: vi.fn() },
+    ], { folder: () => "/x/proj" });
+    palette.open();
+    const input = document.querySelector<HTMLInputElement>(".palette-input")!;
+    type(input, "/x/proj/docs/prompts/2026-11-26-codex-skit.md:42");
+
+    expect(document.querySelector(".palette-row.active .palette-badge")?.textContent).toBe("exact");
+    expect(document.querySelector(".palette-heading")?.textContent).toBe("Files · opens at line 42");
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(openAt).toHaveBeenCalledWith(42);
+    expect(run).not.toHaveBeenCalled();
+  });
 });

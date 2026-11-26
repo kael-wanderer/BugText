@@ -75,6 +75,7 @@ All notable changes to BugText (formerly mdFlow) are documented here. The format
   and Later; discarded drafts can be brought back for seven days or undone from a toast.
 
 ### Changed
+- ⌘K palette file results show the file name first in bold, with matched letters highlighted and the folder dimmed after it, so a long path no longer hides the name. An exact path or file name comes first (an exact path is marked *exact*), then names that start with the query, then fuzzy matches; spaces in the query are ignored. A pasted path may start with `./` or the open folder's full path and end in `:line`, which opens the file at that line.
 - The window title names what the window shows: `file — folder` (the workspace name when one is open, `●` before the file when it has unsaved changes, the folder alone when no file is open). Two BugText windows now appear by name in the Dock menu and the Window menu instead of both as "BugText".
 - Automatic update checks announce a new version once, as a notice with Download, instead of a dialog at launch.
 - Builds are signed with the stable local identity "BugText Local Dev" (`npm run build:app`, which sets `APPLE_SIGNING_IDENTITY`), so after an update the macOS Keychain keeps "Always Allow" for saved API keys instead of asking for the login password again. The first build signed this way asks once per saved key.

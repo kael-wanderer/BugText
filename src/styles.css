@@ -3192,6 +3192,39 @@ body.resizing-ai {
   white-space: nowrap;
 }
 
+/* File rows: the name first and never cut before the folder; the folder loses its start. */
+.palette-row .palette-label.palette-file-name {
+  flex: 0 1 auto;
+  max-width: 70%;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.palette-hit {
+  color: var(--accent);
+}
+
+.palette-detail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.9em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.palette-badge {
+  flex: none;
+  padding: 0 7px;
+  color: var(--accent);
+  font-size: 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 8px;
+}
+
 /* Chat-only AI panel; the compose area survives settings changes. */
 #activities .ab-btn[hidden],
 #ab-ai[hidden] {

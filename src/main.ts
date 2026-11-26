@@ -1107,6 +1107,7 @@ function fileItems(): PaletteItem[] {
     label: relativePath,
     kind: "file",
     run: () => void doOpenPath(joinPath(folder, relativePath)),
+    openAt: line => void doOpenPath(joinPath(folder, relativePath)).then(() => activeView().jumpToLine(line)),
   }));
 }
 
@@ -1114,7 +1115,7 @@ const palette = createPalette(() => [
   ...fileItems(),
   ...outlineItems(),
   ...commandItems(),
-]);
+], { folder: () => getState().folder });
 
 let lastMarkdownFocus: { windowId: string; tabId: string } | null = null;
 
