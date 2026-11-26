@@ -17,7 +17,7 @@ import {
   revealInFinder,
 } from "./filesys";
 import { isFileOpBusy, runExclusiveFileOp } from "./file-op-guard";
-import { joinPath, parentPath } from "./paths";
+import { joinPath, parentPath, relativePath } from "./paths";
 import { getState, refreshDir, setState, subscribe } from "./store";
 import {
   findNode,
@@ -579,7 +579,13 @@ function createRow(node: TreeNode, depth: number): HTMLElement {
 
   const name = document.createElement("span");
   name.className = "tree-name";
-  name.textContent = node.name;
+  appendMiddleEllipsisName(name, node.name, !node.isDir);
+  row.addEventListener("mouseenter", () => {
+    // The full path only when the name is cut off.
+    const cut = [...name.children].some(part => (part as HTMLElement).scrollWidth > (part as HTMLElement).clientWidth) || name.scrollWidth > name.clientWidth;
+    const folder = getState().folder;
+    if (cut) row.title = folder ? relativePath(folder, node.path) : node.path; else row.removeAttribute("title");
+  });
 
   if (node.isDir) {
     row.append(caret, name);
@@ -759,4 +765,20 @@ export function setExplorerNotice(text: string | null): void {
   let notice = tree.parentElement?.querySelector<HTMLElement>(".explorer-notice");
   if (!notice && text) { notice = document.createElement("p"); notice.className = "explorer-notice"; notice.setAttribute("role", "status"); tree.after(notice); }
   if (notice) { notice.textContent = text ?? ""; notice.hidden = !text; }
+}
+
+/**
+ * A long file name keeps its end (`…-skit.md`) visible: the head shrinks with an ellipsis,
+ * the tail (last ~10 characters, extension included) never does. textContent stays the full name.
+ */
+export function appendMiddleEllipsisName(target: HTMLElement, name: string, isFile: boolean): void {
+  if (!isFile || name.length <= 16) { target.textContent = name; return; }
+  const tailLength = Math.min(10, Math.floor(name.length / 2));
+  const head = document.createElement("span");
+  head.className = "tree-name-head";
+  head.textContent = name.slice(0, name.length - tailLength);
+  const tail = document.createElement("span");
+  tail.className = "tree-name-tail";
+  tail.textContent = name.slice(name.length - tailLength);
+  target.replaceChildren(head, tail);
 }
