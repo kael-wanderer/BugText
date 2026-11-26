@@ -1,5 +1,6 @@
 import { searchEmpty } from "./empty-states/views";
-import { createSearchPreview } from "./search-preview";
+import { createSearchPreview, resolveHitLine } from "./search-preview";
+import { looksLikePath, searchFileMatches, type FileMatches } from "./search-files";
 import {
   searchInFolder,
   type SearchHit,
@@ -28,7 +29,12 @@ export type SearchPanelDeps = {
   index?: LinkIndex;
   previewReplace?: (query: string, replacement: string, options: SearchOptions, files: string[]) => Promise<ReplacePreview>;
   onReplacePreview?: (preview: ReplacePreview, query: string, replacement: string, options: SearchOptions) => void;
-  onOpenHit: (path: string, line: number, page?: number) => void;
+  /** `match` is the matched text, selected on the line after opening. */
+  onOpenHit: (path: string, line: number, page?: number, match?: string) => void;
+  /** Opens a folder-relative path, confined to the folder; works for files the scan left out. */
+  onOpenFile?: (relative: string) => void;
+  /** Shows every file match, in the palette. */
+  onShowAllFiles?: (query: string) => void;
   readPreview?: (path: string) => Promise<string>;
   onOpenBeside?: (path: string, line: number, page?: number) => void;
 };
@@ -75,6 +81,37 @@ export function createSearchPanel(
   const previewHost = document.createElement("section"); previewHost.className = "search-preview"; previewHost.hidden = true; host.append(previewHost);
   const preview = createSearchPreview(previewHost, { read: deps.readPreview, open: deps.onOpenHit, openBeside: deps.onOpenBeside });
   let selectedKey = ""; const hitKey = (hit: SearchHit) => `${hit.path}:${hit.page ?? ""}:${hit.line}`;
+  // Outside Replace, rows open on one click; `selectedKey` is the keyboard selection, `lastOpenedKey` marks where you left off.
+  let fileMatches: FileMatches = { query: "", rows: [], total: 0 };
+  let lastOpenedKey = "", lastQuery = "";
+  const openers = new Map<string, () => void>();
+  const rowKeys = (): string[] => [...results.querySelectorAll<HTMLElement>("[data-row-key]")].map(row => row.dataset.rowKey!);
+  const currentKey = (): string => { const keys = rowKeys(); return keys.includes(selectedKey) ? selectedKey : keys[0] ?? ""; };
+  function markSelection(): void {
+    const key = replaceOpen ? "" : currentKey();
+    for (const row of results.querySelectorAll<HTMLElement>("[data-row-key]")) {
+      row.classList.toggle("selected", row.dataset.rowKey === key);
+      row.classList.toggle("last-opened", row.dataset.rowKey === lastOpenedKey);
+    }
+  }
+  function openKey(key: string): boolean {
+    const open = openers.get(key); if (!open) return false;
+    selectedKey = key; lastOpenedKey = key; markSelection(); open(); return true;
+  }
+  function moveSelection(step: number): void {
+    const keys = rowKeys(); if (!keys.length) return;
+    const index = keys.indexOf(currentKey());
+    selectedKey = keys[Math.max(0, Math.min(keys.length - 1, index + step))];
+    markSelection();
+    [...results.querySelectorAll<HTMLElement>("[data-row-key]")].find(row => row.dataset.rowKey === selectedKey)?.scrollIntoView?.({ block: "nearest" });
+  }
+  async function openHit(hit: SearchHit, match: string): Promise<void> {
+    if (hit.page || !deps.readPreview) { deps.onOpenHit(hit.path, hit.line, hit.page, match); return; }
+    let line: number | null = null;
+    try { line = resolveHitLine(await deps.readPreview(hit.path), hit); } catch { line = null; }
+    if (line === null) { message = "This result changed since the search. Search again to open it."; render(lastQuery); return; }
+    deps.onOpenHit(hit.path, line, undefined, match);
+  }
   let state = new SearchRun();
   let timer: number | undefined;
   let token = 0;
@@ -104,26 +141,31 @@ export function createSearchPanel(
     for (const text of state.notes) {
       const note = document.createElement("div"); note.className = "search-note"; note.textContent = text; notes.append(note);
     }
-    if (state.skipped.length) {
-      const details = document.createElement("details"); details.className = "search-note";
-      const summary = document.createElement("summary"); summary.textContent = `${state.skipped.length} file${state.skipped.length === 1 ? "" : "s"} skipped`; details.append(summary);
-      const list = document.createElement("ul");
-      const reasons: Record<string, string> = { too_large: "over 2 MB", not_text: "not text", unreadable: "couldn't read", pdf: "PDF couldn't be opened" };
-      for (const skipped of state.skipped.slice(0, 50)) { const item = document.createElement("li"); item.textContent = `${skipped.relative} — ${reasons[skipped.reason] ?? skipped.reason}`; list.append(item); }
-      if (state.skipped.length > 50) { const item = document.createElement("li"); item.textContent = `and ${state.skipped.length - 50} more`; list.append(item); }
-      details.append(list); notes.append(details);
-    }
+    openers.clear();
+    if (!replaceOpen && fileMatches.rows.length) results.append(filesGroup());
     const groups = new Map<string, SearchHit[]>();
     const allowed = new Set(filterByGlobs(state.hits.map(hit => hit.relative), include.value, exclude.value));
     for (const hit of state.hits) { if (replaceOpen && !allowed.has(hit.relative)) continue; const list = groups.get(hit.relative); if (list) list.push(hit); else groups.set(hit.relative, [hit]); }
     status.textContent = state.statusFor([...groups.values()].flat());
+    if (!replaceOpen && groups.size) {
+      const heading = document.createElement("div"); heading.className = "search-section";
+      heading.textContent = "In files"; results.append(heading);
+    }
     for (const [relative, fileHits] of groups) {
       const group = document.createElement("div");
       group.className = "search-group";
-      const head = document.createElement("div");
+      const head = document.createElement(replaceOpen ? "div" : "button");
       head.className = "search-file";
-      head.textContent = `${relative}  ${fileHits.length}`;
       head.title = relative;
+      appendFileName(head, relative, []);
+      const count = document.createElement("span"); count.className = "search-count"; count.textContent = String(fileHits.length); head.append(count);
+      if (!replaceOpen) {
+        (head as HTMLButtonElement).type = "button";
+        const key = `head:${relative}`; head.dataset.rowKey = key;
+        const first = fileHits[0];
+        openers.set(key, () => void openHit(first, matchedText(first, query)));
+        head.addEventListener("click", () => openKey(key));
+      }
       group.appendChild(head);
       for (const hit of fileHits) {
         const row = document.createElement("button");
@@ -160,27 +202,97 @@ export function createSearchPanel(
         }
         snippet.append(after);
         row.append(ln, snippet);
-        row.dataset.hitKey = hitKey(hit); row.setAttribute("aria-pressed", String(selectedKey === hitKey(hit)));
-        const select = () => { selectedKey = hitKey(hit); for (const other of results.querySelectorAll(".search-hit")) other.setAttribute("aria-pressed", String((other as HTMLElement).dataset.hitKey === selectedKey)); void preview.show(hit); };
-        row.addEventListener("click", select);
-        row.addEventListener("dblclick", () => void preview.open(hit));
-        row.addEventListener("keydown", event => {
-          if (event.key === "Enter") { event.preventDefault(); void preview.open(hit); }
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const rows = [...results.querySelectorAll<HTMLButtonElement>(".search-hit")]; const next = rows[rows.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1)]; next?.focus(); next?.click(); }
-        });
+        row.dataset.hitKey = hitKey(hit);
+        if (replaceOpen) {
+          // Replace reviews each change in the excerpt box before anything is written.
+          row.setAttribute("aria-pressed", String(selectedKey === hitKey(hit)));
+          const select = () => { selectedKey = hitKey(hit); for (const other of results.querySelectorAll(".search-hit")) other.setAttribute("aria-pressed", String((other as HTMLElement).dataset.hitKey === selectedKey)); void preview.show(hit); };
+          row.addEventListener("click", select);
+          row.addEventListener("dblclick", () => void preview.open(hit));
+          row.addEventListener("keydown", event => {
+            if (event.key === "Enter") { event.preventDefault(); void preview.open(hit); }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const rows = [...results.querySelectorAll<HTMLButtonElement>(".search-hit")]; const next = rows[rows.indexOf(row) + (event.key === "ArrowDown" ? 1 : -1)]; next?.focus(); next?.click(); }
+          });
+        } else {
+          const key = `hit:${hitKey(hit)}`; row.dataset.rowKey = key;
+          const match = hit.snippet.slice(highlighted.start, highlighted.end);
+          openers.set(key, () => void openHit(hit, match));
+          row.addEventListener("click", () => openKey(key));
+        }
         group.appendChild(row);
       }
       results.appendChild(group);
     }
-    if ((state.phase === "done" || state.phase === "stopped") && query.length >= 2 && groups.size === 0) {
+    const skipped = state.skipped.filter(item => item.reason !== "not_text");
+    if (skipped.length) {
+      const details = document.createElement("details"); details.className = "search-note search-skipped";
+      const summary = document.createElement("summary"); summary.textContent = `${skipped.length} file${skipped.length === 1 ? "" : "s"} not searched`; details.append(summary);
+      const list = document.createElement("ul");
+      const reasons: Record<string, string> = { too_large: "over 2 MB", unreadable: "couldn't read", pdf: "PDF couldn't be opened" };
+      for (const item of skipped.slice(0, 50)) { const li = document.createElement("li"); li.textContent = `${item.relative} — ${reasons[item.reason] ?? item.reason}`; list.append(li); }
+      if (skipped.length > 50) { const li = document.createElement("li"); li.textContent = `and ${skipped.length - 50} more`; list.append(li); }
+      details.append(list); results.append(details);
+    }
+    if ((state.phase === "done" || state.phase === "stopped") && query.length >= 2 && groups.size === 0 && (replaceOpen || !fileMatches.rows.length)) {
       results.append(searchEmpty(query, replaceOpen && !!(include.value.trim() || exclude.value.trim()), () => { include.value = ""; exclude.value = ""; void run(); }, () => { input.value = ""; cancel(); state = new SearchRun(); render(""); }));
       // The empty state already says there are no matches.
       if (state.phase === "done") status.textContent = "";
     }
     results.scrollTop = scrollTop;
-    if (selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
+    markSelection();
+    if (replaceOpen && selectedKey && state.phase === "done" && ![...results.querySelectorAll<HTMLElement>(".search-hit")].some(row => row.dataset.hitKey === selectedKey)) {
       const first = results.querySelector<HTMLButtonElement>(".search-hit"); if (first) first.click(); else { selectedKey = ""; preview.clear(); }
     }
+  }
+
+  function matchedText(hit: SearchHit, query: string): string {
+    const found = firstSearchMatch(hit.snippet, query, options);
+    return found ? hit.snippet.slice(found.start, found.end) : hit.snippet.slice(hit.match_start, hit.match_end);
+  }
+
+  function appendFileName(target: HTMLElement, relative: string, hits: number[]): void {
+    const slash = relative.lastIndexOf("/");
+    const name = document.createElement("span"); name.className = "search-file-name";
+    const marked = new Set(hits); let plain = "";
+    const text = relative.slice(slash + 1);
+    for (let i = 0; i < text.length; i++) {
+      if (!marked.has(i)) { plain += text[i]; continue; }
+      if (plain) { name.append(plain); plain = ""; }
+      const hit = document.createElement("span"); hit.className = "search-name-hit"; hit.textContent = text[i]; name.append(hit);
+    }
+    if (plain) name.append(plain);
+    target.append(name);
+    if (slash > 0) { const dir = document.createElement("span"); dir.className = "search-file-dir"; dir.textContent = relative.slice(0, slash); target.append(dir); }
+  }
+
+  function filesGroup(): HTMLElement {
+    const group = document.createElement("div"); group.className = "search-files";
+    const heading = document.createElement("div"); heading.className = "search-section";
+    heading.textContent = `Files · ${fileMatches.total}`; group.append(heading);
+    for (const file of fileMatches.rows) {
+      const row = document.createElement("button"); row.type = "button"; row.className = "search-file-match";
+      row.title = file.path;
+      const key = `file:${file.path}`; row.dataset.rowKey = key;
+      appendFileName(row, file.path, file.hits);
+      if (file.exact) { const badge = document.createElement("span"); badge.className = "search-exact"; badge.textContent = "exact"; row.append(badge); }
+      openers.set(key, () => deps.onOpenFile?.(file.path));
+      row.addEventListener("click", () => openKey(key));
+      group.append(row);
+    }
+    if (fileMatches.total > fileMatches.rows.length && deps.onShowAllFiles) {
+      const all = document.createElement("button"); all.type = "button"; all.className = "search-show-all";
+      all.textContent = `Show all ${fileMatches.total} in ⌘K`;
+      all.addEventListener("click", () => deps.onShowAllFiles?.(fileMatches.query));
+      group.append(all);
+    }
+    return group;
+  }
+
+  /** Enter outside Replace: open the selected row, else the first; a pasted path the scan left out still opens. */
+  function openSelected(): void {
+    if (openKey(currentKey())) return;
+    const query = fileMatches.query || input.value.trim();
+    if (query && looksLikePath(query) && deps.onOpenFile) deps.onOpenFile(query);
   }
 
   async function run(): Promise<void> {
@@ -189,12 +301,16 @@ export function createSearchPanel(
     const folder = deps.getFolder();
     const query = input.value.trim();
     state = new SearchRun(); progress.hidden = true; results.replaceChildren(); notes.replaceChildren(); input.removeAttribute("aria-invalid");
+    if (query !== lastQuery) { selectedKey = ""; lastOpenedKey = ""; lastQuery = query; }
+    fileMatches = { query: "", rows: [], total: 0 };
     if (!folder) { groupValid = false; updateButton(); status.textContent = "Open a folder to search its files."; return; }
     if (query.length < (replaceOpen ? 1 : 2)) { groupValid = false; updateButton(); status.textContent = query ? "Type at least 2 characters." : ""; return; }
     groupValid = false; groupError.textContent = ""; message = "";
     const ops = parseSearchOperators(query);
     const useOperators = !replaceOpen && hasOperators(ops) && !!deps.index;
     const textQuery = useOperators ? ops.text : query;
+    // File names match at once from the list in memory, before the content search answers.
+    if (!replaceOpen && !options.regex && !useOperators) fileMatches = searchFileMatches(query, deps.getFiles(), folder);
     state.phase = "text"; render(textQuery);
     if (replaceOpen) {
       try { await invoke("replace_check_groups", { query, options: { ...options }, replacement: replacement.value }); if (current !== token) return; groupValid = true; }
@@ -255,10 +371,21 @@ export function createSearchPanel(
     timer = window.setTimeout(() => void run(), 250);
   });
   input.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      window.clearTimeout(timer);
-      void run();
+    if (replaceOpen) {
+      if (event.key === "Enter") { window.clearTimeout(timer); void run(); }
+      return;
     }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); moveSelection(event.key === "ArrowDown" ? 1 : -1); return; }
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    // A query typed or pasted just now hasn't run yet; run() fills the Files group before its first await.
+    if (input.value.trim() !== lastQuery) { window.clearTimeout(timer); void run(); }
+    openSelected();
+  });
+  results.addEventListener("keydown", event => {
+    if (replaceOpen || (event.key !== "ArrowDown" && event.key !== "ArrowUp")) return;
+    event.preventDefault(); moveSelection(event.key === "ArrowDown" ? 1 : -1);
+    results.querySelector<HTMLElement>(".selected")?.focus();
   });
   host.querySelectorAll<HTMLButtonElement>(".search-option").forEach((button) => {
     button.addEventListener("click", () => {

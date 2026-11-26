@@ -3,6 +3,15 @@ export function excerptLines(source: string, line: number, radius = 3) {
   const lines = source.slice(0, 2_000_000).split(/\r?\n/); const index = Math.max(0, Math.min(lines.length - 1, line - 1));
   return { lines: lines.slice(Math.max(0, index - radius), index + radius + 1).map((text, i) => ({ line: Math.max(0, index - radius) + i + 1, text: text.slice(0, 1000) })), truncated: source.length > 2_000_000 };
 }
+/** The hit's line in the file as it is now, or null when the hit moved and can't be found once. */
+export function resolveHitLine(source: string, hit: Pick<SearchHit, "line" | "snippet">): number | null {
+  const all = source.slice(0, 2_000_000).split(/\r?\n/);
+  const needle = hit.snippet.trim();
+  if (all[hit.line - 1]?.includes(needle)) return hit.line;
+  const candidates = needle ? all.flatMap((text, i) => text.includes(needle) ? [i + 1] : []) : [];
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
 export function createSearchPreview(host: HTMLElement, deps: { read?: (path: string) => Promise<string>; open: (path: string, line: number, page?: number) => void; openBeside?: (path: string, line: number, page?: number) => void }) {
   let token = 0;
   async function show(hit: SearchHit) {
@@ -14,11 +23,8 @@ export function createSearchPreview(host: HTMLElement, deps: { read?: (path: str
       if (hit.page || !deps.read) body.textContent = hit.snippet;
       else {
         const source = await deps.read(hit.path); if (current !== token) return;
-        const all = source.slice(0, 2_000_000).split(/\r?\n/);
-        if (!all[line - 1]?.includes(hit.snippet.trim())) {
-          const needle = hit.snippet.trim(); const candidates = needle ? all.flatMap((text, i) => text.includes(needle) ? [i + 1] : []) : [];
-          if (candidates.length === 1) line = candidates[0]; else stale = true;
-        }
+        const resolved = resolveHitLine(source, hit);
+        if (resolved === null) stale = true; else line = resolved;
         const excerpt = excerptLines(source, line); body.replaceChildren();
         const matched = hit.snippet.slice(hit.match_start, hit.match_end);
         for (const entry of excerpt.lines) {

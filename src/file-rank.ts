@@ -6,6 +6,8 @@ export type FileQuery = { query: string; line: number | null };
 export type RankedFile = {
   path: string;
   exact: boolean;
+  /** Matched by the file name (exact path, exact name, name prefix or fuzzy name), not only by the folders. */
+  byName: boolean;
   /** Indices into the file name (the last path segment) to highlight. */
   hits: number[];
 };
@@ -51,29 +53,29 @@ function fuzzy(query: string, text: string): { score: number; hits: number[] } |
 const range = (from: number, length: number): number[] => Array.from({ length }, (_, i) => from + i);
 
 export function rankFiles(query: string, paths: readonly string[]): RankedFile[] {
-  if (!query) return paths.map(path => ({ path, exact: false, hits: [] }));
+  if (!query) return paths.map(path => ({ path, exact: false, byName: false, hits: [] }));
   const lower = query.toLowerCase();
   const scored: { file: RankedFile; tier: number; score: number }[] = [];
   for (const path of paths) {
     const name = fileName(path);
     const nameLower = name.toLowerCase();
     if (path.toLowerCase() === lower) {
-      scored.push({ file: { path, exact: true, hits: range(0, name.length) }, tier: 0, score: 0 });
+      scored.push({ file: { path, exact: true, byName: true, hits: range(0, name.length) }, tier: 0, score: 0 });
     } else if (nameLower === lower) {
-      scored.push({ file: { path, exact: false, hits: range(0, name.length) }, tier: 1, score: 0 });
+      scored.push({ file: { path, exact: false, byName: true, hits: range(0, name.length) }, tier: 1, score: 0 });
     } else if (nameLower.startsWith(lower)) {
-      scored.push({ file: { path, exact: false, hits: range(0, lower.length) }, tier: 2, score: -name.length });
+      scored.push({ file: { path, exact: false, byName: true, hits: range(0, lower.length) }, tier: 2, score: -name.length });
     } else {
       const byName = fuzzy(query, name);
       if (byName) {
-        scored.push({ file: { path, exact: false, hits: byName.hits }, tier: 3, score: byName.score });
+        scored.push({ file: { path, exact: false, byName: true, hits: byName.hits }, tier: 3, score: byName.score });
         continue;
       }
       const byPath = fuzzy(query, path);
       if (!byPath) continue;
       const nameStart = path.length - name.length;
       const hits = byPath.hits.filter(i => i >= nameStart).map(i => i - nameStart);
-      scored.push({ file: { path, exact: false, hits }, tier: 4, score: byPath.score });
+      scored.push({ file: { path, exact: false, byName: false, hits }, tier: 4, score: byPath.score });
     }
   }
   scored.sort((a, b) => a.tier - b.tier || b.score - a.score || a.file.path.localeCompare(b.file.path));

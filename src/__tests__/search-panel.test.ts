@@ -33,10 +33,10 @@ describe("search panel", () => {
     expect(host.textContent).toContain("new.md"); expect(host.textContent).not.toContain("old.md");
   });
   it("shows invalid patterns and skipped-file overflow", async () => {
-    mocks.invoke.mockImplementation((command: string) => command !== "search_in_folder" ? Promise.resolve() : Promise.resolve({ ...result("a.md"), skipped: Array.from({ length: 52 }, (_, i) => ({ relative: `file${i}`, reason: "not_text" })) }));
+    mocks.invoke.mockImplementation((command: string) => command !== "search_in_folder" ? Promise.resolve() : Promise.resolve({ ...result("a.md"), skipped: [...Array.from({ length: 52 }, (_, i) => ({ relative: `file${i}`, reason: "too_large" })), { relative: "x.pyc", reason: "not_text" }] }));
     const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit: () => {} });
     const input = host.querySelector("input")!; input.value = "hello"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
-    expect(host.textContent).toContain("52 files skipped"); expect(host.textContent).toContain("and 2 more");
+    expect(host.textContent).toContain("52 files not searched"); expect(host.textContent).toContain("and 2 more"); expect(host.textContent).not.toContain("x.pyc");
     mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.reject("unclosed group") : Promise.resolve());
     host.querySelector<HTMLButtonElement>('[data-option="regex"]')!.click(); await flush();
     expect(host.textContent).toContain("Invalid regular expression"); expect(input.getAttribute("aria-invalid")).toBe("true");
@@ -106,4 +106,68 @@ it("counts only the results the file filters keep", async () => {
   expect(host.textContent).toContain("narrowing this search");
   expect(host.textContent).not.toContain("1 result in 1 file");
   expect(host.textContent).not.toContain("No results"); // the empty state says it once
+});
+
+describe("search panel as a list to act on", () => {
+  beforeEach(() => { mocks.invoke.mockReset(); mocks.pdf.mockReset(); });
+  const files = ["docs/superpowers/prompts/2026-11-26-codex-skit.md", "docs/plans/codex-skit-notes.md", "README.md"];
+
+  it("opens a pasted exact path on Enter while content search is still running", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? new Promise(() => {}) : Promise.resolve());
+    const onOpenFile = vi.fn();
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => files, onOpenHit: () => {}, onOpenFile });
+    const input = host.querySelector("input")!;
+    input.value = "docs/superpowers/prompts/2026-11-26-codex-skit.md"; input.dispatchEvent(new Event("input"));
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(onOpenFile).toHaveBeenCalledWith("docs/superpowers/prompts/2026-11-26-codex-skit.md");
+    expect(host.querySelector(".search-file-match .search-exact")?.textContent).toBe("exact");
+    expect(host.querySelector(".search-file-match.last-opened")).not.toBeNull();
+  });
+
+  it("opens an absolute path inside the folder that the scan left out", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? new Promise(() => {}) : Promise.resolve());
+    const onOpenFile = vi.fn();
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => files, onOpenHit: () => {}, onOpenFile });
+    const input = host.querySelector("input")!;
+    input.value = "/a/build/report.md"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(onOpenFile).toHaveBeenCalledWith("build/report.md");
+  });
+
+  it("matches file names for plain words and keeps the selection when content hits arrive", async () => {
+    let answer!: (value: ReturnType<typeof result>) => void;
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? new Promise(r => { answer = r; }) : Promise.resolve());
+    const onOpenFile = vi.fn();
+    const host = document.createElement("div"); createSearchPanel(host, { getFolder: () => "/a", getFiles: () => files, onOpenHit: () => {}, onOpenFile });
+    const input = host.querySelector("input")!;
+    input.value = "codex skit"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect([...host.querySelectorAll(".search-file-match .search-file-name")].map(n => n.textContent)).toEqual(["codex-skit-notes.md", "2026-11-26-codex-skit.md"]);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" })); await flush();
+    answer(result("notes/today.md")); await flush();
+    expect(host.querySelector(".selected")?.textContent).toContain("2026-11-26-codex-skit.md");
+    expect(host.querySelector(".search-hit")).not.toBeNull();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    expect(onOpenFile).toHaveBeenCalledWith("docs/superpowers/prompts/2026-11-26-codex-skit.md");
+  });
+
+  it("opens a content hit on one click at its current line with the match", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("a.md")) : Promise.resolve());
+    const onOpenHit = vi.fn();
+    const host = document.createElement("div");
+    createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit, readPreview: async () => "new first line\nhello" });
+    const input = host.querySelector("input")!; input.value = "hello"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
+    host.querySelector<HTMLButtonElement>(".search-hit")!.click(); await flush();
+    expect(onOpenHit).toHaveBeenCalledWith("/a/a.md", 2, undefined, "hello");
+    expect(host.querySelector(".search-preview:not([hidden])")).toBeNull();
+  });
+
+  it("says so instead of opening a hit that is gone", async () => {
+    mocks.invoke.mockImplementation((command: string) => command === "search_in_folder" ? Promise.resolve(result("a.md")) : Promise.resolve());
+    const onOpenHit = vi.fn();
+    const host = document.createElement("div");
+    createSearchPanel(host, { getFolder: () => "/a", getFiles: () => [], onOpenHit, readPreview: async () => "nothing here" });
+    const input = host.querySelector("input")!; input.value = "hello"; input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); await flush();
+    host.querySelector<HTMLButtonElement>(".search-hit")!.click(); await flush();
+    expect(onOpenHit).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("This result changed since the search");
+  });
 });
