@@ -47,3 +47,14 @@ describe("rankFiles", () => {
     expect(rankFiles("", paths)).toHaveLength(paths.length);
   });
 });
+
+describe("lineMatchRange", async () => {
+  const { lineMatchRange } = await import("../line-match");
+  it("finds the match on the given line", () => {
+    expect(lineMatchRange("one\ntwo hello\nthree", 2, "hello")).toEqual({ from: 8, to: 13 });
+  });
+  it("is null when the line no longer has it", () => {
+    expect(lineMatchRange("one\ntwo", 2, "hello")).toBeNull();
+    expect(lineMatchRange("one", 5, "one")).toBeNull();
+  });
+});

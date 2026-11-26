@@ -17,7 +17,7 @@ export type PaletteProvider = () => PaletteItem[];
 export function createPalette(
   provider: PaletteProvider,
   options: { folder?: () => string | null } = {},
-): { open: () => void } {
+): { open: (query?: string) => void } {
   const overlay = document.createElement("div");
   overlay.id = "palette";
   overlay.className = "palette hidden";
@@ -159,9 +159,9 @@ export function createPalette(
   });
 
   return {
-    open: () => {
+    open: (query = "") => {
       items = provider();
-      input.value = "";
+      input.value = query;
       overlay.classList.remove("hidden");
       refilter();
       input.focus();

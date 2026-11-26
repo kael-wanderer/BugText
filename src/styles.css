@@ -394,7 +394,10 @@ body.resizing-panes {
   user-select: none;
 }
 
-body.resizing-panes iframe {
+/* An HTML or PDF preview frame would swallow the drag once the pointer is over it. */
+body.resizing-panes iframe,
+body.resizing-explorer iframe,
+body.resizing-ai iframe {
   pointer-events: none;
 }
 
@@ -1034,16 +1037,119 @@ body.search-active #search-panel {
 }
 
 .search-group {
+  padding: 4px 0;
+}
+
+/* A line between files so one file's hits don't run into the next. */
+.search-group + .search-group {
+  border-top: 1px solid var(--border);
+}
+
+.search-file,
+.search-file-match {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 12px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+}
+
+button.search-file,
+.search-file-match {
+  cursor: pointer;
+}
+
+button.search-file:hover,
+.search-file-match:hover {
+  background: var(--selection);
+}
+
+.search-file-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.search-name-hit {
+  color: var(--accent);
+}
+
+/* The folder loses its start, never the file name. */
+.search-file-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.search-count {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-exact {
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  color: var(--accent);
+  font-size: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 8px;
+}
+
+.search-section {
+  padding: 8px 12px 3px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.search-files {
   margin-bottom: 6px;
 }
 
-.search-file {
-  padding: 3px 12px;
-  color: var(--muted);
+.search-show-all {
+  padding: 3px 12px 3px 14px;
+  color: var(--accent);
+  font: inherit;
   font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.search-results .selected {
+  background: var(--selection);
+}
+
+/* Where you left off after opening a result. */
+.search-results .last-opened {
+  border-left-color: var(--accent);
+}
+
+.search-skipped {
+  margin-top: 8px;
 }
 
 .search-hit {
@@ -1057,6 +1163,7 @@ body.search-active #search-panel {
   text-align: left;
   background: transparent;
   border: 0;
+  border-left: 2px solid transparent;
   cursor: pointer;
 }
 
@@ -1077,9 +1184,11 @@ body.search-active #search-panel {
   text-overflow: ellipsis;
 }
 
+/* Matched text reads as the theme's accent colour, not as a pale block. */
 .search-snippet mark {
-  color: inherit;
-  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-radius: 2px;
 }
 

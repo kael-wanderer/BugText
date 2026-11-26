@@ -120,6 +120,7 @@ import {
 import { runExclusiveFileOp } from "./file-op-guard";
 import { createPalette, type PaletteItem } from "./palette";
 import { windowTitle } from "./window-title";
+import { lineMatchRange } from "./line-match";
 import { openBinaryHistoryPanel, openHistoryPanel } from "./historyview";
 import { markdownOutline } from "./outline";
 import { addRecent, loadRecent, saveRecent } from "./recent";
@@ -3771,7 +3772,7 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
   index: linkIndex,
   previewReplace: async (query, replacement, options, files) => (await getReplaceFlow()).preview(query, replacement, options, files),
   onReplacePreview: (preview, query, replacement, options) => { void getReplaceFlow().then(flow => flow.show(preview, query, replacement, options)); },
-  onOpenHit: (path, line, page) => {
+  onOpenHit: (path, line, page, match) => {
     void doOpenPath(path).then(() => {
       const tab = activeMeta();
       const name = tab?.path ?? tab?.name ?? "";
@@ -3780,10 +3781,23 @@ const searchPanel = createSearchPanel(document.getElementById("search-panel")!, 
         return;
       }
       if (tab && !isPdfFile(name)) {
-        activeView().editor.gotoLine(line);
+        const view = activeView().editor;
+        view.gotoLine(line);
+        const range = match ? lineMatchRange(view.getText(tab.id), line, match) : null;
+        if (range) view.selectRange(range.from, range.to);
       }
     });
   },
+  onOpenFile: relative => {
+    const folder = getState().folder;
+    if (!folder) return;
+    // Confined to the folder, so a pasted path the scan left out still opens only when it is inside.
+    void doOpenPath(joinPath(folder, relative), getState().activeWindowId, false, folder).then(() => {
+      const tab = activeMeta();
+      if (tab?.path && !isPdfFile(tab.path)) activeView().editor.focus();
+    });
+  },
+  onShowAllFiles: query => palette.open(query),
 });
 
 let gitAvailable = false;
