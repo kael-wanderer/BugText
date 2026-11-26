@@ -46,6 +46,8 @@ import { hashText } from "../hash";
 import { type ChatMessage } from "./providers";
 import { contextTrimWarning } from "./context-budget";
 import { prepareCliAttachments } from "./attachments";
+import { openReplyLink, readReply, writeReply } from "./reply-markdown";
+import { openUrl } from "@tauri-apps/plugin-opener";
 export type AIPanelDeps = {
   getActions?(): RunnableAction[];
   runAction?(id: string): void;
@@ -149,6 +151,13 @@ export function createAIPanel(
   customModel.setAttribute("aria-label", "Custom chat model");
   picker.append(engineSelect, modelSelect, customModel);
   const messagesElement = element("div", "ai-messages");
+  // Links in a reply open a note inside the folder or the browser; they never navigate the app window.
+  messagesElement.addEventListener("click", (event) => {
+    const anchor = event.target instanceof Element ? event.target.closest(".ai-assistant a[href]") : null;
+    if (!anchor) return;
+    event.preventDefault();
+    openReplyLink(anchor.getAttribute("href") ?? "", deps.getWorkingDir(), deps.onOpenNote, (url) => { void openUrl(url).catch(() => {}); });
+  });
   messagesElement.setAttribute("aria-live", "polite");
   const inputRow = element("div", "ai-input-row");
   const attachments = element("div", "ai-attachments");
@@ -232,7 +241,8 @@ export function createAIPanel(
     .catch(() => { appendBubble("system", "Earlier chat could not be moved yet; it stays in place and is retried next launch."); return null; })
     .then(async value => { await switcher.init(value); contextReady = true; renderAttachments(); });
   function appendBubble(role: string, text: string): HTMLElement {
-    const bubble = element("div", `ai-bubble ai-${role}`, text);
+    const bubble = element("div", `ai-bubble ai-${role}`);
+    if (role === "assistant") writeReply(bubble, text); else bubble.textContent = text;
     messagesElement.append(bubble);
     messagesElement.scrollTop = messagesElement.scrollHeight;
     return bubble;
@@ -598,7 +608,7 @@ export function createAIPanel(
         built.messages,
         (chunk) => {
           reply += chunk;
-          if (replyElement) replyElement.textContent = reply.trimStart();
+          if (replyElement) writeReply(replyElement, reply.trimStart());
           messagesElement.scrollTop = messagesElement.scrollHeight;
         },
         {
@@ -728,7 +738,7 @@ export function createAIPanel(
       await runQuickAction(action, { ...actionDeps, onReplyDone, onContext: context => { actionContext = context; }, makeAbort: () => request,
         appendBubble(role, text) { const node = actionDeps.appendBubble(role, text); bubbles.push({ role, node }); return node; },
       });
-      const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && b.node.textContent).map(b => ({ role: b.role as "user" | "assistant", text: b.node.textContent!, time: Date.now(), ...(b.role === "assistant" ? { context: actionContext, ...(done ? { engine: done.model } : {}) } : {}) }));
+      const messages = bubbles.filter(b => (b.role === "user" || b.role === "assistant") && readReply(b.node)).map(b => ({ role: b.role as "user" | "assistant", text: readReply(b.node), time: Date.now(), ...(b.role === "assistant" ? { context: actionContext, ...(done ? { engine: done.model } : {}) } : {}) }));
       appendMeta();
       const disclosure = renderContextSent(actionContext, deps.onOpenNote); if (disclosure) messagesElement.append(disclosure);
       if (messages.some(m => m.role === "assistant")) {

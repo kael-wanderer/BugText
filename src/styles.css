@@ -2697,6 +2697,53 @@ body.no-folder .explorer-empty {
   background: var(--code-bg);
 }
 
+/* A reply rendered from Markdown: compact spacing for the narrow panel. */
+.ai-assistant.ai-md {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ai-md > :first-child { margin-top: 0; }
+.ai-md > :last-child { margin-bottom: 0; }
+.ai-md p,
+.ai-md ul,
+.ai-md ol,
+.ai-md pre,
+.ai-md blockquote,
+.ai-md table { margin: 0 0 8px; }
+.ai-md ul,
+.ai-md ol { padding-left: 18px; }
+.ai-md li + li { margin-top: 2px; }
+.ai-md h1,
+.ai-md h2,
+.ai-md h3,
+.ai-md h4,
+.ai-md h5,
+.ai-md h6 { margin: 10px 0 4px; font-size: 13px; font-weight: 600; }
+.ai-md code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--border-soft);
+}
+.ai-md pre {
+  padding: 8px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--border-soft);
+  white-space: pre;
+}
+.ai-md pre code { padding: 0; background: none; }
+.ai-md blockquote {
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}
+.ai-md table { border-collapse: collapse; display: block; overflow-x: auto; }
+.ai-md th,
+.ai-md td { padding: 2px 6px; border: 1px solid var(--border); }
+.ai-md a { color: var(--accent); }
+
 .ai-error {
   color: #e99;
   background: rgba(220, 80, 80, 0.15);

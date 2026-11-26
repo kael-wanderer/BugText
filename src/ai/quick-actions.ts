@@ -1,3 +1,4 @@
+import { writeReply } from "./reply-markdown";
 import type { ContextSent } from "./context-sent";
 import { isContextExcluded, exclusionMessage } from "./context-exclude";
 import type { AISettings, FeatureId } from "./aisettings";
@@ -163,7 +164,7 @@ export async function runQuickAction(
       built.messages,
       (chunk) => {
         reply += chunk;
-        bubble.textContent = reply.trimStart();
+        writeReply(bubble, reply.trimStart());
       },
       { write: false, folder: null, signal: abort.signal },
     );

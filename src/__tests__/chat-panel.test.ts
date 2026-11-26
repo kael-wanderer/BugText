@@ -349,3 +349,39 @@ it("refuses a prepared request while busy and reports an empty reply", async () 
   vi.mocked(streamChat).mockImplementationOnce(async () => { throw new Error("boom"); });
   expect(await panel.runPrepared(args)).toBe(false);
 });
+
+it("shows a chat reply as Markdown and keeps its source", async () => {
+  vi.mocked(streamChat).mockImplementationOnce(async (_row, _settings, _messages, onChunk) => onChunk("Use **TableNow**."));
+  createAIPanel(root, deps);
+  send();
+  await vi.waitFor(() => expect(root.querySelector(".ai-assistant strong")?.textContent).toBe("TableNow"));
+  await vi.waitFor(() => expect(root.textContent).toContain("Save as new note"));
+  Array.from(root.querySelectorAll("button")).find((b) => b.textContent === "Save as new note")!.click();
+  expect(deps.onNewNote).toHaveBeenCalledWith("Use **TableNow**.");
+  await vi.waitFor(() => expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ messages: expect.arrayContaining([expect.objectContaining({ role: "assistant", text: "Use **TableNow**." })]) })));
+});
+
+it("saves an Answer action's Markdown, not its rendered text", async () => {
+  vi.mocked(streamChat).mockImplementationOnce(async (_row, _settings, _messages, onChunk) => onChunk("- **one**"));
+  const panel = createAIPanel(root, deps);
+  await panel.runAction({ id: "custom", name: "Extract", instruction: "Extract tasks", input: "note", result: "answer", engine: null, panel: true }, {
+    getSettings: deps.getSettings, getClis: deps.getClis, getDoc: deps.getDoc,
+    reviewEdit: vi.fn(), appendBubble: panel.appendBubble, getWorkingDir: deps.getWorkingDir,
+    makeAbort: () => new AbortController(),
+  });
+  expect(root.querySelector(".ai-assistant li strong")?.textContent).toBe("one");
+  expect(writeConversation).toHaveBeenCalledWith("/notes", expect.objectContaining({ messages: expect.arrayContaining([
+    expect.objectContaining({ role: "assistant", text: "- **one**" }),
+  ]) }));
+});
+
+it("opens a note link in a reply inside BugText instead of navigating the window", async () => {
+  vi.mocked(streamChat).mockImplementationOnce(async (_row, _settings, _messages, onChunk) => onChunk("See [Kickoff](meetings/Kickoff.md)."));
+  createAIPanel(root, deps);
+  send();
+  const link = await vi.waitFor(() => { const a = root.querySelector<HTMLAnchorElement>(".ai-assistant a"); expect(a).not.toBeNull(); return a!; });
+  const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+  link.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  expect(deps.onOpenNote).toHaveBeenCalledWith("/notes/meetings/Kickoff.md");
+});
